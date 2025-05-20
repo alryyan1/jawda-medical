@@ -24,7 +24,7 @@ return new class extends Migration
             $table->decimal('percentage_wage', 8, 2);
             $table->boolean('use_static')->default(false);
             $table->boolean('approval')->default(false);
-
+            $table->timestamps(); // Optional: if you want to track when the contract was created/updated
             // No timestamps in original schema
             // $table->unique(['service_id', 'company_id']); // Optional: if a service-company pair should be unique
         });

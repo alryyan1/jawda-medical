@@ -20,6 +20,8 @@ return new class extends Migration
             $table->dateTime('closed_at')->nullable(); // `closed_at` datetime DEFAULT NULL
             $table->boolean('is_closed')->default(false); // `is_closed` tinyint(1) NOT NULL DEFAULT 0
             $table->boolean('pharmacy_entry')->nullable(); // `pharamacy_entry` tinyint(1) DEFAULT NULL (corrected spelling)
+            //user id
+            $table->foreignIdFor(App\Models\User::class, 'user_id')->constrained('users')->cascadeOnDelete();
             $table->timestamps(); // `created_at` and `updated_at`
         });
     }

@@ -2,9 +2,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\RoleResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Resources\UserResource;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -36,9 +38,6 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users,username',
             // 'email' => 'required|string|email|max:255|unique:users,email', // If using email
             'password' => ['required', 'confirmed', Password::defaults()],
-            'doctor_id' => 'nullable|exists:doctors,id',
-            'is_nurse' => 'required|boolean',
-            'user_money_collector_type' => ['required', Rule::in(['lab','company','clinic','all'])],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,name', // Validate that roles exist by name
         ]);
@@ -48,9 +47,9 @@ class UserController extends Controller
             'username' => $validatedData['username'],
             // 'email' => $validatedData['email'],
             'password' => Hash::make($validatedData['password']),
-            'doctor_id' => $validatedData['doctor_id'],
-            'is_nurse' => $validatedData['is_nurse'],
-            'user_money_collector_type' => $validatedData['user_money_collector_type'],
+            'doctor_id' => $validatedData['doctor_id'] ?? null,
+            'is_nurse' => $validatedData['is_nurse'] ?? false,
+            'user_money_collector_type' => $validatedData['user_money_collector_type'] ?? 'all',
         ]);
 
         if (!empty($validatedData['roles']) && $request->user()->can('assign roles')) {

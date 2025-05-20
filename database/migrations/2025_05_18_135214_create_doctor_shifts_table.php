@@ -12,24 +12,26 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('doctor_shifts', function (Blueprint $table) {
-            $table->id(); // `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT
+           $table->id();
+            $table->foreignId('user_id')->constrained('users')->comment('User who initiated this doctor shift (e.g., doctor themselves or admin)');
+            $table->foreignId('shift_id')->constrained('shifts')->comment('The general clinic shift this belongs to');
+            $table->foreignId('doctor_id')->constrained('doctors');
+            
+            // Status: 1 = active/open, 0 = closed. Or use an ENUM.
+            $table->boolean('status')->default(true)->comment('Is this doctor shift session currently active?'); 
+            
+            $table->timestamp('start_time')->nullable()->comment('Actual start time of the doctor working');
+            $table->timestamp('end_time')->nullable()->comment('Actual end time of the doctor working');
+            
+            // These boolean flags were in your original doctor_shifts schema, purpose might need clarification
+            // If they are about proving financial reconciliation for this doctor's shift earnings:
+            $table->boolean('is_cash_revenue_prooved')->default(false);
+            $table->boolean('is_cash_reclaim_prooved')->default(false);
+            $table->boolean('is_company_revenue_prooved')->default(false);
+            $table->boolean('is_company_reclaim_prooved')->default(false);
 
-            $table->unsignedBigInteger('user_id');
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade'); // Or 'restrict'
-
-            $table->unsignedBigInteger('shift_id');
-            $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('cascade'); // Or 'restrict'
-
-            $table->unsignedBigInteger('doctor_id');
-            $table->foreign('doctor_id')->references('id')->on('doctors')->onDelete('cascade'); // Or 'restrict'
-
-            $table->boolean('status'); // `status` tinyint(1) NOT NULL
-            $table->boolean('is_cash_revenue_prooved')->default(false); // is_cash_revenue_prooved
-            $table->boolean('is_cash_reclaim_prooved')->default(false); // is_cash_reclaim_prooved
-            $table->boolean('is_company_revenue_prooved')->default(false); // is_company_revenue_prooved
-            $table->boolean('is_company_reclaim_prooved')->default(false); // is_company_reclaim_prooved
-
-            $table->timestamps(); // `created_at` and `updated_at`
+            $table->timestamps(); // created_at, updated_at
+            
         });
     }
 

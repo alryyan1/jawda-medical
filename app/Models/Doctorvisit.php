@@ -9,40 +9,32 @@ class DoctorVisit extends Model
 {
     use HasFactory;
 
-    // If your table name is 'doctorvisits' (plural) as per some of your earlier schemas:
-    // protected $table = 'doctorvisits'; 
+    // If your table name is 'doctorvisits' (plural)
+    protected $table = 'doctorvisits';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'patient_id',
-        'doctor_id',    // The doctor attending this specific visit
-        'doctor_shift_id', // If the visit is tied to a specific doctor's shift session
-        'user_id',      // User who created/managed this visit (e.g., receptionist, nurse)
-        'shift_id',     // The general clinic shift this visit occurred in
-        'file_id',      // If visits are associated with a "file" from the `files` table
-        'visit_date',   // In your `appointments` table this was `appointment_date`
-        'visit_time',   // In your `appointments` table this was `appointment_time`
-        'status',       // e.g., 'waiting', 'with_doctor', 'completed', 'cancelled', 'no_show'
-        'notes',        // General notes for the visit
-        'is_new',       // From your `doctorvisits` table schema (boolean)
-        'number',       // From your `doctorvisits` table schema (integer, perhaps a queue number)
-        'only_lab',     // From your `doctorvisits` table schema (boolean)
-        // Add any other fields from your 'doctor_visits' table schema
-        // e.g., 'visit_type', 'reason_for_visit', 'vital_signs_id', etc.
+        'doctor_id',
+        'user_id',
+        'shift_id',
+        'doctor_shift_id',
+        // 'appointment_id',
+        'file_id',
+        'visit_date',
+        'visit_time',
+        'status',
+        'visit_type',
+        'queue_number',
+        'reason_for_visit',
+        'visit_notes',
+        'is_new', // from original schema
+        'number', // from original schema
+        'only_lab', // from original schema
     ];
 
-    /**
-     * The attributes that should be cast.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'visit_date' => 'date',
-        'visit_time' => 'datetime:H:i:s', // Casts to Carbon instance, formats to H:i:s on toArray/json
+        // 'visit_time' => 'datetime:H:i:s', // If storing as TIME, Laravel might handle it without explicit cast. If DATETIME, use 'datetime'
         'is_new' => 'boolean',
         'only_lab' => 'boolean',
         'created_at' => 'datetime',
@@ -50,80 +42,105 @@ class DoctorVisit extends Model
     ];
 
     // Relationships
-
-    /**
-     * Get the patient that this visit belongs to.
-     */
     public function patient()
     {
         return $this->belongsTo(Patient::class);
     }
 
-    /**
-     * Get the doctor who attended this visit.
-     */
     public function doctor()
     {
         return $this->belongsTo(Doctor::class);
     }
 
     /**
-     * Get the doctor's shift session this visit belongs to (if applicable).
+     * User who created/managed this visit entry (e.g., receptionist).
      */
-    public function doctorShift()
-    {
-        return $this->belongsTo(DoctorShift::class); // Assuming DoctorShift model exists
-    }
-
-    /**
-     * Get the user (e.g., receptionist) who created/managed this visit.
-     */
-    public function user()
+    public function createdByUser() // Renamed to avoid conflict if a 'user' is the patient/doctor
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
     /**
-     * Get the clinic shift this visit belongs to.
+     * The general clinic shift this visit belongs to.
      */
-    public function shift()
+    public function generalShift()
     {
-        return $this->belongsTo(Shift::class);
+        return $this->belongsTo(Shift::class, 'shift_id');
     }
 
     /**
-     * Get the file associated with this visit (if any).
+     * The specific doctor's working session, if applicable.
+     */
+    public function doctorShift()
+    {
+        return $this->belongsTo(DoctorShift::class);
+    }
+
+    /**
+     * The appointment linked to this visit, if any.
+     * public function appointment() {
+     *     return $this->belongsTo(Appointment::class); // Or hasOne if FK is on appointments table
+     * }
+     */
+    
+    /**
+     * The "file" associated with this visit, if any.
      */
     public function file()
     {
         return $this->belongsTo(File::class); // Assuming File model exists
     }
 
-    /**
-     * Get the appointment associated with this visit (if one visit per appointment).
-     */
-    public function appointment()
-    {
-        // Assuming 'doctorvisit_id' is the FK in the 'appointments' table
-        return $this->hasOne(Appointment::class); 
-        // If Appointment has doctor_visit_id, then use belongsTo if the FK is on DoctorVisit table.
-        // Check your appointments table schema for the FK.
-    }
 
     /**
      * Get all requested services for this visit.
      */
     public function requestedServices()
     {
-        // Assuming your `requested_services` table has `doctorvisits_id` (or `doctor_visit_id`)
-        // If the FK in requested_services is `doctorvisits_id` (plural):
-        return $this->hasMany(RequestedService::class, 'doctorvisits_id');
-        // If the FK is `doctor_visit_id` (singular):
-        // return $this->hasMany(RequestedService::class, 'doctor_visit_id');
+        // Adjust FK name if your requested_services table uses 'doctor_visit_id'
+        return $this->hasMany(RequestedService::class, 'doctorvisits_id'); 
     }
 
-    // You might also have relationships to:
-    // - LabRequests (if directly linked to a visit)
-    // - Prescriptions (if a prescription is tied to a specific visit)
-    // - Vitals (if vitals are stored per visit)
+    /**
+     * Get all lab requests associated with this visit.
+     * This assumes lab_requests has a 'doctor_visit_id' foreign key.
+     * If lab_requests are only linked to patient, this relation might not be direct.
+     * public function labRequests() {
+     *     return $this->hasMany(LabRequest::class);
+     * }
+     */
+    
+    /**
+     * Get all prescriptions issued during this visit.
+     * This assumes drugs_prescribed has a 'doctor_visit_id' foreign key.
+     * public function prescriptions() {
+     *     return $this->hasMany(DrugPrescribed::class);
+     * }
+     */
+
+    // Scopes
+    public function scopeToday($query)
+    {
+        return $query->whereDate('visit_date', today());
+    }
+
+    public function scopeStatus($query, $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    public function scopeWaiting($query)
+    {
+        return $query->where('status', 'waiting');
+    }
+
+    public function scopeWithDoctor($query)
+    {
+        return $query->where('status', 'with_doctor');
+    }
+
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', 'completed');
+    }
 }

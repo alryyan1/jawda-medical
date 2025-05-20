@@ -12,6 +12,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(
+            [
+                RolesAndPermissionsSeeder::class,
+                AdminSeeder::class,
+                // Add other seeders here as needed
+                // For example, if you have a seeder for companies, doctors, etc.
+                // CompanySeeder::class,
+                // DoctorSeeder::class,
+            ]
+        );
         // \App\Models\User::factory(10)->create();
 
         // \App\Models\User::factory()->create([

@@ -1,11 +1,54 @@
 <?php
-
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Pivot; // Important: extends Pivot
 
-class CompanyService extends Model
+class CompanyService extends Pivot
 {
-    use HasFactory;
+    // If your pivot table doesn't follow Laravel's naming convention (company_service),
+    // you might need to specify the table name:
+    // protected $table = 'company_service';
+
+    // Laravel by default assumes a pivot model does not have an incrementing ID.
+    // If your `company_service` table has an `id` (it does based on your schema),
+    // and you want to treat it as a regular model in some contexts:
+    // public $incrementing = true; // Uncomment if you want to use the 'id' as primary key
+
+    // If it has an 'id' and you want it to be findable by that ID,
+    // you might consider making it extend Model instead of Pivot,
+    // but then belongsToMany relationships need manual setup for pivot attributes.
+    // For now, extending Pivot is fine for use with belongsToMany->using().
+
+    protected $fillable = [
+        'company_id', // Not usually in fillable for pivot, but good if creating directly
+        'service_id', // Not usually in fillable for pivot
+        'price',
+        'static_endurance',
+        'percentage_endurance',
+        'static_wage',
+        'percentage_wage',
+        'use_static',
+        'approval'
+    ];
+
+    protected $casts = [
+        'price' => 'decimal:2',
+        'static_endurance' => 'decimal:2',
+        'percentage_endurance' => 'decimal:2',
+        'static_wage' => 'decimal:2',
+        'percentage_wage' => 'decimal:2',
+        'use_static' => 'boolean',
+        'approval' => 'boolean',
+    ];
+
+    // Relationships from the pivot model itself (optional but can be useful)
+    public function company()
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(Service::class);
+    }
 }

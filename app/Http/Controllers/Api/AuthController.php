@@ -56,7 +56,10 @@ class AuthController extends Controller
             ]);
         }
 
+        //load roles and permissions
+        $user->load('roles.permissions');
         $deviceName = $request->input('device_name', $request->userAgent());
+
         $token = $user->createToken($deviceName)->plainTextToken;
 
         return response()->json([

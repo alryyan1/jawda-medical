@@ -15,44 +15,57 @@ class RolesAndPermissionsSeeder extends Seeder
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Define Permissions for Users
-        Permission::firstOrCreate(['name' => 'list users', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'view users', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'create users', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'edit users', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'delete users', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'assign roles', 'guard_name' => 'sanctum']); // To assign roles to users
+        Permission::firstOrCreate(['name' => 'list users', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'view users', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'create users', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'edit users', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'delete users', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'assign roles', 'guard_name' => 'web']); // To assign roles to users
 
         // Define Permissions for Roles (if you want to manage roles via UI too)
-        Permission::firstOrCreate(['name' => 'list roles', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'view roles', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'create roles', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'edit roles', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'delete roles', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'assign permissions to role', 'guard_name' => 'sanctum']);
+        Permission::firstOrCreate(['name' => 'list roles', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'view roles', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'create roles', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'edit roles', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'delete roles', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'assign permissions to role', 'guard_name' => 'web']);
 
 
         // Define Permissions for Doctors (example)
-        Permission::firstOrCreate(['name' => 'list doctors', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'create doctors', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'edit doctors', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'delete doctors', 'guard_name' => 'sanctum']);
+        Permission::firstOrCreate(['name' => 'list doctors', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'create doctors', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'edit doctors', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'delete doctors', 'guard_name' => 'web']);
 
         // Define Permissions for Patients (example)
-        Permission::firstOrCreate(['name' => 'list patients', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'create patients', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'edit patients', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'delete patients', 'guard_name' => 'sanctum']);
-        Permission::firstOrCreate(['name' => 'view patients', 'guard_name' => 'sanctum']);
+        Permission::firstOrCreate(['name' => 'list patients', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'create patients', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'edit patients', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'delete patients', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'view patients', 'guard_name' => 'web']);
 
-
+ // --- NEW: Define Permissions for Companies & Contracts ---
+        Permission::firstOrCreate(['name' => 'view companies', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'list companies', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'create companies', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'edit companies', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'delete companies', 'guard_name' => 'web']);
+        
+        Permission::firstOrCreate(['name' => 'view company_contracts', 'guard_name' => 'web']);
+        // Option 1: General manage permission
+        Permission::firstOrCreate(['name' => 'manage company_contracts', 'guard_name' => 'web']); 
+        // Option 2: More granular permissions (use these OR the 'manage' one, not necessarily both unless for specific overrides)
+        Permission::firstOrCreate(['name' => 'create company_contracts', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'edit company_contracts', 'guard_name' => 'web']);
+        Permission::firstOrCreate(['name' => 'delete company_contracts', 'guard_name' => 'web']);
         // ... add permissions for other modules (services, appointments, clinic, etc.)
 
         // Define Roles
-        $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'sanctum']);
-        $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'sanctum']);
-        $doctorRole = Role::firstOrCreate(['name' => 'Doctor', 'guard_name' => 'sanctum']);
-        $receptionistRole = Role::firstOrCreate(['name' => 'Receptionist', 'guard_name' => 'sanctum']);
-        $nurseRole = Role::firstOrCreate(['name' => 'Nurse', 'guard_name' => 'sanctum']);
+        $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
+        $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
+        $doctorRole = Role::firstOrCreate(['name' => 'Doctor', 'guard_name' => 'web']);
+        $receptionistRole = Role::firstOrCreate(['name' => 'Receptionist', 'guard_name' => 'web']);
+        $nurseRole = Role::firstOrCreate(['name' => 'Nurse', 'guard_name' => 'web']);
         // ... other roles
 
         // Assign Permissions to Roles
@@ -87,25 +100,6 @@ class RolesAndPermissionsSeeder extends Seeder
         ]);
 
 
-        // --- Optional: Assign a role to an existing user (e.g., the first user) ---
-        $user = User::find(1); // Find a user
-        if ($user) {
-            if (!$user->hasRole('Super Admin')) {
-                $user->assignRole('Super Admin');
-                $this->command->info("User {$user->name} assigned Super Admin role.");
-            }
-        } else {
-            // Or create a Super Admin user if one doesn't exist
-            $superAdminUser = User::firstOrCreate(
-                ['username' => 'superadmin'], // Or email
-                [
-                    'name' => 'Super Administrator',
-                    'password' => bcrypt('password'), // Change this!
-                    // Add other required fields from your users table
-                ]
-            );
-            $superAdminUser->assignRole('Super Admin');
-            $this->command->info("Super Admin user created and role assigned.");
-        }
+      
     }
 }
