@@ -1,0 +1,64 @@
+<?php
+namespace App\Http\Resources;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class SettingResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        if (!$this->resource) {
+            return []; // Return empty array if no settings record found
+        }
+        return [
+            'id' => $this->id, // Though likely always 1
+            'is_header' => (bool) $this->is_header,
+            'is_footer' => (bool) $this->is_footer,
+            'is_logo' => (bool) $this->is_logo,
+            'header_base64' => $this->header_base64,
+            'footer_base64' => $this->footer_base64,
+            'logo_base64' => $this->logo_base64,
+            'header_content' => $this->header_content,
+            'footer_content' => $this->footer_content,
+            'lab_name' => $this->lab_name,
+            'hospital_name' => $this->hospital_name,
+            'print_direct' => (bool) $this->print_direct,
+            'inventory_notification_number' => $this->inventory_notification_number,
+            'disable_doctor_service_check' => (bool) $this->disable_doctor_service_check,
+            'currency' => $this->currency,
+            'phone' => $this->phone,
+            'gov' => $this->gov, // bool or int
+            'country' => $this->country, // bool or int
+            'barcode' => (bool) $this->barcode,
+            'show_water_mark' => (bool) $this->show_water_mark,
+            'vatin' => $this->vatin,
+            'cr' => $this->cr,
+            'email' => $this->email,
+            'address' => $this->address,
+            'instance_id' => $this->instance_id,
+            'token' => $this->token, // Be careful about exposing sensitive tokens directly
+            'send_result_after_auth' => (bool) $this->send_result_after_auth,
+            'send_result_after_result' => (bool) $this->send_result_after_result,
+            'edit_result_after_auth' => (bool) $this->edit_result_after_auth,
+            'auditor_stamp' => $this->auditor_stamp,
+            'manager_stamp' => $this->manager_stamp,
+            'finance_account_id' => $this->finance_account_id,
+            'bank_id' => $this->bank_id,
+            'company_account_id' => $this->company_account_id,
+            'endurance_account_id' => $this->endurance_account_id,
+            'main_cash' => $this->main_cash,
+            'main_bank' => $this->main_bank,
+            'financial_year_start' => $this->financial_year_start?->toDateString(),
+            'financial_year_end' => $this->financial_year_end?->toDateString(),
+            'pharmacy_bank' => $this->pharmacy_bank,
+            'pharmacy_cash' => $this->pharmacy_cash,
+            'pharmacy_income' => $this->pharmacy_income,
+            'welcome_message' => $this->welcome_message,
+            'send_welcome_message' => (bool) $this->send_welcome_message,
+            'updated_at' => $this->updated_at?->toIso8601String(),
+
+            // Eager load related finance accounts if needed for display
+            // 'default_finance_account_details' => new FinanceAccountResource($this->whenLoaded('defaultFinanceAccount')),
+        ];
+    }
+}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePatientRequest;
+use App\Http\Resources\PatientResource;
 use App\Models\Doctorvisit;
 use App\Models\Patient;
 use Carbon\Carbon;
@@ -48,7 +49,7 @@ class PatientController extends Controller
                 'age_year' => $validatedData['age_year'],
                 'age_month' => $validatedData['age_month'],
                 'age_day' => $validatedData['age_day'],
-                'address' => $validatedData['address'],
+                // 'address' => $validatedData['address'],
                 'company_id' => $validatedData['company_id'],
                 // Link the patient record to the user who registered them and the current shift
                 'user_id' => Auth::id(),
@@ -84,15 +85,16 @@ class PatientController extends Controller
                 'user_id' => Auth::id(), // User creating the visit (receptionist)
                 'shift_id' => $currentShiftId,
                 'visit_date' => Carbon::today(),
+                 'doctor_shift_id'=> $request->get('doctor_shift_id'), // Assuming the visit is linked to the same shift
                 'status' => 'waiting', // Initial status
-                'notes' => $validatedData['notes'] ?? null, // Or a specific field for visit notes
+                // 'notes' => $validatedData['notes'] ?? null, // Or a specific field for visit notes
                 // 'visit_type' => $validatedData['visit_type'] ?? 'New', // If you add visit_type
             ]);
 
             DB::commit();
 
             // Load relationships for the resource if needed by frontend immediately
-            $patient->load(['doctor', 'company', 'user', 'shift', 'doctorVisits']);
+            $patient->load([ 'company', 'user', 'shift', 'doctorVisits']);
             return new PatientResource($patient);
 
         } catch (\Exception $e) {

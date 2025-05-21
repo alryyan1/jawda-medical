@@ -31,7 +31,7 @@ return new class extends Migration
             $table->boolean('country')->default(false); // Related to country display?
             $table->boolean('barcode')->default(false);
             $table->boolean('show_water_mark')->default(false);
-            $table->string('vatin')->default(''); // VAT Identification Number
+            $table->string('vatin')->nullable()->default(''); // VAT Identification Number
             $table->string('cr')->default(''); // Commercial Registration number
             $table->string('email')->default('');
             $table->string('address')->default('');

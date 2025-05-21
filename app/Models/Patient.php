@@ -186,7 +186,7 @@ class Patient extends Model
     {
         return $this->belongsTo(Company::class);
     }
-
+    
     /**
      * Get the subcompany associated with this patient.
      */

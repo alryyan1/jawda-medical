@@ -29,18 +29,20 @@ class DoctorShiftController extends Controller
         // $currentClinicShift = Shift::where('is_closed', false)->orderBy('start_datetime', 'desc')->first();
         // For now, let's assume we don't filter by a general clinic shift unless passed
 
-        $query = DoctorShift::with('doctor:id,name') // Eager load only necessary doctor fields
+        $query = DoctorShift::with('doctor') // Eager load only necessary doctor fields
             ->activeToday(); // Use the scope defined in the model
 
-        if ($request->has('clinic_shift_id')) {
-            $query->where('shift_id', $request->clinic_shift_id);
-        }
+        // if ($request->has('clinic_shift_id')) {
+        //     $query->where('shift_id', $request->clinic_shift_id);
+        // }
 
         // You might want to order them by doctor name or by when their shift started
-        $activeDoctorShifts = $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
-            ->orderBy('doctors.name')
-            ->select('doctor_shifts.*') // Avoid ambiguity
-            ->get();
+        // $activeDoctorShifts = $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
+        //     ->orderBy('doctors.name')
+        //     ->select('doctor_shifts.*') // Avoid ambiguity
+        //     ->get();
+
+            $activeDoctorShifts = $query->get();
 
         return DoctorShiftResource::collection($activeDoctorShifts);
     }
@@ -58,6 +60,7 @@ class DoctorShiftController extends Controller
 
         $validated = $request->validate([
             'doctor_id' => 'required|exists:doctors,id',
+            // 'shift_id' => 'required|exists:shifts,id', // If a doctor can only have one session per general shift
             // 'start_time' => 'nullable|date_format:Y-m-d H:i:s', // Optional, defaults to now
         ]);
 
@@ -70,7 +73,10 @@ class DoctorShiftController extends Controller
         if ($existingActiveShift) {
             return response()->json(['message' => 'هذا الطبيب لديه وردية عمل مفتوحة بالفعل.'], 409); // 409 Conflict
         }
-
+        $latestShift = Shift::latest('id')->first();
+        if (!$latestShift || !$latestShift->id) {
+            return response()->json(['message' => 'يجب فتح وردية مالية أولاً.'], 400);
+        }
         $doctorShift = DoctorShift::create([
             'doctor_id' => $validated['doctor_id'],
             'shift_id' => Shift::latest('id')->first()?->id,

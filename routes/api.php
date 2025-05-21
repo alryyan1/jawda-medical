@@ -9,9 +9,11 @@ use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
 use App\Http\Controllers\Api\FinanceAccountController;
 use App\Http\Controllers\Api\PatientController;
+use App\Http\Controllers\Api\RequestedServiceDepositController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\ServiceGroupController;
+use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\SpecialistController;
 use App\Http\Controllers\Api\UserController;
@@ -94,29 +96,31 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::put('/doctor-visits/{doctorVisit}/status', [DoctorVisitController::class, 'updateStatus']);
     Route::apiResource('doctor-visits', DoctorVisitController::class);
-    
+
     // Routes for services related to a visit are already in VisitServiceController:
     // Route::get('/visits/{visit}/available-services', [VisitServiceController::class, 'getAvailableServices']);
     // Route::post('/visits/{visit}/request-services', [VisitServiceController::class, 'addRequestedServices']);
     // Route::get('/visits/{visit}/requested-services', [VisitServiceController::class, 'getRequestedServices']);
     // Route::delete('/visits/{visit}/requested-services/{requestedService}', [VisitServiceController::class, 'removeRequestedService']);
-     Route::get('/shifts/current-open', [ShiftController::class, 'getCurrentOpenShift']);
+    Route::get('/shifts/current-open', [ShiftController::class, 'getCurrentOpenShift']);
     Route::post('/shifts/open', [ShiftController::class, 'openShift']);
     Route::put('/shifts/{shift}/close', [ShiftController::class, 'closeShift']);
     Route::put('/shifts/{shift}/financials', [ShiftController::class, 'updateFinancials']);
     Route::get('/doctors-with-shift-status', [DoctorShiftController::class, 'getDoctorsWithShiftStatus'])->middleware('auth:sanctum');
 
     // Standard resource routes if you need general listing/viewing of shifts
-    Route::apiResource('shifts', ShiftController::class)->except(['store', 'update', 'destroy']); 
+    Route::apiResource('shifts', ShiftController::class)->except(['store', 'update', 'destroy']);
+    Route::get('/settings', [SettingsController::class, 'show']);
+    Route::post('/settings', [SettingsController::class, 'update']); // Use POST for updates if sending FormData with files
 
     // ... your other protected API routes
 });
-
+Route::get('/service-groups-with-services', [ServiceGroupController::class, 'getGroupsWithServices'])->middleware('auth:sanctum');
+Route::post('/requested-services/{requestedService}/deposits', [RequestedServiceDepositController::class, 'store'])->middleware('auth:sanctum');
+Route::put('/requested-services/{requestedService}', [VisitServiceController::class, 'updateRequestedService']);
 // For Dropdowns / Lists (duplicate user info route for convenience)
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     $user = $request->user();
     $user->load('roles.permissions');
     return $user;
 });
-
-

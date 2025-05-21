@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
             [
                 RolesAndPermissionsSeeder::class,
                 AdminSeeder::class,
+                DummyDataSeeder::class,
                 // Add other seeders here as needed
                 // For example, if you have a seeder for companies, doctors, etc.
                 // CompanySeeder::class,

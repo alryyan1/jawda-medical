@@ -14,13 +14,11 @@ class ClinicWorkspaceController extends Controller
     {
         $request->validate([
             'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
-            'doctor_id' => 'nullable|integer|exists:doctors,id', // Alternative if filtering by doctor directly
             'search' => 'nullable|string|max:100',
-            'clinic_shift_id' => 'nullable|integer|exists:shifts,id', // General clinic shift
             'page' => 'nullable|integer|min:1',
         ]);
 
-        $query = DoctorVisit::with(['patient', 'doctor:id,name']) // Eager load necessary relations
+        $query = DoctorVisit::with(['patient', 'doctor']) // Eager load necessary relations
                             ->whereDate('visit_date', Carbon::today()) // Example: visits for today
                             ->whereNotIn('status', ['completed', 'cancelled']); // Example: not completed or cancelled
 
@@ -31,16 +29,12 @@ class ClinicWorkspaceController extends Controller
         
         // Filter by specific doctor (from DoctorTabs selection)
         // This depends on whether DoctorTabs gives you a doctor_id or a doctor_shift_id
-        if ($request->filled('doctor_id')) {
-            $query->where('doctor_id', $request->doctor_id);
-        } elseif ($request->filled('doctor_shift_id')) {
-            // If filtering by doctor_shift_id, you might need to join or use whereHas
-            // This assumes doctor_shift_id is directly on the DoctorVisit model
-             $query->where('doctor_shift_id', $request->doctor_shift_id);
-        }
+   
+         $query->where('doctor_shift_id', $request->doctor_shift_id);
+        
 
 
-        if ($request->filled('search')) {
+        if ($request->filled('search') && $request->search !== '') {
             $searchTerm = $request->search;
             $query->whereHas('patient', function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")

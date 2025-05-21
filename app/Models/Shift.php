@@ -18,6 +18,7 @@ class Shift extends Model
         'closed_at',
         'is_closed',
         'pharmacy_entry',
+        'user_id', // If you add this
         // 'user_id_opened', // If you add this
         // 'user_id_closed', // If you add this
         // 'name', // If you add a name field

@@ -63,6 +63,7 @@ class ShiftController extends Controller
      */
     public function openShift(Request $request)
     {
+        $user = Auth::user();
         // Check if there's already an open shift to prevent multiple open shifts if that's your rule
         $existingOpenShift = Shift::open()->exists();
         if ($existingOpenShift) {
@@ -84,6 +85,7 @@ class ShiftController extends Controller
             'total' => 0, // Initial values
             'bank' => 0,
             'expenses' => 0,
+            'user_id'=> $user->id, // Assuming the user is the one opening the shift
         ]);
 
         return new ShiftResource($shift);
