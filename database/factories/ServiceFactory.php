@@ -46,11 +46,12 @@ class ServiceFactory extends Factory
             // Or, if you seed ServiceGroups separately:
             // 'service_group_id' => ServiceGroup::inRandomOrder()->first()?->id ?? ServiceGroup::factory(),
             
-            'price' => $this->faker->randomFloat(2, 50, 1000), // Price between 50.00 and 1000.00
+            'price' => $this->faker->randomElement([1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]), // Fixed thousands from 1000 to 10000
             'activate' => $this->faker->boolean(90), // 90% chance of being active
             'variable' => $this->faker->boolean(20), // 20% chance of price being variable
             'created_at' => now(),
             'updated_at' => now(),
+            
         ];
     }
 }

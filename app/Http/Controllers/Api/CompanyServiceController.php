@@ -9,14 +9,18 @@ use App\Models\CompanyService; // The pivot model
 use Illuminate\Http\Request;
 use App\Http\Resources\CompanyServiceResource;
 use App\Http\Resources\ServiceResource; // For listing available services
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class CompanyServiceController extends Controller
 {
+
+
     // List all contracted services for a specific company
    public function index(Company $company)
 {
-    $search = request('service_name'); // e.g., ?search=cleaning
+    $search = request('search'); // e.g., ?search=cleaning
 
     // Get the query builder for the contractedServices relationship
     $query = $company->contractedServices();
@@ -45,7 +49,75 @@ class CompanyServiceController extends Controller
             ->get();
         return ServiceResource::collection($availableServices);
     }
+/**
+     * Import all active services from the main services list into this company's contract,
+     * if they don't already exist. Uses default/initial contract terms.
+     */
+    public function importAllServices(Request $request, Company $company)
+    {
+        // Permission check: e.g., can('manage company_contracts') or a specific 'import_all_services_to_company_contract'
+        // if (!Auth::user()->can('manage company_contracts')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
 
+        $allActiveServices = Service::where('activate', true)->get();
+        $existingContractedServiceIds = $company->contractedServices()->pluck('services.id')->toArray();
+        
+        $servicesToImport = $allActiveServices->reject(function ($service) use ($existingContractedServiceIds) {
+            return in_array($service->id, $existingContractedServiceIds);
+        });
+
+        if ($servicesToImport->isEmpty()) {
+            return response()->json(['message' => 'جميع الخدمات النشطة مضافة بالفعل إلى عقد هذه الشركة.', 'imported_count' => 0]);
+        }
+
+        $defaultContractTerms = [
+            // Define your default terms for newly imported services.
+            // Option 1: Use the service's standard price, others zero or default.
+            // 'price' => null, // This will be set per service below
+            'static_endurance' => $request->input('default_static_endurance', 0.00),
+            'percentage_endurance' => $request->input('default_percentage_endurance', $company->service_endurance ?? 0.00), // Use company default or 0
+            'static_wage' => $request->input('default_static_wage', 0.00),
+            'percentage_wage' => $request->input('default_percentage_wage', 0.00),
+            'use_static' => $request->input('default_use_static', false),
+            'approval' => $request->input('default_approval', true), // Default to approved
+            'created_at' => now(), // If your pivot table uses timestamps explicitly
+            'updated_at' => now(), // If your pivot table uses timestamps explicitly
+        ];
+        
+        // Validate default terms if they are passed in request body
+        // $request->validate([...rules for default_static_endurance etc...]);
+
+
+        $importedCount = 0;
+        $attachData = [];
+
+        foreach ($servicesToImport as $service) {
+            $attachData[$service->id] = array_merge(
+                $defaultContractTerms,
+                ['price' => $service->price] // Use the service's own price as the default contract price
+            );
+            $importedCount++;
+        }
+        
+        DB::beginTransaction();
+        try {
+             if (!empty($attachData)) {
+                 $company->contractedServices()->attach($attachData);
+             }
+             DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to import services to company contract {$company->id}: " . $e->getMessage());
+            return response()->json(['message' => 'حدث خطأ أثناء استيراد الخدمات.', 'error' => $e->getMessage()], 500);
+        }
+
+
+        return response()->json([
+            'message' => "تم استيراد {$importedCount} خدمة بنجاح إلى عقد الشركة.",
+            'imported_count' => $importedCount,
+        ]);
+    }
     // Add a new service contract to a company
     public function store(Request $request, Company $company)
     {

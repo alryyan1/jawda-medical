@@ -59,7 +59,8 @@ class RolesAndPermissionsSeeder extends Seeder
         Permission::firstOrCreate(['name' => 'edit company_contracts', 'guard_name' => 'web']);
         Permission::firstOrCreate(['name' => 'delete company_contracts', 'guard_name' => 'web']);
         // ... add permissions for other modules (services, appointments, clinic, etc.)
-
+        // view doctor_shift_reports
+        Permission::firstOrCreate(['name' => 'view doctor_shift_reports', 'guard_name' => 'web']);
         // --- NEW PERMISSIONS TO ADD ---
 
         // General Clinic Shift Management
@@ -75,9 +76,29 @@ class RolesAndPermissionsSeeder extends Seeder
         $doctorShiftPerms = [
             'view active_doctor_shifts', 'manage doctor_shifts', 
             'start doctor_shifts', 'end doctor_shifts', // Granular for manage
-            'list all_doctor_shifts', 'edit doctor_shift_details'
+            'list all_doctor_shifts', 'edit doctor_shift_details',
+            'view doctor_shift_financial_summary' // Financial summary dialog
         ];
         foreach ($doctorShiftPerms as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+
+        // Doctor Schedule Management
+        $schedulePerms = [
+            'view doctor_schedules',
+            'manage own_doctor_schedule',
+            'manage all_doctor_schedules' // Super admin/admin level permission
+        ];
+        foreach ($schedulePerms as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
+
+        // Reports Access
+        $reportPerms = [
+            'view reports_section',
+            'view doctor_shift_reports'
+        ];
+        foreach ($reportPerms as $permission) {
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
         
@@ -100,13 +121,17 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Visit-Specific Clinical Actions
         $visitActionPerms = [
-            'request visit_services', 'remove visit_services', 'manage visit_vitals',
+            'request visit_services', 'remove visit_services', 
+            'edit visit_requested_service_details', // For editing service details
+            'record visit_service_payment', // For service payments
+            'manage visit_vitals',
             'manage visit_clinical_notes', 'manage visit_lab_requests', 'view visit_lab_results',
             'manage visit_prescriptions', 'manage visit_documents'
         ];
         foreach ($visitActionPerms as $permission) {
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
+
         // Define Roles
         $superAdminRole = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web']);
         $adminRole = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
@@ -115,11 +140,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $nurseRole = Role::firstOrCreate(['name' => 'Nurse', 'guard_name' => 'web']);
         // ... other roles
 
-        // Assign Permissions to Roles
         // Super Admin gets all permissions
-      
-
-        // Super Admin gets all (if not already by Permission::all())
         $superAdminRole->givePermissionTo(Permission::where('guard_name', 'web')->get());
 
         // Admin Role
@@ -127,50 +148,65 @@ class RolesAndPermissionsSeeder extends Seeder
             // ... existing admin perms ...
             'open clinic_shifts', 'close clinic_shifts', 'manage clinic_shift_financials',
             'list clinic_shifts', 'view clinic_shifts',
-            'manage doctor_shifts', // or granular 'start doctor_shifts', 'end doctor_shifts'
+            'manage doctor_shifts',
             'list all_doctor_shifts', 'edit doctor_shift_details',
-            'list doctor_visits', 'view doctor_visits', 'delete doctor_visits', // Admin might not create/edit visits directly
-                        'view settings',
-            'update settings', // Grant update if Admin should also modify settings
-
+            'view doctor_shift_financial_summary',
+            'list doctor_visits', 'view doctor_visits', 'delete doctor_visits',
+            'view settings', 'update settings',
+            'edit visit_requested_service_details',
+            'record visit_service_payment',
+            // New permissions
+            'view doctor_schedules',
+            'manage all_doctor_schedules',
+            'view reports_section',
+            'view doctor_shift_reports'
         ]);
 
         // Doctor Role
         $doctorRole->givePermissionTo([
-            // ... existing doctor perms ...
-            'view active_doctor_shifts', // So they can see who else is on shift
-            // 'start doctor_shifts', 'end doctor_shifts', // If doctors manage their own clock-in/out via the dialog
-            'view doctor_visits', // Typically their own or all based on clinic policy
-            'edit doctor_visits', // For their clinical notes, diagnosis within a visit
-            'update doctor_visit_status', // e.g., from 'with_doctor' to 'lab_pending'
+            'view active_doctor_shifts',
+            'view doctor_shift_financial_summary',
+            'view doctor_visits',
+            'edit doctor_visits',
+            'update doctor_visit_status',
             'request visit_services', 'remove visit_services',
+            'edit visit_requested_service_details',
             'manage visit_vitals', 'manage visit_clinical_notes',
             'manage visit_lab_requests', 'view visit_lab_results',
-            'manage visit_prescriptions', 'manage visit_documents'
+            'manage visit_prescriptions', 'manage visit_documents',
+            // New permissions
+            'view doctor_schedules',
+            'manage own_doctor_schedule',
+            'view reports_section',
+            'view doctor_shift_reports'
         ]);
 
         // Receptionist Role
         $receptionistRole->givePermissionTo([
-            // ... existing receptionist perms ...
             'view current_open_shift',
-            'open clinic_shifts', 'close clinic_shifts', // If receptionists manage general shifts
+            'open clinic_shifts', 'close clinic_shifts',
             'view active_doctor_shifts',
-            // 'manage doctor_shifts', // If reception can clock doctors in/out
-            'create doctor_visits', // For registering patient and starting a visit
-            'edit doctor_visits', // For non-clinical visit details (e.g., updating visit type, notes if allowed)
-            'update doctor_visit_status', // e.g., from 'waiting' to 'with_doctor', or 'completed'
-            'request visit_services', // If reception adds basic services
+            'create doctor_visits',
+            'edit doctor_visits',
+            'update doctor_visit_status',
+            'request visit_services',
+            'edit visit_requested_service_details',
+            'record visit_service_payment',
+            // New permissions
+            'view doctor_schedules',
+            'view reports_section'
         ]);
 
         // Nurse Role
         $nurseRole->givePermissionTo([
-            // ... existing nurse perms ...
             'view active_doctor_shifts',
-            'view doctor_visits', // View visits they are involved in
-            'update doctor_visit_status', // e.g., if they move patient to next step
+            'view doctor_visits',
+            'update doctor_visit_status',
             'manage visit_vitals',
-            'manage visit_clinical_notes', // Specific nursing notes
-            // 'request visit_services' // If nurses can request certain services
+            'manage visit_clinical_notes',
+            // New permissions
+            'view doctor_schedules',
+            'view reports_section'
         ]);
         
         // Accountant Role (Example)

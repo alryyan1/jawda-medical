@@ -12,10 +12,23 @@ use Illuminate\Validation\Rule;
 
 class DoctorController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $query = Doctor::query();
+
+        // Apply search filter if search parameter is present
+        if ($request->has('search')) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+
         // Eager load relationships for efficiency
-        $doctors = Doctor::with(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user'])->paginate(15);
+        $doctors = $query->with(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user'])
+                        ->paginate(15);
+                        
         return new DoctorCollection($doctors);
     }
 

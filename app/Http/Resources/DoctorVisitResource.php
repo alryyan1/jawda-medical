@@ -14,43 +14,51 @@ class DoctorVisitResource extends JsonResource
      */
   // app/Http/Resources/DoctorVisitResource.php
 // ...
+// ...
 public function toArray(Request $request): array
 {
+    $totalAmount = 0;
+    $totalPaid = 0;
+    $totalDiscount = 0; // If you track discount at visit level or sum from services
+
+    if ($this->relationLoaded('requestedServices')) {
+        foreach ($this->requestedServices as $rs) {
+            $pricePerItem = (float) $rs->price;
+            $count = (int) $rs->count;
+            $itemSubTotal = $pricePerItem * $count;
+            
+            $itemDiscountAmount = (float) $rs->discount; // Fixed discount
+            if ($rs->discount_per > 0) {
+                $itemDiscountAmount += ($itemSubTotal * ((int) $rs->discount_per / 100));
+            }
+
+            $totalAmount += $itemSubTotal;
+            $totalPaid += (float) $rs->amount_paid;
+            $totalDiscount += $itemDiscountAmount;
+        }
+    }
+
     return [
         'id' => $this->id,
+        // ... other visit fields like visit_date, visit_time, status ...
         'visit_date' => $this->visit_date?->toDateString(),
-        'visit_time' => $this->visit_time, // Or ->format('H:i')
+        'visit_time' => $this->visit_time, // or ->format('H:i A')
         'status' => $this->status,
-        'visit_type' => $this->visit_type,
-        'queue_number' => $this->queue_number,
-        'reason_for_visit' => $this->reason_for_visit,
-        'visit_notes' => $this->visit_notes,
-        'is_new' => (bool) $this->is_new,
-        'number' => (int) $this->number, // Original 'number' column
-        'only_lab' => (bool) $this->only_lab,
-        
-        'patient_id' => $this->patient_id,
-        'patient' => new PatientResource($this->whenLoaded('patient')), // Use full PatientResource here
 
+        'patient_id' => $this->patient_id,
+        'patient' => new PatientStrippedResource($this->whenLoaded('patient')),
         'doctor_id' => $this->doctor_id,
         'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor')),
-
-        'user_id' => $this->user_id, // User who created the visit
-        'created_by_user' => new UserStrippedResource($this->whenLoaded('createdByUser')),
         
-        'shift_id' => $this->shift_id,
-        'general_shift_details' => new ShiftResource($this->whenLoaded('generalShift')),
+        // Financials for this visit
+        'total_amount' => $totalAmount,
+        'total_paid' => $totalPaid,
+        'total_discount' => $totalDiscount,
+        'balance_due' => $totalAmount - $totalDiscount - $totalPaid,
 
-        'doctor_shift_id' => $this->doctor_shift_id,
-        'doctor_shift_details' => new DoctorShiftResource($this->whenLoaded('doctorShift')),
-
-        'requested_services' => RequestedServiceResource::collection($this->whenLoaded('requestedServices')),
-        // Add other loaded relationships here:
-        // 'vitals' => VitalResource::collection($this->whenLoaded('vitals')),
-        // 'clinical_notes' => ClinicalNoteResource::collection($this->whenLoaded('clinicalNotes')),
-        
+        'requested_services_summary' => RequestedServiceStrippedResource::collection($this->whenLoaded('requestedServices')), // For the dialog
+        // ... other fields ...
         'created_at' => $this->created_at?->toIso8601String(),
-        'updated_at' => $this->updated_at?->toIso8601String(),
     ];
 }
 }

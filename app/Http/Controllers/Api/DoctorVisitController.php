@@ -29,32 +29,70 @@ class DoctorVisitController extends Controller
      * Display a listing of doctor visits.
      * Useful for an admin overview page, with filters.
      */
+    // public function index(Request $request)
+    // {
+    //     $query = DoctorVisit::with(['patient:id,name,phone', 'doctor:id,name', 'createdByUser:id,name'])
+    //                         ->latest(); // Default order
+
+    //     if ($request->filled('patient_id')) {
+    //         $query->where('patient_id', $request->patient_id);
+    //     }
+    //     if ($request->filled('doctor_id')) {
+    //         $query->where('doctor_id', $request->doctor_id);
+    //     }
+    //     if ($request->filled('status')) {
+    //         $query->where('status', $request->status);
+    //     }
+    //     if ($request->filled('date_from')) {
+    //         $query->whereDate('visit_date', '>=', $request->date_from);
+    //     }
+    //     if ($request->filled('date_to')) {
+    //         $query->whereDate('visit_date', '<=', $request->date_to);
+    //     }
+    //     // Add more filters as needed (shift_id, visit_type, etc.)
+
+    //     $visits = $query->paginate($request->get('per_page', 15));
+    //     return DoctorVisitResource::collection($visits);
+    // }
     public function index(Request $request)
     {
-        $query = DoctorVisit::with(['patient:id,name,phone', 'doctor:id,name', 'createdByUser:id,name'])
-                            ->latest(); // Default order
+        $query = DoctorVisit::with([
+            'patient:id,name,phone,gender,age_year,age_month,age_day', // Select specific patient fields
+            'doctor:id,name',
+            'createdByUser:id,name',
+            'requestedServices' // Eager load requested services to calculate totals
+        ])
+            ->latest('visit_date') // Order by visit date first
+            ->latest('visit_time');  // Then by visit time or created_at
 
-        if ($request->filled('patient_id')) {
-            $query->where('patient_id', $request->patient_id);
-        }
+        // Default to today's visits if no date is specified
+        $visitDate = $request->filled('visit_date') ? Carbon::parse($request->visit_date) : Carbon::today();
+        $query->whereDate('visit_date', $visitDate);
+
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
         }
-        if ($request->filled('status')) {
+
+        if ($request->filled('status') && $request->status !== 'all') { // Allow 'all' to bypass status filter
             $query->where('status', $request->status);
         }
-        if ($request->filled('date_from')) {
-            $query->whereDate('visit_date', '>=', $request->date_from);
+
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->whereHas('patient', function ($q) use ($searchTerm) {
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('id', $searchTerm); // Allow search by patient ID
+            });
         }
-        if ($request->filled('date_to')) {
-            $query->whereDate('visit_date', '<=', $request->date_to);
-        }
-        // Add more filters as needed (shift_id, visit_type, etc.)
 
         $visits = $query->paginate($request->get('per_page', 15));
+
+        // Add total_amount and total_paid to each visit resource if not already there
+        // This can be done in the resource or by transforming the collection here.
+        // For simplicity, we'll assume DoctorVisitResource can handle this.
         return DoctorVisitResource::collection($visits);
     }
-
     /**
      * Store a newly created doctor visit.
      * This might be called directly or as part of Patient Registration.
@@ -90,8 +128,8 @@ class DoctorVisitController extends Controller
         // Calculate the visit number before creating the visit
         $visitNumber = $validatedData['number'] ?? (
             isset($validatedData['patient_id'])
-                ? (DoctorVisit::where('patient_id', $validatedData['patient_id'])->count() + 1)
-                : 1
+            ? (DoctorVisit::where('patient_id', $validatedData['patient_id'])->count() + 1)
+            : 1
         );
 
         $visit = DoctorVisit::create([
@@ -136,7 +174,7 @@ class DoctorVisitController extends Controller
         $validatedData = $request->validate([
             // Allow updating specific fields of a visit
             'doctor_id' => 'sometimes|required|exists:doctors,id',
-            'status' => ['sometimes','required', 'string', Rule::in(['waiting', 'with_doctor', 'lab_pending', 'imaging_pending', 'payment_pending', 'completed', 'cancelled', 'no_show'])],
+            'status' => ['sometimes', 'required', 'string', Rule::in(['waiting', 'with_doctor', 'lab_pending', 'imaging_pending', 'payment_pending', 'completed', 'cancelled', 'no_show'])],
             'visit_type' => 'nullable|string|max:100',
             'reason_for_visit' => 'nullable|string|max:1000',
             'visit_notes' => 'nullable|string',

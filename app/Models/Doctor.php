@@ -70,4 +70,12 @@ class Doctor extends Model
         // Or if a Doctor can have multiple user accounts (less common for this field name)
         // return $this->hasMany(User::class);
     }
+
+    /**
+     * Get the doctor's schedules.
+     */
+    public function schedules()
+    {
+        return $this->hasMany(DoctorSchedule::class);
+    }
 }

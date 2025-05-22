@@ -42,7 +42,7 @@ class DoctorShiftController extends Controller
         //     ->select('doctor_shifts.*') // Avoid ambiguity
         //     ->get();
 
-            $activeDoctorShifts = $query->get();
+        $activeDoctorShifts = $query->get();
 
         return DoctorShiftResource::collection($activeDoctorShifts);
     }
@@ -119,27 +119,146 @@ class DoctorShiftController extends Controller
     /**
      * Display a listing of the resource. (Standard CRUD index)
      */
-    public function index(Request $request)
+    public function index(Request $request) // This will serve as the report endpoint
     {
-        // For an admin page to manage all doctor shifts
-        $query = DoctorShift::with(['doctor:id,name', 'user:id,name', 'generalShift:id,name']) // Example generalShift relation name
-            ->latest(); // Order by most recent first
+        // Permission check: e.g., can('view doctor_shift_reports')
+        // if (!Auth::user()->can('view doctor_shift_reports')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
 
+        $query = DoctorShift::with([
+            'doctor',
+            'user', // User who opened/managed the DoctorShift record
+            'generalShift', // The main clinic shift
+            // Optional: Eager load counts or sums if needed directly for report
+            // 'doctorVisitsCount' => fn($q) => $q->selectRaw('count(*) as aggregate'),
+        ])
+            ->latest('start_time'); // Default order
+
+        // Filtering
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
         }
-        if ($request->has('status') && $request->status !== '') { // 0 or 1
+        if ($request->has('status') && $request->status !== '') { // '0' for closed, '1' for open
             $query->where('status', (bool)$request->status);
         }
         if ($request->filled('date_from')) {
-            $query->whereDate('start_time', '>=', $request->date_from);
+            $query->whereDate('start_time', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            $query->whereDate('start_time', '<=', $request->date_to);
+            $query->whereDate('start_time', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+        if ($request->filled('shift_id')) { // Filter by general clinic shift ID
+            $query->where('shift_id', $request->shift_id);
         }
 
-        $doctorShifts = $query->paginate($request->get('per_page', 15));
+        $doctorShifts = $query->paginate($request->get('per_page', 20));
+
+        // Optionally, you could add totals/summaries to the pagination meta if needed for the report
+        // For example, total hours worked, total patients seen across the fetched shifts.
+        // This would require more complex queries or calculations.
+
         return DoctorShiftResource::collection($doctorShifts);
+    }
+    public function showFinancialSummary(Request $request, DoctorShift $doctorShift)
+    {
+        // Permission check: e.g., can('view doctor_shift_financial_summary')
+        // if (!Auth::user()->can('view doctor_shift_financial_summary')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
+        // Eager load necessary data
+        $doctorShift->load([
+            'doctor', // For doctor's percentages and static wage (if applicable per shift)
+            'generalShift', // For context
+            'doctorVisits' => function ($query) {
+                $query->with([
+                    'patient:id,name,company_id', // Include company_id to differentiate insurance
+                    'requestedServices' => function ($rsQuery) {
+                        $rsQuery->with('service'); // For service details if needed
+                    }
+                ])->orderBy('created_at');
+            }
+        ]);
+
+        if (!$doctorShift->doctor) {
+            return response()->json(['message' => 'Doctor details not found for this shift.'], 404);
+        }
+
+        $summary = [
+            'doctor_shift_id' => $doctorShift->id,
+            'doctor_name' => $doctorShift->doctor->name,
+            'start_time' => $doctorShift->start_time?->toIso8601String(),
+            'end_time' => $doctorShift->end_time?->toIso8601String(),
+            'status' => $doctorShift->status ? 'Open' : 'Closed',
+            'total_patients' => $doctorShift->doctorVisits->count(),
+            'doctor_fixed_share_for_shift' => 0, // This needs clarification: is static_wage per shift, per day, per month?
+            // For this example, let's assume static_wage is per SHIFT if this DoctorShift is closed.
+            // If the shift is open, fixed share might not apply yet or is pro-rated.
+            'doctor_cash_share_total' => 0,
+            'doctor_insurance_share_total' => 0,
+            'patients_breakdown' => [],
+        ];
+
+        // Determine doctor's entitlement percentages
+        $cashPercentage = $doctorShift->doctor->cash_percentage / 100; // Convert to decimal
+        $companyPercentage = $doctorShift->doctor->company_percentage / 100;
+        // $labPercentage = $doctorShift->doctor->lab_percentage / 100; // If lab services contribute differently
+
+        // For simplicity, let's assume static_wage applies if the DoctorShift record is marked as 'closed'
+        // Your business logic for static wage might be different (e.g., per day, per number of hours)
+        if (!$doctorShift->status && $doctorShift->doctor->static_wage > 0) {
+            // This is a simplification. Real static wage might be per day worked,
+            // or if a DoctorShift represents a full scheduled work session.
+            // If a doctor works multiple short DoctorShift sessions in a day, how static_wage is applied needs definition.
+            // For this example, assume it's a one-time wage for this completed DoctorShift.
+            $summary['doctor_fixed_share_for_shift'] = (float) $doctorShift->doctor->static_wage;
+        }
+
+
+        foreach ($doctorShift->doctorVisits as $visit) {
+            $visitTotalPaid = 0;
+            $visitDoctorEntitlement = 0;
+
+            foreach ($visit->requestedServices as $rs) {
+                // We sum amount_paid for each requested service in this visit
+                $visitTotalPaid += (float) $rs->amount_paid;
+
+                // Calculate doctor's share from this service's payment
+                // This logic assumes percentages apply to the amount_paid for the service.
+                // It could also apply to the price of the service before company endurance.
+                // This needs to match your exact business rule.
+                $amountForDoctorCalculation = (float) $rs->amount_paid; // Or $rs->price if calculation is on price before endurance
+
+                if ($visit->patient->company_id) { // Insurance patient
+                    $visitDoctorEntitlement += $amountForDoctorCalculation * $companyPercentage;
+                } else { // Cash patient
+                    $visitDoctorEntitlement += $amountForDoctorCalculation * $cashPercentage;
+                }
+                // Consider lab_percentage if some services are lab and have different entitlements
+            }
+
+            $summary['patients_breakdown'][] = [
+                'patient_id' => $visit->patient->id,
+                'patient_name' => $visit->patient->name,
+                'visit_id' => $visit->id,
+                'total_paid_for_visit' => $visitTotalPaid,
+                'doctor_share_from_visit' => $visitDoctorEntitlement,
+                'is_insurance_patient' => !!$visit->patient->company_id,
+            ];
+
+            if ($visit->patient->company_id) {
+                $summary['doctor_insurance_share_total'] += $visitDoctorEntitlement;
+            } else {
+                $summary['doctor_cash_share_total'] += $visitDoctorEntitlement;
+            }
+        }
+
+        $summary['total_doctor_share'] = $summary['doctor_fixed_share_for_shift'] +
+            $summary['doctor_cash_share_total'] +
+            $summary['doctor_insurance_share_total'];
+
+        return response()->json(['data' => $summary]);
     }
     public function getDoctorsWithShiftStatus(Request $request)
     {
