@@ -82,6 +82,29 @@ class RolesAndPermissionsSeeder extends Seeder
         foreach ($doctorShiftPerms as $permission) {
             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
+      // --- NEW PERMISSIONS TO ADD/UPDATE ---
+        $this->command->info('Creating new/updated permissions...');
+        $newPerms = [
+            // Lab Test Management Refined
+            'manage lab_test_child_options', // For ChildTest predefined result options
+
+            // Lab Test Price List Management
+            'view lab_price_list',
+            'update lab_test_prices',
+            'batch_delete lab_tests', // Differentiated from single delete if needed
+            'print lab_price_list',
+
+            // Reporting Refined
+            'print doctor_shift_reports',
+            'print service_statistics_report',
+            // 'view reports_section', 'view doctor_shift_reports', 'view service_statistics_report' should exist
+
+            // Settings (ensure these exist if not already)
+            'view settings', 'update settings',
+        ];
+        foreach ($newPerms as $permission) {
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+        }
 
         // Doctor Schedule Management
         $schedulePerms = [

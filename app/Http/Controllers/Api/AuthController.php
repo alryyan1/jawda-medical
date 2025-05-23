@@ -79,6 +79,7 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        return response()->json($request->user()); // You might want to use an API Resource here
+        $user = $request->user()->load('roles.permissions');
+        return response()->json($user); // You might want to use an API Resource here
     }
 }

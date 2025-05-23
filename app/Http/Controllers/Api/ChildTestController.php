@@ -63,19 +63,19 @@ public function show(MainTest $mainTest, ChildTest $childTest)
     /**
      * Update the specified child test.
      */
-    public function update(Request $request, MainTest $mainTest, ChildTest $childTest)
+    public function update(Request $request, ChildTest $childTest)
     {
-        if ($childTest->main_test_id !== $mainTest->id) abort(404);
+        // if ($childTest->main_test_id !== $mainTest->id) abort(404);
         // $this->authorize('update', $mainTest);
 
         $validatedData = $request->validate([
             'child_test_name' => ['sometimes','required', 'string', 'max:70',
-                Rule::unique('child_tests')->ignore($childTest->id)->where(function ($query) use ($mainTest) {
-                    return $query->where('main_test_id', $mainTest->id);
-                })
+                // Rule::unique('child_tests')->ignore($childTest->id)->where(function ($query) use ($mainTest) {
+                //     return $query->where('main_test_id', $mainTest->id);
+                // })
             ],
-            'low' => 'nullable|numeric',
-            'upper' => 'nullable|numeric|gte:low',
+            // 'low' => 'nullable|numeric',
+            // 'upper' => 'nullable|numeric|gte:low',
             'defval' => 'nullable|string|max:1000',
             'unit_id' => 'nullable|exists:units,id',
             'normalRange' => 'required_without_all:low,upper|nullable|string|max:1000',
@@ -92,9 +92,9 @@ public function show(MainTest $mainTest, ChildTest $childTest)
     /**
      * Remove the specified child test.
      */
-    public function destroy(MainTest $mainTest, ChildTest $childTest)
+    public function destroy( ChildTest $childTest)
     {
-        if ($childTest->main_test_id !== $mainTest->id) abort(404);
+        // if ($childTest->main_test_id !== $mainTest->id) abort(404);
         // $this->authorize('update', $mainTest); // Or specific delete child_test permission
 
         // Add checks: e.g., cannot delete if linked to requested_results

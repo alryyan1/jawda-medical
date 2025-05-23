@@ -18,6 +18,7 @@ use Carbon\Carbon;
 use App\Http\Resources\ServiceResource; // Can be adapted or a new one created
 use App\Models\Doctor;
 use App\Models\DoctorShift;
+use App\Models\MainTest;
 use App\Models\Setting;
 use App\Models\Shift;
 use App\Services\Pdf\MyCustomTCPDF;
@@ -137,8 +138,8 @@ class ReportController extends Controller
             ],
         ]);
     }
-    
-public function doctorShiftsReportPdf(Request $request)
+
+    public function doctorShiftsReportPdf(Request $request)
     {
         // Permission Check (ensure this permission is defined and assigned)
         // if (!Auth::user()->can('view doctor_shift_reports')) { 
@@ -156,11 +157,11 @@ public function doctorShiftsReportPdf(Request $request)
 
         // --- Fetch Data (same logic as before) ---
         $query = DoctorShift::with([
-                               'doctor', 
-                               'user', 
-                               'generalShift',
-                           ])
-                           ->latest('start_time');
+            'doctor',
+            'user',
+            'generalShift',
+        ])
+            ->latest('start_time');
 
         $filterCriteria = [];
         // ... (filter application logic - same as before) ...
@@ -176,12 +177,12 @@ public function doctorShiftsReportPdf(Request $request)
         if ($doctorShifts->isEmpty()) {
             return response()->json(['message' => 'لا توجد بيانات لإنشاء التقرير بناءً على الفلاتر المحددة.'], 404);
         }
-        
+
         $filterCriteriaString = !empty($filterCriteria) ? "الفلاتر: " . implode(' | ', $filterCriteria) : "عرض كل المناوبات";
 
         // --- PDF Generation ---
         // Using TCPDF constants for orientation, unit, format
-     // ***** CORRECTED INSTANTIATION *****
+        // ***** CORRECTED INSTANTIATION *****
         $pdf = new MyCustomTCPDF(
             'تقرير مناوبات الأطباء',      // $reportTitle
             $filterCriteriaString,         // $filterCriteria
@@ -256,7 +257,7 @@ public function doctorShiftsReportPdf(Request $request)
 
             // Doctor Name (might need MultiCell if names can be long)
             $pdf->MultiCell($colWidths[0], $rowMaxHeight, $ds->doctor->name ?? '-', $border, 'R', $fillRow, $ln, '', '', true, 0, false, true, $rowMaxHeight, 'M');
-            $pdf->MultiCell($colWidths[1], $rowMaxHeight, $ds->generalShift->name ?? ($ds->shift_id ? '#'.$ds->shift_id : '-'), $border, 'C', $fillRow, $ln, '', '', true, 0, false, true, $rowMaxHeight, 'M');
+            $pdf->MultiCell($colWidths[1], $rowMaxHeight, $ds->generalShift->name ?? ($ds->shift_id ? '#' . $ds->shift_id : '-'), $border, 'C', $fillRow, $ln, '', '', true, 0, false, true, $rowMaxHeight, 'M');
             $pdf->MultiCell($colWidths[2], $rowMaxHeight, $startTime, $border, 'C', $fillRow, $ln, '', '', true, 0, false, true, $rowMaxHeight, 'M');
             $pdf->MultiCell($colWidths[3], $rowMaxHeight, $endTime, $border, 'C', $fillRow, $ln, '', '', true, 0, false, true, $rowMaxHeight, 'M');
             $pdf->MultiCell($colWidths[4], $rowMaxHeight, $duration, $border, 'C', $fillRow, $ln, '', '', true, 0, false, true, $rowMaxHeight, 'M');
@@ -272,7 +273,136 @@ public function doctorShiftsReportPdf(Request $request)
         $pdf->Output($pdfFileName, 'I'); // 'I' for inline display in browser
         exit; // Important to prevent Laravel from sending further output
     }
+    public function generatePriceListPdf(Request $request)
+    {
+        // Permission Check
+        // if (!Auth::user()->can('print lab_price_list')) { // Or 'view lab_price_list'
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
+        $request->validate([
+            'search_service_name' => 'nullable|string|max:255',
+            // Add other filters if your price list page supports them and you want them in PDF
+            // 'service_group_id' => 'nullable|integer|exists:service_groups,id',
+            // 'available' => 'nullable|boolean',
+        ]);
+
+        // --- Fetch Data ---
+        $query = MainTest::query()
+            ->where('available', true) // Typically, price lists are for available tests
+            ->orderBy('main_test_name');
+
+        $filterCriteria = [];
+
+        if ($request->filled('search_service_name')) {
+            $searchTerm = $request->search_service_name;
+            $query->where('main_test_name', 'LIKE', '%' . $searchTerm . '%');
+            $filterCriteria[] = "بحث: " . $searchTerm;
+        }
+        // Add other filters here if applicable
+        // if ($request->filled('service_group_id')) { ... }
+
+        $mainTests = $query->get(['id', 'main_test_name', 'price']); // Select only necessary columns
+
+        if ($mainTests->isEmpty()) {
+            return response()->json(['message' => 'لا توجد فحوصات لعرضها في قائمة الأسعار بناءً على الفلاتر.'], 404);
+        }
+
+        $filterCriteriaString = !empty($filterCriteria) ? implode(' | ', $filterCriteria) : "جميع الفحوصات المتاحة";
+
+        // --- PDF Generation ---
+        $pdf = new MyCustomTCPDF(
+            'قائمة أسعار الفحوصات المخبرية', // Report Title
+            $filterCriteriaString,             // Filters applied
+            'P',                               // Orientation: Portrait for a list
+            'mm',
+            'A4',
+            true,
+            'UTF-8',
+            false
+        );
+
+        $pdf->AddPage();
+        $pdf->SetLineWidth(0.1);
+
+        // --- Table Content ---
+        // Define column widths for Portrait A4 (width ~210mm - margins ~20mm = ~190mm usable)
+        // For a 2-column layout (Test Name | Price) repeated
+        $numColumnsOnPage = 2; // Number of "Test | Price" blocks per row
+        $itemBlockWidth = ($pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - (($numColumnsOnPage - 1) * 5)) / $numColumnsOnPage; // 5mm gap between blocks
+        $testNameWidth = $itemBlockWidth * 0.70; // 70% for name
+        $priceWidth = $itemBlockWidth * 0.30;    // 30% for price
+
+        $cellHeight = 6;
+        $headerFont = $pdf->getDefaultFontFamily(); // Or $pdf->defaultFontBold
+        $dataFont = $pdf->getDefaultFontFamily();
+
+        $pdf->SetFont($headerFont, 'B', 9);
+        $pdf->SetFillColor(230, 230, 230);
+
+        $currentX = $pdf->GetX();
+        $currentY = $pdf->GetY();
+        $columnCounter = 0;
+
+        foreach ($mainTests as $index => $test) {
+            if ($columnCounter == 0) { // Start of a new visual row of blocks
+                $currentY = $pdf->GetY(); // Get Y for the start of this visual row
+                $currentX = $pdf->getMargins()['left'];
+                // Draw top border for the "row" of blocks if it's not the first item overall
+                if ($index > 0) {
+                    // $this->Line($this->getX(), $currentY, $this->getPageWidth() - $this->getMargins()['right'], $currentY);
+                }
+            } else {
+                $currentX += $itemBlockWidth + 5; // Move to next block position with gap
+            }
+
+            // Store Y before drawing this item block to reset for next block in same visual row
+            $yForItemBlock = $currentY;
+
+            // --- Draw one item block (Test Name & Price) ---
+            // Header for this item block (optional, could be just data)
+            // $pdf->SetXY($currentX, $yForItemBlock);
+            // $pdf->Cell($testNameWidth, $cellHeight, 'الفحص', 1, 0, 'C', true);
+            // $pdf->Cell($priceWidth, $cellHeight, 'السعر', 1, 1, 'C', true); // ln=1 to ensure Y is updated
+            // $yForItemBlock = $pdf->GetY();
+
+
+            $pdf->SetFont($dataFont, '', 8);
+
+            // Test Name Cell
+            $pdf->SetXY($currentX, $yForItemBlock);
+            $pdf->MultiCell($testNameWidth, $cellHeight, $test->main_test_name, 1, 'R', false, 0, '', '', true, 0, false, true, $cellHeight, 'M');
+
+            // Price Cell
+            $pdf->SetXY($currentX + $testNameWidth, $yForItemBlock);
+            $pdf->MultiCell($priceWidth, $cellHeight, number_format((float)$test->price, 2), 1, 'C', false, 0, '', '', true, 0, false, true, $cellHeight, 'M'); // ln=0 if more blocks in this row
+
+            $columnCounter++;
+
+            if ($columnCounter >= $numColumnsOnPage) {
+                $pdf->Ln($cellHeight); // Move to next line after completing a visual row of blocks
+                $columnCounter = 0;
+                // Check for page break
+                if ($pdf->GetY() + $cellHeight > ($pdf->getPageHeight() - $pdf->getBreakMargin())) {
+                    $pdf->AddPage(); // TCPDF will call Header()
+                    $currentY = $pdf->GetY(); // Reset Y for new page
+                    $pdf->SetFont($headerFont, 'B', 9); // Reset font for potential headers if you had them per block
+                    $pdf->SetFillColor(230, 230, 230);
+                }
+            }
+        }
+
+        // If the last row was not full, ensure we move down
+        if ($columnCounter != 0) {
+            $pdf->Ln($cellHeight);
+        }
+
+        // --- Output PDF ---
+        $pdfFileName = 'lab_price_list_' . date('Ymd_His') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
 }
-
-
-

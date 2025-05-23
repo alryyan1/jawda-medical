@@ -8,4 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 class LabRequest extends Model
 {
     use HasFactory;
+    public $table = 'labrequests';
+
 }
