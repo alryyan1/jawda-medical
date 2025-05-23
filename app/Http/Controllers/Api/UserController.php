@@ -6,6 +6,7 @@ use App\Http\Resources\RoleResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Resources\UserResource;
+use App\Models\RequestedServiceDeposit;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -111,4 +112,44 @@ class UserController extends Controller
          }
         return RoleResource::collection(Role::orderBy('name')->get());
     }
+    public function getCurrentUserShiftIncomeSummary(Request $request)
+{
+    $request->validate([
+        'shift_id' => 'required|integer|exists:shifts,id',
+    ]);
+
+    $user = Auth::user();
+    $shiftId = $request->input('shift_id');
+
+    // Ensure the provided shift is actually open, or allow for closed shifts if that's the requirement
+    // $shift = Shift::where('id', $shiftId)->open()->first();
+    // if (!$shift) {
+    //     return response()->json(['message' => 'الوردية المحددة ليست مفتوحة أو غير موجودة.'], 404);
+    // }
+
+    // Summing payments handled by this user in this shift
+    $depositsQuery = RequestedServiceDeposit::where('user_id', $user->id)
+                                            ->where('shift_id', $shiftId);
+
+    $totalCash = (clone $depositsQuery)->where('is_bank', false)->sum('amount');
+    $totalBank = (clone $depositsQuery)->where('is_bank', true)->sum('amount');
+    $totalIncome = $totalCash + $totalBank;
+    
+    // You might also want to include other income sources or expenses handled by the user
+    // For example, if users can record direct cash income/expenses not tied to services.
+    // This would require querying other tables. For now, focusing on service deposits.
+
+    return response()->json([
+        'data' => [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'shift_id' => (int) $shiftId,
+            'total_income' => (float) $totalIncome,
+            'total_cash' => (float) $totalCash,
+            'total_bank' => (float) $totalBank,
+            // Add more details if needed, like number of transactions
+        ]
+    ]);
+}
+
 }

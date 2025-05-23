@@ -1,14 +1,18 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ChildGroupController;
+use App\Http\Controllers\Api\ChildTestController;
 use App\Http\Controllers\Api\ClinicWorkspaceController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyServiceController;
+use App\Http\Controllers\Api\ContainerController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DoctorScheduleController;
 use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
 use App\Http\Controllers\Api\FinanceAccountController;
+use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
@@ -18,6 +22,7 @@ use App\Http\Controllers\Api\ServiceGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\SpecialistController;
+use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitServiceController;
 use Illuminate\Http\Request;
@@ -150,12 +155,25 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     // Finance Accounts
     Route::get('finance-accounts-list', [FinanceAccountController::class, 'indexList']);
+    Route::get('/user/current-shift-income-summary', [UserController::class, 'getCurrentUserShiftIncomeSummary']);
 
     // Settings
     Route::get('/settings', [SettingsController::class, 'show']);
     Route::post('/settings', [SettingsController::class, 'update']);
 
+    Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
 
     Route::get('/reports/service-statistics', [ReportController::class, 'serviceStatistics']);
+       Route::get('containers-list', [ContainerController::class, 'indexList']);
+    Route::post('containers', [ContainerController::class, 'store']); // For quick add dialog
+    Route::apiResource('main-tests', MainTestController::class);
+      Route::get('units-list', [UnitController::class, 'indexList']);
+    Route::post('units', [UnitController::class, 'store']);
+    Route::get('child-groups-list', [ChildGroupController::class, 'indexList']);
+    Route::post('child-groups', [ChildGroupController::class, 'store']);
+
+    // Nested resource for child tests under a main test
+    Route::apiResource('main-tests.child-tests', ChildTestController::class)->shallow();
+    // Route::apiResource('containers', ContainerController::class); // If full CRUD for containers
 
 });

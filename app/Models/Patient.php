@@ -24,6 +24,7 @@ class Patient extends Model
         'gender',
         'age_day',
         'age_month',
+        'file_id', // Foreign key to the files table
         'age_year',
         'company_id',
         'subcompany_id',
@@ -279,6 +280,10 @@ class Patient extends Model
         return empty($parts) ? 'N/A' : implode(' / ', $parts);
     }
 
+    public function file()
+{
+    return $this->belongsTo(File::class);
+}
     /**
      * Calculate age from Date of Birth if you were to store DOB instead of age parts.
      * public function getAgeAttribute() {

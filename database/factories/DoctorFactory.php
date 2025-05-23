@@ -34,9 +34,11 @@ class DoctorFactory extends Factory
         return [
             'name' => $fullName,
             'phone' => $this->faker->numerify('09########'), // Sudanese phone format example
-            'cash_percentage' => $this->faker->randomFloat(2, 5, 20),    // e.g., 5.00 to 20.00
-            'company_percentage' => $this->faker->randomFloat(2, 10, 25),
+            'cash_percentage' => $this->faker->numberBetween(1, 10) * 10,    // 10, 20, ..., 100
+            'company_percentage' => $this->faker->numberBetween(1, 10) * 10, // 10, 20, ..., 100
             'static_wage' => $this->faker->randomFloat(2, 500, 5000),
+            'lab_percentage' => $this->faker->numberBetween(1, 2) * 10,     // 10 or 20
+            'static_wage' => $this->faker->randomElement([5000, 4000, 3000, 2000]),
             'lab_percentage' => $this->faker->randomFloat(2, 5, 15),
             
             // Assumes Specialist and FinanceAccount factories/records exist

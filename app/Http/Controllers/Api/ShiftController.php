@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use App\Http\Resources\ShiftResource;
+use App\Models\DoctorShift;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ShiftController extends Controller
@@ -102,12 +104,18 @@ class ShiftController extends Controller
     }
 
 
+ 
     /**
      * Close an open clinic shift.
-     * This action would typically involve financial reconciliation.
+     * This action will also close any associated active doctor shifts.
      */
     public function closeShift(Request $request, Shift $shift)
     {
+        // Permission Check: e.g., can('close clinic_shifts')
+        // if (!Auth::user()->can('close clinic_shifts')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
         if ($shift->is_closed) {
             return response()->json(['message' => 'وردية العمل هذه مغلقة بالفعل.'], 400);
         }
@@ -118,27 +126,58 @@ class ShiftController extends Controller
             'bank' => 'required|numeric|min:0',
             'expenses' => 'required|numeric|min:0',
             'touched' => 'sometimes|boolean',
-            // 'user_id_closed' => 'required|exists:users,id', // If tracking who closed
+            // 'user_id_closed' => 'nullable|exists:users,id', // Optional: if user closing is different
         ]);
 
-        // TODO: Add logic for financial reconciliation here if needed.
-        // E.g., compare system calculated totals with manually entered totals.
-        // The 'touched' flag could be set if there's a discrepancy or manual override.
+        DB::beginTransaction();
+        try {
+            $closingTime = Carbon::now();
+            $closingUserId = Auth::id(); // User performing the close action
 
-        $shift->update([
-            'total' => $validatedData['total'],
-            'bank' => $validatedData['bank'],
-            'expenses' => $validatedData['expenses'],
-            'touched' => $request->input('touched', $shift->touched), // Keep existing if not provided
-            'is_closed' => true,
-            'closed_at' => Carbon::now(),
-            // 'user_id_closed' => Auth::id(), // Or passed in request
-        ]);
+            // 1. Update and close the main clinic shift
+            $shift->update([
+                'total' => $validatedData['total'],
+                'bank' => $validatedData['bank'],
+                'expenses' => $validatedData['expenses'],
+                'touched' => $request->input('touched', $shift->touched),
+                'is_closed' => true,
+                'closed_at' => $closingTime,
+                // 'user_id_closed' => $closingUserId, // If you track this
+            ]);
 
-        // TODO: Potentially trigger events, like generating end-of-shift reports.
+            // 2. Find and close all open DoctorShift records associated with this general Shift
+            $openDoctorShifts = DoctorShift::where('shift_id', $shift->id)
+                                          ->where('status', true) // Only active ones
+                                          ->get();
 
-        return new ShiftResource($shift);
+            foreach ($openDoctorShifts as $doctorShift) {
+                $doctorShift->update([
+                    'status' => false,
+                    'end_time' => $closingTime, // Set their end time to the general shift's closing time
+                    // Optionally, if a different user is closing, or log who closed it.
+                    // This assumes the DoctorShift model doesn't have a specific 'closed_by_user_id'.
+                    // If it does, you might want to update that too.
+                ]);
+            }
+            
+            // TODO: Add logic for financial reconciliation here if needed.
+            // E.g., compare system calculated totals with manually entered totals.
+            // The 'touched' flag could be set if there's a discrepancy or manual override.
+
+            // TODO: Potentially trigger events, like generating end-of-shift reports.
+            // event(new ClinicShiftClosed($shift));
+
+            DB::commit();
+
+            return new ShiftResource($shift->loadMissing(['doctorShifts', /* other relations for resource */]));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            // Log the error: Log::error('Failed to close clinic shift and associated doctor shifts: ' . $e->getMessage());
+            return response()->json(['message' => 'حدث خطأ أثناء إغلاق الوردية.', 'error' => $e->getMessage()], 500);
+        }
     }
+
 
     /**
      * Update financial details of a shift (e.g., by an accountant after review).

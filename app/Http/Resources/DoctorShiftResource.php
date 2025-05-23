@@ -33,12 +33,17 @@ class DoctorShiftResource extends JsonResource
             'status_text' => $this->status ? 'مفتوحة' : 'مغلقة',
             'start_time' => $this->start_time?->toIso8601String(),
             'end_time' => $this->end_time?->toIso8601String(),
+            'doctor_specialist_name' => $this->whenLoaded('doctor.specialist', optional($this->doctor->specialist)->name), // Get specialist name
             'formatted_start_time' => $this->start_time?->format('Y-m-d H:i A'),
             'formatted_end_time' => $this->end_time?->format('Y-m-d H:i A'),
             'duration' => $duration, // Calculated duration
             'is_cash_revenue_prooved' => (bool) $this->is_cash_revenue_prooved,
+            'doctor_avatar_url' => $this->whenLoaded('doctor', optional($this->doctor)->image_url), // If doctor model has image_url accessor
             // ... other proof flags ...
             'created_at' => $this->created_at?->toIso8601String(),
+            // New fields computed in controller
+            'is_examining' => (bool) ($this->is_examining ?? false), // Default to false if not set
+            'patients_count' => (int) ($this->patients_waiting_or_with_doctor_count ?? 0), // Default 
             // 'visits_count' => $this->whenCounted('doctorVisits'), // If you add withCount
         ];
     }

@@ -8,6 +8,7 @@ use App\Models\Doctor;
 use App\Models\Shift; // General clinic shift
 use Illuminate\Http\Request;
 use App\Http\Resources\DoctorShiftResource;
+use App\Models\DoctorVisit;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -20,29 +21,48 @@ class DoctorShiftController extends Controller
      */
     public function getActiveShifts(Request $request)
     {
-        // Permission check (example)
-        // if (!Auth::user()->can('view active_doctor_shifts')) {
-        //     return response()->json(['message' => 'Unauthorized'], 403);
-        // }
+        $query = DoctorShift::with([
+            'doctor:id,name,specialist_id', // Get specialist_id
+            'doctor.specialist:id,name', // Eager load specialist name from doctor
+        ])
+            ->activeToday(); // Your scope for active shifts today
 
-        // Determine the current general clinic shift if your system uses one
-        // $currentClinicShift = Shift::where('is_closed', false)->orderBy('start_datetime', 'desc')->first();
-        // For now, let's assume we don't filter by a general clinic shift unless passed
+        if ($request->has('clinic_shift_id')) {
+            $query->where('shift_id', $request->clinic_shift_id);
+        }
 
-        $query = DoctorShift::with('doctor') // Eager load only necessary doctor fields
-            ->activeToday(); // Use the scope defined in the model
+        $activeDoctorShifts = $query->get()->map(function ($doctorShift) {
+            // Determine current patient status for the doctor
+            // This is a simplified example. You might have more complex logic or a dedicated 'current_patient_visit_id' on DoctorShift
+            $currentVisit = DoctorVisit::where('doctor_id', $doctorShift->doctor_id)
+                ->where('doctor_shift_id', $doctorShift->id) // Link to this specific doctor shift session
+                ->where('status', 'with_doctor') // Check if any patient is currently 'with_doctor'
+                ->orderBy('updated_at', 'desc') // Get the most recent one
+                ->first();
 
-        // if ($request->has('clinic_shift_id')) {
-        //     $query->where('shift_id', $request->clinic_shift_id);
-        // }
+            // Count patients assigned to this doctor in this shift (e.g., 'waiting' or 'with_doctor')
+            $patientCount = DoctorVisit::where('doctor_id', $doctorShift->doctor_id)
+                ->where('doctor_shift_id', $doctorShift->id)
+                ->whereIn('status', ['waiting', 'with_doctor']) // Count relevant statuses
+                ->count();
 
-        // You might want to order them by doctor name or by when their shift started
-        // $activeDoctorShifts = $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
-        //     ->orderBy('doctors.name')
-        //     ->select('doctor_shifts.*') // Avoid ambiguity
-        //     ->get();
+            // Add these computed properties to the DoctorShift object before it goes to the resource
+            $doctorShift->current_patient_visit_id = $currentVisit?->id;
+            $doctorShift->is_examining = !!$currentVisit;
+            $doctorShift->patients_waiting_or_with_doctor_count = $patientCount;
 
-        $activeDoctorShifts = $query->get();
+            return $doctorShift;
+        });
+
+        // Order after mapping custom attributes if sorting by them
+        // For now, let's assume Doctor model has user_id linking to a user, and we sort by user's name for Doctor.
+        // Or simply order by doctor's name directly from the 'doctors' table.
+        // The join and select('doctor_shifts.*') from previous version was good for direct DB ordering.
+        // If ordering after map:
+        // $activeDoctorShifts = $activeDoctorShifts->sortBy(function($ds) {
+        //     return $ds->doctor->name ?? '';
+        // });
+
 
         return DoctorShiftResource::collection($activeDoctorShifts);
     }

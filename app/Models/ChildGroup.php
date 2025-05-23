@@ -8,4 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 class ChildGroup extends Model
 {
     use HasFactory;
+    protected $fillable = ['name'];
+    public $timestamps = false;
 }
