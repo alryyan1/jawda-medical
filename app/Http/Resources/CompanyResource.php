@@ -19,6 +19,8 @@ class CompanyResource extends JsonResource {
             // Optionally, a count or brief summary of contracted services
             'contracted_services_count' => $this->whenCounted('contractedServices'),
             // 'contracted_services' => CompanyServiceEntryResource::collection($this->whenLoaded('companyServiceEntries')), // If you fetch them directly
+                    'contracted_main_tests_count' => $this->whenCounted('contractedMainTests'), // NEW
+
         ];
     }
 }

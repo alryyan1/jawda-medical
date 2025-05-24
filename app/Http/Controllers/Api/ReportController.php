@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB; // For aggregate functions
 use Carbon\Carbon;
 // You might create a specific Resource for this report item if needed
 use App\Http\Resources\ServiceResource; // Can be adapted or a new one created
+use App\Models\Company;
 use App\Models\Doctor;
 use App\Models\DoctorShift;
 use App\Models\MainTest;
@@ -405,4 +406,120 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+  public function generateCompanyServiceContractPdf(Request $request, Company $company)
+    {
+        // Permission Check: e.g., can('print company_contracts') or can('view company_contracts')
+        // if (!auth()->user()->can('print company_contracts')) { ... }
+
+        $request->validate(['search' => 'nullable|string|max:255']);
+        $searchTerm = $request->search;
+
+        // Fetch contracted services with pivot data
+        $query = $company->contractedServices()->with('serviceGroup')->orderBy('services.name'); // Order by service name
+        if ($searchTerm) {
+            $query->where('services.name', 'LIKE', "%{$searchTerm}%");
+        }
+        $contractedServices = $query->get();
+
+        if ($contractedServices->isEmpty()) {
+            return response()->json(['message' => 'لا توجد خدمات متعاقد عليها لهذه الشركة لإنشاء التقرير.'], 404);
+        }
+
+        $reportTitle = 'تقرير عقد الخدمات لشركة: ' . $company->name;
+        $filterCriteriaString = $searchTerm ? "بحث: " . $searchTerm : "جميع الخدمات المتعاقد عليها";
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteriaString, 'P', 'mm', 'A4');
+        $pdf->AddPage();
+
+        $headers = ['اسم الخدمة', 'المجموعة', 'سعر العقد', 'تحمل الشركة', 'موافقة'];
+        // A4 Portrait width ~190mm usable
+        $colWidths = [70, 40, 25, 35, 20]; 
+        $colWidths[count($colWidths)-1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
+
+        $alignments = ['R', 'R', 'C', 'C', 'C'];
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        $fill = false;
+        foreach ($contractedServices as $service) {
+            $enduranceText = $service->pivot->use_static 
+                ? number_format((float)$service->pivot->static_endurance, 2) . ' (ثابت)'
+                : number_format((float)$service->pivot->percentage_endurance, 1) . '%';
+
+            $rowData = [
+                $service->name,
+                $service->serviceGroup?->name ?? '-',
+                number_format((float)$service->pivot->price, 2),
+                $enduranceText,
+                $service->pivot->approval ? 'نعم' : 'لا',
+            ];
+            $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
+            $fill = !$fill;
+        }
+         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+
+
+        $pdfFileName = 'company_service_contracts_' . $company->id . '_' . date('Ymd_His') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+                  ->header('Content-Type', 'application/pdf')
+                  ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+
+    public function generateCompanyMainTestContractPdf(Request $request, Company $company)
+    {
+        // Permission Check
+        // if (!auth()->user()->can('print company_contracts')) { ... }
+
+        $request->validate(['search' => 'nullable|string|max:255']);
+        $searchTerm = $request->search;
+
+        $query = $company->contractedMainTests()->with('container')->orderBy('main_tests.main_test_name');
+        if ($searchTerm) {
+            $query->where('main_tests.main_test_name', 'LIKE', "%{$searchTerm}%");
+        }
+        $contractedTests = $query->get();
+
+        if ($contractedTests->isEmpty()) {
+            return response()->json(['message' => 'لا توجد فحوصات متعاقد عليها لهذه الشركة لإنشاء التقرير.'], 404);
+        }
+
+        $reportTitle = 'تقرير عقد الفحوصات لشركة: ' . $company->name;
+        $filterCriteriaString = $searchTerm ? "بحث: " . $searchTerm : "جميع الفحوصات المتعاقد عليها";
+        
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteriaString, 'P', 'mm', 'A4');
+        $pdf->AddPage();
+
+        $headers = ['اسم الفحص', 'نوع العينة', 'سعر العقد', 'تحمل الشركة', 'موافقة'];
+        $colWidths = [70, 35, 25, 35, 20]; 
+        $colWidths[count($colWidths)-1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
+
+        $alignments = ['R', 'R', 'C', 'C', 'C'];
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        $fill = false;
+        foreach ($contractedTests as $test) {
+            $enduranceText = $test->pivot->use_static 
+                ? number_format((float)$test->pivot->endurance_static, 0) . ' (ثابت)' // Assuming static endurance for tests might be integer
+                : number_format((float)$test->pivot->endurance_percentage, 1) . '%';
+            
+            $rowData = [
+                $test->main_test_name,
+                $test->container?->container_name ?? '-',
+                number_format((float)$test->pivot->price, 2),
+                $enduranceText,
+                $test->pivot->approve ? 'نعم' : 'لا',
+            ];
+            $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
+            $fill = !$fill;
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+
+
+        $pdfFileName = 'company_test_contracts_' . $company->id . '_' . date('Ymd_His') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+                  ->header('Content-Type', 'application/pdf')
+                  ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
 }
+

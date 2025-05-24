@@ -103,20 +103,19 @@ class DoctorVisit extends Model
 
     /**
      * Get all lab requests associated with this visit.
-     * This assumes lab_requests has a 'doctor_visit_id' foreign key.
-     * If lab_requests are only linked to patient, this relation might not be direct.
-     * public function labRequests() {
-     *     return $this->hasMany(LabRequest::class);
-     * }
      */
+    public function labRequests()
+    {
+        return $this->hasMany(LabRequest::class, 'doctor_visit_id');
+    }
     
     /**
      * Get all prescriptions issued during this visit.
-     * This assumes drugs_prescribed has a 'doctor_visit_id' foreign key.
-     * public function prescriptions() {
-     *     return $this->hasMany(DrugPrescribed::class);
-     * }
      */
+    public function prescriptions()
+    {
+        return $this->hasMany(DrugPrescribed::class, 'doctor_visit_id');
+    }
 
     // Scopes
     public function scopeToday($query)
@@ -143,4 +142,7 @@ class DoctorVisit extends Model
     {
         return $query->where('status', 'completed');
     }
+
+    
+  
 }

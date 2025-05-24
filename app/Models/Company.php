@@ -37,4 +37,19 @@ class Company extends Model
     public function companyServiceEntries() {
         return $this->hasMany(CompanyService::class);
     }
+    public function contractedMainTests()
+{
+    return $this->belongsToMany(MainTest::class, 'company_main_test', 'company_id', 'main_test_id')
+                ->using(CompanyMainTest::class) // Specify the pivot model
+                ->withPivot([ // Pivot table columns to retrieve
+                    'id', // The pivot table's own ID
+                    'status', 'price', 'approve', 'endurance_static', 
+                    'endurance_percentage', 'use_static'
+                ]);
+                // ->withTimestamps(); // If company_main_test table has timestamps
+}
+// Direct relationship to pivot records if needed
+public function companyMainTestEntries() {
+    return $this->hasMany(CompanyMainTest::class);
+}
 }

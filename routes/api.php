@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
 use App\Http\Controllers\Api\ClinicWorkspaceController;
 use App\Http\Controllers\Api\CompanyController;
+use App\Http\Controllers\Api\CompanyMainTestController;
 use App\Http\Controllers\Api\CompanyServiceController;
 use App\Http\Controllers\Api\ContainerController;
 use App\Http\Controllers\Api\DoctorController;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Api\DoctorScheduleController;
 use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
 use App\Http\Controllers\Api\FinanceAccountController;
+use App\Http\Controllers\Api\LabRequestController;
 use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PatientController;
@@ -164,10 +166,12 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/settings', [SettingsController::class, 'update']);
 
   Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
-
   Route::get('/reports/service-statistics', [ReportController::class, 'serviceStatistics']);
+
   Route::get('containers-list', [ContainerController::class, 'indexList']);
   Route::post('containers', [ContainerController::class, 'store']); // For quick add dialog
+  // Route::apiResource('containers', ContainerController::class); // If full CRUD for containers
+
   Route::apiResource('main-tests', MainTestController::class);
   Route::get('units-list', [UnitController::class, 'indexList']);
   Route::post('units', [UnitController::class, 'store']);
@@ -177,12 +181,44 @@ Route::middleware('auth:sanctum')->group(function () {
   // Nested resource for child tests under a main test
   Route::apiResource('main-tests.child-tests', ChildTestController::class)->shallow();
   Route::put('/batch-update-prices', [MainTestController::class, 'batchUpdatePrices']);
-  // Route::apiResource('containers', ContainerController::class); // If full CRUD for containers
   Route::post('/main-tests/batch-delete', [MainTestController::class, 'batchDeleteTests']); // Using POST for body with IDs
   Route::get('/reports/lab-price-list/pdf', [ReportController::class, 'generatePriceListPdf']);
-      Route::get('packages-list', [PackageController::class, 'indexList']);
-    Route::apiResource('packages', PackageController::class);
-    // Example for a dedicated route to assign tests if needed, though update handles it
-    // Route::post('packages/{package}/assign-tests', [PackageController::class, 'assignTests']);
 
+  Route::get('packages-list', [PackageController::class, 'indexList']);
+  Route::apiResource('packages', PackageController::class);
+
+  // Routes for managing main test contracts of a specific company
+  Route::get('companies/{company}/contracted-main-tests', [CompanyMainTestController::class, 'index'])->name('companies.main_test_contracts.index');
+  Route::get('companies/{company}/available-main-tests', [CompanyMainTestController::class, 'availableMainTests'])->name('companies.main_test_contracts.available');
+  Route::post('companies/{company}/contracted-main-tests', [CompanyMainTestController::class, 'store'])->name('companies.main_test_contracts.store');
+  Route::post('companies/{company}/contracted-main-tests/import-all', [CompanyMainTestController::class, 'importAllMainTests'])->name('companies.main_test_contracts.importAll');
+  // Note: For update and destroy, Laravel's route model binding will bind {main_test} to a MainTest instance
+  Route::put('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'update'])->name('companies.main_test_contracts.update');
+  Route::delete('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'destroy'])->name('companies.main_test_contracts.destroy');
+  // Example for a dedicated route to assign tests if needed, though update handles it
+  // Route::post('packages/{package}/assign-tests', [PackageController::class, 'assignTests']);
+
+  Route::get('/reports/company/{company}/service-contracts/pdf', [ReportController::class, 'generateCompanyServiceContractPdf']);
+  Route::get('/reports/company/{company}/test-contracts/pdf', [ReportController::class, 'generateCompanyMainTestContractPdf']);
+
+  // Lab Requests
+  Route::get('/visits/{visit}/lab-requests', [LabRequestController::class, 'indexForVisit']);
+  Route::get('/visits/{visit}/available-lab-tests', [LabRequestController::class, 'availableTestsForVisit']);
+  Route::post('/visits/{visit}/lab-requests-batch', [LabRequestController::class, 'storeBatchForVisit']);
+
+  Route::put('/labrequests/{labrequest}', [LabRequestController::class, 'update']);
+  Route::delete('/labrequests/{labrequest}', [LabRequestController::class, 'destroy']);
+  Route::post('/labrequests/{labrequest}/pay', [LabRequestController::class, 'recordPayment']);
+  Route::post('/labrequests/{labrequest}/authorize', [LabRequestController::class, 'authorizeResults']);
+
+  Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
+
+  // This is the endpoint that ResultEntryPanel uses to get all data for one LabRequest
+  Route::get('/labrequests/{labrequest}/for-result-entry', [LabRequestController::class, 'getLabRequestForEntry']); 
+
+  Route::post('/labrequests/{labrequest}/results', [LabRequestController::class, 'saveResults']);
+
+  // Generic LabRequest CRUD (if needed separately from visit context for some actions)
+  Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']); 
+  // The `except(['index', 'store'])` means GET /labrequests/{labrequest} (for show) SHOULD be defined by apiResource.
 });

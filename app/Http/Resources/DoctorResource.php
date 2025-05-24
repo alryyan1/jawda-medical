@@ -23,7 +23,7 @@ class DoctorResource extends JsonResource
             'static_wage' => $this->static_wage,
             'lab_percentage' => $this->lab_percentage,
             'specialist_id' => $this->specialist_id,
-            'specialist_name' => $this->whenLoaded('specialist', $this->specialist->name), // Eager load 'specialist'
+            'specialist_name' => $this->whenLoaded('specialist', $this?->specialist?->name), // Eager load 'specialist'
             'start' => $this->start,
             'image' => $this->image, // You might want to return a full URL if storing paths
             'finance_account_id' => $this->finance_account_id,

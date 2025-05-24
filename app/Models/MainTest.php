@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -18,11 +20,11 @@ class MainTest extends Model
 
     protected $casts = [
         'pageBreak' => 'boolean',
-        'price' => 'decimal:1', // As per schema double(10,1)
+        // 'price' => 'decimal:1', // As per schema double(10,1)
         'divided' => 'boolean',
         'available' => 'boolean',
     ];
-    
+
     // Timestamps are NOT in your main_tests schema by default. If you added them:
     // public $timestamps = true; 
     // If not, then:
@@ -48,5 +50,19 @@ class MainTest extends Model
     public function labRequests()
     {
         return $this->hasMany(LabRequest::class);
+    }
+    public function companies()
+    {
+        return $this->belongsToMany(Company::class, 'company_main_test', 'main_test_id', 'company_id')
+            ->using(CompanyMainTest::class)
+            ->withPivot([
+                'id',
+                'status',
+                'price',
+                'approve',
+                'endurance_static',
+                'endurance_percentage',
+                'use_static'
+            ]);
     }
 }

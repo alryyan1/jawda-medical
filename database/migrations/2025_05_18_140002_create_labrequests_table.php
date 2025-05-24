@@ -38,6 +38,9 @@ return new class extends Migration
             $table->boolean('approve')->default(false);
             $table->double('endurance'); // Or decimal
             $table->boolean('is_paid')->default(false);
+            // Consider adding sample_collection_status, result_status, etc.
+            $table->string('sample_id')->nullable()->unique()->comment('Unique ID for the sample collected for this test');
+
 
             $table->timestamps();
         });
