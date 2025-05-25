@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
+use App\Http\Controllers\Api\ChildTestOptionController;
 use App\Http\Controllers\Api\ClinicWorkspaceController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyMainTestController;
@@ -220,5 +221,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
   // Generic LabRequest CRUD (if needed separately from visit context for some actions)
   Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']); 
+  Route::post('/main-tests/{main_test}/child-tests/batch-update-order', [ChildTestController::class, 'batchUpdateOrder'])->middleware('auth:sanctum');
+  Route::apiResource('child-tests.options', ChildTestOptionController::class)->shallow()->except(['show']);
+
   // The `except(['index', 'store'])` means GET /labrequests/{labrequest} (for show) SHOULD be defined by apiResource.
 });

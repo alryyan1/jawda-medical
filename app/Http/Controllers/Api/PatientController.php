@@ -112,7 +112,7 @@ class PatientController extends Controller
                 'doctor_id' => $visitDoctorId,
                 'user_id' => Auth::id(), // User creating the visit
                 'shift_id' => $currentGeneralShift->id, // General clinic shift
-                'doctor_shift_id' => $activeDoctorShiftId, // Link to specific doctor's work session
+                'doctor_shift_id' => $request->get('doctor_shift_id'), // Link to specific doctor's work session
                 'visit_date' => Carbon::today(),
                 'visit_time' => Carbon::now()->format('H:i:s'),
                 'status' => 'waiting', // Initial status for new registration

@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
                 RolesAndPermissionsSeeder::class,
                 AdminSeeder::class,
                 DummyDataSeeder::class,
+                ContainersTableSeeder::class,
                 MainTestsTableSeeder::class,
                 PackageTableSeeder::class,
                 UnitsTableSeeder::class,

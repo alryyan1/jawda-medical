@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -6,30 +7,49 @@ use App\Models\ChildTest;
 use App\Models\MainTest;
 use Illuminate\Http\Request;
 use App\Http\Resources\ChildTestResource;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ChildTestController extends Controller
 {
-    public function __construct() {
+    public function __construct()
+    {
         // Permissions: e.g., 'manage lab_tests' or more specific 'manage child_tests'
     }
 
- public function index(Request $request, MainTest $mainTest)
-{
-    $childTests = $mainTest->childTests()
-                           ->with(['unit', 'childGroup', 'options']) // Eager load options
-                           ->orderBy('test_order')
-                           ->orderBy('child_test_name')
-                           ->get();
-    return ChildTestResource::collection($childTests);
-}
+    public function index(Request $request, MainTest $mainTest)
+    {
+        $childTests = $mainTest->childTests()
+            ->with(['unit', 'childGroup', 'options']) // Eager load options
+            ->orderBy('test_order')
+            ->orderBy('child_test_name')
+            ->get();
+        return ChildTestResource::collection($childTests);
+    }
 
-// Example in ChildTestController@show
-public function show(MainTest $mainTest, ChildTest $childTest)
+    public function batchUpdateOrder(Request $request, MainTest $mainTest)
 {
-     if ($childTest->main_test_id !== $mainTest->id) abort(404);
-    return new ChildTestResource($childTest->loadMissing(['unit', 'childGroup', 'options'])); // Load options if not already loaded
+    // $this->authorize('update', $mainTest); // Or 'manage child_tests'
+    $validated = $request->validate([
+        'child_test_ids' => 'required|array',
+        'child_test_ids.*' => 'required|integer|exists:child_tests,id',
+    ]);
+
+    DB::transaction(function () use ($mainTest, $validated) {
+        foreach ($validated['child_test_ids'] as $index => $childTestId) {
+            $mainTest->childTests()
+                     ->where('id', $childTestId)
+                     ->update(['test_order' => $index + 1]);
+        }
+    });
+    return response()->json(['message' => 'تم تحديث ترتيب المكونات بنجاح.']);
 }
+    // Example in ChildTestController@show
+    public function show(MainTest $mainTest, ChildTest $childTest)
+    {
+        if ($childTest->main_test_id !== $mainTest->id) abort(404);
+        return new ChildTestResource($childTest->loadMissing(['unit', 'childGroup', 'options'])); // Load options if not already loaded
+    }
 
     /**
      * Store a new child test for a main test.
@@ -38,7 +58,10 @@ public function show(MainTest $mainTest, ChildTest $childTest)
     {
         // $this->authorize('update', $mainTest); // User needs permission to modify the main test
         $validatedData = $request->validate([
-            'child_test_name' => ['required', 'string', 'max:70',
+            'child_test_name' => [
+                'required',
+                'string',
+                'max:70',
                 Rule::unique('child_tests')->where(function ($query) use ($mainTest) {
                     return $query->where('main_test_id', $mainTest->id);
                 })
@@ -58,7 +81,7 @@ public function show(MainTest $mainTest, ChildTest $childTest)
         return new ChildTestResource($childTest->load(['unit', 'childGroup']));
     }
 
-    
+
 
     /**
      * Update the specified child test.
@@ -69,7 +92,11 @@ public function show(MainTest $mainTest, ChildTest $childTest)
         // $this->authorize('update', $mainTest);
 
         $validatedData = $request->validate([
-            'child_test_name' => ['sometimes','required', 'string', 'max:70',
+            'child_test_name' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:70',
                 // Rule::unique('child_tests')->ignore($childTest->id)->where(function ($query) use ($mainTest) {
                 //     return $query->where('main_test_id', $mainTest->id);
                 // })
@@ -92,7 +119,7 @@ public function show(MainTest $mainTest, ChildTest $childTest)
     /**
      * Remove the specified child test.
      */
-    public function destroy( ChildTest $childTest)
+    public function destroy(ChildTest $childTest)
     {
         // if ($childTest->main_test_id !== $mainTest->id) abort(404);
         // $this->authorize('update', $mainTest); // Or specific delete child_test permission

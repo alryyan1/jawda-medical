@@ -33,7 +33,7 @@ class MainTestController extends Controller
             $query->where('container_id', $request->container_id);
         }
 
-        $mainTests = $query->orderBy('main_test_name')->paginate($request->get('per_page', 15));
+        $mainTests = $query->orderBy('id', 'asc')->paginate($request->get('per_page', 15));
         return MainTestResource::collection($mainTests);
     }
 

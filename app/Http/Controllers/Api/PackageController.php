@@ -36,40 +36,30 @@ class PackageController extends Controller
     // For dropdowns
     public function indexList()
     {
-        $packages = Package::orderBy('package_name')->get(['package_id', 'package_name']);
-        // Using map to match expected structure for simple list, or adapt PackageResource
-        return response()->json($packages->map(fn($p) => ['id' => $p->package_id, 'name' => $p->package_name]));
+        // $this->authorize('list lab_test_packages'); // Or similar permission
+        $packages = \App\Models\Package::orderBy('package_name')->get(['package_id', 'package_name']);
+        // For consistency, you might want to use a PackageResource for this list too,
+        // or map it to a simple id/name structure if PackageResource is heavy.
+        // return \App\Http\Resources\PackageResource::collection($packages);
+        return response()->json($packages->map(fn($p) => [
+            'id' => $p->package_id, // Frontend might expect 'id'
+            'name' => $p->package_name 
+        ]));    
     }
 
     public function store(Request $request)
-    {
-        $validatedData = $request->validate([
-            'package_name' => 'required|string|max:50|unique:packages,package_name',
-            'container' => 'required|string|max:50', // Validate against 'containers' table if it's a FK
-            'exp_time' => 'required|integer|min:0',
-            'main_test_ids' => 'nullable|array', // Array of MainTest IDs to assign
-            'main_test_ids.*' => 'integer|exists:main_tests,id',
-        ]);
+{
+    // $this->authorize('create lab_test_packages');
+    $validatedData = $request->validate([
+        'package_name' => 'required|string|max:50|unique:packages,package_name',
+        'container' => 'required|string|max:50', // Or 'container_id' if FK
+        'exp_time' => 'required|integer|min:0',
+        // main_test_ids is not needed for quick add of just the package
+    ]);
 
-        DB::beginTransaction();
-        try {
-            $package = Package::create([
-                'package_name' => $validatedData['package_name'],
-                'container' => $validatedData['container'],
-                'exp_time' => $validatedData['exp_time'],
-            ]);
-
-            if (!empty($validatedData['main_test_ids'])) {
-                // Update MainTest records to set their pack_id
-                MainTest::whereIn('id', $validatedData['main_test_ids'])->update(['pack_id' => $package->package_id]);
-            }
-            DB::commit();
-            return new PackageResource($package->loadCount('mainTests'));
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'فشل إنشاء الحزمة.', 'error' => $e->getMessage()], 500);
-        }
-    }
+    $package = \App\Models\Package::create($validatedData);
+    return new \App\Http\Resources\PackageResource($package); // Return full resource
+}
 
     public function show(Package $package) // Route model binding uses primary key 'package_id'
     {
