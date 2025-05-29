@@ -51,6 +51,10 @@ class MainTest extends Model
     {
         return $this->hasMany(LabRequest::class);
     }
+    public function package()
+    {
+        return $this->belongsTo(Package::class);
+    }
     public function companies()
     {
         return $this->belongsToMany(Company::class, 'company_main_test', 'main_test_id', 'company_id')

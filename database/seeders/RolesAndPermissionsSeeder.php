@@ -61,6 +61,32 @@ class RolesAndPermissionsSeeder extends Seeder
         // ... add permissions for other modules (services, appointments, clinic, etc.)
         // view doctor_shift_reports
         Permission::firstOrCreate(['name' => 'view doctor_shift_reports', 'guard_name' => 'web']);
+         // --- NEW PERMISSIONS TO ADD/UPDATE ---
+         $this->command->info('Creating new clinical workflow and reporting permissions...');
+         $newPerms = [
+             // Lab Workflow
+             'edit lab_request_flags', 'clear_pending_lab_requests', 'record_batch lab_payment',
+             'edit lab_results', 'batch_authorize lab_results',
+             'print lab_sample_labels', 'view lab_report_preview',
+ 
+             // Vitals
+             'view patient_vitals', 'record patient_vitals', 'edit patient_vitals', 'delete patient_vitals',
+ 
+             // Clinical Notes
+             'view clinical_notes', 'create clinical_notes', 'edit own_clinical_notes', 'edit all_clinical_notes', 'delete clinical_notes',
+ 
+             // Appointments (ensure no duplicates if some exist from 'manage appointments')
+             'list appointments', 'view appointment_details', 'cancel appointments', 'update appointment_status',
+             
+             // Reporting
+             // 'print doctor_shift_reports', // Already there, just ensure it's assigned
+             // 'print service_statistics_report', // Already there
+             'view monthly_lab_income_report', 'print monthly_lab_income_report',
+         ];
+         foreach ($newPerms as $permission) {
+             Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
+         }
+ 
         // --- NEW PERMISSIONS TO ADD ---
 
         // General Clinic Shift Management

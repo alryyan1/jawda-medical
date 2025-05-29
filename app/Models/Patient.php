@@ -16,89 +16,21 @@ class Patient extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
-        'shift_id',
-        'user_id', // User who registered/created this patient record
-        'doctor_id', // This is the patient's primary/linked doctor, if any. Separate from visit doctor.
-        'phone',
-        'gender',
-        'age_day',
-        'age_month',
-        'file_id', // Foreign key to the files table
-        'age_year',
-        'company_id',
-        'subcompany_id',
-        'company_relation_id',
-        'paper_fees',
-        'guarantor',
-        'expire_date',
-        'insurance_no',
-        'is_lab_paid',
-        'lab_paid',
-        'result_is_locked',
-        'sample_collected',
-        'sample_collect_time',
-        'result_print_date',
-        'sample_print_date',
-        'visit_number',
-        'result_auth',
-        'auth_date',
-        'present_complains',
-        'history_of_present_illness',
-        'procedures',
-        'provisional_diagnosis',
-        'bp',
-        'temp',
-        'weight',
-        'height',
-        'juandice',
-        'pallor',
-        'clubbing',
-        'cyanosis',
-        'edema_feet',
-        'dehydration',
-        'lymphadenopathy',
-        'peripheral_pulses',
-        'feet_ulcer',
-        'country_id',
-        'gov_id',
-        'prescription_notes',
-        'address',
-        'heart_rate',
-        'spo2',
-        'discount',
-        'drug_history',
-        'family_history',
-        'rbs',
-        'doctor_finish',
-        'care_plan',
-        'doctor_lab_request_confirm',
-        'doctor_lab_urgent_confirm',
-        'general_examination_notes',
-        'patient_medical_history',
-        'social_history',
-        'allergies',
-        'general',
-        'skin',
-        'head',
-        'eyes',
-        'ear',
-        'nose',
-        'mouth',
-        'throat',
-        'neck',
-        'respiratory_system',
-        'cardio_system',
-        'git_system',
-        'genitourinary_system',
-        'nervous_system',
-        'musculoskeletal_system',
-        'neuropsychiatric_system',
-        'endocrine_system',
-        'peripheral_vascular_system',
-        'referred',
-        'discount_comment',
-    ];
+        'name', 'shift_id', 'user_id', 'doctor_id', // Primary doctor link
+        'phone', 'gender', 'age_day', 'age_month', 'age_year',
+        'company_id', 'subcompany_id', 'company_relation_id',
+        'paper_fees', 'guarantor', 'expire_date', 'insurance_no',
+        'is_lab_paid', 'lab_paid', 'result_is_locked', 'sample_collected',
+        'sample_collect_time', 'result_print_date', 'sample_print_date',
+        'visit_number', 'result_auth', 'auth_date',
+        'country_id', 'gov_id', 'address', 'discount',
+        // Removed: 'present_complains', 'history_of_present_illness', etc.
+        // Kept visit/process specific flags IF they are still relevant at patient level, else move them to DoctorVisit
+        'doctor_finish', // Likely visit specific
+        'doctor_lab_request_confirm', // Likely visit/request specific
+        'doctor_lab_urgent_confirm', // Likely visit/request specific
+        'discount_comment', // If general patient discount comment
+        ];
 
     /**
      * The attributes that should be cast.
@@ -186,7 +118,9 @@ class Patient extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
+    
     }
+    
     
     /**
      * Get the subcompany associated with this patient.
@@ -195,7 +129,15 @@ class Patient extends Model
     {
         return $this->belongsTo(Subcompany::class);
     }
-
+    
+    public function doctor()
+    {
+        return $this->belongsTo(Doctor::class);
+    }
+    public function doctorVisit()
+    {
+        return $this->hasOne(DoctorVisit::class);
+    }
     /**
      * Get the company relation associated with this patient.
      */

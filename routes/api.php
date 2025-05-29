@@ -7,8 +7,11 @@ use App\Http\Controllers\Api\ChildTestOptionController;
 use App\Http\Controllers\Api\ClinicWorkspaceController;
 use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyMainTestController;
+use App\Http\Controllers\Api\CompanyRelationController;
 use App\Http\Controllers\Api\CompanyServiceController;
 use App\Http\Controllers\Api\ContainerController;
+use App\Http\Controllers\Api\CostController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DoctorScheduleController;
 use App\Http\Controllers\Api\DoctorShiftController;
@@ -26,6 +29,7 @@ use App\Http\Controllers\Api\ServiceGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\SpecialistController;
+use App\Http\Controllers\Api\SubcompanyController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitServiceController;
@@ -70,6 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('permissions-list', [RoleController::class, 'getPermissionsList']);
   Route::apiResource('users', UserController::class);
   Route::apiResource('roles', RoleController::class);
+  Route::post('/users/{user}/update-password', [UserController::class, 'updatePassword']);
 
   /*
     |--------------------------------------------------------------------------
@@ -114,6 +119,8 @@ Route::middleware('auth:sanctum')->group(function () {
     | Patient & Visit Management Routes
     |--------------------------------------------------------------------------
     */
+  Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
+  Route::post('/patients/{patient}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
   // Patients
   Route::apiResource('patients', PatientController::class);
   Route::get('/clinic-active-patients', [ClinicWorkspaceController::class, 'getActivePatients']);
@@ -215,14 +222,47 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
 
   // This is the endpoint that ResultEntryPanel uses to get all data for one LabRequest
-  Route::get('/labrequests/{labrequest}/for-result-entry', [LabRequestController::class, 'getLabRequestForEntry']); 
+  Route::get('/labrequests/{labrequest}/for-result-entry', [LabRequestController::class, 'getLabRequestForEntry']);
 
   Route::post('/labrequests/{labrequest}/results', [LabRequestController::class, 'saveResults']);
 
   // Generic LabRequest CRUD (if needed separately from visit context for some actions)
-  Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']); 
+  Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']);
   Route::post('/main-tests/{main_test}/child-tests/batch-update-order', [ChildTestController::class, 'batchUpdateOrder'])->middleware('auth:sanctum');
   Route::apiResource('child-tests.options', ChildTestOptionController::class)->shallow()->except(['show']);
-
+  Route::get('/cost-categories-list', [CostController::class, 'getCostCategories']);
+  // api/main-tests/find/123
+  Route::get('/main-tests/find/{identifier}', [MainTestController::class, 'findByIdOrCode']);
+  Route::delete('/visits/{visit}/lab-requests/clear-pending', [LabRequestController::class, 'clearPendingRequests'])->middleware('auth:sanctum');
+  Route::post('/costs', [CostController::class, 'store']); // For the dialog
+  // The route api/visits/48/lab-requests/batch-pay could not be foun
+  Route::post('/visits/{visit}/lab-requests/batch-pay', [LabRequestController::class, 'batchPayLabRequests'])->middleware('auth:sanctum');
+  // Route::apiResource('costs', CostController::class); // For full CRUD page later
   // The `except(['index', 'store'])` means GET /labrequests/{labrequest} (for show) SHOULD be defined by apiResource.
+  Route::get('/reports/monthly-lab-income/pdf', [ReportController::class, 'generateMonthlyLabIncomePdf']);
+  Route::get('/dashboard/summary', [DashboardController::class, 'getSummary'])->middleware('auth:sanctum');
+  Route::get('/shifts/{shift}/financial-summary', [ShiftController::class, 'getFinancialSummary'])->middleware('auth:sanctum');
+  Route::get('/subcompanies-list', [SubcompanyController::class, 'indexList'])->middleware('auth:sanctum');
+  Route::post('/subcompanies', [SubcompanyController::class, 'store'])->middleware('auth:sanctum');
+  // Routes: /company-relations-list and POST /company-relations.
+  Route::get('/company-relations-list', [CompanyRelationController::class, 'indexList'])->middleware('auth:sanctum');
+  // the route api/companies/1/relations could not be found
+  Route::post('/companies/{company}/relations', [CompanyRelationController::class, 'store'])->middleware('auth:sanctum');
+
+  // "The route api/company-relations could not be found."
+  Route::apiResource('company-relations', CompanyRelationController::class);
+  // he route api/companies/1/subcompanies could not be found."
+  // Route::get('/companies/{company}/subcompanies', [SubcompanyController::class, 'indexList'])->middleware('auth:sanctum');
+  Route::apiResource('/companies/{company}/subcompanies', SubcompanyController::class);
+
+
+  Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
+
+  //api/reports/clinic-report/1/financial-summary/pdf
+  Route::get('/reports/doctor-shifts/{doctorShift}/financial-summary/pdf', [ReportController::class, 'clinicReport']);
+  // The route api/reports/clinic-shift-summary/pdf could not be found.
+  Route::get('/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
+
+  // Route::
+
 });

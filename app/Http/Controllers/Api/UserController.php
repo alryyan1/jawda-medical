@@ -28,7 +28,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         // Add search/filtering if needed
-        $users = User::with('roles')->orderBy('name')->paginate(15);
+        $users = User::with('roles')->orderBy('id','desc')->paginate(15);
         return UserResource::collection($users);
     }
 
@@ -112,44 +112,79 @@ class UserController extends Controller
          }
         return RoleResource::collection(Role::orderBy('name')->get());
     }
+
+    /**
+     * Update the user's password.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updatePassword(Request $request)
+    {
+        $validatedData = $request->validate([
+            'current_password' => 'required|string',
+            'password' => ['required', 'confirmed', Password::defaults()],
+        ]);
+
+        $user = Auth::user();
+
+        // Check if current password matches
+        if (!Hash::check($validatedData['current_password'], $user->password)) {
+            return response()->json([
+                'message' => 'كلمة المرور الحالية غير صحيحة',
+                'errors' => [
+                    'current_password' => ['كلمة المرور الحالية غير صحيحة']
+                ]
+            ], 422);
+        }
+
+        // Update password
+        $user->update([
+            'password' => Hash::make($validatedData['password'])
+        ]);
+
+        return response()->json([
+            'message' => 'تم تحديث كلمة المرور بنجاح'
+        ]);
+    }
+
     public function getCurrentUserShiftIncomeSummary(Request $request)
-{
-    $request->validate([
-        'shift_id' => 'required|integer|exists:shifts,id',
-    ]);
+    {
+        $request->validate([
+            'shift_id' => 'required|integer|exists:shifts,id',
+        ]);
 
-    $user = Auth::user();
-    $shiftId = $request->input('shift_id');
+        $user = Auth::user();
+        $shiftId = $request->input('shift_id');
 
-    // Ensure the provided shift is actually open, or allow for closed shifts if that's the requirement
-    // $shift = Shift::where('id', $shiftId)->open()->first();
-    // if (!$shift) {
-    //     return response()->json(['message' => 'الوردية المحددة ليست مفتوحة أو غير موجودة.'], 404);
-    // }
+        // Ensure the provided shift is actually open, or allow for closed shifts if that's the requirement
+        // $shift = Shift::where('id', $shiftId)->open()->first();
+        // if (!$shift) {
+        //     return response()->json(['message' => 'الوردية المحددة ليست مفتوحة أو غير موجودة.'], 404);
+        // }
 
-    // Summing payments handled by this user in this shift
-    $depositsQuery = RequestedServiceDeposit::where('user_id', $user->id)
-                                            ->where('shift_id', $shiftId);
+        // Summing payments handled by this user in this shift
+        $depositsQuery = RequestedServiceDeposit::where('user_id', $user->id)
+                                                ->where('shift_id', $shiftId);
 
-    $totalCash = (clone $depositsQuery)->where('is_bank', false)->sum('amount');
-    $totalBank = (clone $depositsQuery)->where('is_bank', true)->sum('amount');
-    $totalIncome = $totalCash + $totalBank;
-    
-    // You might also want to include other income sources or expenses handled by the user
-    // For example, if users can record direct cash income/expenses not tied to services.
-    // This would require querying other tables. For now, focusing on service deposits.
+        $totalCash = (clone $depositsQuery)->where('is_bank', false)->sum('amount');
+        $totalBank = (clone $depositsQuery)->where('is_bank', true)->sum('amount');
+        $totalIncome = $totalCash + $totalBank;
+        
+        // You might also want to include other income sources or expenses handled by the user
+        // For example, if users can record direct cash income/expenses not tied to services.
+        // This would require querying other tables. For now, focusing on service deposits.
 
-    return response()->json([
-        'data' => [
-            'user_id' => $user->id,
-            'user_name' => $user->name,
-            'shift_id' => (int) $shiftId,
-            'total_income' => (float) $totalIncome,
-            'total_cash' => (float) $totalCash,
-            'total_bank' => (float) $totalBank,
-            // Add more details if needed, like number of transactions
-        ]
-    ]);
-}
-
+        return response()->json([
+            'data' => [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'shift_id' => (int) $shiftId,
+                'total_income' => (float) $totalIncome,
+                'total_cash' => (float) $totalCash,
+                'total_bank' => (float) $totalBank,
+                // Add more details if needed, like number of transactions
+            ]
+        ]);
+    }
 }

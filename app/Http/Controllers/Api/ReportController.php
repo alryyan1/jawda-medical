@@ -19,10 +19,14 @@ use App\Http\Resources\ServiceResource; // Can be adapted or a new one created
 use App\Models\Company;
 use App\Models\Doctor;
 use App\Models\DoctorShift;
+use App\Models\DoctorVisit;
+use App\Models\LabRequest;
 use App\Models\MainTest;
 use App\Models\Setting;
 use App\Models\Shift;
+use App\Models\User;
 use App\Services\Pdf\MyCustomTCPDF;
+use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
@@ -146,6 +150,8 @@ class ReportController extends Controller
         // if (!Auth::user()->can('view doctor_shift_reports')) { 
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
+
+        // return $request->all();
 
         // Validation for filters (same as before)
         $request->validate([
@@ -271,8 +277,13 @@ class ReportController extends Controller
         // --- Output PDF ---
         $pdfFileName = 'doctor_shifts_report_' . date('Ymd_His') . '.pdf';
         // TCPDF's Output method handles Content-Disposition for 'I' and 'D'
-        $pdf->Output($pdfFileName, 'I'); // 'I' for inline display in browser
-        exit; // Important to prevent Laravel from sending further output
+       // --- Output PDF ---
+       $pdfFileName = 'lab_price_list_' . date('Ymd_His') . '.pdf';
+       $pdfContent = $pdf->Output($pdfFileName, 'S');
+
+       return response($pdfContent, 200)
+           ->header('Content-Type', 'application/pdf')
+           ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
     public function generatePriceListPdf(Request $request)
     {
@@ -520,6 +531,872 @@ class ReportController extends Controller
         return response($pdfContent, 200)
                   ->header('Content-Type', 'application/pdf')
                   ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+    public function generateLabVisitReportPdf(Request $request, DoctorVisit $visit)
+    {
+        // Permission Check: e.g., can('print lab_report', $visit)
+        // if (!Auth::user()->can('print lab_report', $visit)) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
+        // Eager load all necessary data for the report
+        $visit->load([
+            'patient.company', // Load patient and their company
+            'doctor:id,name',          // Doctor of the visit
+            'labRequests' => function ($query) {
+                $query->orderBy('created_at'); // Order lab requests consistently
+            },
+            'labRequests.mainTest:id,main_test_name,divided,pageBreak', // Main test info
+            'labRequests.requestingUser:id,name', // User who requested the test
+            'labRequests.results' => function ($query) {
+                $query->with(['childTest' => function($ctQuery) {
+                    $ctQuery->with('unit:id,name', 'childGroup:id,name')->orderBy('test_order')->orderBy('child_test_name');
+                }, 'enteredBy:id,name', 'authorizedBy:id,name'])
+                ->whereNotNull('result'); // Only results that have been entered
+            }
+        ]);
+
+        if ($visit->labRequests->isEmpty()) {
+            return response()->json(['message' => 'لا توجد طلبات مختبر لهذه الزيارة لإنشاء تقرير.'], 404);
+        }
+
+        // Fetch settings for header/footer content
+        $appSettings = Setting::instance(); // Your helper to get settings
+
+        $reportTitle = 'تقرير نتائج الفحوصات المخبرية';
+        $filterCriteria = "زيارة رقم: {$visit->id} | تاريخ: {$visit->visit_date->format('Y-m-d')}";
+        
+        // Create PDF instance
+        $pdf = new MyCustomTCPDF(
+            $reportTitle,
+            $filterCriteria,
+            'P', 'mm', 'A4', true, 'UTF-8', false
+        );
+        // Optionally override company details if settings are different from PDF defaults
+        // if ($appSettings && $appSettings->hospital_name) $pdf->setCompanyName($appSettings->hospital_name); // (Need to add setter in MyCustomTCPDF)
+        
+        $pdf->AddPage();
+        $pdf->SetLineWidth(0.1);
+
+        // --- Section 1: Patient and Doctor Information ---
+        $this->drawPatientDoctorInfo($pdf, $visit, $appSettings);
+
+        // --- Section 2: Lab Requests and Results ---
+        $currentYBeforeTests = $pdf->GetY();
+
+        foreach ($visit->labRequests as $labRequest) {
+            if ($labRequest->mainTest->pageBreak && $pdf->GetY() > $currentYBeforeTests && $pdf->GetY() > 60) { // Check if Y moved from previous and not at top
+                 // Add some space or check if enough space for next test header
+                if ($pdf->GetY() + 20 > ($pdf->getPageHeight() - $pdf->getBreakMargin())) { // Rough check for space
+                    $pdf->AddPage();
+                     $currentYBeforeTests = $pdf->GetY(); // Reset for new page
+                } else if ($pdf->GetY() > $currentYBeforeTests) { // If not a new page but some content, add a bit of space
+                    $pdf->Ln(5);
+                }
+            }
+            $currentYBeforeTests = $pdf->GetY(); // Update Y before this test block
+
+            $this->drawMainTestResults($pdf, $labRequest);
+            $pdf->Ln(2); // Space between main tests
+        }
+
+        // --- Section 3: Signatures / Footer Information (if not fully handled by TCPDF Footer) ---
+        // $this->drawSignatures($pdf, $visit); // Example custom method
+
+        // --- Output PDF ---
+        $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
+        $pdfFileName = 'LabReport_' . $visit->id . '_' . $patientNameSanitized . '_' . date('Ymd') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        
+        return response($pdfContent, 200)
+                  ->header('Content-Type', 'application/pdf')
+                  ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+
+    /**
+     * Helper function to draw Patient and Doctor Info Section
+     */
+    protected function drawPatientDoctorInfo(MyCustomTCPDF $pdf, DoctorVisit $visit, ?Setting $settings)
+    {
+        $isRTL = $pdf->getRTL();
+        $defaultFont = $pdf->getDefaultFontFamily();
+        $labelWidth = 25;
+        $valueWidth = 60;
+        $spacerWidth = 5;
+        $lineHeight = 5.5;
+
+        $pdf->SetFont($defaultFont, 'B', 10);
+        $pdf->Cell(0, 7, 'بيانات المريض والطبيب', 0, 1, $isRTL ? 'R' : 'L');
+        $pdf->SetFont($defaultFont, '', 9);
+
+        // Patient Info - Two Columns
+        $startX = $pdf->GetX();
+        $currentY = $pdf->GetY();
+
+        // Column 1
+        $pdf->SetXY($startX, $currentY);
+        $pdf->Cell($labelWidth, $lineHeight, 'اسم المريض:', 0, 0, $isRTL ? 'R' : 'L');
+        $pdf->MultiCell($valueWidth, $lineHeight, $visit->patient->name ?? '-', 0, $isRTL ? 'R' : 'L', false, 1);
+        
+        $currentY = $pdf->GetY(); // Update Y after MultiCell
+        $pdf->SetXY($startX, $currentY);
+        $pdf->Cell($labelWidth, $lineHeight, 'رقم الملف/المريض:', 0, 0, $isRTL ? 'R' : 'L');
+        $pdf->Cell($valueWidth, $lineHeight, $visit->patient->id ?? '-', 0, 1, $isRTL ? 'R' : 'L'); // ln=1
+
+        $currentY = $pdf->GetY();
+        $pdf->SetXY($startX, $currentY);
+        $pdf->Cell($labelWidth, $lineHeight, 'العمر:', 0, 0, $isRTL ? 'R' : 'L');
+        $pdf->Cell($valueWidth, $lineHeight, $visit->patient->getFullAgeAttribute() ?? '-', 0, 1, $isRTL ? 'R' : 'L');
+
+        $currentY = $pdf->GetY();
+        $pdf->SetXY($startX, $currentY);
+        $pdf->Cell($labelWidth, $lineHeight, 'الجنس:', 0, 0, $isRTL ? 'R' : 'L');
+        $pdf->Cell($valueWidth, $lineHeight, $visit->patient->gender ? trans('common.genderEnum.' . $visit->patient->gender) : '-', 0, 1, $isRTL ? 'R' : 'L');
+
+        // Column 2 - Calculate X position
+        $col2X = $startX + $labelWidth + $valueWidth + $spacerWidth;
+        $pdf->SetY($pdf->GetY() - ($lineHeight * 4)); // Reset Y to start of patient info block
+
+        $pdf->SetXY($col2X, $pdf->GetY());
+        $pdf->Cell($labelWidth, $lineHeight, 'الطبيب المعالج:', 0, 0, $isRTL ? 'R' : 'L');
+        $pdf->Cell($valueWidth, $lineHeight, $visit->doctor->name ?? '-', 0, 1, $isRTL ? 'R' : 'L');
+        
+        $currentY = $pdf->GetY();
+        $pdf->SetXY($col2X, $currentY);
+        $pdf->Cell($labelWidth, $lineHeight, 'تاريخ الزيارة:', 0, 0, $isRTL ? 'R' : 'L');
+        $pdf->Cell($valueWidth, $lineHeight, $visit->visit_date?->format('Y-m-d') ?? '-', 0, 1, $isRTL ? 'R' : 'L');
+
+        $sampleId = $visit->labRequests->first()?->sample_id ?? $visit->labRequests->first()?->id ?? '-';
+        $currentY = $pdf->GetY();
+        $pdf->SetXY($col2X, $currentY);
+        $pdf->Cell($labelWidth, $lineHeight, 'رقم العينة/الطلب:', 0, 0, $isRTL ? 'R' : 'L');
+        $pdf->Cell($valueWidth, $lineHeight, $sampleId, 0, 1, $isRTL ? 'R' : 'L');
+        
+        $requestedBy = $visit->labRequests->first()?->requestingUser?->name ?? '-';
+        $currentY = $pdf->GetY();
+        $pdf->SetXY($col2X, $currentY);
+        $pdf->Cell($labelWidth, $lineHeight, 'طلب بواسطة:', 0, 0, $isRTL ? 'R' : 'L');
+        $pdf->Cell($valueWidth, $lineHeight, $requestedBy, 0, 1, $isRTL ? 'R' : 'L');
+
+        $pdf->Ln(3); // Space after patient/doctor info
+        // Draw a line separator
+        $pdf->Line($pdf->GetX(), $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        $pdf->Ln(3);
+    }
+
+    /**
+     * Helper function to draw results for a single MainTest
+     */
+    protected function drawMainTestResults(MyCustomTCPDF $pdf, LabRequest $labRequest)
+    {
+        $isRTL = $pdf->getRTL();
+        $defaultFont = $pdf->getDefaultFontFamily();
+        $lineHeight = 5.5;
+        $indent = 5; // Indent for child tests
+
+        // Main Test Header
+        $pdf->SetFont($defaultFont, 'B', 10); // Bold and slightly larger for main test name
+        // Background for Main Test Header
+        $pdf->SetFillColor(240, 245, 250); // Light blue-ish
+        $pdf->Cell(0, $lineHeight + 1, $labRequest->mainTest->main_test_name, 'B', 1, $isRTL ? 'R' : 'L', true); // ln=1, Fill=true, Border Bottom
+        $pdf->SetFillColor(255,255,255); // Reset fill color
+        $pdf->Ln(1);
+
+        $childColWidths = [60, 35, 25, 50, 0]; 
+        // Child Test Results Table for this Main Test
+        if ($labRequest->results->isNotEmpty()) {
+            $pdf->SetFont($defaultFont, '', 9);
+            $childHeaders = ['المكون الفرعي', 'النتيجة', 'الوحدة', 'النطاق الطبيعي', 'العلامات'];
+            // Usable width = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right']
+            // Make name wider, others roughly equal
+            $childColWidths[count($childColWidths)-1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($childColWidths, 0, -1)) - $indent;
+
+            $childAligns = ['R', 'C', 'C', 'C', 'C'];
+
+            // Draw child test table header (optional, or just list them)
+            $currentX = $pdf->GetX() + ($isRTL ? 0 : $indent); // Apply indent for LTR
+            $pdf->SetX($currentX); // Apply indent
+            $pdf->SetFont($defaultFont, 'B', 8);
+            $pdf->SetFillColor(245, 245, 245);
+            foreach($childHeaders as $i => $ch) {
+                $pdf->Cell($childColWidths[$i], $lineHeight, $ch, 1, ($i == count($childHeaders)-1 ? 1:0), 'C', true);
+            }
+             $pdf->SetFont($defaultFont, '', 8);
+
+
+            foreach ($labRequest->results->sortBy(fn($r) => $r->childTest?->test_order ?? 999) as $result) {
+                $childTest = $result->childTest; // Assumes childTest is loaded on result
+                $isAbnormal = false; // TODO: Implement abnormality check based on ranges/flags
+                
+                $resultValue = $result->result ?? '-';
+                if ($isAbnormal) $resultValue = "**{$resultValue}**"; // TCPDF pseudo-bold with **
+
+                $rowData = [
+                    $childTest?->child_test_name ?? 'غير معروف',
+                    $resultValue,
+                    $result->unit_name ?? $childTest?->unit?->name ?? '-',
+                    $result->normal_range ?? $childTest?->normalRange ?? '-', // Use snapshotted range
+                    $result->flags ?? '-',
+                ];
+                
+                $currentX = $pdf->GetX() + ($isRTL ? 0 : $indent);
+                $pdf->SetX($currentX); // Apply indent for LTR for the row
+
+                // Calculate row height
+                $maxLines = 0;
+                for($i = 0; $i < count($rowData); $i++) {
+                    $numLines = $pdf->getNumLines((string)$rowData[$i], $childColWidths[$i]);
+                    if ($numLines > $maxLines) $maxLines = $numLines;
+                }
+                if ($maxLines == 0) $maxLines = 1;
+                $cellPadding = $pdf->getCellPaddings();
+                $currentLineHeight = ($pdf->getFontSize() * $pdf->getCellHeightRatio() * 0.352777778);
+                if($currentLineHeight < 3) $currentLineHeight = 3.5;
+                $rowH = ($maxLines * $currentLineHeight) + $cellPadding['T'] + $cellPadding['B'] + 0.5;
+                if($rowH < 5) $rowH = 5;
+
+                $yBeforeCall = $pdf->GetY();
+                if ($yBeforeCall + $rowH > ($pdf->getPageHeight() - $pdf->getBreakMargin())) {
+                    $pdf->AddPage(); // TCPDF will call Header()
+                    // Redraw child test table header on new page
+                    $currentX = $pdf->GetX() + ($isRTL ? 0 : $indent);
+                    $pdf->SetX($currentX);
+                    $pdf->SetFont($defaultFont, 'B', 8);
+                    foreach($childHeaders as $i => $ch) {
+                        $pdf->Cell($childColWidths[$i], $lineHeight, $ch, 1, ($i == count($childHeaders)-1 ? 1:0), 'C', true);
+                    }
+                    $pdf->SetFont($defaultFont, '', 8);
+                    $yBeforeCall = $pdf->GetY(); // Update Y after potential page break
+                }
+                $xPos = $currentX;
+                for ($i = 0; $i < count($rowData); $i++) {
+                    $align = $childAligns[$i] ?? 'R';
+                    if(is_numeric(str_replace(['<','>'],'',$rowData[$i]))) $align = 'C';
+                    if($i === 0) $align = ($isRTL ? 'R' : 'L'); // First column align
+
+                    // Apply special formatting for abnormal results
+                    if ($isAbnormal && $i == 1) { // Assuming result is 2nd column
+                        $pdf->SetFont($defaultFont, 'B', 8); // Bold for abnormal
+                    }
+
+                    $pdf->MultiCell($childColWidths[$i], $rowH, (string)$rowData[$i], 'LR', $align, false, 0, $xPos, $yBeforeCall, true, 0, $isAbnormal && $i == 1 ? true : false, true, $rowH, 'M');
+                    $xPos += $childColWidths[$i];
+
+                    if ($isAbnormal && $i == 1) {
+                        $pdf->SetFont($defaultFont, '', 8); // Reset font
+                    }
+                }
+                $pdf->Ln($rowH);
+                $pdf->Line($pdf->GetX() + ($isRTL ? 0 : $indent), $pdf->GetY(), $pdf->GetPageWidth() - $pdf->getMargins()['right'], $pdf->GetY()); // Bottom line for row
+            }
+        } else {
+            $currentX = $pdf->GetX() + ($isRTL ? 0 : $indent);
+            $pdf->SetX($currentX);
+            $pdf->Cell(array_sum($childColWidths), $lineHeight, 'لم يتم إدخال نتائج لهذا الفحص بعد.', 'LTRB', 1, 'C');
+        }
+
+        // Overall comment for the MainTest (from LabRequest)
+        if (!empty($labRequest->comment)) {
+            $pdf->Ln(1);
+            $currentX = $pdf->GetX() + ($isRTL ? 0 : $indent);
+            $pdf->SetX($currentX);
+            $pdf->SetFont($defaultFont, 'I', 8);
+            $pdf->MultiCell(array_sum($childColWidths), $lineHeight, 'ملاحظة على الفحص: ' . $labRequest->comment, 0, $isRTL ? 'R' : 'L', false, 1);
+            $pdf->Ln(1);
+        }
+    }
+    public function generateMonthlyLabIncomePdf(Request $request)
+    {
+        // Permission Check: e.g., can('view monthly_lab_income_report')
+        // if (!auth()->user()->can('view monthly_lab_income_report')) { ... }
+
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:' . (date('Y') + 1),
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+
+        $startDate = Carbon::create($year, $month, 1)->startOfDay();
+        $endDate = $startDate->copy()->endOfMonth()->endOfDay();
+        $period = CarbonPeriod::create($startDate, $endDate);
+
+        $reportTitle = 'تقرير إيرادات المختبر الشهري';
+        $filterCriteria = "لشهر: {$startDate->translatedFormat('F Y')} ( {$startDate->format('Y-m-d')} - {$endDate->format('Y-m-d')} )";
+
+        // --- Data Aggregation ---
+        $dailyData = [];
+        $grandTotals = [
+            'income' => 0,
+            'discount' => 0,
+            'cash' => 0,
+            'bank' => 0,
+        ];
+
+        // Fetch all relevant lab requests for the month for efficiency
+        // Eager load patient for company check
+        $labRequestsForMonth = LabRequest::with('patient') 
+            ->whereBetween('created_at', [$startDate, $endDate]) // Filter by request creation date
+            // Or filter by payment date if that's more relevant for "income"
+            // ->whereHas('payments', function($q) use ($startDate, $endDate) { // If using a payments relation
+            //     $q->whereBetween('payment_date', [$startDate, $endDate]);
+            // })
+            ->get();
+        
+        // Group lab requests by creation date (day)
+        $requestsByDate = $labRequestsForMonth->groupBy(function ($request) {
+            return Carbon::parse($request->created_at)->format('Y-m-d');
+        });
+
+
+        foreach ($period as $date) {
+            $currentDateStr = $date->format('Y-m-d');
+            $dailyIncome = 0;
+            $dailyDiscount = 0;
+            $dailyCash = 0;
+            $dailyBank = 0;
+
+            if ($requestsByDate->has($currentDateStr)) {
+                foreach ($requestsByDate[$currentDateStr] as $lr) {
+                    $price = (float) ($lr->price ?? 0);
+                    $count = (int) ($lr->count ?? 1);
+                    $itemSubTotal = $price * $count;
+                    
+                    $discountAmount = ($itemSubTotal * ((int) ($lr->discount_per ?? 0) / 100));
+                    // Add fixed discount if you have it: + (float)($lr->fixed_discount_amount ?? 0);
+                    
+                    $enduranceAmount = (float) ($lr->endurance ?? 0);
+                    $isCompanyPatient = !!$lr->patient?->company_id;
+                    
+                    $netPayableByPatient = $itemSubTotal - $discountAmount - ($isCompanyPatient ? $enduranceAmount : 0);
+                    
+                    // Income is based on the net amount the patient is supposed to pay for services rendered ON this day
+                    // This assumes 'created_at' of LabRequest signifies the service rendering day for income recognition
+                    $dailyIncome += $netPayableByPatient;
+                    $dailyDiscount += $discountAmount; // Summing calculated discount for the day
+
+                    // For cash/bank, we sum what was ACTUALLY collected for requests of this day
+                    // This assumes labrequests.is_paid and labrequests.amount_paid reflect collection for that request.
+                    // If payments are separate, this logic needs to change.
+                    if ($lr->is_paid || $lr->amount_paid > 0) {
+                        // This is tricky: amount_paid might be partial.
+                        // For simplicity of this report based on current LabRequest model:
+                        // If you want actual collected cash/bank for THIS DAY, you need a payment date on LabRequest
+                        // or join with a payment/deposit table filtered by payment_date.
+                        // Let's assume if it's paid, the amount_paid is the collected amount for that item on its creation day.
+                        $collectedAmountForItem = (float) $lr->amount_paid; 
+                        
+                        if ($lr->is_bankak) { // Or your field for bank payment
+                            $dailyBank += $collectedAmountForItem;
+                        } else {
+                            $dailyCash += $collectedAmountForItem;
+                        }
+                    }
+                }
+            }
+
+            $dailyData[$currentDateStr] = [
+                'date' => $currentDateStr,
+                'income' => $dailyIncome,
+                'discount' => $dailyDiscount,
+                'cash' => $dailyCash,
+                'bank' => $dailyBank,
+            ];
+
+            $grandTotals['income'] += $dailyIncome;
+            $grandTotals['discount'] += $dailyDiscount;
+            $grandTotals['cash'] += $dailyCash;
+            $grandTotals['bank'] += $dailyBank;
+        }
+
+
+        // --- PDF Generation ---
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
+        $pdf->AddPage();
+        $pdf->SetLineWidth(0.1);
+
+        // Table Header
+        $headers = ['التاريخ', 'إجمالي الإيراد (الصافي)', 'إجمالي الخصومات', 'المحصل نقداً', 'المحصل بنك/شبكة'];
+        // A4 Landscape width ~277mm usable
+        $colWidths = [40, 60, 50, 60, 0]; 
+        $colWidths[count($colWidths)-1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
+        $alignments = ['C', 'C', 'C', 'C', 'C'];
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        // Table Body
+        $fill = false;
+        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
+        foreach ($dailyData as $dayData) {
+            if ($dayData['income'] == 0 && $dayData['cash'] == 0 && $dayData['bank'] == 0 && $dayData['discount'] == 0) {
+                // Optionally skip days with no activity to make report shorter
+                // continue; 
+            }
+            $rowData = [
+                Carbon::parse($dayData['date'])->format('Y-m-d (D)'), // Format date with day name
+                number_format($dayData['income'], 2),
+                number_format($dayData['discount'], 2),
+                number_format($dayData['cash'], 2),
+                number_format($dayData['bank'], 2),
+            ];
+            $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
+            $fill = !$fill;
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY()); // Bottom line for table
+        $pdf->Ln(5);
+
+        // Grand Totals Section
+        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 10);
+        $pdf->Cell(0, 8, 'ملخص إجمالي للشهر', 0, 1, $pdf->getRTL() ? 'R' : 'L');
+        
+        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 9);
+        $totalLabelWidth = 60;
+        $totalValueWidth = 50;
+
+        $pdf->Cell($totalLabelWidth, 7, 'إجمالي الإيرادات (الصافي):', 'LTRB', 0, 'R');
+        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['income'], 2), 'LTRB', 1, 'C');
+        $pdf->Cell($totalLabelWidth, 7, 'إجمالي الخصومات الممنوحة:', 'LTRB', 0, 'R');
+        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['discount'], 2), 'LTRB', 1, 'C');
+        $pdf->Cell($totalLabelWidth, 7, 'إجمالي المحصل نقداً:', 'LTRB', 0, 'R');
+        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['cash'], 2), 'LTRB', 1, 'C');
+        $pdf->Cell($totalLabelWidth, 7, 'إجمالي المحصل بنك/شبكة:', 'LTRB', 0, 'R');
+        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['bank'], 2), 'LTRB', 1, 'C');
+        $pdf->Ln(2);
+        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 9);
+        $pdf->Cell($totalLabelWidth, 7, 'إجمالي صافي الدخل المحصل:', 'LTRB', 0, 'R');
+        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['cash'] + $grandTotals['bank'], 2), 'LTRB', 1, 'C');
+
+
+        // --- Output PDF ---
+        $pdfFileName = 'monthly_lab_income_' . $year . '_' . str_pad($month, 2, '0', STR_PAD_LEFT) . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+                  ->header('Content-Type', 'application/pdf')
+                  ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+    public function clinicReport(Request $request,DoctorShift $doctorShift)
+    {
+    
+
+        // $userId = $request->get('user'); // Not used in your original code for filtering DoctorShift
+     $doctorShift->load([
+            'user:id,username', 
+            'doctor:id,name,cash_percentage,company_percentage,static_wage', // Load percentages
+            'visits.patient.company:id,name', // Load patient and their company for each visit
+            'visits.requestedServices.service:id,name', // Load services for each visit
+            'visits.labRequests.mainTest:id,main_test_name', // Load lab tests for each visit
+        ]);
+
+        if (!$doctorShift) {
+            return response()->json(['message' => 'لم يتم العثور على مناوبة الطبيب المحددة.'], 404);
+        }
+        if (!$doctorShift->doctor) {
+             return response()->json(['message' => 'لم يتم العثور على بيانات الطبيب لهذه المناوبة.'], 404);
+        }
+
+        // Prepare filter criteria string for PDF header
+        $filterCriteria = "مناوبة الطبيب: " . ($doctorShift->doctor->name ?? 'غير محدد') . 
+                          " (#" . $doctorShift->id . ")" .
+                          " | بتاريخ: " . $doctorShift->start_time?->format('Y-m-d');
+
+        // --- PDF Generation ---
+        // Using your MyCustomTCPDF class
+        $pdf = new MyCustomTCPDF(
+            'التقرير الخاص بمناوبة الطبيب', // Report Title
+            $filterCriteria,                 // Filters
+            'L',                             // Orientation: Landscape
+            'mm', 'A4', true, 'UTF-8', false
+        );
+        
+        // Attempt to add Arial (ensure arial.ttf is in a TCPDF accessible font path or public_path if using that)
+        // This path needs to be correct or TCPDF needs to find it in its font dirs.
+        // $fontPath = public_path('fonts/arial.ttf'); // Example if in public/fonts
+        // For TCPDF internal fonts like dejavusans, this is not needed.
+        // If using a custom TTF font, ensure it's correctly added via TCPDF_FONTS::addTTFfont
+        // For now, relying on MyCustomTCPDF's default font (dejavusans)
+        $fontname = $pdf->getDefaultFontFamily(); // Use the default from your custom class
+        $fontBold = $pdf->SetFont($fontname, 'B'); // Get bold variant if defaultFontBold is set in MyCustomTCPDF
+
+        $pdf->AddPage();
+        $page_width = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+
+        // Header section in your PDF logic
+        $pdf->SetFont($fontname, 'B', 16); // Slightly smaller than your 22
+        // $pdf->Cell($page_width, 5, 'التقرير الخاص', 0, 1, 'C'); // Title is now in TCPDF Header
+        // $pdf->Ln(5); // Space after title
+        $pdf->SetFont($fontname, 'B', 10); // Smaller font for sub-headers
+
+        $pdf->SetFillColor(220, 220, 220); // Light grey for headers
+        $table_col_width_third = $page_width / 3; // For 3-column layout
+        $table_col_width_sixth = $page_width / 6; // For 6-column layout
+
+        // First header row
+        $pdf->Cell($table_col_width_sixth, 7, 'التاريخ', 1, 0, 'C', 1);
+        $pdf->Cell($table_col_width_sixth, 7, $doctorShift->start_time ? $doctorShift->start_time->format('Y/m/d') : '-', 1, 0, 'C');
+        $pdf->Cell($table_col_width_sixth * 2, 7, ' ', 0, 0, 'C'); // Spacer
+        $pdf->Cell($table_col_width_sixth, 7, 'المستخدم', 1, 0, 'C', 1);
+        $pdf->Cell($table_col_width_sixth, 7, $doctorShift->user->username ?? '-', 1, 1, 'C'); // ln=1
+
+        // Second header row
+        $pdf->Cell($table_col_width_sixth, 7, 'الطبيب', 1, 0, 'C', 1);
+        $pdf->MultiCell($table_col_width_sixth, 7, $doctorShift->doctor->name ?? '-', 1, 'C', false, 0, $pdf->GetX(), $pdf->GetY(), true, 0, false, true, 7,'M');
+        $pdf->Cell($table_col_width_sixth * 2, 7, '', 0, 0, 'C'); // Spacer
+        $pdf->Cell($table_col_width_sixth, 7, 'زمن فتح المناوبة', 1, 0, 'C', 1);
+        $pdf->Cell($table_col_width_sixth, 7, $doctorShift->start_time ? $doctorShift->start_time->format('h:i A') : '-', 1, 1, 'C');
+        $pdf->Ln(3);
+
+        // Financial Summary Row
+        $pdf->SetFont($fontname, 'B', 9);
+        $sectionWidth = ($page_width / 3) - 5; // Approx width for each financial section
+        
+        $pdf->Cell($sectionWidth, 7, 'إجمالي المرضى: ' . $doctorShift->visits->where('only_lab',0)->count(), 1, 0, 'C');
+        $pdf->Cell($sectionWidth, 7, 'استحقاق نقدي: ' . number_format($doctorShift->doctor_credit_cash(), 1), 1, 0, 'C');
+        $pdf->Cell($sectionWidth, 7, 'استحقاق تأمين: ' . number_format($doctorShift->doctor_credit_company(), 1), 1, 1, 'C');
+        $pdf->Ln(5);
+
+        // Table for patient visits
+        $pdf->SetFont($fontname, 'B', 9);
+        // Adjust widths based on landscape and content
+        $h_widths = [15, 55, 40, 25, 25, 25, 30, 0]; // ID, Name, Company, Total, Cash, Bank, Doc Share, Services
+        $h_widths[count($h_widths)-1] = $page_width - array_sum(array_slice($h_widths, 0, -1));
+        $h_aligns = ['C', 'R', 'R', 'C', 'C', 'C', 'C', 'R'];
+        $headerTexts = ['رقم', 'اسم المريض', 'الشركة', 'إجمالي', 'نقداً', 'بنك', 'حصة الطبيب', 'الخدمات*'];
+        
+        $pdf->DrawTableHeader($headerTexts, $h_widths, $h_aligns); // Using your helper
+
+        $pdf->SetFont($fontname, '', 8);
+        $index = 1;
+        $visits = $doctorShift->visits->filter(fn (DoctorVisit $visit) => $visit->only_lab == 0);
+        
+        $safi_total_placeholder = 0; // This variable wasn't clearly used for a grand total in your original
+
+        foreach ($visits as $doctorvisit) {
+            $isCompanyPatient = !!$doctorvisit->patient?->company_id;
+            if ($isCompanyPatient) {
+                $pdf->SetTextColor(200, 0, 0); // Red for company patients
+            }
+
+            $rowData = [
+                $doctorvisit->number ?? $index, // Use visit number or sequence
+                $doctorvisit->patient->name ?? '-',
+                $doctorvisit->patient?->company?->name ?? '-',
+                number_format($doctorvisit->calculateTotalServiceValue(), 1), // Using model method
+                number_format($doctorvisit->calculateTotalPaid() - $doctorvisit->calculateTotalBankPayments(), 1), // Cash
+                number_format($doctorvisit->calculateTotalBankPayments(), 1), // Bank
+                number_format($doctorShift->doctor->calculateVisitCredit($doctorvisit, $isCompanyPatient ? 'company' : 'cash'), 1),
+                $doctorvisit->services_concatinated() // This will use MultiCell via DrawTableRow
+            ];
+            $pdf->DrawTableRow($rowData, $h_widths, $h_aligns, ($index % 2 != 0)); // Alternating fill
+            
+            $pdf->SetTextColor(0, 0, 0); // Reset text color
+            $index++;
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        $pdf->Ln(2);
+
+        // Footer Totals for the patient table
+        $pdf->SetFont($fontname, 'B', 9);
+        $pdf->Cell($h_widths[0], 7, 'الإجمالي', 1, 0, 'C', true); // 'الإجمالي'
+        $pdf->Cell($h_widths[1], 7, '', 1, 0, 'C', true); // Empty
+        $pdf->Cell($h_widths[2], 7, '', 1, 0, 'C', true); // Empty
+        $pdf->Cell($h_widths[3], 7, number_format($doctorShift->total_services(), 1), 1, 0, 'C', true);
+        $pdf->Cell($h_widths[4], 7, number_format($doctorShift->total_paid_services() - $doctorShift->total_bank(), 1), 1, 0, 'C', true);
+        $pdf->Cell($h_widths[5], 7, number_format($doctorShift->total_bank(), 1), 1, 0, 'C', true);
+        $pdf->Cell($h_widths[6], 7, number_format($doctorShift->doctor_credit_cash() + $doctorShift->doctor_credit_company(), 1), 1, 0, 'C', true);
+        $pdf->Cell($h_widths[7], 7, '', 1, 1, 'C', true); // Empty for services
+        $pdf->Ln(5);
+
+
+        // --- Service Costs Section --- (If data is available)
+        $shiftServiceCosts = $doctorShift->shift_service_costs(); // Assumes this returns an array
+        if (!empty($shiftServiceCosts)) {
+            $pdf->AddPage(); // Start service costs on a new page for clarity
+            $pdf->SetFont($fontname, 'B', 14);
+            $pdf->Cell($page_width, 10, 'مصروفات الخدمات للوردية', 0, 1, 'C');
+            $pdf->Ln(2);
+
+            $pdf->SetFont($fontname, 'B', 10);
+            $cost_col_widths = [$page_width * 0.6, $page_width * 0.4];
+            $cost_aligns = ['R', 'C'];
+            $pdf->DrawTableHeader(['بيان مصروف الخدمة', 'الإجمالي'], $cost_col_widths, $cost_aligns);
+            
+            $pdf->SetFont($fontname, '', 9);
+            $fillCost = false;
+            foreach ($shiftServiceCosts as $cost) {
+                $pdf->DrawTableRow([$cost['name'], number_format($cost['amount'], 1)], $cost_col_widths, $cost_aligns, $fillCost);
+                $fillCost = !$fillCost;
+            }
+            $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+            $pdf->Ln(5);
+        }
+        
+        // --- Costs Table Section (from your second table example) ---
+        // This seems to list visits again, but with service_cost_name. This needs clarification.
+        // For now, I'll comment this out as its data source (total_services_cost, services_cost_name)
+        // needs very specific logic in DoctorVisit model.
+
+        /*
+        $pdf->AddPage(); // Or continue on current page if space
+        $pdf->SetFont($fontname, 'B', 14);
+        $pdf->Cell($page_width, 10, 'تفصيل تكاليف الخدمات للمرضى', 0, 1, 'C');
+        $pdf->Ln(2);
+        $pdf->SetFont($fontname, 'B', 9);
+        $cost_detail_widths = [15, 50, 40, 25, 40, 0]; // ID, Name, Company, Total Services Value, Total Service Costs, Cost Names
+        $cost_detail_widths[count($cost_detail_widths)-1] = $page_width - array_sum(array_slice($cost_detail_widths, 0, -1));
+        $cost_detail_aligns = ['C','R','R','C','C','R'];
+        $pdf->DrawTableHeader(['رقم','اسم المريض','الشركة','إجمالي الخدمات','إجمالي التكاليف','بيان التكاليف*'], $cost_detail_widths, $cost_detail_aligns);
+
+        $pdf->SetFont($fontname, '', 8);
+        $fillCostDetail = false;
+        foreach ($visits as $doctorvisit) { // Using the same $visits collection
+             $rowData = [
+                $doctorvisit->number ?? $index,
+                $doctorvisit->patient->name ?? '-',
+                $doctorvisit->patient?->company?->name ?? '-',
+                number_format($doctorvisit->calculateTotalServiceValue(), 1),
+                number_format($doctorvisit->total_services_cost(), 1),
+                $doctorvisit->services_cost_name()
+             ];
+             $pdf->DrawTableRow($rowData, $cost_detail_widths, $cost_detail_aligns, $fillCostDetail);
+             $fillCostDetail = !$fillCostDetail;
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        */
+
+
+        // --- Output PDF ---
+        $pdfFileName = 'clinic_report_doctorshift_' . $doctorShift->id . '_' . date('Ymd_His') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        
+        return response($pdfContent, 200)
+                  ->header('Content-Type', 'application/pdf')
+                  ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+    public function allclinicsReportNew(Request $request)
+    {
+        $request->validate([
+            'shift' => 'required|integer|exists:shifts,id', // General Shift ID
+            'user' => 'nullable|integer|exists:users,id', // User ID for filtering collections
+        ]);
+
+        $shift = Shift::find($request->get('shift'));
+        if (!$shift) {
+            return response()->json(['error' => 'الوردية المحددة غير موجودة.'], 404);
+        }
+
+        // Get all DoctorShifts related to this general Shift
+        $doctorShiftsQuery = DoctorShift::with([
+            'user:id,username,name', 
+            'doctor.specialist:id,name', // Eager load doctor and their specialist
+            'visits.patient.company:id,name',
+            'visits.requestedServices.service:id,name',
+            'visits.labRequests.mainTest:id,main_test_name',
+        ])->where('shift_id', $shift->id);
+
+        // The original PDF logic seems to iterate through doctors in a shift, not users.
+        // If the report is per doctor shift session:
+        // If a specific doctor_shift_id was intended:
+        // $doctorShiftForReport = DoctorShift::with([...])->find($request->get('specific_doctor_shift_id'));
+        // For now, we will loop through all doctor shifts within the general shift.
+        
+        $doctor_shifts_for_report = $doctorShiftsQuery->get();
+
+        if ($doctor_shifts_for_report->isEmpty() && !$request->has('user') /* Only error if no doctor shifts at all for the general shift */ ) {
+             // If request had a user filter, it might be that this user didn't manage any doctor shift
+        }
+
+
+        // --- PDF Initialization ---
+        $reportMainTitle = 'التقرير المالي العام للوردية';
+        $filterCriteriaString = "وردية رقم: " . $shift->id . " | بتاريخ: " . Carbon::parse($shift->created_at)->format('Y/m/d');
+        if($request->has('user') && $userForFilter = User::find($request->get('user'))){
+            $filterCriteriaString .= " | للمستخدم: " . $userForFilter->name;
+        }
+
+        $pdf = new MyCustomTCPDF(
+            $reportMainTitle,
+            $filterCriteriaString,
+            'P', 'mm', 'A4', true, 'UTF-8', false // Portrait for this summary
+        );
+        
+        $fontname = $pdf->getDefaultFontFamily(); // Using font from MyCustomTCPDF
+
+        // --- PAGE 1: Financial Summary (Collections by User, Expenses) ---
+        $pdf->AddPage();
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        
+        // Shift Information (already part of MyCustomTCPDF header, but can add more specifics)
+        // $pdf->SetFont($fontname, 'B', 11); // ... etc. ...
+
+        // --- Section 1: Collections by User ---
+        $pdf->SetFont($fontname, 'B', 12);
+        $pdf->Cell(0, 8, 'ملخص المتحصلات حسب المستخدم (لهذه الوردية العامة)', 0, 1, 'C');
+        $pdf->Ln(1);
+
+        // Iterate users who had payment activity in this shift
+        // This requires user_deposited on LabRequest and a similar field on RequestedService
+        $usersWithActivityIds = DoctorVisit::where('shift_id', $shift->id)
+            ->with(['labRequests', 'requestedServices'])
+            ->get()
+            ->flatMap(function($visit) {
+                $ids = [];
+                foreach($visit->labRequests as $lr) if($lr->user_deposited) $ids[] = $lr->user_deposited;
+                foreach($visit->requestedServices as $rs) if($rs->user_deposited) $ids[] = $rs->user_deposited; // Assuming user_deposited on RequestedService
+                return $ids;
+            })
+            ->unique()
+            ->filter();
+            
+        $usersToReport = User::whereIn('id', $usersWithActivityIds)->get();
+        if ($request->has('user')) { // If specific user filter is applied
+            $usersToReport = User::where('id', $request->get('user'))->get();
+        }
+
+
+        $userCollectionsPresented = false;
+        if ($usersToReport->isNotEmpty()) {
+            foreach ($usersToReport as $user) {
+                // Use Shift model methods to get user-specific totals for THIS general shift
+                $totalPaidForUser = $shift->paidLab($user->id) + $shift->totalPaidService($user->id);
+                $totalBankForUser = $shift->bankakLab($user->id) + $shift->totalPaidServiceBank($user->id);
+                $totalCashForUser = $totalPaidForUser - $totalBankForUser;
+
+                // User specific costs
+                $userTotalCosts = $shift->totalCost($user->id);
+                $userBankCosts = $shift->totalCostBank($user->id);
+                $userCashCosts = $userTotalCosts - $userBankCosts;
+
+                $netBankForUser = $totalBankForUser - $userBankCosts;
+                $netCashForUser = $totalCashForUser - $userCashCosts;
+
+                if ($totalPaidForUser == 0 && $userTotalCosts == 0) continue; // Skip if no activity
+                $userCollectionsPresented = true;
+
+                $pdf->SetFont($fontname, 'B', 10);
+                $pdf->Cell(0, 7, 'المستخدم: ' . ($user->name ?: $user->username), 'B', 1, 'R');
+                $pdf->Ln(1);
+
+                $pdf->SetFont($fontname, 'B', 9);
+                $h_widths = [$pageWidth*0.25, $pageWidth*0.15, $pageWidth*0.15, $pageWidth*0.15, $pageWidth*0.15, $pageWidth*0.15];
+                $h_aligns = ['R', 'C', 'C', 'C', 'C', 'C'];
+                $pdf->DrawTableHeader(['البيان', 'إجمالي متحصل', 'بنك', 'نقدي', 'صافي بنك', 'صافي نقدي'], $h_widths, $h_aligns);
+                
+                $pdf->SetFont($fontname, '', 9);
+                $dataRow = ['إجمالي الإيرادات', $totalPaidForUser, $totalBankForUser, $totalCashForUser, '-', '-']; //SAR is example
+                $pdf->DrawTableRow($dataRow, $h_widths, $h_aligns);
+                $dataRow = ['إجمالي المصروفات', $userTotalCosts, $userBankCosts, $userCashCosts, '-', '-'];
+                $pdf->DrawTableRow($dataRow, $h_widths, $h_aligns, true);
+                $dataRow = ['الصافي للمستخدم', '-', '-', '-', $netBankForUser, $netCashForUser];
+                $pdf->DrawTableRow($dataRow, $h_widths, $h_aligns);
+                $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+                $pdf->Ln(3);
+            }
+        }
+        if (!$userCollectionsPresented) { /* ... no collections message ... */ }
+
+
+        // --- Section 2: General Expenses for the Shift ---
+        $pdf->SetFont($fontname, 'B', 12);
+        $pdf->Cell(0, 8, 'ملخص المصروفات العامة للوردية', 0, 1, 'C');
+        $pdf->Ln(1);
+        $shiftCosts = $shift->costs()->with('costCategory')->get(); // From Shift model
+        if ($shiftCosts->count() > 0) {
+            $exp_h = ['الوصف', 'الفئة', 'المبلغ الكلي', 'نقدي', 'بنك/شبكة'];
+            $exp_w = [$pageWidth*0.4, $pageWidth*0.2, $pageWidth*0.15, $pageWidth*0.125, $pageWidth*0.125];
+            $exp_a = ['R','R','C','C','C'];
+            $pdf->DrawTableHeader($exp_h, $exp_w, $exp_a);
+            $pdf->SetFont($fontname, '', 9);
+            $fillExp = false;
+            foreach($shiftCosts as $c){
+                $cash = (float)$c->amount - (float)$c->amount_bankak;
+                $totalActualCost = (float)$c->amount + (float)$c->amount_bankak; // Should be $c->amount if it's the total
+                $pdf->DrawTableRow([$c->description, $c->costCategory?->name ?? '-', $totalActualCost, $cash, $c->amount_bankak], $exp_w, $exp_a, $fillExp);
+                $fillExp = !$fillExp;
+            }
+            $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        } else { /* ... no expenses message ... */ }
+        $pdf->Ln(5);
+
+
+        // --- PAGE 2 (and onwards): Doctors' Dues per Doctor Shift session ---
+        if ($doctor_shifts_for_report->isNotEmpty()) {
+            $pdf->AddPage('L'); // Landscape for detailed doctor breakdown
+            $pageWidthL = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right']; // Recalculate for landscape
+
+            $pdf->SetFont($fontname, 'B', 12);
+            $pdf->Cell(0, 8, 'تفصيل استحقاقات الأطباء للمناوبات خلال الوردية العامة', 0, 1, 'C');
+            $pdf->Ln(2);
+
+            foreach ($doctor_shifts_for_report as $doctor_shift) {
+                if ($doctor_shift->visits->where('only_lab', 0)->isEmpty() && $doctor_shift->doctor_credit_cash() == 0 && $doctor_shift->doctor_credit_company() == 0) {
+                    continue; // Skip doctor shifts with no relevant activity for this report part
+                }
+
+                $pdf->SetFont($fontname, 'B', 10);
+                $pdf->Cell(0, 7, "الطبيب: " . $doctor_shift->doctor->name . " (مناوبة #" . $doctor_shift->id . ") | التخصص: " . ($doctor_shift->doctor->specialist->name ?? '-'), 'B', 1, 'R');
+                $pdf->Ln(1);
+                
+                // Summary for this doctor's shift
+                $pdf->SetFont($fontname, 'B', 9);
+                $docSummaryWidth = $pageWidthL / 4;
+                $pdf->Cell($docSummaryWidth, 6, 'إجمالي المرضى (عيادة): ' . $doctor_shift->visits->where('only_lab',0)->count(), 1, 0, 'C');
+                $pdf->Cell($docSummaryWidth, 6, 'استحقاق نقدي: ' . $doctor_shift->doctor_credit_cash(), 1, 0, 'C');
+                $pdf->Cell($docSummaryWidth, 6, 'استحقاق تأمين: ' . $doctor_shift->doctor_credit_company(), 1, 0, 'C');
+                $totalDocCredit = $doctor_shift->doctor_credit_cash() + $doctor_shift->doctor_credit_company();
+                $pdf->Cell($docSummaryWidth, 6, 'إجمالي الاستحقاق: ' . $totalDocCredit, 1, 1, 'C');
+                $pdf->Ln(2);
+
+                // Patient details table for this doctor's shift
+                $pdf->SetFont($fontname, 'B', 8);
+                $pat_h = ['م', 'اسم المريض', 'الشركة', 'إجمالي مدفوع', 'نقدي', 'بنك', 'حصة الطبيب', 'الخدمات*'];
+                $pat_w = [10, 50, 35, 25, 25, 25, 30, $pageWidthL - (10+50+35+25+25+25+30)];
+                $pat_a = ['C','R','R','C','C','C','C','R'];
+                $pdf->DrawTableHeader($pat_h, $pat_w, $pat_a);
+                
+                $pdf->SetFont($fontname, '', 7); // Smaller font for details
+                $patIndex = 1;
+                $visitsForDoctor = $doctor_shift->visits->filter(fn (DoctorVisit $visit) => $visit->only_lab == 0);
+                foreach ($visitsForDoctor as $dv) {
+                    $isCompPat = !!$dv->patient?->company_id;
+                    $rowData = [
+                        $patIndex++, $dv->patient->name ?? '-', $dv->patient?->company?->name ?? '-',
+                        $dv->calculateTotalPaid(),
+                        $dv->calculateTotalPaid() - $dv->calculateTotalBankPayments(),
+                        $dv->calculateTotalBankPayments(),
+                        $doctor_shift->doctor->calculateVisitCredit($dv, $isCompPat ? 'company' : 'cash'),
+                        $dv->services_concatinated()
+                    ];
+                    $pdf->DrawTableRow($rowData, $pat_w, $pat_a, ($patIndex % 2 == 0));
+                }
+                 $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+                $pdf->Ln(5); // Space after each doctor's section
+            }
+        } else {
+            $pdf->SetFont($fontname, '', 10);
+            $pdf->Cell(0, 7, 'لا توجد مناوبات أطباء مسجلة أو نشطة لهذه الوردية العامة.', 0, 1, 'C');
+        }
+        
+        // --- Clinic Service Costs (General for the shift) ---
+        // (This section might be better on Page 1 if it's not too long)
+        $clinicServiceCosts = $shift->shiftClinicServiceCosts();
+        if (!empty($clinicServiceCosts)) {
+            if ($pdf->GetY() + (count($clinicServiceCosts) * 6) + 20 > $pdf->getPageHeight() - $pdf->getBreakMargin()) $pdf->AddPage('P'); else $pdf->Ln(3); // Add page if not enough space, or just add some space
+            $pdf->SetFont($fontname, 'B', 12);
+            $pdf->Cell(0, 8, 'مصروفات الخدمات العامة للوردية', 0, 1, 'C');
+            // ... (Table for clinicServiceCosts using DrawTableHeader/Row - similar to general expenses on page 1) ...
+        }
+
+
+        // --- Final Summary on a new page or at the end ---
+        // (Similar to the summary in your original PDF code)
+
+
+        // Output
+        $fileName = 'AllClinicsReport_Shift_' . $shift->id . '_' . now()->format('Ymd_His') . '.pdf';
+        $pdfContent = $pdf->Output($fileName, 'S');
+        return response($pdfContent, 200)
+                  ->header('Content-Type', 'application/pdf')
+                  ->header('Content-Disposition', "inline; filename=\"{$fileName}\"");
     }
 }
 

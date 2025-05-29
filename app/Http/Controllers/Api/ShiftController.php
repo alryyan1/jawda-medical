@@ -7,6 +7,8 @@ use App\Models\Shift;
 use Illuminate\Http\Request;
 use App\Http\Resources\ShiftResource;
 use App\Models\DoctorShift;
+use App\Models\LabRequest;
+use App\Models\RequestedService;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -92,7 +94,107 @@ class ShiftController extends Controller
 
         return new ShiftResource($shift);
     }
+    public function getFinancialSummary(Request $request, Shift $shift)
+    {
+        // Permission check: e.g., can('view shift_financial_summary', $shift)
+        if ($shift->is_closed && !$request->user()->can('view closed_shift_summary')) {
+             // Potentially different permission for closed shifts
+        }
 
+        // 1. Calculate Total Net Income (Services + Lab) for this shift
+        // This logic needs to be robust and match how you define "income"
+        // and how you link services/lab_requests to shifts.
+        
+        // Service Revenue
+        $serviceNetIncome = RequestedService::query()
+            ->whereHas('doctorVisit', fn($dvq) => $dvq->where('shift_id', $shift->id))
+            ->join('doctorvisits', 'requested_services.doctorvisits_id', '=', 'doctorvisits.id')
+            ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
+            ->selectRaw('SUM(
+                (requested_services.price * requested_services.count) 
+                - requested_services.discount 
+                - CASE 
+                    WHEN patients.company_id IS NOT NULL 
+                    THEN requested_services.endurance 
+                    ELSE 0 
+                END
+            ) as total_net')
+            ->value('total_net') ?? 0;
+
+        $labNetIncome = LabRequest::query()
+            ->whereHas('doctorVisit', fn($dvq) => $dvq->where('shift_id', $shift->id))
+            ->join('doctorvisits', 'labrequests.doctor_visit_id', '=', 'doctorvisits.id')
+            ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
+            ->selectRaw('SUM(
+                labrequests.price 
+                - (labrequests.price * labrequests.discount_per / 100)
+                - CASE 
+                    WHEN patients.company_id IS NOT NULL 
+                    THEN labrequests.endurance 
+                    ELSE 0 
+                END
+            ) as total_net')
+            ->value('total_net') ?? 0;
+        
+        $totalNetIncome = (float) $serviceNetIncome + (float) $labNetIncome;
+
+        // 2. Calculate Total Cash and Bank Payments specifically for this Shift
+        // This requires payments (e.g., RequestedServiceDeposit or direct updates on items)
+        // to be linked to the shift_id.
+        // Let's assume 'is_bankak' or 'is_bank' field exists on LabRequest and RequestedService
+        // and amount_paid reflects actual collection.
+
+        $totalCashCollected = 0;
+        $totalBankCollected = 0;
+
+        // Cash/Bank from Services
+        $servicePayments = RequestedService::query()
+            ->whereHas('doctorVisit', fn($dvq) => $dvq->where('shift_id', $shift->id))
+            ->where('is_paid', true) // Consider only fully paid or sum all amount_paid
+            ->get(['amount_paid', 'bank']); // Assuming 'bank' is boolean for payment method
+
+        foreach($servicePayments as $sp) {
+            if ($sp->bank) {
+                $totalBankCollected += (float) $sp->amount_paid;
+            } else {
+                $totalCashCollected += (float) $sp->amount_paid;
+            }
+        }
+
+        // Cash/Bank from Lab Requests
+        $labPayments = LabRequest::query()
+            ->whereHas('doctorVisit', fn($dvq) => $dvq->where('shift_id', $shift->id))
+            ->where('is_paid', true)
+            ->get(['amount_paid', 'is_bankak']); // Assuming 'is_bankak'
+
+        foreach($labPayments as $lp) {
+            if ($lp->is_bankak) {
+                $totalBankCollected += (float) $lp->amount_paid;
+            } else {
+                $totalCashCollected += (float) $lp->amount_paid;
+            }
+        }
+        
+        // Get shift's recorded expenses (already on shift model)
+        $totalExpenses = (float) $shift->expenses;
+
+        return response()->json([
+            'data' => [
+                'shift_id' => $shift->id,
+                'is_closed' => (bool) $shift->is_closed,
+                'closed_at' => $shift->closed_at?->toIso8601String(),
+                'total_net_income' => round($totalNetIncome, 2),
+                'total_discount_applied' => round(($serviceNetIncome + $labNetIncome) - ($totalCashCollected + $totalBankCollected - $totalExpenses),2), //This needs to be calculated based on actual discount fields from services/lab requests if available or make totalIncome be from price before discount
+                'total_cash_collected' => round($totalCashCollected, 2),
+                'total_bank_collected' => round($totalBankCollected, 2),
+                'total_collected' => round($totalCashCollected + $totalBankCollected, 2),
+                'recorded_expenses' => round($totalExpenses, 2),
+                'expected_cash_in_drawer' => round($totalCashCollected - $totalExpenses, 2), // Simple calculation
+                'shift_total_recorded' => (float) $shift->total, // From shift closure
+                'shift_bank_recorded' => (float) $shift->bank,   // From shift closure
+            ]
+        ]);
+    }
     /**
      * Display the specified shift.
      */

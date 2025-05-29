@@ -56,6 +56,14 @@ class SettingResource extends JsonResource
             'welcome_message' => $this->welcome_message,
             'send_welcome_message' => (bool) $this->send_welcome_message,
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'report_header_company_name' => $this->report_header_company_name,
+            'report_header_address_line1' => $this->report_header_address_line1,
+            'report_header_address_line2' => $this->report_header_address_line2,
+            'report_header_phone' => $this->report_header_phone,
+            'report_header_email' => $this->report_header_email,
+            'report_header_vatin' => $this->report_header_vatin,
+            'report_header_cr' => $this->report_header_cr,
+            'report_header_logo_base64' => $this->report_header_logo_base64, 
 
             // Eager load related finance accounts if needed for display
             // 'default_finance_account_details' => new FinanceAccountResource($this->whenLoaded('defaultFinanceAccount')),

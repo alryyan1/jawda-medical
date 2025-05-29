@@ -55,6 +55,8 @@ public function toArray(Request $request): array
         'total_paid' => $totalPaid,
         'total_discount' => $totalDiscount,
         'balance_due' => $totalAmount - $totalDiscount - $totalPaid,
+        'number' => $this->number,
+        'company' => new CompanyStrippedResource($this->patient->company),
 
         'requested_services_summary' => RequestedServiceStrippedResource::collection($this->whenLoaded('requestedServices')), // For the dialog
         // ... other fields ...

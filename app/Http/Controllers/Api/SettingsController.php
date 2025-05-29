@@ -100,15 +100,15 @@ class SettingsController extends Controller
             'print_direct' => 'sometimes|boolean',
             'inventory_notification_number' => 'nullable|string|max:50',
             'disable_doctor_service_check' => 'sometimes|boolean',
-            'currency' => 'sometimes|required|string|max:10',
-            'phone' => 'sometimes|required|string|max:20',
+            'currency' => 'sometimes|string|max:10',
+            'phone' => 'sometimes|max:20',
             'gov' => 'sometimes|boolean', // Or 'nullable|exists:govs,id'
             'country' => 'sometimes|boolean', // Or 'nullable|exists:countries,id'
             'barcode' => 'sometimes|boolean',
             'show_water_mark' => 'sometimes|boolean',
             'vatin' => 'nullable|string|max:50',
             'cr' => 'nullable|string|max:50',
-            'email' => 'sometimes|required|email|max:255',
+            'email' => 'sometimes|max:255',
             'address' => 'nullable|string|max:500',
             'instance_id' => 'nullable|string|max:255',
             'token' => 'nullable|string|max:500', // Store sensitive tokens encrypted
@@ -129,9 +129,17 @@ class SettingsController extends Controller
             'pharmacy_income' => 'nullable|exists:finance_accounts,id',
             'welcome_message' => 'nullable|string|max:2000',
             'send_welcome_message' => 'sometimes|boolean',
+            'report_header_company_name' => 'nullable|string|max:255',
+            'report_header_address_line1' => 'nullable|string|max:255',
+            'report_header_address_line2' => 'nullable|string|max:255',
+            'report_header_phone' => 'nullable|string|max:50',
+            'report_header_email' => 'nullable|email|max:255',
+            'report_header_vatin' => 'nullable|string|max:50',
+            'report_header_cr' => 'nullable|string|max:50',
+            'report_header_logo_file' => 'nullable|image|mimes:png,jpg,jpeg|max:1024', // For upload
         ]);
         
-        $updateData = $request->except(['logo_file', 'header_image_file', 'footer_image_file', 'auditor_stamp_file', 'manager_stamp_file']);
+        $updateData = $request->except(['logo_file', 'header_image_file', 'footer_image_file', 'auditor_stamp_file', 'manager_stamp_file',  'report_header_logo_file']);
 
         // Handle file uploads (example for logo)
         $fileFields = [
@@ -162,6 +170,18 @@ class SettingsController extends Controller
             }
         }
 
+  // Handle Report Header Logo Upload (if storing as base64)
+  if ($request->hasFile('report_header_logo_file')) {
+    $updateData['report_header_logo_base64'] = 'data:' . 
+        $request->file('report_header_logo_file')->getMimeType() . ';base64,' . 
+        base64_encode(file_get_contents($request->file('report_header_logo_file')->getRealPath()));
+} elseif ($request->input("clear_report_header_logo_base64")) { // Check for clear flag
+    $updateData['report_header_logo_base64'] = null;
+    // If storing path and need to delete old file:
+    // if ($settings->report_header_logo_path) {
+    //     Storage::disk('public')->delete($settings->report_header_logo_path);
+    // }
+}
 
         // If token needs to be encrypted:
         // if ($request->filled('token')) {

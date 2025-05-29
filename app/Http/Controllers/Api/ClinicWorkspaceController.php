@@ -18,9 +18,9 @@ class ClinicWorkspaceController extends Controller
             'page' => 'nullable|integer|min:1',
         ]);
 
-        $query = DoctorVisit::with(['patient', 'doctor']) // Eager load necessary relations
-                            ->whereDate('visit_date', Carbon::today()) // Example: visits for today
-                            ->whereNotIn('status', ['completed', 'cancelled']); // Example: not completed or cancelled
+        $query = DoctorVisit::with(['patient', 'doctor','patient.company']); // Eager load necessary relations
+                            // ->whereDate('visit_date', Carbon::today()) // Example: visits for today
+                            // ->whereNotIn('status', ['completed', 'cancelled']); // Example: not completed or cancelled
 
         // Filter by general clinic shift (if your system has overarching shifts)
         if ($request->filled('clinic_shift_id')) {
@@ -45,7 +45,7 @@ class ClinicWorkspaceController extends Controller
 
         // Order by status (e.g., 'with_doctor' first), then by queue number or creation time
         $query->orderByRaw("CASE status WHEN 'with_doctor' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END")
-              ->orderBy('created_at', 'asc'); // Or by appointment_time / queue_number
+              ->orderBy('id', 'desc'); // Or by appointment_time / queue_number
 
         $activeVisits = $query->paginate($request->get('per_page', 20));
 

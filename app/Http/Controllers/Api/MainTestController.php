@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\MainTest;
 use Illuminate\Http\Request;
 use App\Http\Resources\MainTestResource;
+use App\Http\Resources\MainTestStrippedResource;
+use App\Models\DoctorVisit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -18,7 +20,27 @@ class MainTestController extends Controller
         // $this->middleware('can:edit lab_tests')->only('update');
         // ... etc.
     }
+    // app/Http/Controllers/Api/MainTestController.php
+    public function findByIdOrCode(Request $request, $identifier)
+    {
+        // $this->authorize('list lab_tests'); // Or specific permission
+        $mainTest = MainTest::where('id', $identifier)
+            // ->orWhere('short_code', $identifier) // If you have short codes
+            ->where('available', true)
+            ->first();
 
+        if (!$mainTest) {
+            return response()->json(['message' => 'لم يتم العثور على فحص بهذا المعرف أو الرمز.'], 404);
+        }
+        // Optionally, check if this test is already requested for the current visit if visit_id is passed
+        if ($request->has('visit_id')) {
+            $visit = DoctorVisit::find($request->visit_id);
+            if ($visit && $visit->labRequests()->where('main_test_id', $mainTest->id)->exists()) {
+                return response()->json(['message' => 'هذا الفحص مطلوب بالفعل لهذه الزيارة.'], 409); // Conflict
+            }
+        }
+        return new MainTestStrippedResource($mainTest);
+    }
     public function index(Request $request)
     {
         $query = MainTest::with('container'); // Eager load container
@@ -29,12 +51,38 @@ class MainTestController extends Controller
         if ($request->has('available') && $request->available !== '') {
             $query->where('available', (bool)$request->available);
         }
+
+        // // return ['name' => 'waleed'];
         if ($request->filled('container_id')) {
             $query->where('container_id', $request->container_id);
         }
+        // $query = MainTest::with('container', 'package'); // serviceGroup if tests are also services
+        // $query->where('available', true); // Only available tests
+    
+    
+        // if ($request->filled('pack_id') && $request->pack_id !== 'all') { // 'all' could mean no package filter
+        //     $query->where('pack_id', $request->pack_id);
+        // } elseif ($request->pack_id === 'none') { // Explicitly request tests with no package
+        //      $query->whereNull('pack_id');
+        // }
+        // // Exclude tests already requested for a specific visit if visit_id is provided
+        // if ($request->filled('visit_id_to_exclude_requests')) {
+        //     $visit = DoctorVisit::find($request->visit_id_to_exclude_requests);
+        //     if ($visit) {
+        //         $requestedTestIds = $visit->labRequests()->pluck('main_test_id')->toArray();
+        //         $query->whereNotIn('id', $requestedTestIds);
+        //     }
+        // }
 
-        $mainTests = $query->orderBy('id', 'asc')->paginate($request->get('per_page', 15));
-        return MainTestResource::collection($mainTests);
+        // If not paginating for a selection list (e.g., for a specific package tab)
+        if ($request->boolean('no_pagination')) {
+            $mainTests = $query->orderBy('main_test_name')->get();
+            return MainTestStrippedResource::collection($mainTests);
+        }
+
+        $mainTests = $query->orderBy('main_test_name')->paginate($request->get('per_page', 50)); // Default 50 for selection
+        return MainTestResource::collection($mainTests); // Or MainTestStrippedResource
+
     }
 
     public function store(Request $request)
@@ -122,7 +170,7 @@ class MainTestController extends Controller
                 $mainTest = MainTest::find($id);
                 if ($mainTest) {
                     // Dependency check (example)
-                    if ($mainTest->labRequests()->exists() ) {
+                    if ($mainTest->labRequests()->exists()) {
                         $errors[] = "لا يمكن حذف الفحص '{$mainTest->main_test_name}' لارتباطه ببيانات أخرى.";
                         continue;
                     }

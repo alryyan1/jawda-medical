@@ -9,11 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('settings', function (Blueprint $table) {
-            $table->id(); // Even if it's a single-row table, an ID is standard.
+            $table->id()->nullable(); // Even if it's a single-row table, an ID is standard.
 
-            $table->boolean('is_header')->default(false);
-            $table->boolean('is_footer')->default(false);
-            $table->boolean('is_logo')->default(false);
+            $table->boolean('is_header')->default(false)->nullable();
+            $table->boolean('is_footer')->default(false)->nullable();
+            $table->boolean('is_logo')->default(false)->nullable();
             $table->longText('header_base64')->nullable();
             $table->longText('footer_base64')->nullable();
             $table->string('header_content')->nullable();
@@ -24,22 +24,22 @@ return new class extends Migration
             $table->boolean('print_direct')->nullable();
             $table->string('inventory_notification_number')->nullable(); // Assuming this is a phone number or count
 
-            $table->boolean('disable_doctor_service_check')->default(true);
-            $table->string('currency')->default('USD'); // Set a sensible default
-            $table->string('phone')->default('');
-            $table->boolean('gov')->default(false); // Related to government/nationality?
-            $table->boolean('country')->default(false); // Related to country display?
-            $table->boolean('barcode')->default(false);
-            $table->boolean('show_water_mark')->default(false);
+            $table->boolean('disable_doctor_service_check')->default(true)->nullable();
+            $table->string('currency')->default('USD')->nullable(); // Set a sensible default
+            $table->string('phone')->default('')->nullable();
+            $table->boolean('gov')->default(false)->nullable(); // Related to government/nationality?
+            $table->boolean('country')->default(false)->nullable(); // Related to country display?
+            $table->boolean('barcode')->default(false)->nullable();
+            $table->boolean('show_water_mark')->default(false)->nullable();
             $table->string('vatin')->nullable()->default(''); // VAT Identification Number
-            $table->string('cr')->default(''); // Commercial Registration number
-            $table->string('email')->default('');
-            $table->string('address')->default('');
-            $table->string('instance_id')->default(''); // For WhatsApp or other services
-            $table->string('token')->default(''); // API token for WhatsApp or other services
-            $table->boolean('send_result_after_auth')->default(false); // Defaulted to false, schema has NOT NULL
-            $table->boolean('send_result_after_result')->default(false); // Defaulted to false
-            $table->boolean('edit_result_after_auth')->default(true);
+            $table->string('cr')->default('')->nullable(); // Commercial Registration number
+            $table->string('email')->default('')->nullable();
+            $table->string('address')->default('')->nullable();
+            $table->string('instance_id')->default('')->nullable(); // For WhatsApp or other services
+            $table->string('token')->default('')->nullable(); // API token for WhatsApp or other services
+            $table->boolean('send_result_after_auth')->default(false)->nullable(); // Defaulted to false, schema has NOT NULL
+            $table->boolean('send_result_after_result')->default(false)->nullable(); // Defaulted to false
+            $table->boolean('edit_result_after_auth')->default(true)->nullable();
             $table->string('auditor_stamp')->nullable(); // Path to image or base64
             $table->string('manager_stamp')->nullable(); // Path to image or base64
 
@@ -79,8 +79,8 @@ return new class extends Migration
                               " ابتسامتكم هي أولويتنا!\n\n" .
                               " للاستفسارات، يرجى التواصل معنا وسنكون سعداء بالرد على استفساراتكم.\n\n" .
                               " شكراً لثقتكم بنا.";
-            $table->text('welcome_message')->default($welcomeMessage);
-            $table->boolean('send_welcome_message')->default(false); // Defaulted, schema has NOT NULL
+            $table->text('welcome_message')->default($welcomeMessage)->nullable();
+            $table->boolean('send_welcome_message')->default(false)->nullable(); // Defaulted, schema has NOT NULL
 
             $table->timestamps();
         });

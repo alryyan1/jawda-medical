@@ -30,6 +30,14 @@ class Setting extends Model
         'financial_year_start', 'financial_year_end',
         'pharmacy_bank', 'pharmacy_cash', 'pharmacy_income',
         'welcome_message', 'send_welcome_message',
+        'report_header_company_name',
+        'report_header_address_line1',
+        'report_header_address_line2',
+        'report_header_phone',
+        'report_header_email',
+        'report_header_vatin',
+        'report_header_cr',
+        'report_header_logo_base64', // or 'report_header_logo_path'
     ];
 
     protected $casts = [

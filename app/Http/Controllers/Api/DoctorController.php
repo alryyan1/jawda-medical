@@ -26,7 +26,7 @@ class DoctorController extends Controller
         }
 
         // Eager load relationships for efficiency
-        $doctors = $query->with(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user'])
+        $doctors = $query->with(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user'])->orderBy('id', 'desc')
                         ->paginate(15);
                         
         return new DoctorCollection($doctors);

@@ -19,7 +19,7 @@ class MyCustomTCPDF extends TCPDF
 {
     protected string $reportTitle;
     protected string $filterCriteria;
-    
+
     protected string $companyName;
     protected string $companyAddress;
     protected ?string $companyLogoPath; // Path to your company logo
@@ -37,14 +37,14 @@ class MyCustomTCPDF extends TCPDF
     protected string $defaultMonospacedFont = 'arial';
 
     public function __construct(
-        string $reportTitle = 'تقرير', 
+        string $reportTitle = 'تقرير',
         string $filterCriteria = '',
-        string $orientation = 'P', 
-        string $unit = 'mm', 
-        mixed $format = 'A4', 
-        bool $unicode = true, 
-        string $encoding = 'UTF-8', 
-        bool $diskcache = false, 
+        string $orientation = 'P',
+        string $unit = 'mm',
+        mixed $format = 'A4',
+        bool $unicode = true,
+        string $encoding = 'UTF-8',
+        bool $diskcache = false,
         bool $pdfa = false
     ) {
         // 1. Call parent constructor FIRST
@@ -72,14 +72,41 @@ class MyCustomTCPDF extends TCPDF
         //     $this->companyLogoPath = null;
         // }
 
-        // Using placeholders for now:
-        $this->companyName = config('app.name', 'المركز الطبي المتميز');
-        $this->companyAddress = 'الخرطوم، شارع الجمهورية، مقابل برج الاتصالات';
-        $this->companyPhone = '0123456789';
-        $this->companyEmail = 'info@medicalcenter.sd';
-        $this->companyVatin = 'VAT: 123456789';
-        $this->companyCr = 'CR: 98765';
-        $this->companyLogoPath = null; // Example: public_path('images/report_logo.png');
+        // Fetch settings from the database
+        $appSettings = Setting::instance(); // Your helper method to get the single settings row
+
+        // Use report-specific settings if available, fallback to general app settings or defaults
+        $this->companyName = $appSettings?->report_header_company_name ?: ($appSettings?->hospital_name ?: config('app.name', 'المركز الطبي'));
+
+        $addressParts = [];
+        if ($appSettings?->report_header_address_line1) $addressParts[] = $appSettings->report_header_address_line1;
+        if ($appSettings?->report_header_address_line2) $addressParts[] = $appSettings->report_header_address_line2;
+        $this->companyAddress = !empty($addressParts) ? implode("\n", $addressParts) : ($appSettings?->address ?: 'العنوان الافتراضي');
+
+        $this->companyPhone = $appSettings?->report_header_phone ?: $appSettings?->phone;
+        $this->companyEmail = $appSettings?->report_header_email ?: $appSettings?->email;
+        $this->companyVatin = $appSettings?->report_header_vatin ?: $appSettings?->vatin;
+        $this->companyCr = $appSettings?->report_header_cr ?: $appSettings?->cr;
+
+        // Handle logo (assuming base64 is stored in 'report_header_logo_base64')
+        $logoData = $appSettings?->report_header_logo_base64 ?: $appSettings?->logo_base64;
+        if ($logoData && str_starts_with($logoData, 'data:image')) {
+            $this->companyLogoPath = '@' . base64_decode(substr($logoData, strpos($logoData, ',') + 1));
+        } else if ($logoData) { // If it's a path
+            // Assuming $logoData is a path relative to storage/app/public
+            $fullPath = storage_path('app/public/' . $logoData);
+            if (file_exists($fullPath)) {
+                $this->companyLogoPath = $fullPath;
+            } else {
+                $this->companyLogoPath = null;
+            }
+        } else {
+            $this->companyLogoPath = null;
+        }
+
+        // ... (rest of constructor: SetCreator, SetAuthor, fonts, margins, RTL settings as before) ...
+        // The Header() and Footer() methods will now automatically use these properties.
+
 
         // 4. Set PDF metadata and default properties
         $this->SetCreator(config('app.name'));
@@ -99,7 +126,7 @@ class MyCustomTCPDF extends TCPDF
         $this->SetFooterMargin(10);   // Distance from bottom of page to start of footer content block
 
         $this->SetAutoPageBreak(TRUE, 20); // Enable auto page break, 20mm from bottom
-        
+
         $this->setImageScale(PDF_IMAGE_SCALE_RATIO); // Default TCPDF constant
         $this->setFontSubsetting(true); // Recommended for better font handling
 
@@ -129,33 +156,47 @@ class MyCustomTCPDF extends TCPDF
         if ($this->companyLogoPath && (file_exists($this->companyLogoPath) || str_starts_with($this->companyLogoPath, 'data:image'))) {
             $logoX = $isRTL ? ($this->GetPageWidth() - $this->original_rMargin - 20) : $this->original_lMargin;
             // '@' before $this->companyLogoPath tells TCPDF it might be base64 or a URL that needs fetching
-            $this->Image(str_starts_with($this->companyLogoPath, 'data:image') ? '@'.base64_decode(substr($this->companyLogoPath, strpos($this->companyLogoPath, ',')+1)) : $this->companyLogoPath, 
-                         $logoX, $currentY, 20, 0, '', '', 'T', false, 300, '', false, false, 0);
+            $this->Image(
+                str_starts_with($this->companyLogoPath, 'data:image') ? '@' . base64_decode(substr($this->companyLogoPath, strpos($this->companyLogoPath, ',') + 1)) : $this->companyLogoPath,
+                $logoX,
+                $currentY,
+                20,
+                0,
+                '',
+                '',
+                'T',
+                false,
+                300,
+                '',
+                false,
+                false,
+                0
+            );
             $logoHeight = $this->getImageRBY() - $currentY > 15 ? $this->getImageRBY() - $currentY : 15; // Estimate logo height or set fixed
         } else {
             $logoHeight = 0; // No logo, no extra height needed for it
         }
-        
+
         // Text content area
         $textStartX = $isRTL ? $this->original_lMargin : ($this->original_lMargin + ($this->companyLogoPath ? 22 : 0));
         $textWidth = $this->GetPageWidth() - $this->original_lMargin - $this->original_rMargin - ($this->companyLogoPath ? 25 : 0);
         $initialTextY = $currentY; // Y position for text block
 
         $this->SetFont($this->defaultFontBold, 'B', 12);
-        $this->MultiCell($textWidth, 6, $this->companyName, 0, $isRTL ? 'R':'L', false, 1, $textStartX, $initialTextY, true, 0, false, true, 0, 'T', false);
-        
+        $this->MultiCell($textWidth, 6, $this->companyName, 0, $isRTL ? 'R' : 'L', false, 1, $textStartX, $initialTextY, true, 0, false, true, 0, 'T', false);
+
         $currentTextY = $this->GetY();
         $this->SetFont($this->defaultFontFamily, '', 7);
         $addressLine = $this->companyAddress;
-        if($this->companyPhone) $addressLine .= ($isRTL ? " \n" : " | ") . ($isRTL ? "" : "Tel: ") . $this->companyPhone;
-        if($this->companyEmail) $addressLine .= ($isRTL ? " \n" : " | ") . ($isRTL ? "" : "Email: ") . $this->companyEmail;
-        $this->MultiCell($textWidth, 3.5, $addressLine, 0, $isRTL ? 'R':'L', false, 1, $textStartX, $currentTextY, true, 0, false, true, 0, 'T', false);
-        
+        if ($this->companyPhone) $addressLine .= ($isRTL ? " \n" : " | ") . ($isRTL ? "" : "Tel: ") . $this->companyPhone;
+        if ($this->companyEmail) $addressLine .= ($isRTL ? " \n" : " | ") . ($isRTL ? "" : "Email: ") . $this->companyEmail;
+        $this->MultiCell($textWidth, 3.5, $addressLine, 0, $isRTL ? 'R' : 'L', false, 1, $textStartX, $currentTextY, true, 0, false, true, 0, 'T', false);
+
         $currentTextY = $this->GetY();
         $vatCrLine = "";
-        if($this->companyVatin) $vatCrLine .= $this->companyVatin;
-        if($this->companyCr) $vatCrLine .= ($vatCrLine ? ($isRTL ? " | " : " | ") : "") . $this->companyCr;
-        if($vatCrLine) $this->MultiCell($textWidth, 3.5, $vatCrLine, 0, $isRTL ? 'R':'L', false, 1, $textStartX, $currentTextY, true, 0, false, true, 0, 'T', false);
+        if ($this->companyVatin) $vatCrLine .= $this->companyVatin;
+        if ($this->companyCr) $vatCrLine .= ($vatCrLine ? ($isRTL ? " | " : " | ") : "") . $this->companyCr;
+        if ($vatCrLine) $this->MultiCell($textWidth, 3.5, $vatCrLine, 0, $isRTL ? 'R' : 'L', false, 1, $textStartX, $currentTextY, true, 0, false, true, 0, 'T', false);
 
         // Determine Y position after logo and text block for Report Title
         $currentY = max($this->GetY(), $initialTextY + $logoHeight) + 1;
@@ -169,7 +210,7 @@ class MyCustomTCPDF extends TCPDF
             $this->SetFont($this->defaultFontFamily, '', 8);
             $this->Cell(0, 4, $this->filterCriteria, 0, 1, 'C', false, '', 0, false, 'T', 'M');
         }
-        
+
         $this->Ln(1); // Space before the line
         // Header bottom line
         $this->Line($this->original_lMargin, $this->GetY(), $this->GetPageWidth() - $this->original_rMargin, $this->GetY());
@@ -184,7 +225,7 @@ class MyCustomTCPDF extends TCPDF
         $this->SetFont($this->defaultFontFamily, 'I', 7); // Italic, smaller font
 
         // Page number
-        $pageNumberText = $this->l['w_page'].' '.$this->getAliasNumPage().' / '.$this->getAliasNbPages();
+        $pageNumberText = $this->l['w_page'] . ' ' . $this->getAliasNumPage() . ' / ' . $this->getAliasNbPages();
         $this->Cell(0, 10, $pageNumberText, 0, false, 'C', 0, '', 0, false, 'T', 'M');
 
         // Print date on one side of the footer
@@ -195,7 +236,7 @@ class MyCustomTCPDF extends TCPDF
             $this->Cell(0, 10, $dateText, 0, false, 'L', 0, '', 0, false, 'T', 'M');
         } else {
             $this->SetX($this->original_rMargin); // This positions from the right, Cell needs negative width or use GetPageWidth()
-             $this->SetX($this->GetPageWidth() - $this->original_rMargin - $this->GetStringWidth($dateText));
+            $this->SetX($this->GetPageWidth() - $this->original_rMargin - $this->GetStringWidth($dateText));
             $this->Cell($this->GetStringWidth($dateText), 10, $dateText, 0, false, 'R', 0, '', 0, false, 'T', 'M');
         }
     }
@@ -208,7 +249,7 @@ class MyCustomTCPDF extends TCPDF
      */
     public function DrawTableHeader(array $headers, array $widths, array $alignments = [])
     {
-        $this->SetFont($this->defaultFontBold, 'B', $this->defaultFontSize -1);
+        $this->SetFont($this->defaultFontBold, 'B', $this->defaultFontSize - 1);
         $this->SetFillColor(230, 230, 230);
         $this->SetTextColor(0);
         $this->SetDrawColor(150, 150, 150); // Border color for header
@@ -219,7 +260,7 @@ class MyCustomTCPDF extends TCPDF
         foreach ($headers as $i => $header) {
             $align = $alignments[$i] ?? ($this->getRTL() ? 'R' : 'L'); // Default align based on RTL
             if ($header === 'م' || $header === 'ID') $align = 'C'; // Center ID columns
-            
+
             $this->Cell($widths[$i], $lineHeight, $header, $border, 0, $align, true);
         }
         $this->Ln($lineHeight);
@@ -238,7 +279,7 @@ class MyCustomTCPDF extends TCPDF
         $this->SetFont($this->defaultFontFamily, '', $this->defaultFontSize - 1);
         $this->SetFillColor($fill ? 245 : 255, $fill ? 245 : 255, $fill ? 245 : 255);
         $this->SetTextColor(0);
-        $this->SetDrawColor(200,200,200); // Lighter border for data rows
+        $this->SetDrawColor(200, 200, 200); // Lighter border for data rows
         $this->SetLineWidth(0.1);
         $border = 'LR'; // Left and Right borders for cells, top/bottom drawn by Ln or other cells
 
@@ -256,11 +297,11 @@ class MyCustomTCPDF extends TCPDF
         // Estimate line height based on current font size. This is an approximation.
         // TCPDF's getLineHeight is usually FontHeight * CellHeightRatio. FontHeight is FontSize * some_factor.
         $lineHeight = $this->FontSize * $this->getCellHeightRatio() * 0.352777778; // Convert Pt to mm approx
-        if($lineHeight < 3) $lineHeight = 3.5; // Min line height
+        if ($lineHeight < 3) $lineHeight = 3.5; // Min line height
 
         $rowHeight = ($maxLines * $lineHeight) + $cellPadding['T'] + $cellPadding['B'] + 0.5;
         if ($rowHeight < $minRowHeight) $rowHeight = $minRowHeight;
-        
+
         // If it's the first cell of a new line, add top border
         if ($this->GetY() + $rowHeight > $this->getPageHeight() - $this->getBreakMargin()) {
             $this->AddPage($this->CurOrientation); // Add new page if not enough space

@@ -78,4 +78,31 @@ class Doctor extends Model
     {
         return $this->hasMany(DoctorSchedule::class);
     }
+    /**
+     * Calculate doctor's credit for a specific visit.
+     * This is a placeholder for your specific business logic.
+     * @param DoctorVisit $visit
+     * @param string $paymentType 'cash' or 'company'
+     * @return float
+     */
+    public function calculateVisitCredit(DoctorVisit $visit, string $paymentType): float
+    {
+        $credit = 0;
+        // Iterate through $visit->requestedServices and/or $visit->labRequests
+        // Apply $this->cash_percentage or $this->company_percentage to the relevant amounts (paid amount or net price)
+        // This needs your precise calculation rules.
+        
+        // Example pseudo-logic for requested services:
+        foreach($visit->requestedServices as $rs) {
+            $amountForCalc = (float)$rs->amount_paid; // Or (float)$rs->price - (float)$rs->endurance if based on net service value
+            if ($paymentType === 'cash') {
+                $credit += $amountForCalc * ($this->cash_percentage / 100);
+            } elseif ($paymentType === 'company') {
+                $credit += $amountForCalc * ($this->company_percentage / 100);
+            }
+        }
+         // Add similar logic for LabRequests if they contribute to doctor credit
+        return $credit;
+    }
+
 }

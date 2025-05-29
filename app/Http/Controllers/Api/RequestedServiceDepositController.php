@@ -23,7 +23,6 @@ class RequestedServiceDepositController extends Controller
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01', // Must pay something
             'is_bank' => 'required|boolean',
-            'shift_id' => 'required|exists:shifts,id,is_closed,false', // Must be an open shift
         ]);
 
         // Calculate current balance for the requested service
@@ -50,7 +49,7 @@ class RequestedServiceDepositController extends Controller
                 'amount' => $paymentAmount,
                 'is_bank' => $validated['is_bank'],
                 'user_id' => Auth::id(),
-                'shift_id' => $validated['shift_id'],
+                'shift_id' => Shift::latest()->first()->id,
                 'is_claimed' => false, // Default for new deposits
             ]);
 
