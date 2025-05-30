@@ -22,14 +22,17 @@ use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\RequestedServiceCostController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\ServiceController;
+use App\Http\Controllers\Api\ServiceCostController;
 use App\Http\Controllers\Api\ServiceGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\SpecialistController;
 use App\Http\Controllers\Api\SubcompanyController;
+use App\Http\Controllers\Api\SubServiceCostController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitServiceController;
@@ -262,7 +265,40 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/doctor-shifts/{doctorShift}/financial-summary/pdf', [ReportController::class, 'clinicReport']);
   // The route api/reports/clinic-shift-summary/pdf could not be found.
   Route::get('/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
-
+  // ...
+  Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
+  Route::get('/reports/costs/pdf', [ReportController::class, 'generateCostsReportPdf']);
+    // Route for fetching costs for the list page (if not using a full apiResource for costs)
+    Route::get('/costs-report-data', [CostController::class, 'index']); // Using CostController@index for data
   // Route::
+  
+    /*
+    |--------------------------------------------------------------------------
+    | Service Costing Routes
+    |--------------------------------------------------------------------------
+    */
+
+    // SubServiceCost (Cost Components/Types)
+    Route::get('/sub-service-costs-list', [SubServiceCostController::class, 'indexList']);
+    Route::apiResource('sub-service-costs', SubServiceCostController::class);
+    // Route::post('/doctors/{doctor}/sub-service-costs', [DoctorSubServiceCostController::class, 'store']); // If managing pivot
+    // Route::delete('/doctors/{doctor}/sub-service-costs/{subServiceCost}', [DoctorSubServiceCostController::class, 'destroy']); // If managing pivot
+
+
+    // ServiceCost (Defines costs for a specific Service)
+    Route::apiResource('services.service-costs', ServiceCostController::class)->shallow();
+    // This will create routes like:
+    // GET    /api/services/{service}/service-costs        (index)
+    // POST   /api/services/{service}/service-costs        (store)
+    // GET    /api/service-costs/{service_cost}          (show) - shallow
+    // PUT    /api/service-costs/{service_cost}          (update) - shallow
+    // DELETE /api/service-costs/{service_cost}          (destroy) - shallow
+
+
+    // RequestedServiceCost (Actual cost breakdown for a requested service)
+    // These are often created programmatically, direct CRUD might be less common.
+    // Example: Route to view cost breakdown for a specific requested service
+    Route::get('/requested-services/{requested_service}/cost-breakdown', [RequestedServiceCostController::class, 'indexForRequestedService']);
+    // Route::apiResource('requested-service-costs', RequestedServiceCostController::class); // If full CRUD needed
 
 });

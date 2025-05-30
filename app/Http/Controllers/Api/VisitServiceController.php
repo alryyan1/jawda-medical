@@ -107,9 +107,11 @@ class VisitServiceController extends Controller
                     $contract = $company->contractedServices()
                                         ->where('services.id', $serviceId)
                                         ->first(); // This gets the Service model with pivot data
+                                        // return $contract;
                     if ($contract && $contract->pivot->approval) {
                         $companyContractDetails = $contract->pivot;
                         $price = $companyContractDetails->price; // Use contract price
+                        // return ['price'=>$price , 'details'=>$companyContractDetails];
                         if ($companyContractDetails->use_static) {
                             $companyEnduranceAmount = $companyContractDetails->static_endurance;
                         } else {

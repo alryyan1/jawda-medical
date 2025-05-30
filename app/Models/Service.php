@@ -33,4 +33,13 @@ class Service extends Model
                     ]);
                     // ->withTimestamps(); // if pivot has timestamps
     }
+    
+    // NEWLY ADDED for the cost breakdown structure:
+    /**
+     * Get all defined costs associated with this service.
+     */
+    public function serviceCosts()
+    {
+        return $this->hasMany(ServiceCost::class);
+    }
 }
