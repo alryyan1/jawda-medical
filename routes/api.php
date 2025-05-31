@@ -341,4 +341,33 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/insurance-audit/export/pdf', [InsuranceAuditController::class, 'exportPdf']);
     // http://127.0.0.1/jawda-medical/public/api/insurance-audit/export/excel?company_id=1&date_from=2025-05-01&date_to=2025-05-31&service_group_ids[]=9&service_group_ids[]=1&service_group_ids[]=2&service_group_ids[]=3&service_group_ids[]=4&service_group_ids[]=7&service_group_ids[]=5
     Route::get('/insurance-audit/export/excel', [ExcelController::class, 'exportInsuranceClaim']);
+    Route::get('/reports/monthly-service-deposits-income', [ReportController::class, 'monthlyServiceDepositsIncome']);
+     /*
+    |--------------------------------------------------------------------------
+    | Patient Specific Actions (ensure these are within the auth:sanctum group)
+    |--------------------------------------------------------------------------
+    */
+    // Existing search and store-from-history routes for patients
+    Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
+    Route::post('/patients/{patient}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
+    
+    // NEW: Route for patient visit history
+    Route::get('/patients/{patient}/visit-history', [PatientController::class, 'visitHistory'])->name('patients.visitHistory');
+    
+    Route::apiResource('patients', PatientController::class); // This should already be there
+
+    /*
+    |--------------------------------------------------------------------------
+    | Doctor Visit Specific Actions (ensure these are within the auth:sanctum group)
+    |--------------------------------------------------------------------------
+    */
+    // Existing status update and apiResource for doctor visits
+    Route::put('/doctor-visits/{doctorVisit}/status', [DoctorVisitController::class, 'updateStatus']);
+    Route::apiResource('doctor-visits', DoctorVisitController::class);
+
+    // NEW: Route for reassigning a doctor visit to a different shift
+    Route::post('/doctor-visits/{doctorVisit}/reassign-shift', [DoctorVisitController::class, 'reassignToShift'])->name('doctorVisits.reassignShift');
+    
+    // NEW: Route for creating a new visit for a patient by copying their data to a new shift
+    Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift'])->name('patients.copyToNewVisit');
 });

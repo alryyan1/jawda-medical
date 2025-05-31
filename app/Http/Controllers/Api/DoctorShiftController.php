@@ -8,6 +8,7 @@ use App\Models\Doctor;
 use App\Models\Shift; // General clinic shift
 use Illuminate\Http\Request;
 use App\Http\Resources\DoctorShiftResource;
+use App\Http\Resources\DoctorVisitResource;
 use App\Models\DoctorVisit;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -322,6 +323,42 @@ class DoctorShiftController extends Controller
         });
 
         return response()->json($doctorsWithStatus);
+    }
+    // In DoctorVisitController.php or a new VisitActionController.php
+    public function reassignToShift(Request $request, DoctorVisit $visit)
+    {
+        // $this->authorize('reassign', $visit);
+        $validated = $request->validate([
+            'target_doctor_shift_id' => 'required|integer|exists:doctor_shifts,id',
+        ]);
+
+        $targetDoctorShift = DoctorShift::findOrFail($validated['target_doctor_shift_id']);
+
+        // Business logic:
+        // 1. Check if targetDoctorShift is active and belongs to the same doctor or if user has permission.
+        // 2. Ensure it's not the same shift.
+        if ($visit->doctor_shift_id == $targetDoctorShift->id) {
+            return response()->json(['message' => 'الزيارة موجودة بالفعل في هذه المناوبة.'], 409);
+        }
+        if (!$targetDoctorShift->status) { // Target shift not active
+            return response()->json(['message' => 'لا يمكن نقل الزيارة إلى مناوبة مغلقة.'], 400);
+        }
+        // Add more rules like: can only copy to same doctor's shift unless admin.
+        // if ($visit->doctor_id !== $targetDoctorShift->doctor_id && !Auth::user()->can('reassign_visit_any_doctor')) { ... }
+
+
+        // Option A: Move (update existing visit)
+        $visit->update([
+            'doctor_shift_id' => $targetDoctorShift->id,
+            'doctor_id' => $targetDoctorShift->doctor_id, // Update doctor if target shift is for different doc
+            'queue_number' => DoctorVisit::where('doctor_shift_id', $targetDoctorShift->id)->count() + 1, // Recalculate queue
+            // Reset status to 'waiting' for the new shift? Or keep current status?
+            'status' => 'waiting',
+        ]);
+        // Option B: Copy (create new visit, mark old as 'transferred' or similar) - More complex
+        // ...
+
+        return new DoctorVisitResource($visit->fresh()->load(['patient', 'doctor']));
     }
     // You might add show, update, destroy for full CRUD management of DoctorShift records if needed.
     // For 'update', you might allow changing financial proof flags, notes, etc.

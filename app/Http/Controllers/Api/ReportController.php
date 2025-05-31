@@ -1869,4 +1869,104 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+    public function monthlyServiceDepositsIncome(Request $request)
+    {
+        // $this->authorize('view monthly_service_income_report'); // Permission check
+
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:' . (date('Y') + 5),
+            // Add other filters if needed, e.g., specific user who processed deposits
+            // 'user_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+
+        $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $period = CarbonPeriod::create($startDate, '1 day', $endDate);
+
+        $dailyData = [];
+        $grandTotals = [
+            'total_deposits' => 0,
+            'total_cash_deposits' => 0,
+            'total_bank_deposits' => 0,
+            'total_costs_for_days_with_deposits' => 0, // Costs on days that had deposits
+            'net_total_income' => 0, // total_deposits - total_costs_for_days_with_deposits
+            'net_cash_flow' => 0,    // total_cash_deposits - cash_costs_on_deposit_days
+            'net_bank_flow' => 0,    // total_bank_deposits - bank_costs_on_deposit_days
+        ];
+
+        // Fetch all relevant deposits and costs for the month once for efficiency
+        $allDepositsForMonth = RequestedServiceDeposit::with('shift') // Eager load shift if needed for context
+            ->whereBetween('created_at', [$startDate, $endDate])
+            // ->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->user_id))
+            ->get();
+
+        $allCostsForMonth = Cost::query()
+            ->whereBetween('created_at', [$startDate, $endDate]) // Assuming costs are recorded on their occurrence date
+            // ->when($request->filled('user_id'), fn($q) => $q->where('user_cost', $request->user_id)) // If filtering costs by user too
+            ->get();
+
+        foreach ($period as $date) {
+            $currentDateStr = $date->format('Y-m-d');
+            
+            $depositsOnThisDay = $allDepositsForMonth->filter(function ($deposit) use ($currentDateStr) {
+                return Carbon::parse($deposit->created_at)->format('Y-m-d') === $currentDateStr;
+            });
+
+            $costsOnThisDay = $allCostsForMonth->filter(function ($cost) use ($currentDateStr) {
+                return Carbon::parse($cost->created_at)->format('Y-m-d') === $currentDateStr;
+            });
+
+            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && !$request->input('show_empty_days', false)) {
+                continue; // Skip days with no activity unless explicitly requested
+            }
+
+            $dailyTotalDeposits = $depositsOnThisDay->sum('amount');
+            $dailyCashDeposits = $depositsOnThisDay->where('is_bank', false)->sum('amount');
+            $dailyBankDeposits = $depositsOnThisDay->where('is_bank', true)->sum('amount');
+            
+            $dailyTotalCosts = $costsOnThisDay->sum(fn($cost) => (float)$cost->amount + (float)$cost->amount_bankak);
+            $dailyCashCosts = $costsOnThisDay->sum('amount');
+            $dailyBankCosts = $costsOnThisDay->sum('amount_bankak');
+
+            $dailyNetIncome = $dailyTotalDeposits - $dailyTotalCosts;
+            $dailyNetCash = $dailyCashDeposits - $dailyCashCosts;
+            $dailyNetBank = $dailyBankDeposits - $dailyBankCosts;
+
+            $dailyData[] = [
+                'date' => $currentDateStr,
+                'total_income' => (float) $dailyTotalDeposits,
+                'total_cash_income' => (float) $dailyCashDeposits,
+                'total_bank_income' => (float) $dailyBankDeposits,
+                'total_cost' => (float) $dailyTotalCosts,
+                'net_cash' => (float) $dailyNetCash,
+                'net_bank' => (float) $dailyNetBank,
+                'net_income_for_day' => (float) $dailyNetIncome,
+            ];
+
+            $grandTotals['total_deposits'] += $dailyTotalDeposits;
+            $grandTotals['total_cash_deposits'] += $dailyCashDeposits;
+            $grandTotals['total_bank_deposits'] += $dailyBankDeposits;
+            $grandTotals['total_costs_for_days_with_deposits'] += $dailyTotalCosts; // Summing all costs within the period
+            // These will be calculated at the end from summed totals
+        }
+        
+        $grandTotals['net_total_income'] = $grandTotals['total_deposits'] - $grandTotals['total_costs_for_days_with_deposits'];
+        $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount'); // Total cash costs for month
+        $grandTotals['net_bank_flow'] = $grandTotals['total_bank_deposits'] - $allCostsForMonth->sum('amount_bankak'); // Total bank costs for month
+
+
+        return response()->json([
+            'daily_data' => $dailyData,
+            'summary' => $grandTotals,
+            'report_period' => [
+                'month_name' => $startDate->translatedFormat('F Y'), // Localized month name
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ]
+        ]);
+    }
 }

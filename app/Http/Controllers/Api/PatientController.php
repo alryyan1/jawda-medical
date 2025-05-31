@@ -61,17 +61,17 @@ class PatientController extends Controller
      * Store a newly created patient in storage.
      * This also creates an initial DoctorVisit for the clinic workflow.
      */
-  /**
+    /**
      * Store a NEW patient record and an initial DoctorVisit.
      * A new File record is created and linked to the DoctorVisit.
      */
     public function store(StorePatientRequest $request)
     {
         $validatedPatientData = $request->validated(); // Use validated() directly
-        
+
         $visitDoctorId = $validatedPatientData['doctor_id'];
         $visitReason = $validatedPatientData['notes'] ?? ($validatedPatientData['present_complains'] ?? 'New Visit');
-        
+
         // Remove fields that are not part of the Patient model directly or handled separately
         $patientSpecificData = collect($validatedPatientData)->except(['doctor_id', 'notes', 'active_doctor_shift_id'])->toArray();
 
@@ -88,9 +88,9 @@ class PatientController extends Controller
             // Check for existing patient with same phone number or identical name
             $existingPatient = null;
             $fileToUseId = null;
-            
+
             if (!empty($patientSpecificData['phone']) || !empty($patientSpecificData['name'])) {
-                $existingPatient = Patient::where(function($query) use ($patientSpecificData) {
+                $existingPatient = Patient::where(function ($query) use ($patientSpecificData) {
                     if (!empty($patientSpecificData['phone'])) {
                         $query->where('phone', $patientSpecificData['phone']);
                     }
@@ -120,7 +120,7 @@ class PatientController extends Controller
             $patient = Patient::create(array_merge($patientSpecificData, [
                 'user_id' => Auth::id(),
                 'shift_id' => $currentGeneralShift->id,
-                'visit_number' => $visitLabNumber, 
+                'visit_number' => $visitLabNumber,
                 'doctor_id' => $visitDoctorId,
                 'result_auth' => false,
             ]));
@@ -143,11 +143,10 @@ class PatientController extends Controller
 
             DB::commit();
             return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file']));
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("New patient registration failed: " . $e->getMessage(), ['exception' => $e]);
-            return response()->json(['message' => 'فشل تسجيل المريض.', 'error' => 'خطأ داخلي.'.$e->getMessage()], 500);
+            return response()->json(['message' => 'فشل تسجيل المريض.', 'error' => 'خطأ داخلي.' . $e->getMessage()], 500);
         }
     }
 
@@ -159,7 +158,7 @@ class PatientController extends Controller
     public function storeVisitFromHistory(Request $request, Patient $patient)
     {
         $validatedVisitData = $request->validate([
-            'previous_visit_id' => 'nullable|integer|exists:doctorvisits,id,patient_id,'.$patient->id,
+            'previous_visit_id' => 'nullable|integer|exists:doctorvisits,id,patient_id,' . $patient->id,
             'doctor_id' => 'required|integer|exists:doctors,id',
             'active_doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
             'reason_for_visit' => 'nullable|string|max:1000',
@@ -177,13 +176,13 @@ class PatientController extends Controller
             $previousVisit = DoctorVisit::find($validatedVisitData['previous_visit_id']);
             $fileToUseId = $previousVisit?->file_id; // Copy existing file_id
         }
-        
+
         // If no previous visit was specified to copy file_id from, OR if that visit had no file_id,
         // AND if the existingPatient's latest visit also doesn't provide a file_id, create a new file.
         // This logic assumes you want to reuse file_id if available from history.
         if (!$fileToUseId) {
-             $latestVisitOfExistingPatient = $patient->doctorVisit()->latest('visit_date')->first();
-             $fileToUseId = $latestVisitOfExistingPatient?->file_id;
+            $latestVisitOfExistingPatient = $patient->doctorVisit()->latest('visit_date')->first();
+            $fileToUseId = $latestVisitOfExistingPatient?->file_id;
         }
 
 
@@ -201,19 +200,21 @@ class PatientController extends Controller
             $newPatientData = $patient->replicate()->fill([
                 'user_id' => Auth::id(),
                 'shift_id' => $currentGeneralShift->id,
-                'visit_number' => $visitLabNumber, 
+                'visit_number' => $visitLabNumber,
                 'created_at' => now(), // New record, new timestamps
                 'updated_at' => now(),
                 'doctor_id' => $validatedVisitData['doctor_id'],
-                 'result_auth' => false,
+                'result_auth' => false,
                 // Reset visit-specific flags from the old patient snapshot
-                'is_lab_paid' => false, 'lab_paid' => 0,
-                'result_is_locked' => false, 'sample_collected' => false,
+                'is_lab_paid' => false,
+                'lab_paid' => 0,
+                'result_is_locked' => false,
+                'sample_collected' => false,
                 // Potentially update some demographics if the form was partially filled for this "new" visit using old data as base
                 // 'phone' => $request->input('new_phone', $existingPatient->phone), // Example
             ])->toArray();
             // Ensure 'id' is not carried over from replication for create
-            unset($newPatientData['id']); 
+            unset($newPatientData['id']);
 
             $newPatient = Patient::create($newPatientData);
 
@@ -228,18 +229,17 @@ class PatientController extends Controller
                 'visit_time' => Carbon::now()->format('H:i:s'),
                 'status' => 'waiting',
                 'reason_for_visit' => $validatedVisitData['reason_for_visit'] ?? ($previousVisit?->reason_for_visit ?? 'متابعة'),
-                'is_new' => false, 
+                'is_new' => false,
                 'number' => $queueNumber, // Example: Using file_id as the visit/encounter number
                 'queue_number' => $queueNumber, // Example: Using file_id as the visit/encounter number
             ]);
             DB::commit();
-            
-            return new DoctorVisitResource($doctorVisit->load(['patient', 'doctor', 'file']));
 
+            return new DoctorVisitResource($doctorVisit->load(['patient', 'doctor', 'file']));
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to store visit from history for original patient {$patient->id}: " . $e->getMessage(), ['exception' => $e]);
-            return response()->json(['message' => 'فشل إنشاء الزيارة الجديدة من السجل.', 'error' => 'خطأ داخلي.'.$e->getMessage()], 500);
+            return response()->json(['message' => 'فشل إنشاء الزيارة الجديدة من السجل.', 'error' => 'خطأ داخلي.' . $e->getMessage()], 500);
         }
     }
     public function searchExisting(Request $request)
@@ -263,7 +263,7 @@ class PatientController extends Controller
 
         return PatientSearchResultResource::collection($patients);
     }
- 
+
     /**
      * Display the specified patient.
      */
@@ -311,5 +311,16 @@ class PatientController extends Controller
         $patient->delete();
         // });
         return response()->json(null, 204);
+    }
+    // In PatientController.php
+    public function visitHistory(Patient $patient)
+    {
+        // $this->authorize('view', $patient);
+        $history = $patient->doctorVisits()
+            ->with(['doctor:id,name', 'requestedServices.service:id,name']) // Eager load for display
+            ->orderBy('visit_date', 'desc')
+            ->orderBy('visit_time', 'desc')
+            ->paginate(10); // Or get all if it's a dialog scroll
+        return DoctorVisitResource::collection($history);
     }
 }
