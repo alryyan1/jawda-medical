@@ -18,26 +18,90 @@ class CompanyServiceController extends Controller
 
 
     // List all contracted services for a specific company
-   public function index(Company $company)
-{
-    $search = request('search'); // e.g., ?search=cleaning
+    public function index(Company $company, Request $request)
+    {
+        $search = request('search'); // e.g., ?search=cleaning
 
-    // Get the query builder for the contractedServices relationship
-    $query = $company->contractedServices();
+        // Get the query builder for the contractedServices relationship
+        $query = $company->contractedServices();
 
-    // Filter by service name if a search term is present
-    if ($search) {
-        $query->where('services.name', 'like', '%' . $search . '%');
+        // Filter by service name if a search term is present
+        if ($search) {
+            $query->where('services.name', 'like', '%' . $search . '%');
+        }
+
+        // Optionally eager load the serviceGroup
+        $query->with('serviceGroup');
+
+        // Paginate results
+        if ($request->has('page') && $request->page == 0) {
+            $contractedServices = $query->get();
+        } else {
+            $contractedServices = $query->paginate(20);
+        }
+
+        return CompanyServiceResource::collection($contractedServices);
+    }
+    public function copyContractsFrom(Request $request, Company $targetCompany, Company $sourceCompany)
+    {
+        // Authorization: User should be able to manage contracts for the targetCompany
+        // if (!Auth::user()->can('manage company_contracts', $targetCompany)) { // Example policy check
+        //     return response()->json(['message' => 'Unauthorized to modify target company contracts.'], 403);
+        // }
+        // if (!Auth::user()->can('view company_contracts', $sourceCompany)) { // Example policy check
+        //     return response()->json(['message' => 'Unauthorized to view source company contracts.'], 403);
+        // }
+
+        if ($targetCompany->id === $sourceCompany->id) {
+            return response()->json(['message' => 'لا يمكن نسخ العقود من نفس الشركة إلى نفسها.'], 422);
+        }
+
+        // Crucial Check: Target company must not have existing service contracts
+        if ($targetCompany->contractedServices()->exists()) {
+            return response()->json(['message' => 'لا يمكن نسخ العقود. الشركة المستهدفة لديها عقود خدمات موجودة بالفعل.'], 409); // 409 Conflict
+        }
+
+        $sourceContracts = $sourceCompany->contractedServices()->get();
+
+        if ($sourceContracts->isEmpty()) {
+            return response()->json(['message' => 'الشركة المصدر لا تحتوي على عقود خدمات لنسخها.', 'copied_count' => 0], 404);
+        }
+
+        $attachData = [];
+        foreach ($sourceContracts as $sourceContractPivotedService) {
+            // $sourceContractPivotedService is a Service model with ->pivot populated
+            $pivotData = $sourceContractPivotedService->pivot;
+            $attachData[$sourceContractPivotedService->id] = [
+                'price' => $pivotData->price,
+                'static_endurance' => $pivotData->static_endurance,
+                'percentage_endurance' => $pivotData->percentage_endurance,
+                'static_wage' => $pivotData->static_wage,
+                'percentage_wage' => $pivotData->percentage_wage,
+                'use_static' => $pivotData->use_static,
+                'approval' => $pivotData->approval, // Copy approval status as well
+                'created_at' => now(), // New timestamps for the new contract
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::beginTransaction();
+        try {
+            if (!empty($attachData)) {
+                $targetCompany->contractedServices()->attach($attachData);
+            }
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to copy service contracts from company {$sourceCompany->id} to {$targetCompany->id}: " . $e->getMessage());
+            return response()->json(['message' => 'فشل نسخ عقود الخدمات.', 'error' => $e->getMessage()], 500);
+        }
+
+        return response()->json([
+            'message' => "تم نسخ " . count($attachData) . " عقد خدمة بنجاح من " . $sourceCompany->name . " إلى " . $targetCompany->name . ".",
+            'copied_count' => count($attachData),
+        ]);
     }
 
-    // Optionally eager load the serviceGroup
-    $query->with('serviceGroup');
-
-    // Paginate results
-    $contractedServices = $query->paginate(20);
-
-    return CompanyServiceResource::collection($contractedServices);
-}
     // List services NOT yet contracted by this company (for adding new contracts)
     public function availableServices(Company $company)
     {
@@ -49,7 +113,7 @@ class CompanyServiceController extends Controller
             ->get();
         return ServiceResource::collection($availableServices);
     }
-/**
+    /**
      * Import all active services from the main services list into this company's contract,
      * if they don't already exist. Uses default/initial contract terms.
      */
@@ -62,7 +126,7 @@ class CompanyServiceController extends Controller
 
         $allActiveServices = Service::where('activate', true)->get();
         $existingContractedServiceIds = $company->contractedServices()->pluck('services.id')->toArray();
-        
+
         $servicesToImport = $allActiveServices->reject(function ($service) use ($existingContractedServiceIds) {
             return in_array($service->id, $existingContractedServiceIds);
         });
@@ -84,7 +148,7 @@ class CompanyServiceController extends Controller
             'created_at' => now(), // If your pivot table uses timestamps explicitly
             'updated_at' => now(), // If your pivot table uses timestamps explicitly
         ];
-        
+
         // Validate default terms if they are passed in request body
         // $request->validate([...rules for default_static_endurance etc...]);
 
@@ -99,13 +163,13 @@ class CompanyServiceController extends Controller
             );
             $importedCount++;
         }
-        
+
         DB::beginTransaction();
         try {
-             if (!empty($attachData)) {
-                 $company->contractedServices()->attach($attachData);
-             }
-             DB::commit();
+            if (!empty($attachData)) {
+                $company->contractedServices()->attach($attachData);
+            }
+            DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to import services to company contract {$company->id}: " . $e->getMessage());

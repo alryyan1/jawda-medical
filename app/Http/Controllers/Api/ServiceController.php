@@ -11,9 +11,20 @@ class ServiceController extends Controller
 {
     public function index(Request $request)
     {
-        $services = Service::with('serviceGroup')->orderBy('name')->paginate(15);
-        // return new ServiceCollection($services);
-        return ServiceResource::collection($services); // Default collection for pagination
+        $query = Service::with('serviceGroup'); // Eager load by default
+    
+        // Filter by search term (service name)
+        if ($request->filled('search')) {
+            $query->where('name', 'LIKE', '%' . $request->search . '%');
+        }
+    
+        // Filter by service group ID
+        if ($request->filled('service_group_id')) {
+            $query->where('service_group_id', $request->service_group_id);
+        }
+    
+        $services = $query->orderBy('id','desc')->paginate($request->get('per_page', 15));
+        return ServiceResource::collection($services);
     }
 
     public function store(Request $request)

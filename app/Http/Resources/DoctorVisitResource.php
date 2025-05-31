@@ -46,7 +46,7 @@ public function toArray(Request $request): array
         'status' => $this->status,
 
         'patient_id' => $this->patient_id,
-        'patient' => new PatientStrippedResource($this->whenLoaded('patient')),
+        'patient' => new PatientResource($this->whenLoaded('patient')),
         'doctor_id' => $this->doctor_id,
         'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor')),
         

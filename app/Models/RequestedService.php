@@ -9,21 +9,21 @@ class RequestedService extends Model
 {
     use HasFactory;
 
-    protected $table = 'requested_services'; // Explicitly define if not following plural convention perfectly
+    protected $table = 'requested_services';
 
     protected $fillable = [
-        'doctorvisits_id', // Or 'doctor_visit_id' if you changed it
+        'doctorvisits_id', // Or 'doctor_visit_id'
         'service_id',
-        'user_id',          // User who added/requested
-        'user_deposited',   // User who confirmed payment
-        'doctor_id',        // Doctor performing/responsible for this service item
+        'user_id',
+        'user_deposited',
+        'doctor_id',
         'price',
         'amount_paid',
         'endurance',
         'is_paid',
         'discount',
         'discount_per',
-        'bank',
+        'bank', // This 'bank' field indicates if the *last or primary* payment was bank. Individual deposits have their own is_bank.
         'count',
         'doctor_note',
         'nurse_note',
@@ -36,7 +36,7 @@ class RequestedService extends Model
         'amount_paid' => 'decimal:2',
         'endurance' => 'decimal:2',
         'is_paid' => 'boolean',
-        'discount' => 'decimal:2', // If fixed discount can have decimals
+        'discount' => 'decimal:2',
         'discount_per' => 'integer',
         'bank' => 'boolean',
         'count' => 'integer',
@@ -48,79 +48,89 @@ class RequestedService extends Model
 
     // Relationships
 
-    /**
-     * Get the doctor visit this requested service belongs to.
-     * Adjust 'doctorvisits_id' if your FK column is named 'doctor_visit_id'.
-     */
     public function doctorVisit()
     {
-        return $this->belongsTo(DoctorVisit::class, 'doctorvisits_id'); // Or 'doctor_visit_id'
+        // Ensure this FK name matches your DB schema for requested_services table
+        return $this->belongsTo(DoctorVisit::class, 'doctorvisits_id'); 
     }
 
-    /**
-     * Get the service that was requested.
-     */
     public function service()
     {
         return $this->belongsTo(Service::class);
     }
 
-    /**
-     * Get the user who requested/added this service item.
-     */
-    public function requestingUser() // Renamed to avoid conflict with 'user' if that's patient
+    public function requestingUser()
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    /**
-     * Get the user who handled the deposit/payment for this service.
-     */
-    public function depositUser() // Or paymentConfirmedByUser
+    public function depositUser() // User who made the last/main deposit perhaps
     {
         return $this->belongsTo(User::class, 'user_deposited');
     }
 
-    /**
-     * Get the doctor specifically associated with this service instance.
-     */
-    public function performingDoctor() // Renamed to avoid conflict if 'doctor' is the main visit doctor
+    public function performingDoctor()
     {
         return $this->belongsTo(Doctor::class, 'doctor_id');
     }
 
-    // Accessors for calculated values (Examples)
+    /**
+     * Get all the actual cost breakdown entries for this requested service.
+     */
+    public function costBreakdown()
+    {
+        return $this->hasMany(RequestedServiceCost::class, 'requested_service_id');
+    }
 
     /**
-     * Calculate the total price for this line item (price * count).
+     * Get all payment deposits made for this requested service.
      */
+    public function deposits() // <-- THE MISSING RELATIONSHIP
+    {
+        return $this->hasMany(RequestedServiceDeposit::class, 'requested_service_id');
+    }
+
+
+    // Accessors
+
     public function getTotalPriceAttribute(): float
     {
-        return (float) $this->price * (int) $this->count;
+        return (float) $this->price * (int) ($this->count ?? 1);
     }
 
     /**
-     * Calculate the net amount due after discount and endurance.
-     * Net Due = (Price * Count) - Discount Amount - Endurance Amount
+     * Calculates the net amount payable by the patient after discounts and company endurance.
      */
-    public function getNetAmountDueAttribute(): float
+    public function getNetPayableByPatientAttribute(): float
     {
-        $totalPrice = $this->total_price; // Uses the accessor above
-        $discountAmount = $this->discount; // Assuming 'discount' is a fixed amount
-        
-        // If 'discount_per' is used and 'discount' stores the calculated amount:
-        // $discountAmount = ($totalPrice * $this->discount_per) / 100; 
-        // OR if 'discount' is a fixed amount and 'discount_per' is additional, adjust logic.
-        // For now, assuming 'discount' is the primary discount value.
+        $totalPrice = $this->total_price; // Uses accessor
 
-        return $totalPrice - $discountAmount - (float) $this->endurance;
+        $discountAmountFixed = (float) $this->discount;
+        $discountAmountPercentage = ($totalPrice * (int)($this->discount_per ?? 0)) / 100;
+        $totalDiscount = $discountAmountFixed + $discountAmountPercentage;
+
+        $amountAfterDiscount = $totalPrice - $totalDiscount;
+        
+        $enduranceAmount = 0;
+        // To apply endurance conditionally, we need patient context.
+        // This requires the doctorVisit and its patient relation to be loaded.
+        // $patient = $this->doctorVisit?->patient; // Make sure doctorVisit is loaded
+        // if ($patient && $patient->company_id) {
+        //     $enduranceAmount = (float) $this->endurance;
+        // }
+        // For simplicity in the model accessor, if endurance is set, we assume it applies.
+        // The controller or service layer should ensure `endurance` is correctly set based on patient type.
+        $enduranceAmount = (float) $this->endurance;
+
+
+        return $amountAfterDiscount - $enduranceAmount;
     }
 
-    /**
-     * Calculate the remaining balance for this service.
-     */
+
     public function getBalanceAttribute(): float
     {
-        return $this->net_amount_due - (float) $this->amount_paid;
+        // Net payable by patient (after their discounts and company endurance)
+        $netPatientOwes = $this->net_payable_by_patient; // Uses accessor
+        return $netPatientOwes - (float) $this->amount_paid;
     }
 }

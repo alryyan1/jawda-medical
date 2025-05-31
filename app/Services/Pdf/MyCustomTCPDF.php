@@ -349,4 +349,17 @@ class MyCustomTCPDF extends TCPDF
     {
         return $this->defaultFontFamily;
     }
+
+    /**
+     * Get the current margins as an array
+     * @return array
+     */
+    public function getMargins(): array
+    {
+        return [
+            'left' => $this->lMargin,
+            'right' => $this->rMargin,
+            'top' => $this->tMargin
+        ];
+    }
 }

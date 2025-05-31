@@ -16,7 +16,9 @@ use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DoctorScheduleController;
 use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
+use App\Http\Controllers\Api\ExcelController;
 use App\Http\Controllers\Api\FinanceAccountController;
+use App\Http\Controllers\Api\InsuranceAuditController;
 use App\Http\Controllers\Api\LabRequestController;
 use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\PackageController;
@@ -298,7 +300,45 @@ Route::middleware('auth:sanctum')->group(function () {
     // RequestedServiceCost (Actual cost breakdown for a requested service)
     // These are often created programmatically, direct CRUD might be less common.
     // Example: Route to view cost breakdown for a specific requested service
-    Route::get('/requested-services/{requested_service}/cost-breakdown', [RequestedServiceCostController::class, 'indexForRequestedService']);
     // Route::apiResource('requested-service-costs', RequestedServiceCostController::class); // If full CRUD needed
+    
+    // For RequestedServiceCost entries linked to a specific RequestedService
+    Route::get('/requested-services/{requested_service}/cost-breakdown', [RequestedServiceCostController::class, 'indexForRequestedService']);
+    Route::post('/requested-services/{requested_service}/costs', [RequestedServiceCostController::class, 'storeOrUpdateBatch']); // For creating/updating multiple costs for a RequestedService
+    
+    // If you need individual CRUD for RequestedServiceCost items directly by their own ID
+    // Route::apiResource('requested-service-costs', RequestedServiceCostController::class)->only(['show', 'update', 'destroy']);
+    // OR if you want to allow creating one by one via its own resource controller, less common if always tied to requested service
+    Route::post('/requested-service-costs', [RequestedServiceCostController::class, 'storeSingle']);
+    Route::put('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'updateSingle']);
+    Route::delete('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'destroySingle']);
+    
+    // Deposits for a specific Requested Service
+    Route::get('/requested-services/{requested_service}/deposits', [RequestedServiceDepositController::class, 'indexForRequestedService']); // NEW or ensure exists
+    // POST to '/requested-services/{requested_service}/deposits' is already handled by RequestedServiceDepositController@store
+    
+    // If you want direct CRUD on the deposit records themselves by their own ID:
+    // Route::apiResource('requested-service-deposits', RequestedServiceDepositController::class)->except(['store']); 
+    // Or more specific routes for update/delete:
+    Route::put('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'update']); // NEW
+    Route::delete('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'destroy']); // NEW
+    Route::post('companies/{targetCompany}/copy-contracts-from/{sourceCompany}', [CompanyServiceController::class, 'copyContractsFrom']); // NEW ROUTE
+     /*
+    |--------------------------------------------------------------------------
+    | Insurance Auditing Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/insurance-audit/patients', [InsuranceAuditController::class, 'listAuditableVisits']);
+    Route::get('/insurance-audit/visits/{doctorVisit}/audit-record', [InsuranceAuditController::class, 'getOrCreateAuditRecordForVisit']);
+    Route::put('/insurance-audit/records/{auditedPatientRecord}', [InsuranceAuditController::class, 'updateAuditedPatientInfo']);
+    Route::post('/insurance-audit/records/{auditedPatientRecord}/copy-services', [InsuranceAuditController::class, 'copyServicesToAudit']);
+    Route::post('/insurance-audit/audited-services', [InsuranceAuditController::class, 'storeAuditedService']);
+    Route::put('/insurance-audit/audited-services/{auditedRequestedService}', [InsuranceAuditController::class, 'updateAuditedService']);
+    Route::delete('/insurance-audit/audited-services/{auditedRequestedService}', [InsuranceAuditController::class, 'deleteAuditedService']);
+    Route::post('/insurance-audit/records/{auditedPatientRecord}/verify', [InsuranceAuditController::class, 'verifyAuditRecord']);
 
+    // PDF/Excel Export Routes
+    Route::get('/insurance-audit/export/pdf', [InsuranceAuditController::class, 'exportPdf']);
+    // http://127.0.0.1/jawda-medical/public/api/insurance-audit/export/excel?company_id=1&date_from=2025-05-01&date_to=2025-05-31&service_group_ids[]=9&service_group_ids[]=1&service_group_ids[]=2&service_group_ids[]=3&service_group_ids[]=4&service_group_ids[]=7&service_group_ids[]=5
+    Route::get('/insurance-audit/export/excel', [ExcelController::class, 'exportInsuranceClaim']);
 });

@@ -46,7 +46,7 @@ class CompanyController extends Controller
         }
 
 
-        $companies = $query->orderBy('name')->paginate($request->get('per_page', 15));
+        $companies = $query->orderBy('id', 'desc')->paginate($request->get('per_page', 15));
 
         // If using a custom collection resource:
         // return new CompanyCollection($companies);

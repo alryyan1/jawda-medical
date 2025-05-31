@@ -309,5 +309,12 @@ class DoctorVisit extends Model
     //     // return $totalCollected - $doctorShare - $serviceCosts; // Simplified
     //     return $this->calculateTotalServiceValue() * 0.2; // Placeholder 20% hospital share of total service value
     // }
+      /**
+     * Get the audit record associated with this doctor visit.
+     */
+    public function auditRecord() // <-- THE NEW RELATIONSHIP
+    {
+        return $this->hasOne(AuditedPatientRecord::class, 'doctor_visit_id');
+    }
 
 }
