@@ -28,15 +28,13 @@ class LabRequestController extends Controller
 {
     public function __construct()
     {
-        // Example Permissions (adjust to your defined permission names)
-        // $this->middleware('can:view lab_queue')->only('getLabPendingQueue');
-        // $this->middleware('can:view lab_requests')->only(['indexForVisit', 'show', 'getLabRequestForEntry']);
-        // $this->middleware('can:request lab_tests')->only(['storeBatchForVisit', 'availableTestsForVisit']);
-        // $this->middleware('can:edit lab_requests')->only(['update', 'updateFlags']); // updateFlags could be part of update
-        // $this->middleware('can:cancel lab_requests')->only('destroy');
-        // $this->middleware('can:record lab_payment')->only('recordPayment');
-        // $this->middleware('can:enter lab_results')->only('saveResults');
-        // $this->middleware('can:authorize lab_results')->only('authorizeResults');
+        // Apply middleware for permissions. Adjust permission names as needed.
+        // $this->middleware('can:list users')->only('index', 'getRolesList'); // Added getRolesList here too
+        // $this->middleware('can:view users')->only('show');
+        // $this->middleware('can:create users')->only('store');
+        // $this->middleware('can:edit users')->only('update', 'updatePassword'); // Added updatePassword
+        // $this->middleware('can:delete users')->only('destroy');
+        // 'assign roles' permission is typically checked within store/update methods if request has roles
     }
     // Example in LabRequestController or VisitServiceController
 // app/Http/Controllers/Api/LabRequestController.php

@@ -18,11 +18,11 @@ class UserController extends Controller
     public function __construct()
     {
         // Apply middleware for permissions. Adjust permission names as needed.
-        $this->middleware('can:list users')->only('index');
-        $this->middleware('can:view users')->only('show');
-        $this->middleware('can:create users')->only('store');
-        $this->middleware('can:edit users')->only('update');
-        $this->middleware('can:delete users')->only('destroy');
+        // $this->middleware('can:list users')->only('index');
+        // $this->middleware('can:view users')->only('show');
+        // $this->middleware('can:create users')->only('store');
+        // $this->middleware('can:edit users')->only('update');
+        // $this->middleware('can:delete users')->only('destroy');
     }
 
     public function index(Request $request)
