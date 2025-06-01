@@ -30,5 +30,12 @@ return [
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
+    
+    'waapi' => [
+        'base_url' => env('WAAPI_BASE_URL', 'https://waapi.app/api/v1/instances'),
+        'instance_id' => env('WAAPI_INSTANCE_ID'),
+        'token' => env('WAAPI_TOKEN'),
+        'default_country_code' => env('WHATSAPP_DEFAULT_COUNTRY_CODE', '249'), // Example for Sudan
+    ],
 
 ];

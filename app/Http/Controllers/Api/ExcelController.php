@@ -239,4 +239,100 @@ class ExcelController extends Controller
             return response()->json(['message' => 'حدث خطأ أثناء إنشاء ملف الإكسل المدقق.', 'error' => $e->getMessage()], 500);
         }
     }
+    public function exportMonthlyServiceDepositsIncomeExcel(Request $request)
+    {
+        // $this->authorize('export monthly_service_income_report');
+        $data = $this->getMonthlyServiceDepositsIncomeData(new Request($request->all() + ['show_empty_days' => true]));
+        
+        $dailyData = $data['daily_data'];
+        $summary = $data['summary'];
+        $reportPeriod = $data['report_period'];
+
+        if (empty($dailyData)) {
+            return response()->json(['message' => 'لا توجد بيانات لإنشاء التقرير.'], 404);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setRightToLeft(true);
+
+        $spreadsheet->getProperties()->setTitle('تقرير الإيرادات الشهرية من الخدمات');
+        
+        $headerStyle = [ /* Same as ExcelController */];
+        $totalRowStyle = [ /* Same as ExcelController */];
+         $headerStyle = [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E90FF']],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '000000']]],
+            ];
+            $totalRowStyle = [
+                'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => 'FF0000']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFFF99']],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THICK, 'color' => ['rgb' => '000000']]],
+            ];
+
+        $sheet->setCellValue('A1', 'تقرير الإيرادات الشهرية من الخدمات');
+        $sheet->mergeCells('A1:H1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->setCellValue('A2', "لشهر: {$reportPeriod['month_name']}");
+        $sheet->mergeCells('A2:H2');
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $headers = ['التاريخ', 'إجمالي الإيداعات', 'إيداعات نقدية', 'إيداعات بنكية', 'إجمالي المصروفات', 'صافي النقدية', 'صافي البنك', 'صافي الدخل اليومي'];
+        $sheet->fromArray($headers, null, 'A4');
+        $sheet->getStyle('A4:H4')->applyFromArray($headerStyle);
+        $sheet->getRowDimension(4)->setRowHeight(20);
+
+        $dataRows = [];
+        foreach ($dailyData as $day) {
+            $dataRows[] = [
+                Carbon::parse($day['date'])->translatedFormat('D, M j, Y'),
+                (float)$day['total_income'],
+                (float)$day['total_cash_income'],
+                (float)$day['total_bank_income'],
+                (float)$day['total_cost'],
+                (float)$day['net_cash'],
+                (float)$day['net_bank'],
+                (float)$day['net_income_for_day'],
+            ];
+        }
+        $sheet->fromArray($dataRows, null, 'A5');
+        
+        $lastDataRow = 4 + count($dataRows);
+        
+        // Column widths and number formats
+        $sheet->getColumnDimension('A')->setWidth(25);
+        for ($col = 'B'; $col <= 'H'; $col++) {
+            $sheet->getColumnDimension($col)->setWidth(18);
+            $sheet->getStyle($col . '5:' . $col . $lastDataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+        }
+
+        // Totals Row
+        $totalRowIdx = $lastDataRow + 1;
+        $sheet->setCellValue('A' . $totalRowIdx, 'الإجمالي الشهري:');
+        $sheet->setCellValue('B' . $totalRowIdx, "=SUM(B5:B{$lastDataRow})");
+        $sheet->setCellValue('C' . $totalRowIdx, "=SUM(C5:C{$lastDataRow})");
+        $sheet->setCellValue('D' . $totalRowIdx, "=SUM(D5:D{$lastDataRow})");
+        $sheet->setCellValue('E' . $totalRowIdx, "=SUM(E5:E{$lastDataRow})");
+        $sheet->setCellValue('F' . $totalRowIdx, "=SUM(F5:F{$lastDataRow})");
+        $sheet->setCellValue('G' . $totalRowIdx, "=SUM(G5:G{$lastDataRow})");
+        $sheet->setCellValue('H' . $totalRowIdx, "=SUM(H5:H{$lastDataRow})");
+        $sheet->getStyle('A' . $totalRowIdx . ':H' . $totalRowIdx)->applyFromArray($totalRowStyle);
+        $sheet->getRowDimension($totalRowIdx)->setRowHeight(22);
+        
+        // Borders for data
+        $sheet->getStyle('A5:H'.$lastDataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle('A5:H'.$lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $writer = new Xlsx($spreadsheet);
+        $fileName = 'monthly_service_income_' . $reportPeriod['from'] . '_' . $reportPeriod['to'] . '.xlsx';
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
 }

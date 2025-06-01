@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\SubServiceCostController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\VisitServiceController;
+use App\Http\Controllers\Api\WhatsAppController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -370,4 +371,15 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // NEW: Route for creating a new visit for a patient by copying their data to a new shift
     Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift'])->name('patients.copyToNewVisit');
+    
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Communication Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::post('/whatsapp/send-text', [WhatsAppController::class, 'sendText']);
+    Route::post('/whatsapp/send-media', [WhatsAppController::class, 'sendMedia']);
+    // Route::get('/whatsapp/templates', [WhatsAppController::class, 'getMessageTemplates']); // 
+    Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
+    Route::get('/reports/monthly-service-deposits-income/excel', [ReportController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
 });

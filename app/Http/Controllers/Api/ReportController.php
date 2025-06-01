@@ -795,7 +795,7 @@ class ReportController extends Controller
                     }
                 }
                 $pdf->Ln($rowH);
-                $pdf->Line($pdf->GetX() + ($isRTL ? 0 : $indent), $pdf->GetY(), $pdf->GetPageWidth() - $pdf->getMargins()['right'], $pdf->GetY()); // Bottom line for row
+                $pdf->Line($pdf->GetX() + ($isRTL ? 0 : $indent), $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY()); // Bottom line for row
             }
         } else {
             $currentX = $pdf->GetX() + ($isRTL ? 0 : $indent);
@@ -1414,7 +1414,7 @@ class ReportController extends Controller
                 }
             }
         } else {
-            if ($pdf->getPageOrientation() === 'L') { // If already in landscape from a previous doctor
+            if ($pdf->getPage() > 1) { // If beyond first page (landscape pages start after page 1)
                  $pdf->SetFont($fontname, '', 10);
                  $pdf->Cell(0, 7, 'لا توجد زيارات عيادة لمناوبات الأطباء خلال هذه الوردية العامة.', 0, 1, 'C');
             } else { // Still on portrait (page 1)
@@ -1969,4 +1969,167 @@ class ReportController extends Controller
             ]
         ]);
     }
+     /**
+     * Helper function to get monthly service deposit income data.
+     * This will be used by both the JSON API endpoint and the export functions.
+     */
+    private function getMonthlyServiceDepositsIncomeData(Request $request): array
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:' . (date('Y') + 5),
+            // 'user_id' => 'nullable|integer|exists:users,id', // Optional filter
+            'show_empty_days' => 'nullable|boolean', // For PDF/Excel, you might always want to show all days
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+
+        $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $period = CarbonPeriod::create($startDate, '1 day', $endDate);
+
+        $dailyData = [];
+        $grandTotals = [
+            'total_deposits' => 0,
+            'total_cash_deposits' => 0,
+            'total_bank_deposits' => 0,
+            'total_costs_for_days_with_activity' => 0, // Costs on days that had deposits OR costs
+        ];
+
+        $allDepositsForMonth = RequestedServiceDeposit::whereBetween('created_at', [$startDate, $endDate])
+            // ->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->user_id))
+            ->get();
+
+        $allCostsForMonth = Cost::query()
+            ->whereBetween('created_at', [$startDate, $endDate])
+            // ->when($request->filled('user_id'), fn($q) => $q->where('user_cost', $request->user_id))
+            ->get();
+
+        foreach ($period as $date) {
+            $currentDateStr = $date->format('Y-m-d');
+            
+            $depositsOnThisDay = $allDepositsForMonth->filter(fn ($d) => Carbon::parse($d->created_at)->isSameDay($date));
+            $costsOnThisDay = $allCostsForMonth->filter(fn ($c) => Carbon::parse($c->created_at)->isSameDay($date));
+
+            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && !$request->input('show_empty_days', true)) { // Default to true for reports
+                continue;
+            }
+
+            $dailyTotalDeposits = $depositsOnThisDay->sum('amount');
+            $dailyCashDeposits = $depositsOnThisDay->where('is_bank', false)->sum('amount');
+            $dailyBankDeposits = $depositsOnThisDay->where('is_bank', true)->sum('amount');
+            
+            $dailyCashCosts = $costsOnThisDay->sum('amount');
+            $dailyBankCosts = $costsOnThisDay->sum('amount_bankak');
+            $dailyTotalCosts = $dailyCashCosts + $dailyBankCosts;
+
+            $dailyData[] = [
+                'date_obj' => $date, // Keep Carbon instance for PDF formatting
+                'date' => $currentDateStr,
+                'total_income' => (float) $dailyTotalDeposits,
+                'total_cash_income' => (float) $dailyCashDeposits,
+                'total_bank_income' => (float) $dailyBankDeposits,
+                'total_cost' => (float) $dailyTotalCosts,
+                'net_cash' => (float) ($dailyCashDeposits - $dailyCashCosts),
+                'net_bank' => (float) ($dailyBankDeposits - $dailyBankCosts),
+                'net_income_for_day' => (float) ($dailyTotalDeposits - $dailyTotalCosts),
+            ];
+
+            $grandTotals['total_deposits'] += $dailyTotalDeposits;
+            $grandTotals['total_cash_deposits'] += $dailyCashDeposits;
+            $grandTotals['total_bank_deposits'] += $dailyBankDeposits;
+            $grandTotals['total_costs_for_days_with_activity'] += $dailyTotalCosts;
+        }
+        
+        $grandTotals['net_total_income'] = $grandTotals['total_deposits'] - $grandTotals['total_costs_for_days_with_activity'];
+        $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount');
+        $grandTotals['net_bank_flow'] = $grandTotals['total_bank_deposits'] - $allCostsForMonth->sum('amount_bankak');
+
+        return [
+            'daily_data' => $dailyData,
+            'summary' => $grandTotals,
+            'report_period' => [
+                'month_name' => $startDate->translatedFormat('F Y'),
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ]
+        ];
+    }
+
+
+    public function exportMonthlyServiceDepositsIncomePdf(Request $request)
+    {
+        // $this->authorize('export monthly_service_income_report');
+        $data = $this->getMonthlyServiceDepositsIncomeData(new Request($request->all() + ['show_empty_days' => true])); // Ensure all days for PDF
+        
+        $dailyData = $data['daily_data'];
+        $summary = $data['summary'];
+        $reportPeriod = $data['report_period'];
+
+        if (empty($dailyData)) {
+            return response()->json(['message' => 'لا توجد بيانات لإنشاء التقرير.'], 404);
+        }
+
+        $reportTitle = 'تقرير الإيرادات الشهرية من الخدمات';
+        $filterCriteria = "لشهر: {$reportPeriod['month_name']}";
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
+        $pdf->AddPage();
+        $pdf->SetLineWidth(0.1);
+        $fontname = $pdf->getDefaultFontFamily();
+
+        // Table Header
+        $headers = ['التاريخ', 'إجمالي الإيداعات', 'إيداعات نقدية', 'إيداعات بنكية', 'إجمالي المصروفات', 'صافي النقدية', 'صافي البنك', 'صافي الدخل اليومي'];
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $colWidths = array_fill(0, count($headers), $pageWidth / count($headers)); // Equal width
+        // Or define specific widths:
+        // $colWidths = [35, 35, 35, 35, 35, 35, 35, 0]; 
+        // $colWidths[count($colWidths)-1] = $pageWidth - array_sum(array_slice($colWidths,0,-1));
+        $alignments = array_fill(0, count($headers), 'C');
+        $alignments[0] = 'R'; // Date align right
+
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        // Table Body
+        $pdf->SetFont($fontname, '', 8);
+        $fill = false;
+        foreach ($dailyData as $day) {
+            $rowData = [
+                Carbon::parse($day['date'])->translatedFormat('D, M j, Y'), // Localized date
+                number_format($day['total_income'], 2),
+                number_format($day['total_cash_income'], 2),
+                number_format($day['total_bank_income'], 2),
+                number_format($day['total_cost'], 2),
+                number_format($day['net_cash'], 2),
+                number_format($day['net_bank'], 2),
+                number_format($day['net_income_for_day'], 2),
+            ];
+            $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
+            $fill = !$fill;
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        // Summary Footer for Table
+        $pdf->SetFont($fontname, 'B', 8.5);
+        $summaryRow = [
+            'الإجمالي الشهري:',
+            number_format($summary['total_deposits'], 2),
+            number_format($summary['total_cash_deposits'], 2),
+            number_format($summary['total_bank_deposits'], 2),
+            number_format($summary['total_costs_for_days_with_activity'], 2),
+            number_format($summary['net_cash_flow'], 2),
+            number_format($summary['net_bank_flow'], 2),
+            number_format($summary['net_total_income'], 2),
+        ];
+        $pdf->DrawTableRow($summaryRow, $colWidths, $alignments, true, 10); // Filled, height 10
+
+        $pdfFileName = 'monthly_service_income_' . $reportPeriod['from'] . '_' . $reportPeriod['to'] . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+
+  
 }
