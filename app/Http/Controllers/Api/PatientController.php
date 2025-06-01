@@ -82,7 +82,11 @@ class PatientController extends Controller
         }
         $activeDoctorShiftId = $request->input('doctor_shift_id');
 
-
+        if ($request->filled('company_id')) {
+            $this->authorize('register insurance_patient');
+        } else {
+            $this->authorize('register cash_patient');
+        }
         DB::beginTransaction();
         try {
             // Check for existing patient with same phone number or identical name

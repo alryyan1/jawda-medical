@@ -78,6 +78,9 @@ class DoctorShiftController extends Controller
         // if (!Auth::user()->can('start doctor_shift')) {
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
+        if (!Auth::user()->can('start doctor_shifts')) {
+            return response()->json(['message' => 'لا يمكنك فتح وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
+        }
 
         $validated = $request->validate([
             'doctor_id' => 'required|exists:doctors,id',
@@ -118,9 +121,16 @@ class DoctorShiftController extends Controller
         // if (!Auth::user()->can('end doctor_shift')) {
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
+        if (!Auth::user()->can('end doctor_shifts')) {
+            return response()->json(['message' => 'لا يمكنك إغلاق وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
+        }
 
         if (!$doctorShift->status) { // If already closed
             return response()->json(['message' => 'وردية عمل هذا الطبيب مغلقة بالفعل.'], 400);
+        }
+
+        if ($doctorShift->user_id !== Auth::id()) {
+            return response()->json(['message' => 'لا يمكنك إغلاق وردية هذا الطبيب لأنك لست المسؤول عنها.'], 403);
         }
 
         $validated = $request->validate([
@@ -359,6 +369,21 @@ class DoctorShiftController extends Controller
         // ...
 
         return new DoctorVisitResource($visit->fresh()->load(['patient', 'doctor']));
+    }
+    // app/Http/Controllers/Api/DoctorShiftController.php
+    public function updateProofingFlags(Request $request, DoctorShift $doctorShift)
+    {
+        // $this->authorize('update_proofing_flags', $doctorShift); // Permission check
+
+        $validated = $request->validate([
+            'is_cash_revenue_prooved' => 'sometimes|boolean',
+            'is_cash_reclaim_prooved' => 'sometimes|boolean',
+            'is_company_revenue_prooved' => 'sometimes|boolean',
+            'is_company_reclaim_prooved' => 'sometimes|boolean',
+        ]);
+
+        $doctorShift->update($validated);
+        return new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift']));
     }
     // You might add show, update, destroy for full CRUD management of DoctorShift records if needed.
     // For 'update', you might allow changing financial proof flags, notes, etc.

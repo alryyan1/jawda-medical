@@ -7,6 +7,8 @@ use App\Models\Company;
 use App\Models\ServiceGroup;
 use App\Models\AuditedPatientRecord;
 use App\Models\AuditedRequestedService;
+use App\Models\Cost;
+use App\Models\RequestedServiceDeposit;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -14,6 +16,7 @@ use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Log;
 
 class ExcelController extends Controller
@@ -239,6 +242,90 @@ class ExcelController extends Controller
             return response()->json(['message' => 'حدث خطأ أثناء إنشاء ملف الإكسل المدقق.', 'error' => $e->getMessage()], 500);
         }
     }
+    private function getMonthlyServiceDepositsIncomeData(Request $request): array
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:' . (date('Y') + 5),
+            // 'user_id' => 'nullable|integer|exists:users,id', // Optional filter
+            'show_empty_days' => 'nullable|boolean', // For PDF/Excel, you might always want to show all days
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+
+        $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $period = CarbonPeriod::create($startDate, '1 day', $endDate);
+
+        $dailyData = [];
+        $grandTotals = [
+            'total_deposits' => 0,
+            'total_cash_deposits' => 0,
+            'total_bank_deposits' => 0,
+            'total_costs_for_days_with_activity' => 0, // Costs on days that had deposits OR costs
+        ];
+
+        $allDepositsForMonth = RequestedServiceDeposit::whereBetween('created_at', [$startDate, $endDate])
+            // ->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->user_id))
+            ->get();
+
+        $allCostsForMonth = Cost::query()
+            ->whereBetween('created_at', [$startDate, $endDate])
+            // ->when($request->filled('user_id'), fn($q) => $q->where('user_cost', $request->user_id))
+            ->get();
+
+        foreach ($period as $date) {
+            $currentDateStr = $date->format('Y-m-d');
+            
+            $depositsOnThisDay = $allDepositsForMonth->filter(fn ($d) => Carbon::parse($d->created_at)->isSameDay($date));
+            $costsOnThisDay = $allCostsForMonth->filter(fn ($c) => Carbon::parse($c->created_at)->isSameDay($date));
+
+            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && !$request->input('show_empty_days', true)) { // Default to true for reports
+                continue;
+            }
+
+            $dailyTotalDeposits = $depositsOnThisDay->sum('amount');
+            $dailyCashDeposits = $depositsOnThisDay->where('is_bank', false)->sum('amount');
+            $dailyBankDeposits = $depositsOnThisDay->where('is_bank', true)->sum('amount');
+            
+            $dailyCashCosts = $costsOnThisDay->sum('amount');
+            $dailyBankCosts = $costsOnThisDay->sum('amount_bankak');
+            $dailyTotalCosts = $dailyCashCosts + $dailyBankCosts;
+
+            $dailyData[] = [
+                'date_obj' => $date, // Keep Carbon instance for PDF formatting
+                'date' => $currentDateStr,
+                'total_income' => (float) $dailyTotalDeposits,
+                'total_cash_income' => (float) $dailyCashDeposits,
+                'total_bank_income' => (float) $dailyBankDeposits,
+                'total_cost' => (float) $dailyTotalCosts,
+                'net_cash' => (float) ($dailyCashDeposits - $dailyCashCosts),
+                'net_bank' => (float) ($dailyBankDeposits - $dailyBankCosts),
+                'net_income_for_day' => (float) ($dailyTotalDeposits - $dailyTotalCosts),
+            ];
+
+            $grandTotals['total_deposits'] += $dailyTotalDeposits;
+            $grandTotals['total_cash_deposits'] += $dailyCashDeposits;
+            $grandTotals['total_bank_deposits'] += $dailyBankDeposits;
+            $grandTotals['total_costs_for_days_with_activity'] += $dailyTotalCosts;
+        }
+        
+        $grandTotals['net_total_income'] = $grandTotals['total_deposits'] - $grandTotals['total_costs_for_days_with_activity'];
+        $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount');
+        $grandTotals['net_bank_flow'] = $grandTotals['total_bank_deposits'] - $allCostsForMonth->sum('amount_bankak');
+
+        return [
+            'daily_data' => $dailyData,
+            'summary' => $grandTotals,
+            'report_period' => [
+                'month_name' => $startDate->translatedFormat('F Y'),
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ]
+        ];
+    }
+
     public function exportMonthlyServiceDepositsIncomeExcel(Request $request)
     {
         // $this->authorize('export monthly_service_income_report');

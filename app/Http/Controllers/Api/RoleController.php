@@ -44,23 +44,23 @@ class RoleController extends Controller
             'name' => [
                 'required', 'string', 'max:255',
                 Rule::unique('roles', 'name')->where(function ($query) {
-                    return $query->where('guard_name', 'sanctum'); // Or your default guard
+                    return $query->where('guard_name', 'web'); // Or your default guard
                 })
             ],
             'permissions' => 'nullable|array',
-            'permissions.*' => 'sometimes|string|exists:permissions,name,guard_name,sanctum', // Validate permission names exist for sanctum guard
+            'permissions.*' => 'sometimes|string|exists:permissions,name,guard_name,web', // Validate permission names exist for web guard
         ]);
 
         DB::beginTransaction();
         try {
             $role = Role::create([
                 'name' => $validatedData['name'],
-                'guard_name' => 'sanctum' // Or your default API guard
+                'guard_name' => 'web' // Or your default API guard
             ]);
 
             if (!empty($validatedData['permissions']) && Auth::user()->can('assign permissions to role')) {
                 $permissions = Permission::whereIn('name', $validatedData['permissions'])
-                                         ->where('guard_name', 'sanctum')
+                                         ->where('guard_name', 'web')
                                          ->get();
                 $role->syncPermissions($permissions);
             }
@@ -74,7 +74,7 @@ class RoleController extends Controller
 
     public function show(Role $role)
     {
-        // Ensure the role uses the 'sanctum' guard or your API guard
+        // Ensure the role uses the 'web' guard or your API guard
         if ($role->guard_name !== 'web') {
             // Or handle this more gracefully, perhaps filter in route model binding
             return response()->json(['message' => 'Role not found for this guard.'], 404);
@@ -84,7 +84,7 @@ class RoleController extends Controller
 
     public function update(Request $request, Role $role)
     {
-        // Ensure the role uses the 'sanctum' guard
+        // Ensure the role uses the 'web' guard
         if ($role->guard_name !== 'web') {
             return response()->json(['message' => 'Role not found for this guard.'], 404);
         }

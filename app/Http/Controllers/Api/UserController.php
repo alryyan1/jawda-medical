@@ -27,11 +27,39 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
-        // Add search/filtering if needed
-        $users = User::with('roles')->orderBy('id','desc')->paginate(15);
+        // Validate per_page if you want to restrict its range
+        $request->validate([
+            'per_page' => 'nullable|integer|min:5|max:200', // Example range
+            'search' => 'nullable|string|max:255', // Optional search term
+            'role' => 'nullable|string|max:255', // Optional filter by role name
+        ]);
+
+        $perPage = $request->input('per_page', 15); // Default to 15 items per page
+
+        $query = User::with('roles'); // Eager load roles
+
+        // Optional: Search functionality
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('username', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('email', 'LIKE', "%{$searchTerm}%"); // If you have email
+            });
+        }
+
+        // Optional: Filter by role
+        if ($request->filled('role')) {
+            $roleName = $request->role;
+            $query->whereHas('roles', function ($q) use ($roleName) {
+                $q->where('name', $roleName);
+            });
+        }
+        
+        $users = $query->orderBy('id', 'desc')->paginate($perPage);
+        
         return UserResource::collection($users);
     }
-
     public function store(Request $request)
     {
         $validatedData = $request->validate([

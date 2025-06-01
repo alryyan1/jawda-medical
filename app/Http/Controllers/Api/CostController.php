@@ -12,6 +12,7 @@ use App\Http\Resources\CostResource; // Create this
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class CostController extends Controller
 {
@@ -32,41 +33,30 @@ class CostController extends Controller
     {
         // $this->authorize('create', Cost::class);
         $validated = $request->validate([
-            'shift_id' => [
-                'required',
-                'integer',
-                'exists:shifts,id',
-                // Ensure the shift is currently open
-                Rule::exists('shifts', 'id')->where(function ($query) {
-                    $query->where('is_closed', false);
-                }),
-            ],
+            'shift_id' => ['required', 'integer', 'exists:shifts,id', Rule::exists('shifts', 'id')->where('is_closed', false)],
             'cost_category_id' => 'nullable|integer|exists:cost_categories,id',
-            'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id', // Optional
+            'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
             'description' => 'required|string|max:255',
             'comment' => 'nullable|string|max:255',
-            'amount' => 'required|numeric|min:0.01',
-            'is_bank_payment' => 'required|boolean', // To determine if amount goes to 'amount' or 'amount_bankak'
+            'amount_cash' => 'required_without:amount_bank|nullable|numeric|min:0', // Amount from cash
+            'amount_bank' => 'required_without:amount_cash|nullable|numeric|min:0', // Amount from bank
         ]);
-
-        $costData = [
+    
+        // Ensure at least one amount is provided and not both zero if one is required
+        if (($validated['amount_cash'] ?? 0) <= 0 && ($validated['amount_bank'] ?? 0) <= 0) {
+            throw ValidationException::withMessages(['amount_cash' => 'At least one amount (cash or bank) must be greater than zero.']);
+        }
+    
+        $cost = Cost::create([
             'shift_id' => $validated['shift_id'],
             'user_cost' => Auth::id(),
             'cost_category_id' => $validated['cost_category_id'] ?? null,
             'doctor_shift_id' => $validated['doctor_shift_id'] ?? null,
             'description' => $validated['description'],
             'comment' => $validated['comment'] ?? null,
-        ];
-
-        if ($validated['is_bank_payment']) {
-            $costData['amount_bankak'] = $validated['amount'];
-            $costData['amount'] = 0; // Or your DB default if different
-        } else {
-            $costData['amount'] = $validated['amount'];
-            $costData['amount_bankak'] = 0; // Or your DB default
-        }
-
-        $cost = Cost::create($costData);
+            'amount' => $validated['amount_cash'] ?? 0,       // Store cash portion
+            'amount_bankak' => $validated['amount_bank'] ?? 0, // Store bank portion
+        ]);
         return new CostResource($cost->load(['costCategory', 'userCost:id,name']));
     }
     public function index(Request $request)

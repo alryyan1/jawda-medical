@@ -381,5 +381,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/whatsapp/send-media', [WhatsAppController::class, 'sendMedia']);
     // Route::get('/whatsapp/templates', [WhatsAppController::class, 'getMessageTemplates']); // 
     Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
-    Route::get('/reports/monthly-service-deposits-income/excel', [ReportController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
+    Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
+    Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
+
 });
