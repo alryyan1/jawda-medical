@@ -127,7 +127,73 @@ class WhatsAppController extends Controller
             return response()->json(['message' => $result['error'] ?? 'فشل إرسال الوسائط.', 'details' => $result['data']], 500);
         }
     }
-
+    public function getPatientsForBulkMessage(Request $request)
+    {
+        // $this->authorize('send_bulk_whatsapp_messages'); // Permission
+        $validated = $request->validate([
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'service_id' => 'nullable|integer|exists:services,id',
+            'specialist_id' => 'nullable|integer|exists:specialists,id',
+            'unique_phones_only' => 'sometimes|boolean',
+        ]);
+    
+        $query = Patient::query()->select('patients.id', 'patients.name', 'patients.phone') // Select necessary fields
+                          ->whereNotNull('patients.phone')->where('patients.phone', '!=', '');
+    
+        if (!empty($validated['date_from']) && !empty($validated['date_to'])) {
+            $startDate = Carbon::parse($validated['date_from'])->startOfDay();
+            $endDate = Carbon::parse($validated['date_to'])->endOfDay();
+            $query->whereHas('doctorVisits', function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('visit_date', [$startDate, $endDate]);
+            });
+        }
+    
+        if (!empty($validated['doctor_id'])) {
+            $query->whereHas('doctorVisits', function ($q) use ($validated) {
+                $q->where('doctor_id', $validated['doctor_id']);
+                if (!empty($validated['date_from']) && !empty($validated['date_to'])) { // Ensure date filter applies to doctor's visits
+                     $q->whereBetween('visit_date', [Carbon::parse($validated['date_from'])->startOfDay(), Carbon::parse($validated['date_to'])->endOfDay()]);
+                }
+            });
+        }
+    
+        if (!empty($validated['service_id'])) {
+            $query->whereHas('doctorVisits.requestedServices', function ($q) use ($validated) {
+                $q->where('service_id', $validated['service_id']);
+                 if (!empty($validated['date_from']) && !empty($validated['date_to'])) { // Ensure date filter applies
+                     $q->whereBetween('requested_services.created_at', [Carbon::parse($validated['date_from'])->startOfDay(), Carbon::parse($validated['date_to'])->endOfDay()]);
+                }
+            });
+        }
+        
+        if (!empty($validated['specialist_id'])) {
+            $query->whereHas('doctorVisits.doctor.specialist', function ($q) use ($validated) {
+                $q->where('specialists.id', $validated['specialist_id']);
+                if (!empty($validated['date_from']) && !empty($validated['date_to'])) { // Ensure date filter applies
+                     $q->whereBetween('doctorvisits.visit_date', [Carbon::parse($validated['date_from'])->startOfDay(), Carbon::parse($validated['date_to'])->endOfDay()]);
+                }
+            });
+        }
+    
+        if (!empty($validated['unique_phones_only']) && $validated['unique_phones_only']) {
+            // This gets a bit tricky with eager loading names for each unique phone.
+            // One way: get unique phones, then fetch one patient per phone.
+            $uniquePhones = (clone $query)->distinct()->pluck('patients.phone');
+            $patients = Patient::select('id', 'name', 'phone')
+                                ->whereIn('phone', $uniquePhones)
+                                ->groupBy('phone') // Get one patient per phone number
+                                ->orderBy('name')
+                                ->get();
+        } else {
+            $patients = $query->distinct('patients.id')->orderBy('patients.name')->get();
+        }
+        
+        // For simplicity, returning a collection of PatientStrippedResource
+        // You might need to add last_visit_date if desired.
+        return \App\Http\Resources\PatientStrippedResource::collection($patients);
+    }
     // Placeholder for message template processing
     // private function processMessageTemplate(string $rawMessage, ?Patient $patient): string
     // {

@@ -397,6 +397,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
 
     Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
+    Route::get('/whatsapp/bulk-message-patients', [WhatsAppController::class, 'getPatientsForBulkMessage']);
 
 
 });
