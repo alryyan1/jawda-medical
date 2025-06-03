@@ -280,9 +280,7 @@ class PatientController extends Controller
             'companyRelation',
             'primaryDoctor:id,name',
             'user:id,name', // User who registered
-            'doctorVisits' => function ($query) { // Load last few visits for history preview
-                $query->with('doctor:id,name')->latest()->limit(5);
-            }
+            
         ]);
         return new PatientResource($patient);
     }
@@ -319,12 +317,14 @@ class PatientController extends Controller
     // In PatientController.php
     public function visitHistory(Patient $patient)
     {
-        // $this->authorize('view', $patient);
-        $history = $patient->doctorVisits()
-            ->with(['doctor:id,name', 'requestedServices.service:id,name']) // Eager load for display
-            ->orderBy('visit_date', 'desc')
-            ->orderBy('visit_time', 'desc')
-            ->paginate(10); // Or get all if it's a dialog scroll
-        return DoctorVisitResource::collection($history);
+        // Get all doctor visits where the patient's phone number matches
+        $patients = DoctorVisit::whereHas('patient', function($query) use ($patient) {
+            $query->where('phone', $patient->phone);
+        })
+        ->with(['doctor:id,name', 'requestedServices.service:id,name', 'patient','doctor'])
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+        return DoctorVisitResource::collection($patients);
     }
 }

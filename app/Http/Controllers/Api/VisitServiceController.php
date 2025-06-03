@@ -102,7 +102,8 @@ class VisitServiceController extends Controller
                                 $companyEnduranceAmount = (float) $contractPivot->static_endurance;
                             } else {
                                 if($contractPivot->percentage_endurance > 0){
-                                    $companyEnduranceAmount = ($price * (float)($contractPivot->percentage_endurance ?? 0)) / 100;
+                                    $companyServiceEndurance = ($price * (float)($contractPivot->percentage_endurance ?? 0)) / 100;
+                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
                                 }
                                 else{
                                     // return $company;

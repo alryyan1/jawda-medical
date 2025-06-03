@@ -173,6 +173,71 @@ class DoctorVisit extends Model
         }
         return $credit;
     }
+    public function bankak_service()
+    {
+        $total = 0;
+        foreach ($this->requestedServices as $service) {
+            $total+= $service->totalDepositsBank();
+        }
+        return $total;
+    }
+    public function service_costs()
+    {
+        $total = [];
+        /**@var RequestedService $requested_service */
+        foreach ($this->requestedServices as $requested_service) {
+
+            /**@var ServiceCost $service_cost */
+            foreach ($requested_service->service->service_costs as $service_cost) {
+                $total[] = $service_cost;
+            }
+        }
+        return $total;
+    }
+    public function total_paid_services(Doctor|null $doctor  = null, $user = null)
+    {
+        $total = 0;
+        //        dd($this->services);
+        foreach ($this->requestedServices as $service) {
+
+            //            if (!$service->is_paid) continue;
+            // if (!is_null($doctor)) {
+            //     if ($doctor->id != $service->doctor_id) {
+            //         continue;
+            //     }
+            // }
+            // if($service->service->variable) continue;
+            if ($user != null) {
+               if ($service->user_deposited != $user) continue;
+                $total += $service->amount_paid;
+            } else {
+                $total += $service->amount_paid;
+            }
+        }
+        return $total;
+    }
+    public function total_services(Doctor|null $doctor  = null, $user = null)
+    {
+        $total = 0;
+        //        dd($this->services);
+        foreach ($this->requestedServices as $service) {
+
+            //            if (!$service->is_paid) continue;
+            if (!is_null($doctor)) {
+                if ($doctor->id != $service->doctor_id) {
+                    continue;
+                }
+            }
+            if ($user != null) {
+                if ($service->user_deposited != $user) continue;
+                $total += $service->price;
+            } else {
+                $total += $service->price * $service->count;
+            }
+        }
+        return $total;
+    }
+
        /**
      * Calculate total cost of providing services/labs for THIS visit.
      * This requires a 'cost' field on Service/MainTest or a related costs table.
@@ -210,28 +275,10 @@ class DoctorVisit extends Model
      * Total collected for this visit - doctor's share for this visit.
      * The service costs are general clinic expenses, not subtracted per visit for hospital credit *from this visit*.
      */
-    public function hospital_credit(): float
+    public function hospital_credit()
     {
-        $totalCollectedForVisit = $this->calculateTotalPaid();
-        
-        // Ensure doctorShift relationship is loaded or available
-        if (!$this->doctorShift || !$this->doctorShift->doctor) {
-            // Fallback or error if doctorShift relationship isn't loaded,
-            // or if DoctorVisit is not directly linked to a DoctorShift
-            // but rather to a general Shift and a Doctor.
-            // In that case, use $this->doctor for percentages.
-            $doctorForCredit = $this->doctor; // The doctor of the visit
-        } else {
-            $doctorForCredit = $this->doctorShift->doctor;
-        }
-        
-        if (!$doctorForCredit) return $totalCollectedForVisit; // No doctor, all goes to hospital
-
-        $doctorShare = $doctorForCredit->calculateVisitCredit($this, $this->patient->company_id ? 'company' : 'cash');
-        
-        return $totalCollectedForVisit - $doctorShare;
+        return ($this->total_paid_services() - $this->totalServiceCosts($this->patient->doctor)) - ($this->doctorShift->doctor->doctor_credit($this));
     }
-    
   /**
      * Calculate total value of services (and lab tests if they are services) for this visit,
      * potentially considering the specific doctor's pricing or contract if applicable.
@@ -249,7 +296,14 @@ class DoctorVisit extends Model
         }
         return $total;
     }
-
+    public function totalServiceCosts($doctor)
+    {
+        $total = 0;
+        foreach ($this->requestedServices as $requested_service) {
+            $total += $requested_service->getTotalCosts($doctor);
+        }
+        return $total;
+    }
     /**
      * Calculate total amount paid for services/labs in this visit.
      */

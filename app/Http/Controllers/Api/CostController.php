@@ -38,13 +38,13 @@ class CostController extends Controller
             'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
             'description' => 'required|string|max:255',
             'comment' => 'nullable|string|max:255',
-            'amount_cash' => 'required_without:amount_bank|nullable|numeric|min:0', // Amount from cash
-            'amount_bank' => 'required_without:amount_cash|nullable|numeric|min:0', // Amount from bank
+            'amount_cash_input' => 'required_without:amount_bank|nullable|numeric|min:0', // Amount from cash
+            'amount_bank_input' => 'required_without:amount_cash|nullable|numeric|min:0', // Amount from bank
         ]);
     
         // Ensure at least one amount is provided and not both zero if one is required
-        if (($validated['amount_cash'] ?? 0) <= 0 && ($validated['amount_bank'] ?? 0) <= 0) {
-            throw ValidationException::withMessages(['amount_cash' => 'At least one amount (cash or bank) must be greater than zero.']);
+        if (($validated['amount_cash_input'] ?? 0) <= 0 && ($validated['amount_bank_input'] ?? 0) <= 0) {
+            throw ValidationException::withMessages(['amount_cash_input' => 'At least one amount (cash or bank) must be greater than zero.']);
         }
     
         $cost = Cost::create([
@@ -54,8 +54,8 @@ class CostController extends Controller
             'doctor_shift_id' => $validated['doctor_shift_id'] ?? null,
             'description' => $validated['description'],
             'comment' => $validated['comment'] ?? null,
-            'amount' => $validated['amount_cash'] ?? 0,       // Store cash portion
-            'amount_bankak' => $validated['amount_bank'] ?? 0, // Store bank portion
+            'amount' => $validated['amount_cash_input'] ?? 0,       // Store cash portion
+            'amount_bankak' => $validated['amount_bank_input'] ?? 0, // Store bank portion
         ]);
         return new CostResource($cost->load(['costCategory', 'userCost:id,name']));
     }

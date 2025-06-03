@@ -42,4 +42,18 @@ class Service extends Model
     {
         return $this->hasMany(ServiceCost::class);
     }
+       /**
+     * The doctors who offer this service with specific financial terms.
+     */
+    public function doctorsProviding()
+    {
+        return $this->belongsToMany(Doctor::class, 'doctor_services')
+                    ->using(DoctorService::class)
+                    ->withPivot(['id', 'percentage', 'fixed'])
+                    ->withTimestamps();
+    }
+    public function service_costs()
+    {
+        return $this->hasMany(ServiceCost::class);
+    }
 }

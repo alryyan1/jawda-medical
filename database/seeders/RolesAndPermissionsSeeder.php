@@ -96,8 +96,8 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // --- Shift Management ---
         $createPermission('view current_open_clinic_shift');
-        $createPermission('open clinic_shifts');
-        $createPermission('close clinic_shifts');
+        // $createPermission('open clinic_shifts');
+        // $createPermission('close clinic_shifts');
         $createPermission('manage clinic_shift_financials');
         $createPermission('list clinic_shifts');
         $createPermission('view clinic_shifts');
@@ -226,7 +226,10 @@ class RolesAndPermissionsSeeder extends Seeder
         // --- Communication ---
         $createPermission('send whatsapp_messages');
         // $createPermission('manage whatsapp_templates');
-
+        //open financials shift
+        $createPermission('open financials_shift');
+        //close financials shift
+        $createPermission('close financials_shift');
 
         // Define Roles
         $this->command->info('Creating roles...');
@@ -254,7 +257,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'manage company_service_contracts', 'import_all_services_to_company_contract', 'copy_company_service_contracts',
             'manage company_main_test_contracts', 'import_all_main_tests_to_company_contract',
             'view settings', 'update settings',
-            'open clinic_shifts', 'close clinic_shifts', 'manage clinic_shift_financials', 'list clinic_shifts', 'view clinic_shifts',
+'manage clinic_shift_financials', 'list clinic_shifts', 'view clinic_shifts',
             'manage doctor_shifts', 'list all_doctor_shifts', 'view doctor_shift_financial_summary',
             'manage all_doctor_schedules',
             'list services', 'create services', 'edit services', 'delete services',
@@ -268,7 +271,8 @@ class RolesAndPermissionsSeeder extends Seeder
             'list auditable_visits', 'view audit_record', 'create_or_update audit_record_patient_info', 'manage_audited_services', 'copy_original_services_to_audit', 'finalize_audit_record', 'export_audit_claims_pdf', 'export_audit_claims_excel',
             'send whatsapp_messages',
             'manage sub_service_cost_types', // For the new costing system
-            'manage service_payments_deposits' // For the new service payment deposits dialog
+            'manage service_payments_deposits', // For the new service payment deposits dialog
+            'open financials_shift', 'close financials_shift' // For the new financials shift
         ]);
         $this->command->info('Admin role permissions set.');
 

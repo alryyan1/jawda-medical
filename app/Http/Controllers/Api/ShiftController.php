@@ -67,6 +67,12 @@ class ShiftController extends Controller
      */
     public function openShift(Request $request)
     {
+        //check if user has permission to open shift
+        if (!Auth::user()->can('open financials_shift')) {
+            return response()->json(['message' => 'ليس لديك صلاحية لفتح وردية عمل.'], 403);
+        }
+
+       
         $user = Auth::user();
         // Check if there's already an open shift to prevent multiple open shifts if that's your rule
         $existingOpenShift = Shift::open()->exists();
@@ -213,6 +219,11 @@ class ShiftController extends Controller
      */
     public function closeShift(Request $request, Shift $shift)
     {
+
+          if (!Auth::user()->can('close financials_shift')) {   
+            return response()->json(['message' => 'ليس لديك صلاحية لإغلاق وردية عمل.'], 403);
+          }
+
         // Permission Check: e.g., can('close clinic_shifts')
         // if (!Auth::user()->can('close clinic_shifts')) {
         //     return response()->json(['message' => 'Unauthorized'], 403);

@@ -258,4 +258,8 @@ class Shift extends Model
         // and then link those to the shift, the logic would be different.
         return $aggregated; // Return empty array if no such costs
     }
+    public  function cost()
+    {
+        return $this->hasMany(Cost::class);
+    }
 }

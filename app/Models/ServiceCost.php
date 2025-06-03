@@ -57,4 +57,7 @@ class ServiceCost extends Model
     {
         return $this->hasMany(RequestedServiceCost::class);
     }
+    public function costOrders(){
+        return $this->hasMany(CostOrder::class,'service_cost_id');
+    }
 }

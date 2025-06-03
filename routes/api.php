@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\CostController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DoctorScheduleController;
+use App\Http\Controllers\Api\DoctorServiceController;
 use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
 use App\Http\Controllers\Api\ExcelController;
@@ -52,7 +54,16 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-
+     /*
+    |--------------------------------------------------------------------------
+    | Doctor Specific Service Configuration Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/doctors/{doctor}/configured-services', [DoctorServiceController::class, 'index']);
+    Route::get('/doctors/{doctor}/available-services-for-config', [DoctorServiceController::class, 'availableServices']);
+    Route::post('/doctors/{doctor}/configure-service', [DoctorServiceController::class, 'store']);
+    Route::put('/doctors/{doctor}/configure-service/{service}', [DoctorServiceController::class, 'update']);
+    Route::delete('/doctors/{doctor}/configure-service/{service}', [DoctorServiceController::class, 'destroy']);
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
@@ -384,5 +395,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
     Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
     Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
+
+    Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
+
 
 });

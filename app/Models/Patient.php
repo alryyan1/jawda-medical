@@ -154,25 +154,11 @@ class Patient extends Model
         return $this->belongsTo(Country::class); // Assuming Country model exists
     }
 
-    /**
-     * Get all doctor visits for this patient.
-     */
-    public function doctorVisits()
-    {
-        return $this->hasMany(DoctorVisit::class);
-    }
+ 
 
-    /**
-     * Get the latest doctor visit for this patient.
-     */
-    public function latestDoctorVisit()
-    {
-        return $this->hasOne(DoctorVisit::class)->latestOfMany();
-    }
 
-    /**
-     * Get all lab requests for this patient.
-     */
+
+
     public function labRequests()
     {
         return $this->hasMany(LabRequest::class, 'pid'); // 'pid' is the FK in labrequests table

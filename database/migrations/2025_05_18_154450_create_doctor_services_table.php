@@ -10,16 +10,13 @@ return new class extends Migration
     {
         Schema::create('doctor_services', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('doctor_id')->constrained('doctors')->onDelete('cascade');
+            $table->foreignId('service_id')->constrained('services')->onDelete('cascade');
+            $table->decimal('percentage', 5, 2)->nullable(); // e.g., 20.00 for 20%
+            $table->decimal('fixed', 15, 2)->nullable(); // Fixed amount the doctor receives
 
-            $table->unsignedBigInteger('doctor_id');
-            $table->foreign('doctor_id')->references('id')->on('doctors')->onDelete('cascade');
-
-            $table->unsignedBigInteger('service_id');
-            $table->foreign('service_id')->references('id')->on('services')->onDelete('cascade');
-
-            $table->decimal('percentage', 8, 2);
-            $table->decimal('fixed', 8, 2);
-
+            // Ensure a doctor can only have one entry per service
+            $table->unique(['doctor_id', 'service_id']);
             // No timestamps in original schema
             // $table->unique(['doctor_id', 'service_id']); // Optional: if a doctor-service pair should be unique
         });

@@ -8,10 +8,10 @@ class PatientSearchResultResource extends JsonResource {
             'phone' => $this->phone,
             'gender' => $this->gender,
             'age_year' => $this->age_year, // For quick display
-            'last_visit_id' => $this->latestDoctorVisit?->id,
-            'last_visit_date' => $this->latestDoctorVisit?->visit_date?->toDateString(),
-            'last_visit_doctor_name' => $this->latestDoctorVisit?->doctor?->name,
-            'last_visit_file_id' => $this->latestDoctorVisit?->file_id, // For copying
+            'last_visit_id' => $this?->id,
+            'last_visit_date' => $this?->visit_date?->toDateString(),
+            'last_visit_doctor_name' => $this?->doctor?->name,
+            'last_visit_file_id' => $this?->file_id, // For copying
         ];
     }
 }

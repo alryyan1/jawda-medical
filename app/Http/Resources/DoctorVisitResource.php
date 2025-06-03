@@ -49,6 +49,7 @@ public function toArray(Request $request): array
         'patient' => new PatientResource($this->whenLoaded('patient')),
         'doctor_id' => $this->doctor_id,
         'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor')),
+        'name' => $this->patient->name,
         
         // Financials for this visit
         'total_amount' => $totalAmount,

@@ -147,47 +147,103 @@ class DoctorShiftController extends Controller
         return new DoctorShiftResource($doctorShift->load('doctor'));
     }
 
+  
     /**
-     * Display a listing of the resource. (Standard CRUD index)
+     * Display a listing of the DoctorShift resources.
+     * This serves as the data source for reports like the "Doctor Shifts Report".
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      */
-    public function index(Request $request) // This will serve as the report endpoint
+    public function index(Request $request)
     {
-        // Permission check: e.g., can('view doctor_shift_reports')
-        // if (!Auth::user()->can('view doctor_shift_reports')) {
+        // Permission check: e.g., can('list all_doctor_shifts') or 'view doctor_shift_reports'
+        // if (!Auth::user()->can('list all_doctor_shifts')) {
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
 
+        $request->validate([
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100', // Control items per page
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'doctor_name_search' => 'nullable|string|max:255', // For searching by doctor name
+            'user_id_opened' => 'nullable|integer|exists:users,id', // User who started the DoctorShift
+            'status' => 'nullable|string|in:0,1,all', // '0' for closed, '1' for open, 'all' for both
+            'shift_id' => 'nullable|integer|exists:shifts,id', // Filter by general clinic shift ID
+            'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status', // Allowed sort fields
+            'sort_direction' => 'nullable|string|in:asc,desc',
+        ]);
+
         $query = DoctorShift::with([
-            'doctor',
-            'user', // User who opened/managed the DoctorShift record
-            'generalShift', // The main clinic shift
-            // Optional: Eager load counts or sums if needed directly for report
+            'doctor:id,name,specialist_id', // Eager load doctor with specialist_id
+            'doctor.specialist:id,name',    // Eager load specialist details
+            'user:id,name,username',        // User who opened/managed the DoctorShift record
+            'generalShift:id,created_at,closed_at', // The main clinic shift
+            // Optional: Eager load counts for quick display if needed, but can make query heavier
             // 'doctorVisitsCount' => fn($q) => $q->selectRaw('count(*) as aggregate'),
-        ])
-            ->latest('start_time'); // Default order
+        ]);
 
         // Filtering
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
         }
-        if ($request->has('status') && $request->status !== '') { // '0' for closed, '1' for open
+        if ($request->filled('doctor_name_search')) {
+            $searchTerm = $request->doctor_name_search;
+            $query->whereHas('doctor', function ($q) use ($searchTerm) {
+                $q->where('name', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+        if ($request->filled('user_id_opened')) {
+            $query->where('user_id', $request->user_id_opened);
+        }
+        if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
             $query->where('status', (bool)$request->status);
         }
         if ($request->filled('date_from')) {
             $query->whereDate('start_time', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
+            // If filtering by end_time, need to be careful if end_time can be null for open shifts
+            // For start_time based filtering:
             $query->whereDate('start_time', '<=', Carbon::parse($request->date_to)->endOfDay());
+            // Or if you want to include shifts that *ended* within the range:
+            // $query->where(function ($q) use ($request) {
+            //     $q->whereBetween('start_time', [Carbon::parse($request->date_from)->startOfDay(), Carbon::parse($request->date_to)->endOfDay()])
+            //       ->orWhereBetween('end_time', [Carbon::parse($request->date_from)->startOfDay(), Carbon::parse($request->date_to)->endOfDay()]);
+            // });
         }
-        if ($request->filled('shift_id')) { // Filter by general clinic shift ID
+        if ($request->filled('shift_id')) {
             $query->where('shift_id', $request->shift_id);
         }
 
-        $doctorShifts = $query->paginate($request->get('per_page', 20));
+        // Sorting
+        $sortBy = $request->input('sort_by', 'start_time');
+        $sortDirection = $request->input('sort_direction', 'desc');
 
-        // Optionally, you could add totals/summaries to the pagination meta if needed for the report
-        // For example, total hours worked, total patients seen across the fetched shifts.
-        // This would require more complex queries or calculations.
+        if ($sortBy === 'doctor_name') {
+            // Sort by related table requires join or more complex subquery for optimal performance
+            // For simplicity with eager loading, you might sort on collection after fetching,
+            // or use a join. Let's try with a join for DB-level sorting.
+            $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
+                  ->orderBy('doctors.name', $sortDirection)
+                  ->select('doctor_shifts.*'); // Important to select all columns from doctor_shifts
+        } elseif ($sortBy === 'user_name') {
+            $query->join('users', 'doctor_shifts.user_id', '=', 'users.id')
+                  ->orderBy('users.name', $sortDirection)
+                  ->select('doctor_shifts.*');
+        } else {
+            $query->orderBy($sortBy, $sortDirection);
+        }
+         // Add secondary sort for consistency
+        if ($sortBy !== 'start_time') {
+            $query->orderBy('start_time', 'desc');
+        }
+
+
+        $perPage = $request->input('per_page', 15); // Default items per page
+        $doctorShifts = $query->paginate($perPage);
 
         return DoctorShiftResource::collection($doctorShifts);
     }
@@ -223,11 +279,11 @@ class DoctorShiftController extends Controller
             'end_time' => $doctorShift->end_time?->toIso8601String(),
             'status' => $doctorShift->status ? 'Open' : 'Closed',
             'total_patients' => $doctorShift->doctorVisits->count(),
-            'doctor_fixed_share_for_shift' => 0, // This needs clarification: is static_wage per shift, per day, per month?
+            'doctor_fixed_share_for_shift' => $doctorShift->doctor->static_wage, // This needs clarification: is static_wage per shift, per day, per month?
             // For this example, let's assume static_wage is per SHIFT if this DoctorShift is closed.
             // If the shift is open, fixed share might not apply yet or is pro-rated.
-            'doctor_cash_share_total' => 0,
-            'doctor_insurance_share_total' => 0,
+            'doctor_cash_share_total' => $doctorShift->doctor_credit_cash(),
+            'doctor_insurance_share_total' => $doctorShift->doctor_credit_company(),
             'patients_breakdown' => [],
         ];
 
@@ -236,16 +292,7 @@ class DoctorShiftController extends Controller
         $companyPercentage = $doctorShift->doctor->company_percentage / 100;
         // $labPercentage = $doctorShift->doctor->lab_percentage / 100; // If lab services contribute differently
 
-        // For simplicity, let's assume static_wage applies if the DoctorShift record is marked as 'closed'
-        // Your business logic for static wage might be different (e.g., per day, per number of hours)
-        if (!$doctorShift->status && $doctorShift->doctor->static_wage > 0) {
-            // This is a simplification. Real static wage might be per day worked,
-            // or if a DoctorShift represents a full scheduled work session.
-            // If a doctor works multiple short DoctorShift sessions in a day, how static_wage is applied needs definition.
-            // For this example, assume it's a one-time wage for this completed DoctorShift.
-            $summary['doctor_fixed_share_for_shift'] = (float) $doctorShift->doctor->static_wage;
-        }
-
+    
 
         foreach ($doctorShift->doctorVisits as $visit) {
             $visitTotalPaid = 0;
@@ -274,7 +321,7 @@ class DoctorShiftController extends Controller
                 'patient_name' => $visit->patient->name,
                 'visit_id' => $visit->id,
                 'total_paid_for_visit' => $visitTotalPaid,
-                'doctor_share_from_visit' => $visitDoctorEntitlement,
+                'doctor_share_from_visit' => $doctorShift->doctor->doctor_credit($visit),
                 'is_insurance_patient' => !!$visit->patient->company_id,
             ];
 
@@ -285,9 +332,8 @@ class DoctorShiftController extends Controller
             }
         }
 
-        $summary['total_doctor_share'] = $summary['doctor_fixed_share_for_shift'] +
-            $summary['doctor_cash_share_total'] +
-            $summary['doctor_insurance_share_total'];
+        $summary['total_doctor_share'] = $doctorShift->doctor_credit_cash() +
+            $doctorShift->doctor_credit_company() + $doctorShift->doctor->static_wage;
 
         return response()->json(['data' => $summary]);
     }
