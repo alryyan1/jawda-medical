@@ -31,6 +31,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Log;
 use App\Models\CostCategory;
 use App\Models\RequestedServiceDeposit;
+use Illuminate\Support\Facades\Auth;
 
 class ReportController extends Controller
 {
@@ -1035,6 +1036,7 @@ class ReportController extends Controller
         $pdf->AddPage();
         $pdf->setRTL(true);
         $page_width = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        
 
         // Header section in your PDF logic
         $pdf->SetFont('arial', 'B', 16); // Slightly smaller than your 22
@@ -1048,7 +1050,7 @@ class ReportController extends Controller
 
         // First header row
         $pdf->Cell($table_col_width_sixth, 7, 'التاريخ', 1, 0, 'C', 1);
-        $pdf->Cell($table_col_width_sixth, 7, $doctorShift->start_time ? $doctorShift->start_time->format('Y/m/d') : '-', 1, 0, 'C');
+        $pdf->Cell($table_col_width_sixth, 7, $doctorShift->start_time ? $doctorShift->start_time->format('Y/m/d') : '-', 1, 0, 'C', 1);
         $pdf->Cell($table_col_width_sixth * 2, 7, ' ', 0, 0, 'C'); // Spacer
         $pdf->Cell($table_col_width_sixth, 7, 'المستخدم', 1, 0, 'C', 1);
         $pdf->Cell($table_col_width_sixth, 7, $doctorShift->user->username ?? '-', 1, 1, 'C'); // ln=1
@@ -1082,7 +1084,7 @@ class ReportController extends Controller
 
         $pdf->SetFont('arial', '', 8);
         $index = 1;
-        $visits = $doctorShift->visits->filter(fn(DoctorVisit $visit) => $visit->only_lab == 0);
+        $visits = $doctorShift->visits->reverse()->filter(fn(DoctorVisit $visit) => $visit->only_lab == 0);
 
         $safi_total_placeholder = 0; // This variable wasn't clearly used for a grand total in your original
 
@@ -1097,8 +1099,8 @@ class ReportController extends Controller
                 $doctorvisit->patient->name ?? '-',
                 $doctorvisit->patient?->company?->name ?? '-',
                 number_format($doctorvisit->calculateTotalServiceValue(), 1), // Using model method
-                number_format($doctorvisit->calculateTotalPaid() - $doctorvisit->calculateTotalBankPayments(), 1), // Cash
-                number_format($doctorvisit->calculateTotalBankPayments(), 1), // Bank
+                number_format($doctorvisit->total_paid_services($doctorShift->doctor) - $doctorvisit->bankak_service(), 1), // Cash
+                number_format($doctorvisit->bankak_service(), 1), // Bank
                 number_format($doctorShift->doctor->doctor_credit($doctorvisit), 1),
                 $doctorvisit->services_concatinated() // This will use MultiCell via DrawTableRow
             ];
@@ -1182,6 +1184,195 @@ class ReportController extends Controller
 
         // --- Output PDF ---
         $pdfFileName = 'clinic_report_doctorshift_' . $doctorShift->id . '_' . date('Ymd_His') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+    public function clinicReport_old(Request $request)
+    {
+
+
+        $user_id = $request->get('user');
+        $doctor_shift_id = $request->get('doctor_shift_id');
+        $doctorShift = DoctorShift::find($doctor_shift_id);
+
+
+        $pdf = new MyCustomTCPDF('تقرير الخاص', '', 'L', 'mm', 'A4');
+
+        $lg = array();
+        $lg['a_meta_charset'] = 'UTF-8';
+        $lg['a_meta_dir'] = 'rtl';
+        $lg['a_meta_language'] = 'fa';
+        $lg['w_page'] = 'page';
+        $pdf->setLanguageArray($lg);
+        $pdf->setCreator(PDF_CREATOR);
+        $pdf->setAuthor('Nicola Asuni');
+        $pdf->setTitle('التقرير الخاص');
+        $pdf->setSubject('TCPDF Tutorial');
+        $pdf->setKeywords('TCPDF, PDF, example, test, guide');
+        $pdf->setHeaderData(PDF_HEADER_LOGO, PDF_HEADER_LOGO_WIDTH, PDF_HEADER_TITLE, PDF_HEADER_STRING);
+        $pdf->setHeaderFont(array(PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN));
+        $pdf->setFooterFont(array(PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA));
+        $pdf->setDefaultMonospacedFont(PDF_FONT_MONOSPACED);
+        $pdf->setMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
+        $pdf->setHeaderMargin(PDF_MARGIN_HEADER);
+        $pdf->setFooterMargin(PDF_MARGIN_FOOTER);
+        $pdf->setAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+        $pdf->setFont('times', 'BI', 12);
+        $pdf->AddPage();
+        $page_width = $pdf->getPageWidth() - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT;
+        $pdf->setFont('arial', 'b', 22);
+
+        $pdf->Cell($page_width, 5, 'التقرير الخاص', 0, 1, 'C');
+        $pdf->Ln();
+        $pdf->setFont('arial', 'b', 16);
+
+        $pdf->setFillColor(200, 200, 200);
+        $table_col_widht = $page_width / 6;
+        $pdf->Cell($table_col_widht, 5, 'التاريخ ', 1, 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht, 5, $doctorShift->created_at->format('Y/m/d'), 1, 0, 'C');
+        $pdf->Cell($table_col_widht, 5, ' ', 0, 0, 'C', fill: 0);
+        $pdf->Cell($table_col_widht, 5, ' ', 0, 0, 'C', fill: 0);
+
+        $pdf->Cell($table_col_widht, 5, 'المستخدم ', 1, 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht, 5, $doctorShift->user->username, 1, 1, 'C');
+
+        $table_col_widht = ($page_width - 20) / 7;
+        $pdf->Ln();
+        $pdf->setFont('arial', 'b', 14);
+        $table_col_widht = ($page_width) / 6;
+
+        $pdf->Cell($table_col_widht, 5, 'الطبيب', 1, 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht, 5, $doctorShift->doctor->name, 1, 0, 'C', fill: 0, stretch: 1);
+        $pdf->Cell($table_col_widht, 5, '', 0, 0, 'C', fill: 0);
+        $pdf->Cell($table_col_widht, 5, '', 0, 0, 'C', fill: 0);
+        $pdf->Cell($table_col_widht, 5, 'زمن فتح العياده', 1, 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht, 5, $doctorShift->created_at->format('h:i A'), 1, 1, 'C', fill: 0);
+        $pdf->Ln();
+        $pdf->Cell('30', 5, 'المرضي', 1, 0, 'C', fill: 0);
+        $y = $pdf->getY();
+        $pdf->setXY(160, $y);
+        $pdf->Cell('30', 5, 'الاستحقاق النقدي', 1, 0, 'C', fill: 0);
+        $pdf->Cell('30', 5, number_format($doctorShift->doctor_credit_cash(), 1), 1, 0, 'C', fill: 0);
+        $pdf->Cell('10', 5, ' ', 0, 0, 'C', fill: 0);
+
+        $pdf->Cell('30', 5, 'استحقاق التامين', 1, 0, 'C', fill: 0);
+        $pdf->Cell('30', 5, number_format(+$doctorShift->doctor_credit_company(), 1), 1, 0, 'C', fill: 0);
+        $pdf->Ln(5);
+        $pdf->Ln(5);
+        $table_col_widht = ($page_width) / 9;
+
+        $pdf->Cell($table_col_widht / 2, 5, 'رقم', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht * 2, 5, 'اسم', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht, 5, 'الشركه', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht / 1.3, 5, 'اجمالي', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht / 1.3, 5, 'نقدا', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht / 1.3, 5, 'بنك', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht / 1.3, 5, '  استحقاق الطبيب ', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht * 2, 5, 'الخدمات *', 'TB', 1, 'C', fill: 1);
+        $pdf->Ln();
+        $pdf->setFont('arial', '', 11);
+        $index = 1;
+        /** @var Doctorvisit $doctorvisit */
+        $visits = $doctorShift->visits->reverse()->filter(function (Doctorvisit $visit) {
+            return $visit->only_lab == 0;
+        });
+        $safi_total = 0;
+        foreach ($visits as $doctorvisit) {
+            $y = $pdf->GetY();
+            $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
+
+            if ($doctorvisit->patient->company) {
+                $pdf->setTextColor(200, 0, 0);
+            }
+            $pdf->Cell($table_col_widht / 2, 5, $doctorvisit->number, 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht * 2, 5, $doctorvisit->patient->name, 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht, 5, $doctorvisit->patient?->company?->name, 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorvisit->total_services($doctorShift->doctor), 1), 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorvisit->total_paid_services() - $doctorvisit->bankak_service(), 1), 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorvisit->bankak_service(), 1), 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht, 5, number_format($doctorvisit->doctorShift->doctor->doctor_credit($doctorvisit), 1), 0, 0, 'C', fill: 0);
+
+            $safi_total += $doctorvisit->hospital_credit();
+            // $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorvisit->hospital_credit(), 1), 0, 0, 'C', fill: 0);
+            $pdf->MultiCell($table_col_widht * 2, 5, $doctorvisit->services_concatinated(), 0, 'R', false, stretch: 1);
+            $y = $pdf->GetY();
+            $index++;
+            $pdf->setTextColor(0, 0, 0);
+
+            $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
+        }
+        $pdf->Ln();
+
+
+        $pdf->Cell($table_col_widht / 2, 5, '', 'TB', 0, 'C', fill: 0);
+        $pdf->Cell($table_col_widht * 2, 5, '', 'TB', 0, 'C', fill: 0);
+
+        $pdf->Cell($table_col_widht, 5, '', 'TB', 0, 'C', fill: 0);
+        $pdf->setTextColor(0, 100, 0);
+
+        $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorShift->total_services(), 1), 'TB', 0, 'C', fill: 0);
+        $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorShift->total_paid_services() - $doctorShift->total_bank(), 1), 'TB', 0, 'C', fill: 0);
+        $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorShift->total_bank(), 1), 'TB', 0, 'C', fill: 0);
+        $pdf->Cell($table_col_widht, 5, number_format($doctorShift->doctor_credit_cash() + $doctorShift->doctor_credit_company(), 1), 'TB', 0, 'C', fill: 0);
+
+        $pdf->Cell($table_col_widht * 2, 5, ' ', 0, 1, 'C', fill: 0);
+
+        $pdf->AddPage();
+
+
+        $col = $page_width / 2;
+        $pdf->Ln();
+        $pdf->Cell($page_width, 5, 'مصروف الخدمات', 0, 1, 'C', fill: 0);
+        $pdf->Cell($col, 5, 'مصروف الخدمه', 0, 0, 'C', fill: 1);
+        $pdf->Cell($col, 5, 'الاجمالي', 0, 1, 'C', fill: 1);
+        foreach ($doctorShift->shift_service_costs() as $cost) {
+            $pdf->Cell($col, 5, $cost['name'], 0, 0, 'C', fill: 0);
+            $pdf->Cell($col, 5, number_format($cost['amount'], 1), 0, 1, 'C', fill: 0);
+        }
+        $pdf->Ln();
+
+        $table_col_widht = $page_width / 6;
+        $pdf->Cell($table_col_widht / 2, 5, 'رقم', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht, 5, 'اسم', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht, 5, 'الشركه', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht / 2, 5, 'الاجمالي', 'TB', 0, 'C', fill: 1);
+
+        $pdf->Cell($table_col_widht, 5, 'اجمالي مصروفات', 'TB', 0, 'C', fill: 1);
+        $pdf->Cell($table_col_widht * 2, 5, 'مصروفات *', 'TB', 1, 'C', fill: 1);
+        $pdf->Ln();
+        $pdf->setFont('arial', '', 11);
+        $index = 1;
+        /** @var Doctorvisit $doctorvisit */
+        $visits = $doctorShift->visits->filter(function (Doctorvisit $visit) {
+            return $visit->only_lab == 0;
+        });
+
+        foreach ($visits as $doctorvisit) {
+            $y = $pdf->GetY();
+            $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
+
+            $pdf->Cell($table_col_widht / 2, 5, $doctorvisit->number, 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht, 5, $doctorvisit->patient->name, 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht, 5, $doctorvisit->patient?->company?->name, 0, 0, 'C', fill: 0);
+            $pdf->Cell($table_col_widht / 2, 5, number_format($doctorvisit->total_services($doctorShift->doctor), 1), 0, 0, 'C', fill: 0);
+
+            $pdf->Cell($table_col_widht, 5, number_format($doctorvisit->total_services_cost(), 1), 0, 0, 'C', fill: 0);
+            $pdf->MultiCell($table_col_widht * 2, 5, $doctorvisit->services_cost_name(), 0, 'R', false, stretch: 1);
+            $y = $pdf->GetY();
+            $index++;
+
+            $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
+        }
+        $pdf->Ln();
+
+
+        $pdf->Ln();
+
+        // Generate PDF content and return as response
+        $pdfFileName = 'clinic_report_' . date('Ymd_His') . '.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
 
         return response($pdfContent, 200)
@@ -1532,209 +1723,178 @@ class ReportController extends Controller
           ->header('Content-Type', 'application/pdf')
           ->header('Content-Disposition', "inline; filename=\"{$fileName}\"");
     }
+  
     public function generateThermalServiceReceipt(Request $request, DoctorVisit $visit)
     {
-        // Permission Check: e.g., can('print patient_receipt', $visit)
-        // if (!Auth::user()->can('print patient_receipt', $visit)) {
-        //     return response()->json(['message' => 'Unauthorized'], 403);
-        // }
+        // Permission Check
+        // if (!Auth::user()->can('print thermal_receipt', $visit)) { ... }
 
         $visit->load([
-            'patient' => function ($query) {
-                $query->with(['company:id,name', 'subcompany:id,name', 'companyRelation:id,name']);
-            },
-            'requestedServices.service:id,name',
-            // 'user:id,name', // Cashier/user who generated receipt - if needed
-            'doctor:id,name', // To display attending doctor
+            'patient:id,name,phone,company_id', // Added company_id
+            'patient.company:id,name', // To display company name if present
+            'requestedServices.service:id,name,price', 
+            'doctor:id,name' // Doctor of the visit
         ]);
 
         if ($visit->requestedServices->isEmpty()) {
             return response()->json(['message' => 'لا توجد خدمات لإنشاء إيصال لها في هذه الزيارة.'], 404);
         }
 
-        $isRTL = true; // Explicitly setting for this receipt
+        $appSettings = Setting::instance();
+        $isCompanyPatient = !empty($visit->patient->company_id);
 
         // --- PDF Instantiation with Thermal Defaults ---
-        $pdf = new MyCustomTCPDF('إيصال خدمات', "زيارة رقم: {$visit->id}");
-        $pdf->setThermalDefaults(config('app_settings.thermal_printer_width', 76));
-        $pdf->setRTL($isRTL); // Set RTL mode
+        $pdf = new MyCustomTCPDF('إيصال خدمات', "زيارة رقم: {$visit->id}"); // Title and filter less prominent on thermal
+        $pdf->setThermalDefaults( (float)($appSettings?->thermal_printer_width ?? 76) ); // Use setting or default
+        $pdf->AddPage();
+        
+        $fontName = $pdf->getDefaultFontFamily(); // Using the one from MyCustomTCPDF defaults for thermal
+        $isRTL = $pdf->getRTL();
+        $alignRight = $isRTL ? 'L' : 'R';
+        $alignLeft = $isRTL ? 'R' : 'L';
+        $alignCenter = 'C';
 
-        $settings = Setting::instance();
-        // Use hospital_name if available, otherwise app name, otherwise a generic fallback
-        $clinicName = $settings?->hospital_name ?: ($settings?->lab_name ?: config('app.name', 'العيادة'));
-        $clinicPhone = $settings?->phone ?: '';
-        $clinicAddress = $settings?->address ?: '';
-        $vatin = $settings?->vatin ? "الرقم الضريبي: {$settings->vatin}" : '';
-        $cr = $settings?->cr ? "س.ت: {$settings->cr}" : '';
-        $receiptFooterMessage = $settings?->receipt_footer_message ?: 'شكراً لزيارتكم!';
+        // --- Clinic/Company Header ---
+        $logoData = null;
+        if ($appSettings?->logo_base64 && str_starts_with($appSettings->logo_base64, 'data:image')) {
+             try { $logoData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $appSettings->logo_base64)); } catch (\Exception $e) {}
+        }
+        
+        if ($logoData) {
+            $pdf->Image('@'.$logoData, '', '', 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0, false, false, false); // Centered logo, width 15mm
+            $pdf->Ln(1); // Space after logo if small
+        }
 
-
-        // --- Receipt Header ---
-        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 9); // Adjusted size for thermal
-        $pdf->MultiCell(0, 4.5, $clinicName, 0, 'C', false, 1);
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 6.5); // Smaller font for details
-        if ($clinicAddress) $pdf->MultiCell(0, 3, $clinicAddress, 0, 'C', false, 1);
-        if ($clinicPhone) $pdf->MultiCell(0, 3, "الهاتف: " . $clinicPhone, 0, 'C', false, 1);
-        if ($vatin) $pdf->MultiCell(0, 3, $vatin, 0, 'C', false, 1);
-        if ($cr) $pdf->MultiCell(0, 3, $cr, 0, 'C', false, 1);
+        $pdf->SetFont($fontName, 'B', $logoData ? 9 : 10);
+        $pdf->MultiCell(0, 4, $appSettings?->hospital_name ?: ($appSettings?->lab_name ?: config('app.name')), 0, $alignCenter, false, 1);
+        
+        $pdf->SetFont($fontName, '', 6.5); // Smaller font for details
+        if ($appSettings?->address) $pdf->MultiCell(0, 3, $appSettings->address, 0, $alignCenter, false, 1);
+        if ($appSettings?->phone) $pdf->MultiCell(0, 3, "الهاتف: " . $appSettings->phone, 0, $alignCenter, false, 1);
+        if ($appSettings?->vatin) $pdf->MultiCell(0, 3, "رقم ضريبي: " . $appSettings->vatin, 0, $alignCenter, false, 1);
+        
         $pdf->Ln(1);
-        $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
+        $pdf->Cell(0, 0.1, '', 'T', 1, 'C'); // Horizontal line
         $pdf->Ln(1);
 
         // Receipt Info
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 7);
-        $receiptNumber = "RCPT-" . $visit->id . "-" . Carbon::now()->format('His'); // Example receipt number
-        $pdf->Cell(0, 3.5, "رقم الإيصال: " . $receiptNumber, 0, 1, ($isRTL ? 'R' : 'L'));
-        $pdf->Cell(0, 3.5, "التاريخ: " . Carbon::now()->format('Y/m/d H:i A'), 0, 1, ($isRTL ? 'R' : 'L'));
-        $pdf->Cell(0, 3.5, "المريض: " . $visit->patient->name . ($visit->patient->phone ? " / " . $visit->patient->phone : ""), 0, 1, ($isRTL ? 'R' : 'L'));
-        if ($visit->queue_number) {
-             $pdf->Cell(0, 3.5, "رقم الانتظار: " . $visit->queue_number, 0, 1, ($isRTL ? 'R' : 'L'));
+        $pdf->SetFont($fontName, '', 7.5);
+        $receiptNumber =  $visit->id ; // More unique
+        $pdf->Cell(0, 3.5, "رقم الفاتورة: " . $receiptNumber, 0, 1, $alignRight);
+        $pdf->Cell(0, 3.5, "رقم الانتظار: " . $visit->number, 0, 1, $alignRight);
+        $pdf->Cell(0, 3.5, "التاريخ: " . Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignRight);
+        $pdf->Cell(0, 3.5, "المريض: " . $visit->patient->name, 0, 1, $alignRight);
+        if ($visit->patient->phone) $pdf->Cell(0, 3.5, "الهاتف: " . $visit->patient->phone, 0, 1, $alignRight);
+        if ($isCompanyPatient && $visit->patient->company) $pdf->Cell(0, 3.5, "الشركة: " . $visit->patient->company->name, 0, 1, $alignRight);
+        if ($visit->doctor) $pdf->Cell(0, 3.5, "الطبيب: " . $visit->doctor->name, 0, 1, $alignRight);
+        $pdf->Cell(0, 3.5, "الكاشير: " . (Auth::user()?->name ?? 'النظام'), 0, 1, $alignRight);
+        
+        // Barcode for Visit ID
+        if($appSettings?->barcode){
+            $pdf->Ln(2);
+            $style = [
+                'position' => '', 'align' => 'C', 'stretch' => false, 'fitwidth' => true, 'cellfitalign' => '',
+                'border' => false, 'hpadding' => 'auto', 'vpadding' => 'auto', 'fgcolor' => [0,0,0],
+                'bgcolor' => false, 'text' => true, 'font' => $pdf->getDefaultFontFamily(), 'fontsize' => 6, 'stretchtext' => 4
+            ];
+            $pdf->write1DBarcode((string)$visit->id, 'C128B', '', '', '', 12, 0.3, $style, 'N'); // Height 12mm, bar width 0.3mm
+            $pdf->Ln(1);
         }
-        if ($visit->doctor) {
-            $pdf->Cell(0, 3.5, "طبيب الزيارة: " . $visit->doctor->name, 0, 1, ($isRTL ? 'R' : 'L'));
-        }
+
+        $pdf->Ln(2);
+        $pdf->Cell(0, 0.1, '', 'T', 1, 'C'); // Horizontal line
         $pdf->Ln(1);
 
-        // --- Company Related Fields Section (Conditional) ---
-        if ($visit->patient->company_id) {
-            $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 7); // Bold for section title
-            $pdf->Cell(0, 4, 'بيانات التأمين/الشركة', 'B', 1, ($isRTL ? 'R' : 'L'));
-            $pdf->SetFont($pdf->getDefaultFontFamily(), '', 7);
-            
-            if ($visit->patient->insurance_no) {
-                $pdf->Cell(0, 3.5, "رقم التأمين: " . $visit->patient->insurance_no, 0, 1, ($isRTL ? 'R' : 'L'));
-            }
-            if ($visit->patient->company) {
-                $pdf->Cell(0, 3.5, "الشركة: " . $visit->patient->company->name, 0, 1, ($isRTL ? 'R' : 'L'));
-            }
-            if ($visit->patient->subcompany) {
-                $pdf->Cell(0, 3.5, "الشركة الفرعية: " . $visit->patient->subcompany->name, 0, 1, ($isRTL ? 'R' : 'L'));
-            }
-            if ($visit->patient->companyRelation) {
-                $pdf->Cell(0, 3.5, "العلاقة بالشركة: " . $visit->patient->companyRelation->name, 0, 1, ($isRTL ? 'R' : 'L'));
-            }
-            if ($visit->patient->guarantor) {
-                $pdf->Cell(0, 3.5, "الكفيل/الضامن: " . $visit->patient->guarantor, 0, 1, ($isRTL ? 'R' : 'L'));
-            }
-            $pdf->Ln(1); // Space after company section
-        }
 
+        // Items Table
+        $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $nameWidth = $pageUsableWidth * 0.48; 
+        $qtyWidth  = $pageUsableWidth * 0.12; 
+        $priceWidth = $pageUsableWidth * 0.20; 
+        $totalWidth = $pageUsableWidth * 0.20; 
 
-        // --- Items Table ---
-        $pageUsableWidth = $pdf->getPageWidth() ;
-        
-        // Adjusted column widths for thermal, including endurance
-        $nameWidth      = $pageUsableWidth * 0.38; // Name (38%)
-        $qtyWidth       = $pageUsableWidth * 0.10; // Qty (10%)
-        $priceWidth     = $pageUsableWidth * 0.15; // Price (15%)
-        $enduranceWidth = $pageUsableWidth * 0.15; // Endurance (15%) - shown if company patient
-        $totalWidth     = $pageUsableWidth * 0.22; // Total (22%)
-
-        if (!$visit->patient->company_id) { // If not a company patient, redistribute endurance width
-            $nameWidth += $enduranceWidth / 2;
-            $totalWidth += $enduranceWidth / 2;
-        }
-
-        // Table Header
-        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 6.5); // Small bold font for header
+        $pdf->SetFont($fontName, 'B', 7);
         $pdf->Cell($nameWidth, 4, 'البيان', 'B', 0, 'R');
         $pdf->Cell($qtyWidth, 4, 'كمية', 'B', 0, 'C');
         $pdf->Cell($priceWidth, 4, 'سعر', 'B', 0, 'C');
-        if ($visit->patient->company_id) {
-            $pdf->Cell($enduranceWidth, 4, 'تحمل', 'B', 0, 'C'); // Endurance Column
-        }
         $pdf->Cell($totalWidth, 4, 'إجمالي', 'B', 1, 'C');
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 6.5); // Regular small font for items
+        $pdf->SetFont($fontName, '', 7);
 
-        $grandTotalNetPayable = 0; // This will be the sum of net payables for each item
-        $totalDiscountOnVisitItems = 0;
-        $totalEnduranceOnVisitItems = 0;
-        $subTotalForAllItems = 0;
+        $subTotalServices = 0;
+        $totalDiscountOnServices = 0;
+        $totalEnduranceOnServices = 0;
 
         foreach ($visit->requestedServices as $rs) {
             $serviceName = $rs->service?->name ?? 'خدمة غير معروفة';
             $quantity = (int)($rs->count ?? 1);
-            $unitPrice = (float)($rs->price ?? 0);
-            $itemSubTotal = $unitPrice * $quantity;
-            $subTotalForAllItems += $itemSubTotal;
+            $unitPrice = (float)($rs->price ?? 0); // This should be the contract price if company, else standard
+            $itemGrossTotal = $unitPrice * $quantity;
+            $subTotalServices += $itemGrossTotal;
 
+            $itemDiscountPercent = (float)($rs->discount_per ?? 0);
             $itemDiscountFixed = (float)($rs->discount ?? 0);
-            $itemDiscountPercent = ($itemSubTotal * (float)($rs->discount_per ?? 0)) / 100;
-            $totalItemDiscount = $itemDiscountFixed + $itemDiscountPercent;
-            $totalDiscountOnVisitItems += $totalItemDiscount;
+            $itemDiscountAmount = (($itemGrossTotal * $itemDiscountPercent) / 100) + $itemDiscountFixed;
+            $totalDiscountOnServices += $itemDiscountAmount;
+            
+            $itemNetAfterDiscount = $itemGrossTotal - $itemDiscountAmount;
 
             $itemEndurance = 0;
-            if ($visit->patient->company_id) { // Endurance only applies if company patient
-                $itemEndurance = (float)($rs->endurance ?? 0);
-                $totalEnduranceOnVisitItems += $itemEndurance;
+            if ($isCompanyPatient) {
+                $itemEndurance = (float)($rs->endurance ?? 0) * $quantity; // Endurance per item * count
+                $totalEnduranceOnServices += $itemEndurance;
             }
             
-            $itemNetPayable = $itemSubTotal - $totalItemDiscount - $itemEndurance;
-            $grandTotalNetPayable += $itemNetPayable;
+            // For display in table, we show the item's gross total before endurance
+            $pdf->MultiCell($nameWidth, 3.5, $serviceName, 0, 'R', false, 0, '', '', true, 0, false, true, 0, 'T');
+            $currentY = $pdf->GetY(); // Capture Y after MultiCell might have wrapped
+            $pdf->SetXY($pdf->getMargins()['left'] + $nameWidth, $currentY);
 
-            $yPos = $pdf->GetY();
-            $pdf->MultiCell($nameWidth, 3.5, $serviceName, 0, 'R', false, 0, $pdf->getMargins()['left'], $yPos);
-            $currentX = $pdf->getMargins()['left'] + $nameWidth;
-            
-            $pdf->SetXY($currentX, $yPos);
             $pdf->Cell($qtyWidth, 3.5, $quantity, 0, 0, 'C');
-            $currentX += $qtyWidth;
-
-            $pdf->SetXY($currentX, $yPos);
             $pdf->Cell($priceWidth, 3.5, number_format($unitPrice, 2), 0, 0, 'C');
-            $currentX += $priceWidth;
-
-            if ($visit->patient->company_id) {
-                $pdf->SetXY($currentX, $yPos);
-                $pdf->Cell($enduranceWidth, 3.5, number_format($itemEndurance, 2), 0, 0, 'C');
-                $currentX += $enduranceWidth;
-            }
-            
-            $pdf->SetXY($currentX, $yPos);
-            $pdf->Cell($totalWidth, 3.5, number_format($itemSubTotal, 2), 0, 1, 'C');
-            
-            // Ensure Y position advances if MultiCell took more space
-             $nameLines = $pdf->getNumLines($serviceName, $nameWidth);
-             if ($nameLines > 1) {
-                 $pdf->Ln(($nameLines - 1) * 3.5); // Adjust line height if MultiCell wrapped
-             }
+            $pdf->Cell($totalWidth, 3.5, number_format($itemGrossTotal, 2), 0, 1, 'C');
+            $pdf->SetY(max($pdf->GetY(), $currentY + ($pdf->getNumLines($serviceName, $nameWidth) * 3.5) )); // Ensure Y moves past tallest cell
         }
         $pdf->Ln(1);
         $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
         $pdf->Ln(1);
 
-        // --- Totals Section ---
-        $totalPaid = 0;
-        foreach ($visit->requestedServices as $rs) {
-            $totalPaid += (float) $rs->amount_paid;
-        }
-        // Add lab request payments if they are part of this receipt's scope
-        // foreach($visit->labRequests as $lr){ $totalPaid += (float) $lr->amount_paid; }
-
-        $this->drawThermalTotalRow($pdf, 'الإجمالي الفرعي:', $subTotalForAllItems, $pageUsableWidth);
-        if ($totalDiscountOnVisitItems > 0) {
-            $this->drawThermalTotalRow($pdf, 'إجمالي الخصم:', $totalDiscountOnVisitItems, $pageUsableWidth, false, true); // Mark as discount
-        }
-        if ($visit->patient->company_id && $totalEnduranceOnVisitItems > 0) {
-            $this->drawThermalTotalRow($pdf, 'تحمل الشركة:', $totalEnduranceOnVisitItems, $pageUsableWidth, false, true); // Mark as discount/reduction
+        // Totals Section
+        $pdf->SetFont($fontName, '', 7.5); // Slightly larger for totals
+        
+        $this->drawThermalTotalRow($pdf, 'إجمالي الخدمات:', $subTotalServices, $pageUsableWidth);
+        if ($totalDiscountOnServices > 0) {
+            $this->drawThermalTotalRow($pdf, 'إجمالي الخصم:', -$totalDiscountOnServices, $pageUsableWidth, 'text-red-500');
         }
         
-        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 7.5);
-        $this->drawThermalTotalRow($pdf, 'صافي المطلوب:', $grandTotalNetPayable, $pageUsableWidth, true);
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 7);
+        $netAfterDiscount = $subTotalServices - $totalDiscountOnServices;
+        $companyWillPayOnFuture = $netAfterDiscount - ($isCompanyPatient ? $totalEnduranceOnServices : 0);
+        if ($isCompanyPatient) {
+            $this->drawThermalTotalRow($pdf, 'تحمل الشركة:', -$companyWillPayOnFuture, $pageUsableWidth, 'text-blue-500');
+        }
+        
+        $pdf->SetFont($fontName, 'B', 8.5);
+        $this->drawThermalTotalRow($pdf, 'صافي المطلوب من المريض:', $totalEnduranceOnServices, $pageUsableWidth, true);
+        $pdf->SetFont($fontName, '', 7.5);
 
-        $this->drawThermalTotalRow($pdf, 'المبلغ المدفوع:', $totalPaid, $pageUsableWidth);
-        $balanceDue = $grandTotalNetPayable - $totalPaid;
-        $this->drawThermalTotalRow($pdf, 'المبلغ المتبقي:', $balanceDue, $pageUsableWidth, ($balanceDue != 0));
+        $totalPaidByPatient = $visit->requestedServices->sum('amount_paid'); // Assumes amount_paid is patient's payment
+        $this->drawThermalTotalRow($pdf, 'المبلغ المدفوع:', $totalPaidByPatient, $pageUsableWidth);
+        
+        $balanceDue = $companyWillPayOnFuture - $totalPaidByPatient;
+        $pdf->SetFont($fontName, 'B', 8.5);
+        $this->drawThermalTotalRow($pdf, 'المبلغ المتبقي:', $visit->amountRemaining(), $pageUsableWidth, ($balanceDue != 0));
+
+        $pdf->Ln(2);
+     
+
 
         $pdf->Ln(3);
-        
-        // --- Footer Message ---
-        $pdf->SetFont($pdf->getDefaultFontFamily(), 'I', 6.5);
-        $pdf->MultiCell(0, 3, $receiptFooterMessage, 0, 'C', false, 1);
-        $pdf->Ln(5); // Extra space for paper cut
-        
-        $pdfFileName = 'ThermalReceipt_Visit_' . $visit->id . '_' . Carbon::now()->format('YmdHis') . '.pdf';
+        $pdf->SetFont($fontName, 'I', 6.5);
+        $footerMessage = $appSettings?->receipt_footer_message ?: 'شكراً لزيارتكم!';
+        $pdf->MultiCell(0, 3, $footerMessage, 0, 'C', false, 1);
+        $pdf->Ln(5); 
+
+        $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
+        $pdfFileName = 'Receipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
 
         return response($pdfContent, 200)
@@ -1742,24 +1902,41 @@ class ReportController extends Controller
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
 
-    // Helper for drawing total rows in thermal receipt style
-    protected function drawThermalTotalRow(MyCustomTCPDF $pdf, string $label, float $value, float $pageUsableWidth, bool $isBoldValue = false, bool $isReduction = false)
+    protected function drawThermalTotalRow(MyCustomTCPDF $pdf, string $label, float $value, float $pageUsableWidth, bool $isBoldValue = false, string $valueClass = '')
     {
-        $labelWidth = $pageUsableWidth * 0.60; // Adjust ratio for thermal
-        $valueWidth = $pageUsableWidth * 0.40;
-        $currentStyle = $pdf->getFontStyle();
-        $currentFontFamily = $pdf->getFontFamily();
+        $fontName = $pdf->getDefaultFontFamily();
         $currentFontSize = $pdf->getFontSizePt();
+        $currentStyle = $pdf->getFontStyle();
 
+        $labelWidth = $pageUsableWidth * 0.60;
+        $valueWidth = $pageUsableWidth * 0.40;
 
-        $pdf->Cell($labelWidth, 4, $label, 0, 0, 'R'); // Label aligned right
-        if ($isBoldValue) $pdf->SetFont($currentFontFamily, 'B', $currentFontSize);
+        if ($isBoldValue) $pdf->SetFont($fontName, 'B', $currentFontSize + 0.5); // Slightly larger if bold
+
+        $pdf->Cell($labelWidth, 4, $label, 0, 0, $pdf->getRTL() ? 'R' : 'L');
+        $pdf->Cell($valueWidth, 4, number_format($value, 2), 0, 1, $pdf->getRTL() ? 'L' : 'R');
         
-        $valueString = ($isReduction && $value > 0 ? '-' : '') . number_format($value, 2);
-        $pdf->Cell($valueWidth, 4, $valueString, 0, 1, 'L'); // Value aligned left
-        
-        if ($isBoldValue) $pdf->SetFont($currentFontFamily, $currentStyle, $currentFontSize); // Reset font
+        if ($isBoldValue) $pdf->SetFont($fontName, $currentStyle, $currentFontSize); // Reset
     }
+
+    // // Helper for drawing total rows in thermal receipt style
+    // protected function drawThermalTotalRow(MyCustomTCPDF $pdf, string $label, float $value, float $pageUsableWidth, bool $isBoldValue = false, bool $isReduction = false)
+    // {
+    //     $labelWidth = $pageUsableWidth * 0.60; // Adjust ratio for thermal
+    //     $valueWidth = $pageUsableWidth * 0.40;
+    //     $currentStyle = $pdf->getFontStyle();
+    //     $currentFontFamily = $pdf->getFontFamily();
+    //     $currentFontSize = $pdf->getFontSizePt();
+
+
+    //     $pdf->Cell($labelWidth, 4, $label, 0, 0, 'R'); // Label aligned right
+    //     if ($isBoldValue) $pdf->SetFont($currentFontFamily, 'B', $currentFontSize);
+        
+    //     $valueString = ($isReduction && $value > 0 ? '-' : '') . number_format($value, 2);
+    //     $pdf->Cell($valueWidth, 4, $valueString, 0, 1, 'L'); // Value aligned left
+        
+    //     if ($isBoldValue) $pdf->SetFont($currentFontFamily, $currentStyle, $currentFontSize); // Reset font
+    // }
 
     // Helper for drawing total rows
     protected function drawTotalRow(MyCustomTCPDF $pdf, string $label, float $value, float $pageUsableWidth, bool $isBoldValue = false)

@@ -7,6 +7,53 @@ use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $total
+ * @property string $bank
+ * @property string $expenses
+ * @property bool $touched
+ * @property \Illuminate\Support\Carbon|null $closed_at
+ * @property bool $is_closed
+ * @property int $user_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool|null $pharamacy_entry
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Cost> $cost
+ * @property-read int|null $cost_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Cost> $costs
+ * @property-read int|null $costs_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorShift> $doctorShifts
+ * @property-read int|null $doctor_shifts_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorVisit> $doctorVisits
+ * @property-read int|null $doctor_visits_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\FinanceEntry> $financeEntries
+ * @property-read int|null $finance_entries_count
+ * @property-read float $net_cash
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Patient> $patients
+ * @property-read int|null $patients_count
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift closed()
+ * @method static \Database\Factories\ShiftFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift open()
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift today()
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereBank($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereClosedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereExpenses($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereIsClosed($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift wherePharamacyEntry($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereTotal($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereTouched($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Shift whereUserId($value)
+ * @mixin \Eloquent
+ */
 class Shift extends Model
 {
     use HasFactory;
@@ -18,7 +65,7 @@ class Shift extends Model
         'touched',
         'closed_at',
         'is_closed',
-        'pharmacy_entry',
+        'pharamacy_entry',
         'user_id', // If you add this
         // 'user_id_opened', // If you add this
         // 'user_id_closed', // If you add this
@@ -34,7 +81,7 @@ class Shift extends Model
         'touched' => 'boolean',
         'closed_at' => 'datetime',
         'is_closed' => 'boolean',
-        'pharmacy_entry' => 'boolean',
+        'pharamacy_entry' => 'boolean',
     ];
 
     // Relationships

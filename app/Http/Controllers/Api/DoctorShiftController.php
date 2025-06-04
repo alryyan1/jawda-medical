@@ -23,10 +23,10 @@ class DoctorShiftController extends Controller
     public function getActiveShifts(Request $request)
     {
         $query = DoctorShift::with([
-            'doctor:id,name,specialist_id', // Get specialist_id
-            'doctor.specialist:id,name', // Eager load specialist name from doctor
-        ])
-            ->activeToday(); // Your scope for active shifts today
+            'doctor', // Get specialist_id
+            'doctor.specialist', // Eager load specialist name from doctor
+        ]);
+            // ->activeToday(); // Your scope for active shifts today
 
         if ($request->has('clinic_shift_id')) {
             $query->where('shift_id', $request->clinic_shift_id);
@@ -35,22 +35,22 @@ class DoctorShiftController extends Controller
         $activeDoctorShifts = $query->get()->map(function ($doctorShift) {
             // Determine current patient status for the doctor
             // This is a simplified example. You might have more complex logic or a dedicated 'current_patient_visit_id' on DoctorShift
-            $currentVisit = DoctorVisit::where('doctor_id', $doctorShift->doctor_id)
-                ->where('doctor_shift_id', $doctorShift->id) // Link to this specific doctor shift session
+            $currentVisit = DoctorVisit::
+                where('doctor_shift_id', $doctorShift->id) // Link to this specific doctor shift session
                 ->where('status', 'with_doctor') // Check if any patient is currently 'with_doctor'
                 ->orderBy('updated_at', 'desc') // Get the most recent one
                 ->first();
 
             // Count patients assigned to this doctor in this shift (e.g., 'waiting' or 'with_doctor')
-            $patientCount = DoctorVisit::where('doctor_id', $doctorShift->doctor_id)
-                ->where('doctor_shift_id', $doctorShift->id)
-                ->whereIn('status', ['waiting', 'with_doctor']) // Count relevant statuses
+            $patientCount = DoctorVisit::
+                where('doctor_shift_id', $doctorShift->id)
+                // ->whereIn('status', ['waiting', 'with_doctor']) // Count relevant statuses
                 ->count();
 
             // Add these computed properties to the DoctorShift object before it goes to the resource
-            $doctorShift->current_patient_visit_id = $currentVisit?->id;
-            $doctorShift->is_examining = !!$currentVisit;
-            $doctorShift->patients_waiting_or_with_doctor_count = $patientCount;
+            // $doctorShift->current_patient_visit_id = $currentVisit?->id;
+            // $doctorShift->is_examining = !!$currentVisit;
+            $doctorShift->patients_count = $patientCount;
 
             return $doctorShift;
         });
@@ -67,7 +67,12 @@ class DoctorShiftController extends Controller
 
         return DoctorShiftResource::collection($activeDoctorShifts);
     }
-
+    public function moneyCash(Request $request, DoctorShift $doctorShift)
+    {
+        return $doctorShift->doctor_credit_cash();
+    }
+   
+   
     /**
      * Start a new shift session for a doctor.
      * This might be called by an admin or the doctor themselves.
@@ -146,7 +151,15 @@ class DoctorShiftController extends Controller
 
         return new DoctorShiftResource($doctorShift->load('doctor'));
     }
-
+   
+    public function moneyInsu(Request $request, DoctorShift $doctorShift)
+    {
+        return $doctorShift->doctor_credit_company;
+    }
+    public function totalMoney(Request $request, DoctorShift $doctorShift)
+    {
+        return $doctorShift->doctor_credit_cash() + $doctorShift->doctor_credit_company + $doctorShift->doctor->static_wage;
+    }
   
     /**
      * Display a listing of the DoctorShift resources.
@@ -287,53 +300,9 @@ class DoctorShiftController extends Controller
             'patients_breakdown' => [],
         ];
 
-        // Determine doctor's entitlement percentages
-        $cashPercentage = $doctorShift->doctor->cash_percentage / 100; // Convert to decimal
-        $companyPercentage = $doctorShift->doctor->company_percentage / 100;
-        // $labPercentage = $doctorShift->doctor->lab_percentage / 100; // If lab services contribute differently
 
-    
 
-        foreach ($doctorShift->doctorVisits as $visit) {
-            $visitTotalPaid = 0;
-            $visitDoctorEntitlement = 0;
-
-            foreach ($visit->requestedServices as $rs) {
-                // We sum amount_paid for each requested service in this visit
-                $visitTotalPaid += (float) $rs->amount_paid;
-
-                // Calculate doctor's share from this service's payment
-                // This logic assumes percentages apply to the amount_paid for the service.
-                // It could also apply to the price of the service before company endurance.
-                // This needs to match your exact business rule.
-                $amountForDoctorCalculation = (float) $rs->amount_paid; // Or $rs->price if calculation is on price before endurance
-
-                if ($visit->patient->company_id) { // Insurance patient
-                    $visitDoctorEntitlement += $amountForDoctorCalculation * $companyPercentage;
-                } else { // Cash patient
-                    $visitDoctorEntitlement += $amountForDoctorCalculation * $cashPercentage;
-                }
-                // Consider lab_percentage if some services are lab and have different entitlements
-            }
-
-            $summary['patients_breakdown'][] = [
-                'patient_id' => $visit->patient->id,
-                'patient_name' => $visit->patient->name,
-                'visit_id' => $visit->id,
-                'total_paid_for_visit' => $visitTotalPaid,
-                'doctor_share_from_visit' => $doctorShift->doctor->doctor_credit($visit),
-                'is_insurance_patient' => !!$visit->patient->company_id,
-            ];
-
-            if ($visit->patient->company_id) {
-                $summary['doctor_insurance_share_total'] += $visitDoctorEntitlement;
-            } else {
-                $summary['doctor_cash_share_total'] += $visitDoctorEntitlement;
-            }
-        }
-
-        $summary['total_doctor_share'] = $doctorShift->doctor_credit_cash() +
-            $doctorShift->doctor_credit_company() + $doctorShift->doctor->static_wage;
+   
 
         return response()->json(['data' => $summary]);
     }

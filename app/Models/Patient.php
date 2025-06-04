@@ -6,6 +6,110 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int|null $file_id
+ * @property string $name
+ * @property int $shift_id
+ * @property int $user_id
+ * @property int|null $doctor_id
+ * @property string $phone
+ * @property string $gender
+ * @property int|null $age_day
+ * @property int|null $age_month
+ * @property int|null $age_year
+ * @property int|null $company_id
+ * @property int|null $subcompany_id
+ * @property int|null $company_relation_id
+ * @property int|null $paper_fees
+ * @property string|null $guarantor
+ * @property \Illuminate\Support\Carbon|null $expire_date
+ * @property string|null $insurance_no
+ * @property bool $is_lab_paid
+ * @property int $lab_paid
+ * @property bool $result_is_locked
+ * @property bool $sample_collected
+ * @property string|null $sample_collect_time
+ * @property \Illuminate\Support\Carbon|null $result_print_date
+ * @property \Illuminate\Support\Carbon|null $sample_print_date
+ * @property int $visit_number
+ * @property bool $result_auth
+ * @property \Illuminate\Support\Carbon $auth_date
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property int|null $country_id
+ * @property string|null $gov_id
+ * @property string|null $address
+ * @property string $discount
+ * @property bool $doctor_finish
+ * @property bool $doctor_lab_request_confirm
+ * @property bool $doctor_lab_urgent_confirm
+ * @property string|null $referred
+ * @property string|null $discount_comment
+ * @property-read \App\Models\Company|null $company
+ * @property-read \App\Models\CompanyRelation|null $companyRelation
+ * @property-read \App\Models\Country|null $country
+ * @property-read \App\Models\Doctor|null $doctor
+ * @property-read \App\Models\DoctorVisit|null $doctorVisit
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DrugPrescribed> $drugsPrescribed
+ * @property-read int|null $drugs_prescribed_count
+ * @property-read \App\Models\File|null $file
+ * @property-read string $full_age
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LabRequest> $labRequests
+ * @property-read int|null $lab_requests_count
+ * @property-read \App\Models\Doctor|null $primaryDoctor
+ * @property-read \App\Models\Shift $shift
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Sickleave> $sickleaves
+ * @property-read int|null $sickleaves_count
+ * @property-read \App\Models\Subcompany|null $subcompany
+ * @property-read \App\Models\User $user
+ * @method static \Database\Factories\PatientFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereAddress($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereAgeDay($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereAgeMonth($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereAgeYear($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereAuthDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereCompanyId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereCompanyRelationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereCountryId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereDiscount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereDiscountComment($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereDoctorFinish($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereDoctorId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereDoctorLabRequestConfirm($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereDoctorLabUrgentConfirm($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereExpireDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereFileId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereGender($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereGovId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereGuarantor($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereInsuranceNo($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereIsLabPaid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereLabPaid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient wherePaperFees($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient wherePhone($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereReferred($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereResultAuth($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereResultIsLocked($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereResultPrintDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereSampleCollectTime($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereSampleCollected($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereSamplePrintDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereShiftId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereSubcompanyId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereUserId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Patient whereVisitNumber($value)
+ * @mixin \Eloquent
+ */
 class Patient extends Model
 {
     use HasFactory;

@@ -62,6 +62,7 @@ class VisitServiceController extends Controller
             'service_ids.*' => 'required|integer|exists:services,id',
             'quantities' => 'nullable|array', // Optional: if frontend sends quantities for each service
             'quantities.*' => 'required_with:quantities|integer|min:1',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
         ]);
 
         $patient = $visit->patient()->firstOrFail();
@@ -125,7 +126,7 @@ class VisitServiceController extends Controller
                     'doctorvisits_id' => $visit->id,
                     'service_id' => $serviceId,
                     'user_id' => Auth::id(),
-                    'doctor_id' => $visit->doctor_id,
+                    'doctor_id' => $visit->patient->doctor_id,
                     'price' => $price,
                     'amount_paid' => 0,
                     'endurance' => $companyEnduranceAmount,

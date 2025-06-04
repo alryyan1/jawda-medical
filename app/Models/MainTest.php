@@ -5,6 +5,39 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $main_test_name
+ * @property int|null $pack_id
+ * @property bool $pageBreak
+ * @property int $container_id
+ * @property float|null $price
+ * @property bool $divided
+ * @property bool $available
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ChildTest> $childTests
+ * @property-read int|null $child_tests_count
+ * @property-read \App\Models\CompanyMainTest $pivot
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Company> $companies
+ * @property-read int|null $companies_count
+ * @property-read \App\Models\Container $container
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LabRequest> $labRequests
+ * @property-read int|null $lab_requests_count
+ * @property-read \App\Models\Package|null $package
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest query()
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest whereAvailable($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest whereContainerId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest whereDivided($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest whereMainTestName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest wherePackId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest wherePageBreak($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|MainTest wherePrice($value)
+ * @mixin \Eloquent
+ */
 class MainTest extends Model
 {
     use HasFactory;

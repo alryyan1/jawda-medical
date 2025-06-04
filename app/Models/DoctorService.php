@@ -5,6 +5,30 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\Pivot; // Use Pivot for custom pivot models
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int $doctor_id
+ * @property int $service_id
+ * @property string $percentage
+ * @property string $fixed
+ * @property string|null $created_at
+ * @property string|null $updated_at
+ * @property-read \App\Models\Doctor $doctor
+ * @property-read \App\Models\Service $service
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService query()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService whereDoctorId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService whereFixed($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService wherePercentage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService whereServiceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorService whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class DoctorService extends Pivot // Extend Pivot
 {
     use HasFactory;

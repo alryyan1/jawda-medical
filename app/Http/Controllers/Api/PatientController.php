@@ -209,6 +209,7 @@ class PatientController extends Controller
                 'updated_at' => now(),
                 'doctor_id' => $validatedVisitData['doctor_id'],
                 'result_auth' => false,
+                'auth_date' => null,
                 // Reset visit-specific flags from the old patient snapshot
                 'is_lab_paid' => false,
                 'lab_paid' => 0,
@@ -261,7 +262,7 @@ class PatientController extends Controller
             $query->where('name', 'LIKE', "%{$searchTerm}%")
                 ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
         })
-            ->with(['latestDoctorVisit.doctor:id,name']) // latestDoctorVisit is a hasOne relationship in Patient model
+            ->with(['doctorVisit.doctor:id,name']) // latestDoctorVisit is a hasOne relationship in Patient model
             ->limit(10) // Limit results for live search
             ->get();
 

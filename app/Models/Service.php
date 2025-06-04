@@ -3,6 +3,40 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $name
+ * @property int $service_group_id
+ * @property string $price
+ * @property bool $activate
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $variable
+ * @property-read \App\Models\DoctorService $pivot
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Company> $companies
+ * @property-read int|null $companies_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Doctor> $doctorsProviding
+ * @property-read int|null $doctors_providing_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ServiceCost> $serviceCosts
+ * @property-read int|null $service_costs_count
+ * @property-read \App\Models\ServiceGroup $serviceGroup
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ServiceCost> $service_costs
+ * @method static \Database\Factories\ServiceFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder|Service newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Service newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Service query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereActivate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service wherePrice($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereServiceGroupId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Service whereVariable($value)
+ * @mixin \Eloquent
+ */
 class Service extends Model
 {
     use HasFactory;

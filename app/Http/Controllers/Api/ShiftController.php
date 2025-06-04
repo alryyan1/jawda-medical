@@ -89,7 +89,7 @@ class ShiftController extends Controller
         $shift = Shift::create([
             'is_closed' => false,
             'touched' => false,
-            'pharmacy_entry' => $request->input('pharmacy_entry', null),
+            'pharamacy_entry' => $request->input('pharmacy_entry', null),
             // 'user_id_opened' => Auth::id(), // Or passed in request
             // 'name' => $validatedData['name'] ?? 'Shift - ' . Carbon::now()->toDateTimeString(),
             'total' => 0, // Initial values

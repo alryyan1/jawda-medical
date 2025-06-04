@@ -5,6 +5,63 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int $main_test_id
+ * @property int $pid
+ * @property bool $hidden
+ * @property bool $is_lab2lab
+ * @property bool $valid
+ * @property bool $no_sample
+ * @property string|null $price
+ * @property string|null $amount_paid
+ * @property int $discount_per
+ * @property bool $is_bankak
+ * @property string|null $comment
+ * @property int|null $user_requested
+ * @property int|null $user_deposited
+ * @property bool $approve
+ * @property string $endurance
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $is_paid
+ * @property string|null $sample_id Unique ID for the sample collected for this test
+ * @property int $doctor_visit_id
+ * @property-read \App\Models\User|null $depositUser
+ * @property-read \App\Models\DoctorVisit|null $doctorVisit
+ * @property-read \App\Models\MainTest $mainTest
+ * @property-read \App\Models\Patient $patient
+ * @property-read \App\Models\User|null $requestingUser
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RequestedResult> $results
+ * @property-read int|null $results_count
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest query()
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereAmountPaid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereApprove($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereComment($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereDiscountPer($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereDoctorVisitId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereEndurance($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereHidden($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereIsBankak($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereIsLab2lab($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereIsPaid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereMainTestId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereNoSample($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest wherePid($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest wherePrice($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereSampleId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereUserDeposited($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereUserRequested($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|LabRequest whereValid($value)
+ * @mixin \Eloquent
+ */
 class LabRequest extends Model
 {
     use HasFactory;

@@ -3,6 +3,54 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $lab_endurance
+ * @property string $service_endurance
+ * @property bool $status
+ * @property int $lab_roof
+ * @property int $service_roof
+ * @property string $phone
+ * @property string $email
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property int|null $finance_account_id
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CompanyMainTest> $companyMainTestEntries
+ * @property-read int|null $company_main_test_entries_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CompanyRelation> $companyRelations
+ * @property-read int|null $company_relations_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CompanyService> $companyServiceEntries
+ * @property-read int|null $company_service_entries_count
+ * @property-read \App\Models\CompanyService $pivot
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\MainTest> $contractedMainTests
+ * @property-read int|null $contracted_main_tests_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $contractedServices
+ * @property-read int|null $contracted_services_count
+ * @property-read \App\Models\FinanceAccount|null $financeAccount
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Patient> $patients
+ * @property-read int|null $patients_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Subcompany> $subcompanies
+ * @property-read int|null $subcompanies_count
+ * @method static \Illuminate\Database\Eloquent\Builder|Company newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Company newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Company query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereEmail($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereFinanceAccountId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereLabEndurance($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereLabRoof($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company wherePhone($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereServiceEndurance($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereServiceRoof($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Company whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class Company extends Model
 {
     use HasFactory;

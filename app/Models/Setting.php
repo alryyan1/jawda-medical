@@ -4,6 +4,108 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property bool $is_header
+ * @property bool $is_footer
+ * @property bool $is_logo
+ * @property string|null $header_base64
+ * @property string|null $footer_base64
+ * @property string|null $header_content
+ * @property string|null $footer_content
+ * @property string|null $logo_base64
+ * @property string|null $lab_name
+ * @property string|null $hospital_name
+ * @property bool|null $print_direct
+ * @property string|null $inventory_notification_number
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $disable_doctor_service_check
+ * @property string $currency
+ * @property string $phone
+ * @property bool $gov
+ * @property bool $country
+ * @property bool $barcode
+ * @property bool $show_water_mark
+ * @property string $vatin
+ * @property string $cr
+ * @property string $email
+ * @property string $address
+ * @property string $instance_id
+ * @property string $token
+ * @property bool $send_result_after_auth
+ * @property bool $send_result_after_result
+ * @property bool $edit_result_after_auth
+ * @property string|null $auditor_stamp
+ * @property string|null $manager_stamp
+ * @property int|null $finance_account_id
+ * @property int|null $bank_id
+ * @property int|null $company_account_id
+ * @property int|null $endurance_account_id
+ * @property int|null $main_cash
+ * @property int|null $main_bank
+ * @property \Illuminate\Support\Carbon|null $financial_year_start
+ * @property \Illuminate\Support\Carbon|null $financial_year_end
+ * @property int|null $pharmacy_bank
+ * @property int|null $pharmacy_cash
+ * @property int|null $pharmacy_income
+ * @property string|null $welcome_message
+ * @property bool $send_welcome_message
+ * @property-read \App\Models\FinanceAccount|null $defaultBank
+ * @property-read \App\Models\FinanceAccount|null $defaultFinanceAccount
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereAddress($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereAuditorStamp($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereBankId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereBarcode($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCompanyAccountId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCountry($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCr($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCurrency($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereDisableDoctorServiceCheck($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereEditResultAfterAuth($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereEmail($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereEnduranceAccountId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFinanceAccountId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFinancialYearEnd($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFinancialYearStart($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFooterBase64($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFooterContent($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereGov($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereHeaderBase64($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereHeaderContent($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereHospitalName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereInstanceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereInventoryNotificationNumber($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereIsFooter($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereIsHeader($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereIsLogo($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereLabName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereLogoBase64($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereMainBank($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereMainCash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereManagerStamp($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePharmacyBank($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePharmacyCash($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePharmacyIncome($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePhone($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePrintDirect($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereSendResultAfterAuth($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereSendResultAfterResult($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereSendWelcomeMessage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereShowWaterMark($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereToken($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereVatin($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereWelcomeMessage($value)
+ * @mixin \Eloquent
+ */
 class Setting extends Model
 {
     use HasFactory;

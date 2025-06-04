@@ -7,6 +7,50 @@ use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int $user_id
+ * @property int $shift_id
+ * @property int $doctor_id
+ * @property bool $status Is this doctor shift session currently active?
+ * @property \Illuminate\Support\Carbon|null $start_time Actual start time of the doctor working
+ * @property \Illuminate\Support\Carbon|null $end_time Actual end time of the doctor working
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $is_cash_revenue_prooved
+ * @property bool $is_cash_reclaim_prooved
+ * @property bool $is_company_revenue_prooved
+ * @property bool $is_company_reclaim_prooved
+ * @property-read \App\Models\Doctor $doctor
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorVisit> $doctorVisits
+ * @property-read int|null $doctor_visits_count
+ * @property-read \App\Models\Shift $generalShift
+ * @property-read int|null $visits_count
+ * @property-read \App\Models\User $user
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorVisit> $visits
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift active()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift activeToday()
+ * @method static \Database\Factories\DoctorShiftFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift query()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereDoctorId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereEndTime($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereIsCashReclaimProoved($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereIsCashRevenueProoved($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereIsCompanyReclaimProoved($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereIsCompanyRevenueProoved($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereShiftId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereStartTime($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereUserId($value)
+ * @mixin \Eloquent
+ */
 class DoctorShift extends Model
 {
     use HasFactory;

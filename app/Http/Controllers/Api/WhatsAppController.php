@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PatientStrippedResource;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use App\Models\Setting; // To get instanceId and token if not passed
 use App\Models\Patient; // To get patient phone number
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\File; // For handling file path if PDF is generated on server
 
@@ -129,70 +131,75 @@ class WhatsAppController extends Controller
     }
     public function getPatientsForBulkMessage(Request $request)
     {
-        // $this->authorize('send_bulk_whatsapp_messages'); // Permission
+        // $this->authorize('send_bulk_whatsapp_messages');
         $validated = $request->validate([
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'doctor_id' => 'nullable|integer|exists:doctors,id',
             'service_id' => 'nullable|integer|exists:services,id',
             'specialist_id' => 'nullable|integer|exists:specialists,id',
-            'unique_phones_only' => 'sometimes|boolean',
         ]);
-    
-        $query = Patient::query()->select('patients.id', 'patients.name', 'patients.phone') // Select necessary fields
-                          ->whereNotNull('patients.phone')->where('patients.phone', '!=', '');
-    
+
+        $query = Patient::query()
+            ->select('patients.id', 'patients.name', 'patients.phone')
+            ->whereNotNull('patients.phone')->where('patients.phone', '!=', '')
+            ->join('doctorvisits', 'patients.id', '=', 'doctorvisits.patient_id'); // Join with the single DoctorVisit
+
         if (!empty($validated['date_from']) && !empty($validated['date_to'])) {
             $startDate = Carbon::parse($validated['date_from'])->startOfDay();
             $endDate = Carbon::parse($validated['date_to'])->endOfDay();
-            $query->whereHas('doctorVisits', function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('visit_date', [$startDate, $endDate]);
-            });
+            $query->whereBetween('doctorvisits.visit_date', [$startDate, $endDate]);
         }
-    
+
         if (!empty($validated['doctor_id'])) {
-            $query->whereHas('doctorVisits', function ($q) use ($validated) {
-                $q->where('doctor_id', $validated['doctor_id']);
-                if (!empty($validated['date_from']) && !empty($validated['date_to'])) { // Ensure date filter applies to doctor's visits
-                     $q->whereBetween('visit_date', [Carbon::parse($validated['date_from'])->startOfDay(), Carbon::parse($validated['date_to'])->endOfDay()]);
-                }
-            });
+            $query->where('doctorvisits.doctor_id', $validated['doctor_id']);
+            // If date range should also apply specifically to this doctor's visits:
+            // (already handled by the general date filter on doctorvisits.visit_date)
         }
-    
+
         if (!empty($validated['service_id'])) {
-            $query->whereHas('doctorVisits.requestedServices', function ($q) use ($validated) {
+            // We need to check if the patient's single DoctorVisit has the requested service
+            $query->whereHas('doctorVisit.requestedServices', function ($q) use ($validated) {
                 $q->where('service_id', $validated['service_id']);
-                 if (!empty($validated['date_from']) && !empty($validated['date_to'])) { // Ensure date filter applies
-                     $q->whereBetween('requested_services.created_at', [Carbon::parse($validated['date_from'])->startOfDay(), Carbon::parse($validated['date_to'])->endOfDay()]);
-                }
+                // If date range should also apply to when service was requested:
+                // if (!empty($validated['date_from']) && !empty($validated['date_to'])) {
+                //     $q->whereBetween('requested_services.created_at', [Carbon::parse($validated['date_from'])->startOfDay(), Carbon::parse($validated['date_to'])->endOfDay()]);
+                // }
             });
         }
         
         if (!empty($validated['specialist_id'])) {
-            $query->whereHas('doctorVisits.doctor.specialist', function ($q) use ($validated) {
+            // Check if the doctor of the patient's single DoctorVisit has the specified specialist
+            $query->whereHas('doctorVisit.doctor.specialist', function ($q) use ($validated) {
                 $q->where('specialists.id', $validated['specialist_id']);
-                if (!empty($validated['date_from']) && !empty($validated['date_to'])) { // Ensure date filter applies
-                     $q->whereBetween('doctorvisits.visit_date', [Carbon::parse($validated['date_from'])->startOfDay(), Carbon::parse($validated['date_to'])->endOfDay()]);
-                }
             });
         }
-    
+
         if (!empty($validated['unique_phones_only']) && $validated['unique_phones_only']) {
-            // This gets a bit tricky with eager loading names for each unique phone.
-            // One way: get unique phones, then fetch one patient per phone.
-            $uniquePhones = (clone $query)->distinct()->pluck('patients.phone');
-            $patients = Patient::select('id', 'name', 'phone')
-                                ->whereIn('phone', $uniquePhones)
-                                ->groupBy('phone') // Get one patient per phone number
-                                ->orderBy('name')
-                                ->get();
+            // This makes the query more complex if you need to select one patient per unique phone
+            // while still respecting all other join-based filters.
+            // A common approach is to get all matching patient IDs first, then get unique phones from those,
+            // then select one patient per unique phone.
+            // For now, a simpler approach:
+            $patients = $query->distinct('patients.phone') // This might not give you the specific patient record you want per phone
+                               ->orderBy('patients.name')
+                               ->get(['patients.id', 'patients.name', 'patients.phone']);
+            // To get one full patient record per unique phone, you might need a subquery or window function in raw SQL,
+            // or fetch all and then filter in PHP (less ideal for large sets).
+            // A more robust unique_phones_only with other filters:
+            // $allMatchingPatientIds = (clone $query)->distinct('patients.id')->pluck('patients.id');
+            // $uniquePhones = Patient::whereIn('id', $allMatchingPatientIds)->distinct()->pluck('phone');
+            // $patients = Patient::select('id', 'name', 'phone')
+            //                     ->whereIn('phone', $uniquePhones)
+            //                     ->groupBy('phone') // May need to adjust for DB strict mode
+            //                     ->orderBy('name')
+            //                     ->get();
+
         } else {
-            $patients = $query->distinct('patients.id')->orderBy('patients.name')->get();
+            $patients = $query->distinct('patients.id')->orderBy('patients.name')->get(['patients.id', 'patients.name', 'patients.phone']);
         }
         
-        // For simplicity, returning a collection of PatientStrippedResource
-        // You might need to add last_visit_date if desired.
-        return \App\Http\Resources\PatientStrippedResource::collection($patients);
+        return PatientStrippedResource::collection($patients);
     }
     // Placeholder for message template processing
     // private function processMessageTemplate(string $rawMessage, ?Patient $patient): string

@@ -5,6 +5,71 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int $patient_id
+ * @property int $doctor_id
+ * @property int $user_id
+ * @property int|null $doctor_shift_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property bool $is_new Is this a new patient visit or a follow-up for an existing issue?
+ * @property int $number Original "number" column, clarify purpose. Queue number?
+ * @property bool $only_lab Is this visit solely for lab work without doctor consultation?
+ * @property int $shift_id
+ * @property int|null $file_id
+ * @property \Illuminate\Support\Carbon $visit_date
+ * @property string|null $visit_time
+ * @property string $status
+ * @property string|null $visit_type e.g., New, Follow-up, Emergency, Consultation
+ * @property int|null $queue_number
+ * @property string|null $reason_for_visit
+ * @property string|null $visit_notes
+ * @property-read \App\Models\AuditedPatientRecord|null $auditRecord
+ * @property-read \App\Models\User|null $createdByUser
+ * @property-read \App\Models\Doctor|null $doctor
+ * @property-read \App\Models\DoctorShift|null $doctorShift
+ * @property-read \App\Models\File|null $file
+ * @property-read \App\Models\Shift|null $generalShift
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LabRequest> $labRequests
+ * @property-read int|null $lab_requests_count
+ * @property-read \App\Models\Patient $patient
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DrugPrescribed> $prescriptions
+ * @property-read int|null $prescriptions_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RequestedService> $requestedServices
+ * @property-read int|null $requested_services_count
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit completed()
+ * @method static \Database\Factories\DoctorVisitFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit query()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit status($status)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit today()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit waiting()
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereDoctorId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereDoctorShiftId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereFileId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereIsNew($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereNumber($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereOnlyLab($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit wherePatientId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereQueueNumber($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereReasonForVisit($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereShiftId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereUserId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereVisitDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereVisitNotes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereVisitTime($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereVisitType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit withDoctor()
+ * @mixin \Eloquent
+ */
 class DoctorVisit extends Model
 {
     use HasFactory;
@@ -173,7 +238,7 @@ class DoctorVisit extends Model
         }
         return $credit;
     }
-    public function bankak_service()
+        public function bankak_service()
     {
         $total = 0;
         foreach ($this->requestedServices as $service) {
@@ -199,7 +264,6 @@ class DoctorVisit extends Model
         $total = 0;
         //        dd($this->services);
         foreach ($this->requestedServices as $service) {
-
             //            if (!$service->is_paid) continue;
             // if (!is_null($doctor)) {
             //     if ($doctor->id != $service->doctor_id) {
@@ -208,9 +272,11 @@ class DoctorVisit extends Model
             // }
             // if($service->service->variable) continue;
             if ($user != null) {
+                
                if ($service->user_deposited != $user) continue;
                 $total += $service->amount_paid;
             } else {
+                
                 $total += $service->amount_paid;
             }
         }
@@ -284,18 +350,7 @@ class DoctorVisit extends Model
      * potentially considering the specific doctor's pricing or contract if applicable.
      * For this example, sums price * count from requested_services.
      */
-    public function calculateTotalServiceValue(Doctor $contextDoctor = null): float
-    {
-        $total = 0;
-        foreach ($this->requestedServices as $rs) {
-            $total += ((float)$rs->price * (int)($rs->count ?? 1));
-        }
-        // Add LabRequest prices if they are separate from services
-        foreach ($this->labRequests as $lr) {
-            $total += (float)$lr->price; // Assuming count is 1 for lab requests
-        }
-        return $total;
-    }
+   
     public function totalServiceCosts($doctor)
     {
         $total = 0;
@@ -320,25 +375,6 @@ class DoctorVisit extends Model
     }
 
     /**
-     * Calculate total amount paid via bank for this visit.
-     */
-    public function calculateTotalBankPayments(): float
-    {
-         $totalBank = 0;
-         foreach($this->requestedServices as $rs) {
-             if ($rs->bank) { // Assuming 'bank' boolean on RequestedService
-                 $totalBank += (float)$rs->amount_paid;
-             }
-         }
-         foreach($this->labRequests as $lr) {
-             if ($lr->is_bankak) { // Assuming 'is_bankak' boolean on LabRequest
-                 $totalBank += (float)$lr->amount_paid;
-             }
-         }
-         return $totalBank;
-    }
-    
-    /**
      * Concatenated string of service names for this visit.
      */
     public function services_concatinated(): string
@@ -350,25 +386,32 @@ class DoctorVisit extends Model
  
 
 
-    /**
-     * Hospital's credit from this visit (e.g. total collected - doctor share - service costs)
-     * This is highly dependent on your financial model.
-     */
-    // public function hospital_credit(): float
-    // {
-    //     $totalCollected = $this->calculateTotalPaid();
-    //     $doctorShare = $this->doctorShift->doctor->calculateVisitCredit($this, $this->patient->company_id ? 'company' : 'cash');
-    //     $serviceCosts = $this->total_services_cost();
-        
-    //     // return $totalCollected - $doctorShare - $serviceCosts; // Simplified
-    //     return $this->calculateTotalServiceValue() * 0.2; // Placeholder 20% hospital share of total service value
-    // }
       /**
      * Get the audit record associated with this doctor visit.
      */
     public function auditRecord() // <-- THE NEW RELATIONSHIP
     {
         return $this->hasOne(AuditedPatientRecord::class, 'doctor_visit_id');
+    }
+    public function totalEnduranceWillPay(){
+        $total = 0;
+        /**@var RequestedService $rs */
+        foreach($this->requestedServices as $rs){
+            $total += $rs->endurance;
+        }
+        return $total;
+    }
+
+    public function amountRemaining(){
+        $total_paid = 0;
+        /**@var RequestedService $rs */
+        foreach($this->requestedServices as $rs){
+            $total_paid += $rs->totalDeposits();
+        }
+       if($this->patient->company_id){
+          return $total_paid - $this->totalEnduranceWillPay();
+       }
+       return $this->total_services() - $total_paid;
     }
 
 }

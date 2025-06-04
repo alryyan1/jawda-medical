@@ -18,7 +18,8 @@ class ClinicWorkspaceController extends Controller
             'page' => 'nullable|integer|min:1',
         ]);
 
-        $query = DoctorVisit::with(['patient', 'doctor','patient.company']); // Eager load necessary relations
+        $query = DoctorVisit::with(['patient', 'doctor','patient.company'])
+                           ->withCount('requestedServices'); // Add count of requested services
                             // ->whereDate('visit_date', Carbon::today()) // Example: visits for today
                             // ->whereNotIn('status', ['completed', 'cancelled']); // Example: not completed or cancelled
 

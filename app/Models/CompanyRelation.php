@@ -4,6 +4,31 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $lab_endurance
+ * @property string $service_endurance
+ * @property int $company_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Company|null $company
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Patient> $patients
+ * @property-read int|null $patients_count
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation query()
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation whereCompanyId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation whereLabEndurance($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation whereServiceEndurance($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyRelation whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class CompanyRelation extends Model
 {
     use HasFactory;

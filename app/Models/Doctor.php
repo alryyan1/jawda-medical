@@ -5,6 +5,60 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $phone
+ * @property string $cash_percentage
+ * @property string $company_percentage
+ * @property string $static_wage
+ * @property string $lab_percentage
+ * @property int $specialist_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property int $start
+ * @property string|null $image
+ * @property int|null $finance_account_id
+ * @property int $finanace_account_id_insurance
+ * @property bool $calc_insurance
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorServiceCost> $doctorServiceCosts
+ * @property-read int|null $doctor_service_costs_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorServiceCost> $doctorSubServiceCosts
+ * @property-read int|null $doctor_sub_service_costs_count
+ * @property-read \App\Models\FinanceAccount|null $financeAccount
+ * @property-read \App\Models\FinanceAccount|null $insuranceFinanceAccount
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorSchedule> $schedules
+ * @property-read int|null $schedules_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorService> $services
+ * @property-read int|null $services_count
+ * @property-read \App\Models\Specialist $specialist
+ * @property-read \App\Models\DoctorService $pivot
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $specificServices
+ * @property-read int|null $specific_services_count
+ * @property-read \App\Models\User|null $user
+ * @method static \Database\Factories\DoctorFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor query()
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereCalcInsurance($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereCashPercentage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereCompanyPercentage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereFinanaceAccountIdInsurance($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereFinanceAccountId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereImage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereLabPercentage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor wherePhone($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereSpecialistId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereStart($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereStaticWage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class Doctor extends Model
 {
     use HasFactory;

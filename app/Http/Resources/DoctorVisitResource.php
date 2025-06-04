@@ -21,6 +21,7 @@ public function toArray(Request $request): array
     $totalPaid = 0;
     $totalDiscount = 0; // If you track discount at visit level or sum from services
 
+    
     if ($this->relationLoaded('requestedServices')) {
         foreach ($this->requestedServices as $rs) {
             $pricePerItem = (float) $rs->price;
@@ -62,6 +63,7 @@ public function toArray(Request $request): array
         'requested_services_summary' => RequestedServiceStrippedResource::collection($this->whenLoaded('requestedServices')), // For the dialog
         // ... other fields ...
         'created_at' => $this->created_at?->toIso8601String(),
+        'requested_services_count' => $this->whenCounted('requestedServices', $this->requested_services_count, 0),
     ];
 }
 }

@@ -2,6 +2,34 @@
 namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
+/**
+ * 
+ *
+ * @property int $id
+ * @property int $main_test_id
+ * @property int $company_id
+ * @property bool $status
+ * @property string $price
+ * @property bool $approve
+ * @property int $endurance_static
+ * @property string $endurance_percentage
+ * @property bool $use_static
+ * @property-read \App\Models\Company $company
+ * @property-read \App\Models\MainTest $mainTest
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest query()
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest whereApprove($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest whereCompanyId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest whereEndurancePercentage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest whereEnduranceStatic($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest whereMainTestId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest wherePrice($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|CompanyMainTest whereUseStatic($value)
+ * @mixin \Eloquent
+ */
 class CompanyMainTest extends Pivot
 {
     protected $table = 'company_main_test'; // Explicitly define table name
