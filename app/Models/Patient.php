@@ -128,6 +128,8 @@ class Patient extends Model
         'sample_collect_time', 'result_print_date', 'sample_print_date',
         'visit_number', 'result_auth', 'auth_date',
         'country_id', 'gov_id', 'address', 'discount',
+        'referred',
+        'discount_comment',
         // Removed: 'present_complains', 'history_of_present_illness', etc.
         // Kept visit/process specific flags IF they are still relevant at patient level, else move them to DoctorVisit
         'doctor_finish', // Likely visit specific

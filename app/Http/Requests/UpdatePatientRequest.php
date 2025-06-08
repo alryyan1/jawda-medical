@@ -21,7 +21,7 @@ class UpdatePatientRequest extends FormRequest
 
         return [
             'name' => 'sometimes|required|string|max:255',
-            'phone' => ['sometimes','required','string','max:10', Rule::unique('patients')->ignore($patientId)],
+            'phone' => ['sometimes','required','string','max:10'],
             'gender' => ['sometimes','required', Rule::in(['male', 'female'])],
             'age_day' => 'nullable|integer|min:0|max:30',
             'age_month' => 'nullable|integer|min:0|max:11',

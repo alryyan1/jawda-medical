@@ -138,7 +138,7 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
-  Route::post('/patients/{patient}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
+  Route::post('/patients/{doctorVisit}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
   // Patients
   Route::apiResource('patients', PatientController::class);
   Route::get('/clinic-active-patients', [ClinicWorkspaceController::class, 'getActivePatients']);
@@ -399,5 +399,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
     Route::get('/whatsapp/bulk-message-patients', [WhatsAppController::class, 'getPatientsForBulkMessage']);
 
-
+    Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
 });

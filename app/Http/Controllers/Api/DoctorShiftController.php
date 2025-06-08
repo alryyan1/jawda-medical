@@ -285,6 +285,9 @@ class DoctorShiftController extends Controller
             return response()->json(['message' => 'Doctor details not found for this shift.'], 404);
         }
 
+        $doctor_cash_share_total = $doctorShift->doctor_credit_cash();
+        $doctor_insurance_share_total = $doctorShift->doctor_credit_company();
+        $total_doctor_share = $doctor_cash_share_total + $doctor_insurance_share_total;
         $summary = [
             'doctor_shift_id' => $doctorShift->id,
             'doctor_name' => $doctorShift->doctor->name,
@@ -295,8 +298,9 @@ class DoctorShiftController extends Controller
             'doctor_fixed_share_for_shift' => $doctorShift->doctor->static_wage, // This needs clarification: is static_wage per shift, per day, per month?
             // For this example, let's assume static_wage is per SHIFT if this DoctorShift is closed.
             // If the shift is open, fixed share might not apply yet or is pro-rated.
-            'doctor_cash_share_total' => $doctorShift->doctor_credit_cash(),
-            'doctor_insurance_share_total' => $doctorShift->doctor_credit_company(),
+            'doctor_cash_share_total' => $doctor_cash_share_total,
+            'total_doctor_share' => $total_doctor_share,
+            'doctor_insurance_share_total' => $doctor_insurance_share_total,
             'patients_breakdown' => [],
         ];
 
@@ -315,12 +319,12 @@ class DoctorShiftController extends Controller
 
         // Get all currently open doctor shifts (status = true, or start_time set and end_time null)
         // This logic depends on how you define an "open" DoctorShift
-        $openDoctorShiftIds = DoctorShift::activeToday() // Use your scope for active shifts
+        $openDoctorShiftIds = DoctorShift::latestGeneralShift() // Use your scope for active shifts
             ->pluck('doctor_id', 'id') // Get doctor_id keyed by DoctorShift id
             ->all(); // ['doctor_shift_id' => 'doctor_id'] -> this might be inverted for easier lookup
         // Let's rather get it as: ['doctor_id' => 'doctor_shift_id']
 
-        $openDoctorShifts = DoctorShift::activeToday()
+        $openDoctorShifts = DoctorShift::latestGeneralShift()
             ->get()
             ->keyBy('doctor_id'); // Key by doctor_id for easy lookup
 

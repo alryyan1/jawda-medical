@@ -225,6 +225,11 @@ class DoctorShift extends Model
         // Simpler version if 'status' column is reliably managed:
         // ->where('status', true)->whereDate('created_at', Carbon::today());
     }
+    public function scopeLatestGeneralShift($query)
+    {
+        $shift_id = Shift::latest()->first()->id;
+        return $query->where('shift_id', $shift_id)->where('status', true);
+    }
     /**
      * Get all visits associated with this specific doctor's shift session.
      * This assumes DoctorVisit has a 'doctor_shift_id' FK.

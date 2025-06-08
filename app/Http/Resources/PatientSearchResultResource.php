@@ -4,10 +4,10 @@ class PatientSearchResultResource extends JsonResource {
     public function toArray(Request $request): array {
         return [
             'id' => $this->id,
-            'name' => $this->name,
-            'phone' => $this->phone,
-            'gender' => $this->gender,
-            'age_year' => $this->age_year, // For quick display
+            'name' => $this?->patient?->name,
+            'phone' => $this?->patient?->phone,
+            'gender' => $this?->patient?->gender,
+            'age_year' => $this?->patient?->age_year, // For quick display
             'last_visit_id' => $this?->id,
             'last_visit_date' => $this?->visit_date?->toDateString(),
             'last_visit_doctor_name' => $this?->doctor?->name,

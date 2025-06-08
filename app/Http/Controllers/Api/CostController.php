@@ -120,7 +120,7 @@ class CostController extends Controller
         // Optionally add a summary of totals for the current filtered view
         $summaryQuery = clone $query;
         $summaryQuery->getQuery()->orders = []; // Remove any ORDER BY clauses
-        $totals = $summaryQuery->selectRaw('SUM(amount) as total_cash_paid, SUM(amount_bankak) as total_bank_paid, SUM(amount + amount_bankak) as grand_total_paid')->first();
+        $totals = $summaryQuery->selectRaw('(SUM(amount) - SUM(amount_bankak)) as total_cash_paid, SUM(amount_bankak) as total_bank_paid, SUM(amount)  as grand_total_paid')->first();
         
         return CostResource::collection($costs)->additional(['meta' => ['summary' => $totals]]);
     }

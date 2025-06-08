@@ -108,7 +108,7 @@ return new class extends Migration
             $table->string('neuropsychiatric_system')->default(''); // Added default
             $table->string('endocrine_system')->default(''); // Added default
             $table->string('peripheral_vascular_system')->default(''); // Added default
-            $table->string('referred')->default(''); // Added default
+            $table->string('referred')->default('no'); // Added default
             $table->string('discount_comment')->default(''); // Added default
 
             $table->timestamps();

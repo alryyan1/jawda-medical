@@ -1098,7 +1098,7 @@ class ReportController extends Controller
                 $doctorvisit->number ?? $index, // Use visit number or sequence
                 $doctorvisit->patient->name ?? '-',
                 $doctorvisit->patient?->company?->name ?? '-',
-                number_format($doctorvisit->calculateTotalServiceValue(), 1), // Using model method
+                number_format($doctorvisit->total_services(), 1), // Using model method
                 number_format($doctorvisit->total_paid_services($doctorShift->doctor) - $doctorvisit->bankak_service(), 1), // Cash
                 number_format($doctorvisit->bankak_service(), 1), // Bank
                 number_format($doctorShift->doctor->doctor_credit($doctorvisit), 1),
@@ -2046,9 +2046,9 @@ class ReportController extends Controller
         $pdf->AddPage();
 
         // Summary Section
-        $totalCash = $costs->sum('amount');
+        $grandTotal = $costs->sum('amount');
         $totalBank = $costs->sum('amount_bankak');
-        $grandTotal = $totalCash + $totalBank;
+        $totalCash = $grandTotal - $totalBank;
 
         $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 12);
         $pdf->Cell(0, 8, 'ملخص المصروفات', 0, 1, 'C');
@@ -2074,7 +2074,7 @@ class ReportController extends Controller
         $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 9);
         $pdf->DrawTableHeader($headers, $colWidths, $alignments);
 
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
+        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 12);
         $fill = false;
 
         foreach ($costs as $cost) {
@@ -2207,9 +2207,9 @@ class ReportController extends Controller
             $dailyCashDeposits = $depositsOnThisDay->where('is_bank', false)->sum('amount');
             $dailyBankDeposits = $depositsOnThisDay->where('is_bank', true)->sum('amount');
             
-            $dailyTotalCosts = $costsOnThisDay->sum(fn($cost) => (float)$cost->amount + (float)$cost->amount_bankak);
-            $dailyCashCosts = $costsOnThisDay->sum('amount');
+            $dailyTotalCosts = $costsOnThisDay->sum('amount');
             $dailyBankCosts = $costsOnThisDay->sum('amount_bankak');
+            $dailyCashCosts = $dailyTotalCosts - $dailyBankCosts;
 
             $dailyNetIncome = $dailyTotalDeposits - $dailyTotalCosts;
             $dailyNetCash = $dailyCashDeposits - $dailyCashCosts;
@@ -2230,11 +2230,14 @@ class ReportController extends Controller
             $grandTotals['total_cash_deposits'] += $dailyCashDeposits;
             $grandTotals['total_bank_deposits'] += $dailyBankDeposits;
             $grandTotals['total_costs_for_days_with_deposits'] += $dailyTotalCosts; // Summing all costs within the period
+            $grandTotals['net_cash_flow'] += $dailyNetCash;
+            // $grandTotals['net_bank_flow'] += $dailyNetBank;
+
             // These will be calculated at the end from summed totals
         }
         
         $grandTotals['net_total_income'] = $grandTotals['total_deposits'] - $grandTotals['total_costs_for_days_with_deposits'];
-        $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount'); // Total cash costs for month
+        // $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount'); // Total cash costs for month
         $grandTotals['net_bank_flow'] = $grandTotals['total_bank_deposits'] - $allCostsForMonth->sum('amount_bankak'); // Total bank costs for month
 
 
@@ -2274,6 +2277,7 @@ class ReportController extends Controller
             'total_cash_deposits' => 0,
             'total_bank_deposits' => 0,
             'total_costs_for_days_with_activity' => 0, // Costs on days that had deposits OR costs
+            'net_cash_flow' => 0,
         ];
 
         $allDepositsForMonth = RequestedServiceDeposit::whereBetween('created_at', [$startDate, $endDate])
@@ -2299,9 +2303,10 @@ class ReportController extends Controller
             $dailyCashDeposits = $depositsOnThisDay->where('is_bank', false)->sum('amount');
             $dailyBankDeposits = $depositsOnThisDay->where('is_bank', true)->sum('amount');
             
-            $dailyCashCosts = $costsOnThisDay->sum('amount');
+            $dailyCosts = $costsOnThisDay->sum('amount');
             $dailyBankCosts = $costsOnThisDay->sum('amount_bankak');
-            $dailyTotalCosts = $dailyCashCosts + $dailyBankCosts;
+            $dailyCashCosts = $dailyCosts - $dailyBankCosts;
+            $dailyTotalCosts = $dailyCosts ;
 
             $dailyData[] = [
                 'date_obj' => $date, // Keep Carbon instance for PDF formatting
@@ -2313,16 +2318,18 @@ class ReportController extends Controller
                 'net_cash' => (float) ($dailyCashDeposits - $dailyCashCosts),
                 'net_bank' => (float) ($dailyBankDeposits - $dailyBankCosts),
                 'net_income_for_day' => (float) ($dailyTotalDeposits - $dailyTotalCosts),
+                'net_income_for_day_cash' => (float) ($dailyCashDeposits - $dailyCashCosts),
             ];
 
             $grandTotals['total_deposits'] += $dailyTotalDeposits;
             $grandTotals['total_cash_deposits'] += $dailyCashDeposits;
             $grandTotals['total_bank_deposits'] += $dailyBankDeposits;
             $grandTotals['total_costs_for_days_with_activity'] += $dailyTotalCosts;
+            $grandTotals['net_cash_flow'] += ($dailyCashDeposits - $dailyCashCosts);
         }
         
         $grandTotals['net_total_income'] = $grandTotals['total_deposits'] - $grandTotals['total_costs_for_days_with_activity'];
-        $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount');
+        // $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount');
         $grandTotals['net_bank_flow'] = $grandTotals['total_bank_deposits'] - $allCostsForMonth->sum('amount_bankak');
 
         return [
@@ -2356,6 +2363,8 @@ class ReportController extends Controller
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
         $pdf->AddPage();
         $pdf->SetLineWidth(0.1);
+        //rtl
+        $pdf->SetRTL(true);
         
 
         // Table Header
@@ -2410,5 +2419,157 @@ class ReportController extends Controller
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
 
-  
+    public function generateDoctorReclaimsPdf(Request $request)
+    {
+        // $this->authorize('print doctor_reclaims_report'); // Permission
+
+        $validated = $request->validate([
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+            'user_id_opened' => 'nullable|integer|exists:users,id', // User who opened/managed the DoctorShift
+            'doctor_name_search' => 'nullable|string|max:255',
+            // 'status' => 'nullable|string|in:0,1,all', // Usually for reclaims, we consider closed shifts or all
+        ]);
+
+        $startDate = Carbon::parse($validated['date_from'])->startOfDay();
+        $endDate = Carbon::parse($validated['date_to'])->endOfDay();
+
+        $query = DoctorShift::with([
+            'doctor.specialist:id,name', // Eager load doctor and their specialist
+            'user:id,name',              // User who managed the shift
+            'generalShift:id',      // General shift info
+            // For calculating entitlements, we need visits and their financial details
+            'visits.patient',
+            'visits.requestedServices.service',
+            'visits.labRequests.mainTest',
+        ])
+        ->whereBetween('start_time', [$startDate, $endDate]); // Filter by DoctorShift start time
+
+        $filterCriteria = ["الفترة من: " . $startDate->format('Y-m-d') . " إلى: " . $endDate->format('Y-m-d')];
+
+        if ($request->filled('user_id_opened')) {
+            $query->where('user_id', $validated['user_id_opened']);
+            $user = User::find($validated['user_id_opened']);
+            if($user) $filterCriteria[] = "المستخدم: " . $user->name;
+        }
+        if ($request->filled('doctor_name_search')) {
+            $searchTerm = $validated['doctor_name_search'];
+            $query->whereHas('doctor', fn($q) => $q->where('name', 'LIKE', "%{$searchTerm}%"));
+            $filterCriteria[] = "بحث عن طبيب: " . $searchTerm;
+        }
+        // if ($request->filled('status') && $request->status !== 'all') {
+        //     $query->where('status', (bool)$validated['status']);
+        //     $filterCriteria[] = "الحالة: " . ((bool)$validated['status'] ? 'مفتوحة' : 'مغلقة');
+        // }
+
+        $doctorShifts = $query->orderBy('doctors.name', 'asc') // Requires join for sorting by doctor name
+                                ->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
+                                ->select('doctor_shifts.*') // Ensure we select all from doctor_shifts
+                                ->orderBy('doctor_shifts.start_time', 'asc')
+                                ->get();
+
+        if ($doctorShifts->isEmpty()) {
+            return response()->json(['message' => 'لا توجد مناوبات أطباء تطابق هذه الفلاتر لإنشاء التقرير.'], 404);
+        }
+
+        // --- Augment with Financial Data ---
+        $dataForPdf = [];
+        $grandTotals = [
+            'total_entitlement' => 0,
+            'cash_entitlement' => 0,
+            'insurance_entitlement' => 0,
+        ];
+
+        foreach ($doctorShifts as $ds) {
+            if (!$ds->doctor) continue; // Skip if doctor somehow not loaded
+
+            // Reuse logic from DoctorShift model or controller financial summary
+            // For simplicity, assuming these methods are available on $ds or can be called:
+            $cashEntitlement = $ds->doctor_credit_cash(); // From DoctorShift model
+            $insuranceEntitlement = $ds->doctor_credit_company(); // From DoctorShift model
+            $staticWage = (float)($ds->status == false ? $ds->doctor->static_wage : 0); // Static wage if shift is closed
+            $totalEntitlement = $cashEntitlement + $insuranceEntitlement + $staticWage;
+
+            $dataForPdf[] = [
+                'doctor_name' => $ds->doctor->name,
+                'specialist_name' => $ds->doctor->specialist?->name ?? '-',
+                'shift_id' => $ds->id,
+                'start_time' => Carbon::parse($ds->start_time)->format('Y-m-d H:i'),
+                'end_time' => $ds->end_time ? Carbon::parse($ds->end_time)->format('Y-m-d H:i') : 'مفتوحة',
+                'total_entitlement' => $totalEntitlement,
+                'cash_entitlement' => $cashEntitlement,
+                'insurance_entitlement' => $insuranceEntitlement,
+                'static_wage' => $staticWage, // For potential breakdown in PDF
+                'opened_by' => $ds->user?->name ?? '-',
+            ];
+
+            $grandTotals['total_entitlement'] += $totalEntitlement;
+            $grandTotals['cash_entitlement'] += $cashEntitlement;
+            $grandTotals['insurance_entitlement'] += $insuranceEntitlement;
+        }
+
+
+        // --- PDF Generation ---
+        $reportTitle = 'تقرير مستحقات الأطباء';
+        $filterCriteriaString = implode(' | ', $filterCriteria);
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteriaString, 'L', 'mm', 'A4'); // Landscape
+        $pdf->AddPage();
+        $pdf->SetLineWidth(0.1);
+        $fontname = $pdf->getDefaultFontFamily();
+
+        // Table Header
+        $headers = ['الطبيب', 'التخصص', 'رقم المناوبة', 'وقت البدء', 'وقت الإنتهاء', 'إجمالي المستحق', 'مستحق نقدي', 'مستحق تأمين', 'بواسطة'];
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        // Adjust widths: ID, Start, End, By can be smaller. Names, Entitlements larger.
+        $colWidths = [45, 35, 20, 30, 30, 30, 25, 25, 0]; 
+        $colWidths[count($colWidths)-1] = $pageWidth - array_sum(array_slice($colWidths,0,-1)); // Last column takes remaining
+        $alignments = ['R', 'R', 'C', 'C', 'C', 'C', 'C', 'C', 'R'];
+        
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        // Table Body
+        $pdf->SetFont($fontname, '', 8);
+        $fill = false;
+        foreach ($dataForPdf as $row) {
+            $rowData = [
+                $row['doctor_name'],
+                $row['specialist_name'],
+                $row['shift_id'],
+                $row['start_time'],
+                $row['end_time'],
+                number_format($row['total_entitlement'], 2),
+                number_format($row['cash_entitlement'], 2),
+                number_format($row['insurance_entitlement'], 2),
+                $row['opened_by'],
+            ];
+            $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 6); // Height 6
+            $fill = !$fill;
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        // Summary Footer for Table
+        $pdf->SetFont($fontname, 'B', 8.5);
+        $summaryRowPdf = [
+            'الإجمالي العام:', '', '', '', '', // Span first 5 columns or leave empty
+            number_format($grandTotals['total_entitlement'], 2),
+            number_format($grandTotals['cash_entitlement'], 2),
+            number_format($grandTotals['insurance_entitlement'], 2),
+            '', // Empty for "Opened By"
+        ];
+        // For TCPDF, you might need to draw empty cells to align totals correctly
+        $totalAlignments = ['R', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'];
+        $pdf->DrawTableRow([
+            $summaryRowPdf[0], $summaryRowPdf[1], $summaryRowPdf[2], $summaryRowPdf[3], $summaryRowPdf[4],
+            $summaryRowPdf[5], $summaryRowPdf[6], $summaryRowPdf[7], $summaryRowPdf[8]
+        ], $colWidths, $totalAlignments, true, 7);
+
+
+        $pdfFileName = 'doctor_reclaims_report_' . $validated['date_from'] . '_to_' . $validated['date_to'] . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+
+    }
 }

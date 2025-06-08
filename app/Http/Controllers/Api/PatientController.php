@@ -127,6 +127,8 @@ class PatientController extends Controller
                 'visit_number' => $visitLabNumber,
                 'doctor_id' => $visitDoctorId,
                 'result_auth' => false,
+                'referred' => 'no',
+                'discount_comment' => '',
             ]));
 
             // 3. Create the DoctorVisit record linked to this new Patient record and new File
@@ -140,7 +142,7 @@ class PatientController extends Controller
                 'visit_time' => Carbon::now()->format('H:i:s'),
                 'status' => 'waiting',
                 'reason_for_visit' => $visitReason,
-                'is_new' => !$existingPatient,
+                'is_new' => 1,
                 'number' => $queueNumber,
                 'queue_number' => $queueNumber,
             ]);
@@ -159,13 +161,13 @@ class PatientController extends Controller
      * A new File record is created and linked if no previous_visit_id is provided,
      * otherwise, the file_id from the previous visit is copied.
      */
-    public function storeVisitFromHistory(Request $request, Patient $patient)
+    public function storeVisitFromHistory(Request $request, DoctorVisit $doctorVisit)
     {
         $validatedVisitData = $request->validate([
-            'previous_visit_id' => 'nullable|integer|exists:doctorvisits,id,patient_id,' . $patient->id,
             'doctor_id' => 'required|integer|exists:doctors,id',
             'active_doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
             'reason_for_visit' => 'nullable|string|max:1000',
+            'previous_visit_id' => 'nullable|integer|exists:doctorvisits,id,patient_id,' . $doctorVisit->patient_id,
         ]);
 
         $currentGeneralShift = Shift::open()->latest('created_at')->first();
@@ -185,7 +187,7 @@ class PatientController extends Controller
         // AND if the existingPatient's latest visit also doesn't provide a file_id, create a new file.
         // This logic assumes you want to reuse file_id if available from history.
         if (!$fileToUseId) {
-            $latestVisitOfExistingPatient = $patient->doctorVisit()->latest('visit_date')->first();
+            $latestVisitOfExistingPatient = $doctorVisit->patient->doctorVisit()->latest('visit_date')->first();
             $fileToUseId = $latestVisitOfExistingPatient?->file_id;
         }
 
@@ -201,7 +203,7 @@ class PatientController extends Controller
             $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1;
             $queueNumber = DoctorVisit::where('doctor_shift_id', $validatedVisitData['active_doctor_shift_id'])->count() + 1;
             // 2. Clone patient data to create a NEW patient record
-            $newPatientData = $patient->replicate()->fill([
+            $newPatientData = $doctorVisit->patient->replicate()->fill([
                 'user_id' => Auth::id(),
                 'shift_id' => $currentGeneralShift->id,
                 'visit_number' => $visitLabNumber,
@@ -243,7 +245,7 @@ class PatientController extends Controller
             return new DoctorVisitResource($doctorVisit->load(['patient', 'doctor', 'file']));
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to store visit from history for original patient {$patient->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Failed to store visit from history for original patient {$doctorVisit->patient->id}: " . $e->getMessage(), ['exception' => $e]);
             return response()->json(['message' => 'فشل إنشاء الزيارة الجديدة من السجل.', 'error' => 'خطأ داخلي.' . $e->getMessage()], 500);
         }
     }
@@ -257,16 +259,19 @@ class PatientController extends Controller
         $searchTerm = $request->term;
 
         // Search by name or phone
-        // Eager load last visit with its doctor for context
-        $patients = Patient::where(function ($query) use ($searchTerm) {
-            $query->where('name', 'LIKE', "%{$searchTerm}%")
-                ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
-        })
-            ->with(['doctorVisit.doctor:id,name']) // latestDoctorVisit is a hasOne relationship in Patient model
-            ->limit(10) // Limit results for live search
+        $searchTerm = $request->input('search_term', '');
+
+        $visits = DoctorVisit::query()
+            ->whereHas('patient', function ($query) use ($searchTerm) { // Filter visits based on patient criteria
+                $query->where('name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+            })
+            ->with(['patient', 'doctor']) // Eager load patient and doctor for each visit
+            ->orderBy('visit_date', 'desc') // Get latest visits first
+            ->limit(20) // Get more visits initially, then filter/group in PHP if needed
             ->get();
 
-        return PatientSearchResultResource::collection($patients);
+        return PatientSearchResultResource::collection($visits);
     }
 
     /**
@@ -281,7 +286,7 @@ class PatientController extends Controller
             'companyRelation',
             'primaryDoctor:id,name',
             'user:id,name', // User who registered
-            
+
         ]);
         return new PatientResource($patient);
     }
@@ -319,12 +324,12 @@ class PatientController extends Controller
     public function visitHistory(Patient $patient)
     {
         // Get all doctor visits where the patient's phone number matches
-        $patients = DoctorVisit::whereHas('patient', function($query) use ($patient) {
+        $patients = DoctorVisit::whereHas('patient', function ($query) use ($patient) {
             $query->where('phone', $patient->phone);
         })
-        ->with(['doctor:id,name', 'requestedServices.service:id,name', 'patient','doctor'])
-        ->orderBy('created_at', 'desc')
-        ->get();
+            ->with(['doctor:id,name', 'requestedServices.service:id,name', 'patient', 'doctor'])
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         return DoctorVisitResource::collection($patients);
     }
