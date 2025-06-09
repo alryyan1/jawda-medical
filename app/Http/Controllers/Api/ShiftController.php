@@ -35,7 +35,7 @@ class ShiftController extends Controller
         $query = Shift::latest(); // Default order by most recent
 
         if ($request->has('is_closed') && $request->is_closed !== '') {
-            $query->where('is_closed', (bool)$request->is_closed);
+            // $query->where('is_closed', (bool)$request->is_closed);
         }
         if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
@@ -44,7 +44,12 @@ class ShiftController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $shifts = $query->paginate($request->get('per_page', 15));
+        //if perpage = 0 return all
+        if ($request->get('per_page') == 0) {
+            $shifts = $query->get();
+        } else {
+            $shifts = $query->paginate($request->get('per_page', 15));
+        }
         return ShiftResource::collection($shifts);
     }
 

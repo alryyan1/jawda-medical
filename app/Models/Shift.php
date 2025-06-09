@@ -91,9 +91,8 @@ class Shift extends Model
      */
     public function patients()
     {
-        return $this->hasMany(Patient::class);
+        return $this->hasMany(Doctorvisit::class)->orderBy('id', 'desc');
     }
-
     /**
      * Get all doctor-specific work sessions that occurred within this general shift.
      */
@@ -188,95 +187,104 @@ class Shift extends Model
      * Total amount paid for lab requests associated with this general shift,
      * optionally filtered by a specific user who handled the deposit.
      */
-    public function paidLab(int $userId = null): float
+      public function paidLab($user = null)
     {
-        $query = LabRequest::query()
-            ->whereHas('doctorVisit', fn($q) => $q->where('shift_id', $this->id))
-            ->where('is_paid', true);
-        
-        if ($userId) {
-            $query->where('user_deposited', $userId);
+        $total = 0;
+        /** @var Doctorvisit $patient */
+        foreach ($this->patients as $patient) {
+            $total += $patient->patient->paid_lab($user);
         }
-        return (float) $query->sum('amount_paid');
+        return $total;
     }
 
     /**
      * Total amount paid via Bankak/Bank for lab requests for this shift,
      * optionally filtered by a specific user.
      */
-    public function bankakLab(int $userId = null): float
+    public function bankakLab($user = null)
     {
-        $query = LabRequest::query()
-            ->whereHas('doctorVisit', fn($q) => $q->where('shift_id', $this->id))
-            ->where('is_paid', true)
-            ->where('is_bankak', true); // Or your field name for bank payment
-
-        if ($userId) {
-            $query->where('user_deposited', $userId);
+        $total = 0;
+        /** @var Doctorvisit $patient */
+        foreach ($this->patients as $patient) {
+            $total += $patient->patient->lab_bank($user);
         }
-        return (float) $query->sum('amount_paid');
+        return $total;
     }
-
     /**
      * Total amount paid for general services for this shift,
      * optionally filtered by a specific user who handled the deposit.
      */
-    public function totalPaidService(int $userId = null): float
+    public function totalPaidService($user = null): mixed
     {
-        $query = RequestedService::query()
-            ->whereHas('doctorVisit', fn($q) => $q->where('shift_id', $this->id))
-            ->where('is_paid', true);
-
-        if ($userId) {
-            // Assuming RequestedService has user_deposited or similar
-            // $query->where('user_deposited_id_on_requested_service', $userId); 
-            // For now, sum all if user specific deposit tracking isn't on RequestedService directly
+        $total = 0;
+        // /** @var DoctorShift $doctorShift */
+        // foreach ($this->doctorShifts as $doctorShift) {
+        //     /** @var Doctorvisit $doctorvisit */
+        //     foreach ($doctorShift->visits as $doctorvisit) {
+        //         $total += $doctorvisit->total_paid_services(null, $user);
+        //     }
+        // }
+        if ($user) {
+            return RequestedServiceDeposit::where('shift_id', $this->id)->where('user_id', $user)->sum('amount');
+        } else {
+            return RequestedServiceDeposit::where('shift_id', $this->id)->sum('amount');
         }
-        return (float) $query->sum('amount_paid');
+        // return $total;
     }
     
     /**
      * Total amount paid via Bank for general services for this shift,
      * optionally filtered by a specific user.
      */
-     public function totalPaidServiceBank(int $userId = null): float
-     {
-         $query = RequestedService::query()
-             ->whereHas('doctorVisit', fn($q) => $q->where('shift_id', $this->id))
-             ->where('is_paid', true)
-             ->where('bank', true); // Assuming 'bank' boolean on RequestedService
-
-         if ($userId) {
-             // Filter by user if applicable
-         }
-         return (float) $query->sum('amount_paid');
-     }
-
-
-    /**
-     * Total general costs recorded for this shift, optionally filtered by user.
-     * This refers to your `costs` table.
-     */
-    public function totalCost(int $userId = null): float
+    public function totalPaidServiceBank($user = null): mixed
     {
-        $query = $this->costs(); // Uses the hasMany relationship
-        if ($userId) {
-            $query->where('user_cost', $userId);
+        $total = 0;
+        /** @var DoctorShift $doctorShift */
+        // foreach ($this->doctorShifts as $doctorShift) {
+
+        //     /** @var Doctorvisit $doctorvisit */
+        //     foreach ($doctorShift->visits as $doctorvisit) {
+        //         foreach ($doctorvisit->services as $service) {
+        //             if ($user != null) {
+
+        //                 if ($service->user_deposited != $user) continue;
+        //             }
+        //             $total += $service->totalDepositsBank();
+        //         }
+        //     }
+        // }
+        if ($user) {
+            return RequestedServiceDeposit::where('shift_id', $this->id)->where('user_id', $user)->where('is_bank', 1)->sum('amount');
+        } else {
+            return RequestedServiceDeposit::where('shift_id', $this->id)->where('is_bank', 1)->sum('amount');
         }
-        // Sum 'amount' + 'amount_bankak' from costs table
-        return (float) $query->sum(DB::raw('amount + amount_bankak'));
+
+
+        return $total;
     }
 
-    /**
-     * Total general costs paid via bank for this shift, optionally by user.
-     */
-    public function totalCostBank(int $userId = null): float
+    public function totalCost($user = null)
     {
-        $query = $this->costs();
-        if ($userId) {
-            $query->where('user_cost', $userId);
+        $total = 0;
+        foreach ($this->cost as $cost) {
+            if ($user) {
+                if ($cost->user_cost != $user) continue;
+            }
+            $total += $cost->amount;
         }
-        return (float) $query->sum('amount_bankak');
+        return $total;
+    }
+    public function totalCostBank($user = null)
+    {
+        $total = 0;
+        foreach ($this->cost as $cost) {
+            if ($user) {
+                if ($cost->user_cost != $user) continue;
+            }
+                $total += $cost->amount_bankak;
+
+        }
+        return $total;
     }
     
     /**
@@ -286,24 +294,36 @@ class Shift extends Model
      * The original PDF code ` $doctorShift->shift_service_costs()` was on DoctorShift.
      * If these are general shift costs related to services:
      */
-    public function shiftClinicServiceCosts(): array
+    public function shiftClinicServiceCosts()
     {
-        // This needs a clear data source. Are these from the `costs` table with a specific category?
-        // Or a different table entirely?
-        // Example: Costs categorized as "Service Operational Cost"
-        $serviceOperationalCosts = $this->costs()
-                                    ->whereHas('costCategory', fn($q) => $q->where('name', 'LIKE', '%مصروف خدمة%')) // Example category name
-                                    ->get();
-        $aggregated = [];
-        foreach ($serviceOperationalCosts as $cost) {
-            $aggregated[] = [
-                'name' => $cost->description, // Or a more specific cost item name
-                'amount' => (float) ($cost->amount + $cost->amount_bankak),
-            ];
+        $costs = collect();
+
+        /**@var Doctorvisit $visit */
+        foreach ($this->doctorShifts as $shifts) {
+
+            foreach ($shifts->visits as $visit) {
+                foreach ($visit->service_costs() as $cost) {
+
+                    $arr = [];
+                    $arr['id'] = $cost->subServiceCost->id;
+                    $arr['name'] = $cost->subServiceCost->name;
+                    $arr['amount'] = $visit->total_services_cost($cost->id);
+                    $costs->push($arr);
+                }
+            }
         }
-        // If you have a table that directly links services to their operational costs (materials etc.)
-        // and then link those to the shift, the logic would be different.
-        return $aggregated; // Return empty array if no such costs
+        // return $costs;
+        return $costs
+            ->groupBy('id') // Group by the 'id' key
+            ->map(function ($group) {
+                return [
+                    'id' => $group->first()['id'],
+                    'name' => $group->first()['name'],
+                    'amount' => $group->sum('amount'), // Sum the 'amount' field
+                ];
+            })
+            ->values() // Reset the keys
+            ->toArray();
     }
     public  function cost()
     {

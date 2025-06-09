@@ -1408,7 +1408,7 @@ class ReportController extends Controller
 
         // --- PDF Initialization and Configuration ---
         // $pdf = new MYCustomPDF('P', PDF_UNIT, 'A4', true, 'UTF-8', false); // 'P' for Portrait, A4 for standard size
-        $pdf = new MyCustomTCPDF('تقرير العام', '', 'L', 'mm', 'A4');
+        $pdf = new MyCustomTCPDF('تقرير العام', '', 'p', 'mm', 'A4');
 
         // Document Information
         $pdf->SetCreator(config('app.name', 'Your Application Name'));
@@ -1499,7 +1499,10 @@ class ReportController extends Controller
             $totalCostBankForUser = $shift->totalCostBank($user->id);
             $totalCost = $shift->totalCost($user->id);
             $totalCostBank = $shift->totalCostBank($user->id);
+            $totalCash = $totalPaid - $totalBank;
             $totalCostCash = $totalCost - $totalCostBank;
+            $netCash = $totalCash - $totalCostCash;
+            
             if ($totalPaid == 0 && $totalBank == 0) {
                 continue;
             }
@@ -1524,7 +1527,7 @@ class ReportController extends Controller
             $pdf->Cell($headerColWidth, 6, number_format($totalBank, 2), 1, 0, 'C');
             $pdf->Cell($headerColWidth, 6, number_format($totalPaid - $totalBank, 2), 1, 0, 'C');
             $pdf->Cell($headerColWidth, 6, number_format($totalBank - $totalCostBank, 2), 1, 0, 'C');
-            $pdf->Cell($headerColWidth, 6, number_format(($totalPaid - $totalBank) - $totalCostCash, 2), 1, 0, 'C');
+            $pdf->Cell($headerColWidth, 6, number_format($netCash, 2), 1, 0, 'C');
             $pdf->Ln(5);
         }
         if (!$userCollectionsPresented) {

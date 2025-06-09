@@ -246,19 +246,7 @@ class DoctorVisit extends Model
         }
         return $total;
     }
-    public function service_costs()
-    {
-        $total = [];
-        /**@var RequestedService $requested_service */
-        foreach ($this->requestedServices as $requested_service) {
-
-            /**@var ServiceCost $service_cost */
-            foreach ($requested_service->service->service_costs as $service_cost) {
-                $total[] = $service_cost;
-            }
-        }
-        return $total;
-    }
+ 
     public function total_paid_services(Doctor|null $doctor  = null, $user = null)
     {
         $total = 0;
@@ -304,23 +292,25 @@ class DoctorVisit extends Model
         return $total;
     }
 
-       /**
-     * Calculate total cost of providing services/labs for THIS visit.
-     * This requires a 'cost' field on Service/MainTest or a related costs table.
-     */
-    public function total_services_cost(): float
+    public function total_services_cost($cost_id = null)
     {
-        $totalCost = 0;
-        foreach ($this->requestedServices as $rs) {
-            // Assuming Service model has a 'cost_price' attribute
-            $totalCost += (float)($rs->service?->cost_price ?? 0) * (int)($rs->count ?? 1);
+        $total = 0;
+        /**@var RequestedService $requested_service */
+        foreach ($this->requestedServices as $requested_service) {
+
+
+            /**@var RequestedServiceCost $requestedServiceCost */
+            foreach ($requested_service->requestedServiceCosts as $requestedServiceCost) {
+                $service_cost = $requestedServiceCost->serviceCost;
+                if ($cost_id) {
+                    if ($cost_id != $service_cost?->id) continue;
+                }
+                $total += $requestedServiceCost->amount;
+            }
         }
-        foreach ($this->labRequests as $lr) {
-             // Assuming MainTest model has a 'cost_price' attribute
-            $totalCost += (float)($lr->mainTest?->cost_price ?? 0); // Assuming count is 1
-        }
-        return $totalCost;
+        return $total;
     }
+
 
     /**
      * Concatenated string of service cost names (or descriptions of costs incurred for this visit).
@@ -335,7 +325,19 @@ class DoctorVisit extends Model
         }
         return "-";
     }
+    public function service_costs()
+    {
+        $total = [];
+        /**@var RequestedService $requested_service */
+        foreach ($this->requestedServices as $requested_service) {
 
+            /**@var ServiceCost $service_cost */
+            foreach ($requested_service->service->service_costs as $service_cost) {
+                $total[] = $service_cost;
+            }
+        }
+        return $total;
+    }
     /**
      * Hospital's net credit from this visit.
      * Total collected for this visit - doctor's share for this visit.
@@ -359,6 +361,7 @@ class DoctorVisit extends Model
         }
         return $total;
     }
+    
     /**
      * Calculate total amount paid for services/labs in this visit.
      */

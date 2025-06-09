@@ -120,14 +120,36 @@ class Patient extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'name', 'shift_id', 'user_id', 'doctor_id', // Primary doctor link
-        'phone', 'gender', 'age_day', 'age_month', 'age_year',
-        'company_id', 'subcompany_id', 'company_relation_id',
-        'paper_fees', 'guarantor', 'expire_date', 'insurance_no',
-        'is_lab_paid', 'lab_paid', 'result_is_locked', 'sample_collected',
-        'sample_collect_time', 'result_print_date', 'sample_print_date',
-        'visit_number', 'result_auth', 'auth_date',
-        'country_id', 'gov_id', 'address', 'discount',
+        'name',
+        'shift_id',
+        'user_id',
+        'doctor_id', // Primary doctor link
+        'phone',
+        'gender',
+        'age_day',
+        'age_month',
+        'age_year',
+        'company_id',
+        'subcompany_id',
+        'company_relation_id',
+        'paper_fees',
+        'guarantor',
+        'expire_date',
+        'insurance_no',
+        'is_lab_paid',
+        'lab_paid',
+        'result_is_locked',
+        'sample_collected',
+        'sample_collect_time',
+        'result_print_date',
+        'sample_print_date',
+        'visit_number',
+        'result_auth',
+        'auth_date',
+        'country_id',
+        'gov_id',
+        'address',
+        'discount',
         'referred',
         'discount_comment',
         // Removed: 'present_complains', 'history_of_present_illness', etc.
@@ -136,7 +158,7 @@ class Patient extends Model
         'doctor_lab_request_confirm', // Likely visit/request specific
         'doctor_lab_urgent_confirm', // Likely visit/request specific
         'discount_comment', // If general patient discount comment
-        ];
+    ];
 
     /**
      * The attributes that should be cast.
@@ -184,7 +206,7 @@ class Patient extends Model
                 $patient->visit_number = 1; // Or calculate next visit number
             }
             if (empty($patient->auth_date) && $patient->result_auth === false) { // Default auth_date if not set
-                 $patient->auth_date = Carbon::now();
+                $patient->auth_date = Carbon::now();
             }
             // You can set other defaults for the many NOT NULL string fields here if needed
             // e.g., $patient->history_of_present_illness = $patient->history_of_present_illness ?? '';
@@ -224,10 +246,9 @@ class Patient extends Model
     public function company()
     {
         return $this->belongsTo(Company::class);
-    
     }
-    
-    
+
+
     /**
      * Get the subcompany associated with this patient.
      */
@@ -235,7 +256,7 @@ class Patient extends Model
     {
         return $this->belongsTo(Subcompany::class);
     }
-    
+
     public function doctor()
     {
         return $this->belongsTo(Doctor::class);
@@ -260,7 +281,7 @@ class Patient extends Model
         return $this->belongsTo(Country::class); // Assuming Country model exists
     }
 
- 
+
 
 
 
@@ -313,11 +334,45 @@ class Patient extends Model
         }
         return empty($parts) ? 'N/A' : implode(' / ', $parts);
     }
+    public function paid_lab($user = null)
+    {
+        $total = 0;
+        /** @var LabRequest $labrequest */
+        foreach ($this->labrequests as $labrequest) {
 
+            if ($user) {
+                if ($labrequest->user_deposited != $user) continue;
+            }
+            if (!$labrequest->is_paid) continue;
+
+            $total += $labrequest->amount_paid;
+        }
+        return $total;
+    }
+    public function lab_bank($user = null){
+
+        $total = 0;
+        foreach ($this->labrequests as $labrequest){
+            if ($user){
+                if ($labrequest->user_deposited != $user) continue;
+
+            }
+            if ($labrequest->is_paid){
+                if ($labrequest->is_bankak == 1){
+
+                    $total+=$labrequest->amount_paid;
+                }
+
+            }
+
+        }
+        return $total;
+
+    }
     public function file()
-{
-    return $this->belongsTo(File::class);
-}
+    {
+        return $this->belongsTo(File::class);
+    }
     /**
      * Calculate age from Date of Birth if you were to store DOB instead of age parts.
      * public function getAgeAttribute() {
