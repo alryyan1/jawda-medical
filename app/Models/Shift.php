@@ -303,7 +303,7 @@ class Shift extends Model
 
             foreach ($shifts->visits as $visit) {
                 foreach ($visit->service_costs() as $cost) {
-
+                    // echo $visit->total_services_cost($cost->id);
                     $arr = [];
                     $arr['id'] = $cost->subServiceCost->id;
                     $arr['name'] = $cost->subServiceCost->name;

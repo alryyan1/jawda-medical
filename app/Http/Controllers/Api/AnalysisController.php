@@ -66,7 +66,7 @@ class AnalysisController extends Controller
         
         // 5. Total Costs
         $totalCosts = Cost::whereBetween('created_at', [$startDate, $endDate])
-            ->sum(DB::raw('amount + amount_bankak'));
+            ->sum(DB::raw('amount'));
 
 
         // 6. Top 10 Services Requested (by count of requests)
@@ -85,14 +85,21 @@ class AnalysisController extends Controller
             });
 
         // 7. Doctor with Top Patient Frequency (most visits)
-        $topDoctorByVisits = DoctorVisit::with('doctor:id,name')
-            ->select('doctor_id', DB::raw('COUNT(id) as visit_count'))
-            ->whereNotNull('doctor_id') // Ensure doctor is assigned
-            ->whereBetween('visit_date', [$startDate, $endDate])
-            ->groupBy('doctor_id')
-            ->orderByDesc('visit_count')
-            ->first();
-
+        // $topDoctorByVisits = DoctorVisit::with('doctor:id,name')
+        //     ->select('doctor_id', DB::raw('COUNT(id) as visit_count'))
+        //     ->whereNotNull('doctor_id') // Ensure doctor is assigned
+        //     ->whereBetween('visit_date', [$startDate, $endDate])
+        //     ->groupBy('doctor_id')
+        //     ->orderByDesc('visit_count')
+        //     ->first();
+        $topDoctorByVisits = DoctorVisit::with('doctorShift.doctor:id,name')
+        ->select('doctor_shifts.doctor_id', DB::raw('COUNT(doctorvisits.id) as visit_count'))
+        ->join('doctor_shifts', 'doctorvisits.doctor_shift_id', '=', 'doctor_shifts.id')
+        ->whereNotNull('doctor_shifts.doctor_id')
+        ->whereBetween('visit_date', [$startDate, $endDate])
+        ->groupBy('doctor_shifts.doctor_id')
+        ->orderByDesc('visit_count')
+        ->first();
 
         return response()->json([
             'data' => [

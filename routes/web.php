@@ -2,6 +2,7 @@
         <?php
 
 use App\Http\Controllers\Api\ReportController;
+use App\Models\Shift;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -27,5 +28,8 @@ Route::get('/reports/doctor-shifts/{doctor}/financial-summary/pdf', [ReportContr
 
 Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
 Route::get('/', function () {
-    return view('welcome');
+    $shift = Shift::find(168);
+    return $shift->shiftClinicServiceCosts();
 });
+
+

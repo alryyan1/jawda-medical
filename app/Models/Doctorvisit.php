@@ -297,12 +297,16 @@ class DoctorVisit extends Model
         $total = 0;
         /**@var RequestedService $requested_service */
         foreach ($this->requestedServices as $requested_service) {
+            
 
 
             /**@var RequestedServiceCost $requestedServiceCost */
             foreach ($requested_service->requestedServiceCosts as $requestedServiceCost) {
+                // $total += 500
+                // echo $requestedServiceCost->amount;
                 $service_cost = $requestedServiceCost->serviceCost;
                 if ($cost_id) {
+                    // echo $cost_id . ' -  service_cost_id: ' . $service_cost?->id.'<br>';
                     if ($cost_id != $service_cost?->id) continue;
                 }
                 $total += $requestedServiceCost->amount;
