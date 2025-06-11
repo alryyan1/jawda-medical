@@ -30,7 +30,9 @@ use App\Services\Pdf\MyCustomTCPDF;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Log;
 use App\Models\CostCategory;
+use App\Models\RequestedServiceCost;
 use App\Models\RequestedServiceDeposit;
+use App\Models\SubServiceCost;
 use Illuminate\Support\Facades\Auth;
 
 class ReportController extends Controller
@@ -2574,5 +2576,742 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
 
+    }
+    public function serviceCostBreakdownReport(Request $request)
+    {
+        // $this->authorize('view service_cost_breakdown_report'); // Permission check
+
+        $validated = $request->validate([
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+            'sub_service_cost_id' => 'nullable|integer|exists:sub_service_costs,id', // Optional filter by specific cost type
+            'service_id' => 'nullable|integer|exists:services,id', // Optional filter by main service
+            'doctor_id' => 'nullable|integer|exists:doctors,id', // Optional filter by doctor if relevant
+        ]);
+
+        $startDate = Carbon::parse($validated['date_from'])->startOfDay();
+        $endDate = Carbon::parse($validated['date_to'])->endOfDay();
+
+        $query = RequestedServiceCost::with([
+                'subServiceCost:id,name', // Name of the cost type
+                'requestedService.service:id,name', // Name of the parent service
+                'requestedService.doctorVisit.doctor:id,name' // Doctor if filtering or grouping by doctor
+            ])
+            ->select(
+                'sub_service_cost_id',
+                DB::raw('SUM(amount) as total_amount')
+            )
+            ->whereBetween('requested_service_cost.created_at', [$startDate, $endDate]) // Filter by RequestedServiceCost creation date
+            ->groupBy('sub_service_cost_id');
+
+        if ($request->filled('sub_service_cost_id')) {
+            $query->where('sub_service_cost_id', $validated['sub_service_cost_id']);
+        }
+        if ($request->filled('service_id')) {
+            $query->whereHas('requestedService.service', function ($q) use ($validated) {
+                $q->where('id', $validated['service_id']);
+            });
+        }
+        if ($request->filled('doctor_id')) {
+            $query->whereHas('requestedService.doctorVisit.doctor', function ($q) use ($validated) {
+                $q->where('id', $validated['doctor_id']);
+            });
+        }
+        
+        // Order by sub_service_cost_id to group them if sub_service_cost_id filter is not applied
+        // Or order by total_amount
+        $results = $query->orderBy('sub_service_cost_id')->get();
+        
+        // We need to fetch SubServiceCost names if not directly joinable or already loaded
+        // The with('subServiceCost') above should handle this for results that have it.
+        // For a cleaner structure, fetch all SubServiceCost names once.
+        $allSubServiceCostTypes = SubServiceCost::pluck('name', 'id');
+
+        $reportData = $results->map(function ($item) use ($allSubServiceCostTypes) {
+            return [
+                'sub_service_cost_id' => $item->sub_service_cost_id,
+                'sub_service_cost_name' => $item->subServiceCost?->name ?? $allSubServiceCostTypes->get($item->sub_service_cost_id) ?? 'Unknown Cost Type',
+                'total_amount' => (float) $item->total_amount,
+            ];
+        });
+
+        return response()->json([
+            'data' => $reportData,
+            'grand_total_cost' => $reportData->sum('total_amount'),
+            'report_period' => [
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ]
+        ]);
+    }
+
+    public function exportServiceCostBreakdownPdf(Request $request)
+    {
+        // $this->authorize('print service_cost_breakdown_report');
+        
+        // Re-use the data fetching logic (consider extracting to a private method or service)
+        $jsonResponse = $this->serviceCostBreakdownReport($request);
+        $responseData = json_decode($jsonResponse->getContent(), true);
+
+        if ($jsonResponse->getStatusCode() !== 200 || empty($responseData['data'])) {
+            // Attempt to generate PDF even for empty data to show "No data"
+            // Or return a 404 if that's preferred. Here, we'll generate a PDF indicating no data.
+        }
+
+        $reportData = $responseData['data'] ?? [];
+        $grandTotalCost = $responseData['grand_total_cost'] ?? 0;
+        $reportPeriod = $responseData['report_period'] ?? [
+            'from' => $request->date_from,
+            'to' => $request->date_to
+        ];
+
+
+        $reportTitle = 'تقرير تفصيل تكاليف الخدمات';
+        $filterCriteria = "الفترة من: " . $reportPeriod['from'] . " إلى: " . $reportPeriod['to'];
+        // Add other active filters to $filterCriteria string if they were applied
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'P', 'mm', 'A4'); // Portrait
+        $pdf->AddPage();
+        $pdf->SetLineWidth(0.1);
+        $fontname = $pdf->getDefaultFontFamily();
+
+        // Table Header
+        $headers = ['نوع التكلفة الفرعية', 'إجمالي المبلغ'];
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $colWidths = [$pageWidth * 0.7, $pageWidth * 0.3];
+        $alignments = ['R', 'C'];
+        
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        // Table Body
+        $pdf->SetFont($fontname, '', 9);
+        $fill = false;
+        if (empty($reportData)) {
+            $pdf->Cell(array_sum($colWidths), 10, 'لا توجد بيانات لهذه الفترة أو الفلاتر المحددة.', 1, 1, 'C', $fill);
+        } else {
+            foreach ($reportData as $item) {
+                $rowData = [
+                    $item['sub_service_cost_name'],
+                    number_format($item['total_amount'], 2),
+                ];
+                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 7); // Height 7
+                $fill = !$fill;
+            }
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        // Summary Footer for Table
+        $pdf->SetFont($fontname, 'B', 10);
+        $summaryRowPdf = [
+            'الإجمالي العام للتكاليف:',
+            number_format($grandTotalCost, 2),
+        ];
+        $pdf->DrawTableRow($summaryRowPdf, $colWidths, $alignments, true, 8); // Filled, height 8
+
+        $pdfFileName = 'service_cost_breakdown_' . $reportPeriod['from'] . '_to_' . $reportPeriod['to'] . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+    public function doctorStatisticsReport(Request $request)
+    {
+        // $this->authorize('view doctor_statistics_report'); // Permission
+
+        $validated = $request->validate([
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+            'doctor_id' => 'nullable|integer|exists:doctors,id', // Optional: filter for a specific doctor
+            'specialist_id' => 'nullable|integer|exists:specialists,id', // Optional: filter by specialty
+            'sort_by' => 'nullable|string|in:patient_count,total_entitlement,doctor_name', // Add more as needed
+            'sort_direction' => 'nullable|string|in:asc,desc',
+        ]);
+
+        $startDate = Carbon::parse($validated['date_from'])->startOfDay();
+        $endDate = Carbon::parse($validated['date_to'])->endOfDay();
+
+        // Base query for doctors
+        $doctorsQuery = Doctor::query()->with('specialist:id,name');
+
+        if ($request->filled('doctor_id')) {
+            $doctorsQuery->where('id', $validated['doctor_id']);
+        }
+        if ($request->filled('specialist_id')) {
+            $doctorsQuery->where('specialist_id', $validated['specialist_id']);
+        }
+
+        $doctors = $doctorsQuery->get();
+        $reportData = [];
+
+        foreach ($doctors as $doctor) {
+            // Get visits for this doctor within the date range
+            $visits = DoctorVisit::whereHas('patient', function ($query) use ($doctor) {
+                $query->where('doctor_id', $doctor->id);
+            })
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->with(['patient', 'requestedServices']) // Eager load for calculations
+                ->get();
+
+            if ($visits->isEmpty() && !$request->filled('doctor_id')) { // Skip if no visits and not filtering for a specific doctor
+                continue;
+            }
+
+            $patientCount = $visits->pluck('patient_id')->unique()->count();
+            $totalIncomeFromVisits = 0;
+            $doctorCashEntitlement = 0;
+            $doctorInsuranceEntitlement = 0;
+
+            foreach ($visits as $visit) {
+                // Calculate total income generated by this visit (Net after discounts & company endurance)
+                // This assumes calculateTotalPaid reflects amount collected towards net patient payable
+                $totalIncomeFromVisits += $visit->total_services(); // Or calculateTotalServiceValue if that's defined as net revenue
+
+                // Calculate doctor's entitlement from this visit
+                // This uses the method on your Doctor model
+                if ($visit->patient?->company_id) {
+                    $doctorInsuranceEntitlement += $doctor->doctor_credit($visit); // Pass 'company' context if method requires it
+                } else {
+                    $doctorCashEntitlement += $doctor->doctor_credit($visit); // Pass 'cash' context if method requires it
+                }
+            }
+            // Add static wage if applicable for the period and doctor
+            // $staticWageForPeriod = ... logic to determine doctor's static wage for this period ...
+            // $doctorCashEntitlement += $staticWageForPeriod; // Or however it's attributed
+
+            $reportData[] = [
+                'doctor_id' => $doctor->id,
+                'doctor_name' => $doctor->name,
+                'specialist_name' => $doctor->specialist?->name ?? '-',
+                'patient_count' => $patientCount,
+                'total_income_generated' => (float) $totalIncomeFromVisits,
+                'cash_entitlement' => (float) $doctorCashEntitlement,
+                'insurance_entitlement' => (float) $doctorInsuranceEntitlement,
+                'total_entitlement' => (float) ($doctorCashEntitlement + $doctorInsuranceEntitlement /* + $staticWageForPeriod */),
+            ];
+        }
+
+        // Sorting
+        $sortBy = $validated['sort_by'] ?? 'doctor_name';
+        $sortDirection = $validated['sort_direction'] ?? 'asc';
+        $reportData = collect($reportData)->sortBy($sortBy, SORT_REGULAR, $sortDirection === 'desc')->values()->all();
+
+
+        return response()->json([
+            'data' => $reportData,
+            'report_period' => [
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ]
+        ]);
+    }
+
+    public function exportDoctorStatisticsPdf(Request $request)
+    {
+        // $this->authorize('print doctor_statistics_report');
+        
+        $jsonResponse = $this->doctorStatisticsReport($request); // Call the data fetching method
+        $responseData = json_decode($jsonResponse->getContent(), true);
+
+        if ($jsonResponse->getStatusCode() !== 200 || empty($responseData['data'])) {
+             // Log error or handle gracefully if needed before PDF attempt
+        }
+        
+        $reportData = $responseData['data'] ?? [];
+        $reportPeriod = $responseData['report_period'] ?? [
+            'from' => $request->date_from, 'to' => $request->date_to
+        ];
+
+        $reportTitle = 'تقرير إحصائيات الأطباء';
+        $filterCriteria = "الفترة من: " . $reportPeriod['from'] . " إلى: " . $reportPeriod['to'];
+        // Append other applied filters to filterCriteria string
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
+        $pdf->AddPage();
+        $fontname = $pdf->getDefaultFontFamily();
+
+        // Table Header
+        $headers = ['الطبيب', 'التخصص', 'عدد المرضى', 'إجمالي الدخل المحقق', 'مستحق نقدي', 'مستحق تأمين', 'إجمالي المستحقات'];
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        // Adjust widths
+        $colWidths = [50, 35, 25, 40, 30, 30, 0]; 
+        $colWidths[count($colWidths)-1] = $pageWidth - array_sum(array_slice($colWidths,0,-1));
+        $alignments = ['R', 'R', 'C', 'C', 'C', 'C', 'C'];
+        
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        // Table Body
+        $pdf->SetFont($fontname, '', 8);
+        $fill = false;
+        $grandTotals = ['patients' => 0, 'income' => 0, 'cash_ent' => 0, 'ins_ent' => 0, 'total_ent' => 0];
+
+        if (empty($reportData)) {
+            $pdf->Cell(array_sum($colWidths), 10, 'لا توجد بيانات لهذه الفترة أو الفلاتر المحددة.', 1, 1, 'C', $fill);
+        } else {
+            foreach ($reportData as $row) {
+                $rowData = [
+                    $row['doctor_name'],
+                    $row['specialist_name'],
+                    $row['patient_count'],
+                    number_format($row['total_income_generated'], 2),
+                    number_format($row['cash_entitlement'], 2),
+                    number_format($row['insurance_entitlement'], 2),
+                    number_format($row['total_entitlement'], 2),
+                ];
+                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 7);
+                $fill = !$fill;
+
+                $grandTotals['patients'] += $row['patient_count'];
+                $grandTotals['income'] += $row['total_income_generated'];
+                $grandTotals['cash_ent'] += $row['cash_entitlement'];
+                $grandTotals['ins_ent'] += $row['insurance_entitlement'];
+                $grandTotals['total_ent'] += $row['total_entitlement'];
+            }
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        // Summary Footer for Table
+        if (!empty($reportData)) {
+            $pdf->SetFont($fontname, 'B', 8.5);
+            $summaryRowPdf = [
+                'الإجمالي العام:', '', // Span 2 columns
+                $grandTotals['patients'],
+                number_format($grandTotals['income'], 2),
+                number_format($grandTotals['cash_ent'], 2),
+                number_format($grandTotals['ins_ent'], 2),
+                number_format($grandTotals['total_ent'], 2),
+            ];
+            $pdf->DrawTableRow([
+                $summaryRowPdf[0], $summaryRowPdf[1], $summaryRowPdf[2], $summaryRowPdf[3], 
+                $summaryRowPdf[4], $summaryRowPdf[5], $summaryRowPdf[6]
+            ], $colWidths, $alignments, true, 8);
+        }
+
+        $pdfFileName = 'doctor_statistics_report_' . $reportPeriod['from'] . '_to_' . $reportPeriod['to'] . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+    public function companyPerformanceReport(Request $request)
+    {
+        // $this->authorize('view company_performance_report'); // Permission
+
+        $validated = $request->validate([
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+            'company_id' => 'nullable|integer|exists:companies,id', // Optional: filter for a specific company
+            'sort_by' => 'nullable|string|in:company_name,patient_count,net_income_from_company_patients,total_endurance,net_income',
+            'sort_direction' => 'nullable|string|in:asc,desc',
+        ]);
+
+        $startDate = Carbon::parse($validated['date_from'])->startOfDay();
+        $endDate = Carbon::parse($validated['date_to'])->endOfDay();
+
+        $companiesQuery = Company::query()->where('status', true); // Typically active companies
+
+        if ($request->filled('company_id')) {
+            $companiesQuery->where('id', $validated['company_id']);
+        }
+
+        $companies = $companiesQuery->orderBy('name')->get();
+        $reportData = [];
+
+        foreach ($companies as $company) {
+            // Get visits for patients of this company within the date range
+            $visitsForCompany = DoctorVisit::whereHas('patient', function ($q) use ($company) {
+                $q->where('company_id', $company->id);
+            })
+            ->whereBetween('visit_date', [$startDate, $endDate])
+            ->with(['requestedServices', 'labRequests']) // Eager load for calculations
+            ->get();
+
+            if ($visitsForCompany->isEmpty() && !$request->filled('company_id')) {
+                continue; // Skip if no visits and not filtering for this specific company
+            }
+
+            $patientCount = $visitsForCompany->pluck('patient_id')->unique()->count();
+            $totalIncomeFromCompanyPatients = 0; // Total collected (cash + bank) from services/labs for these patients
+            $totalCompanyEndurance = 0;       // Total amount covered by the company
+
+            foreach ($visitsForCompany as $visit) {
+                // Calculate income from services for this visit
+                foreach ($visit->requestedServices as $rs) {
+                    // Income here means the full price of service before endurance (what clinic charges)
+                    // Or, if you mean "collected income", then sum $rs->amount_paid
+                    // Let's assume "total income" means total billable value before endurance for services provided to these patients
+                    $itemPrice = (float) $rs->price;
+                    $itemCount = (int) ($rs->count ?? 1);
+                    $itemSubTotal = $itemPrice * $itemCount;
+                    
+                    // Subtract discounts if they apply before company endurance
+                    $discountFromPercentage = ($itemSubTotal * (intval($rs->discount_per) ?? 0)) / 100;
+                    $fixedDiscount = intval($rs->discount) ?? 0;
+                    $itemNetAfterDiscount = $itemSubTotal - $discountFromPercentage - $fixedDiscount;
+                    
+                    $totalIncomeFromCompanyPatients += $itemNetAfterDiscount;
+                    $totalCompanyEndurance += ((float)($rs->endurance ?? 0) * $itemCount); // Endurance is per item
+                }
+
+                // Calculate income and endurance from lab requests for this visit
+                foreach ($visit->labRequests as $lr) {
+                    $labPrice = (float) $lr->price;
+                    $labDiscount = ($labPrice * (float)($lr->discount_per ?? 0)) / 100;
+                    $labNetAfterDiscount = $labPrice - $labDiscount;
+
+                    $totalIncomeFromCompanyPatients += $labNetAfterDiscount;
+                    $totalCompanyEndurance += (float)($lr->endurance ?? 0); // Assuming endurance is on LabRequest
+                }
+            }
+
+            $netIncomeAfterEndurance = $totalIncomeFromCompanyPatients - $totalCompanyEndurance;
+
+            $reportData[] = [
+                'company_id' => $company->id,
+                'company_name' => $company->name,
+                'patient_count' => $patientCount,
+                'total_income_generated' => round($totalIncomeFromCompanyPatients, 2), // Total value of services/labs for these patients
+                'total_endurance_by_company' => round($totalCompanyEndurance, 2), // What company covered
+                'net_income_from_company_patients' => round($netIncomeAfterEndurance, 2), // What patient paid + what clinic gets after company coverage
+            ];
+        }
+
+        // Sorting
+        $sortBy = $validated['sort_by'] ?? 'company_name';
+        $sortDirection = $validated['sort_direction'] ?? 'asc';
+        $reportData = collect($reportData)->sortBy($sortBy, SORT_REGULAR, $sortDirection === 'desc')->values()->all();
+
+        return response()->json([
+            'data' => $reportData,
+            'report_period' => [
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ]
+        ]);
+    }
+
+    public function exportCompanyPerformancePdf(Request $request)
+    {
+        // $this->authorize('print company_performance_report');
+        $jsonResponse = $this->companyPerformanceReport($request);
+        $responseData = json_decode($jsonResponse->getContent(), true);
+
+        if ($jsonResponse->getStatusCode() !== 200 || empty($responseData['data'])) {
+            // Handle no data for PDF
+        }
+        
+        $reportData = $responseData['data'] ?? [];
+        $reportPeriod = $responseData['report_period'] ?? [
+            'from' => $request->date_from, 'to' => $request->date_to
+        ];
+
+        $reportTitle = 'تقرير أداء شركات التأمين';
+        $filterCriteria = "الفترة من: " . $reportPeriod['from'] . " إلى: " . $reportPeriod['to'];
+        if ($request->filled('company_id')) {
+            $company = Company::find($request->company_id);
+            if ($company) $filterCriteria .= " | الشركة: " . $company->name;
+        }
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4');
+        $pdf->AddPage();
+        $fontname = $pdf->getDefaultFontFamily();
+
+        $headers = ['الشركة', 'عدد المرضى', 'إجمالي الدخل من مرضى الشركة', 'إجمالي تحمل الشركة', 'صافي الدخل (بعد التحمل)'];
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $colWidths = [70, 30, 50, 50, 0]; 
+        $colWidths[count($colWidths)-1] = $pageWidth - array_sum(array_slice($colWidths,0,-1));
+        $alignments = ['R', 'C', 'C', 'C', 'C'];
+        
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        $pdf->SetFont($fontname, '', 8);
+        $fill = false;
+        $grandTotals = ['patients' => 0, 'income' => 0, 'endurance' => 0, 'net' => 0];
+
+        if (empty($reportData)) {
+            $pdf->Cell(array_sum($colWidths), 10, 'لا توجد بيانات.', 1, 1, 'C', $fill);
+        } else {
+            foreach ($reportData as $row) {
+                $rowData = [
+                    $row['company_name'],
+                    $row['patient_count'],
+                    number_format($row['total_income_generated'], 2),
+                    number_format($row['total_endurance_by_company'], 2),
+                    number_format($row['net_income_from_company_patients'], 2),
+                ];
+                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 7);
+                $fill = !$fill;
+
+                $grandTotals['patients'] += $row['patient_count'];
+                $grandTotals['income'] += $row['total_income_generated'];
+                $grandTotals['endurance'] += $row['total_endurance_by_company'];
+                $grandTotals['net'] += $row['net_income_from_company_patients'];
+            }
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        if (!empty($reportData)) {
+            $pdf->SetFont($fontname, 'B', 8.5);
+            $summaryRowPdf = [
+                'الإجمالي العام:',
+                $grandTotals['patients'],
+                number_format($grandTotals['income'], 2),
+                number_format($grandTotals['endurance'], 2),
+                number_format($grandTotals['net'], 2),
+            ];
+             $pdf->DrawTableRow($summaryRowPdf, $colWidths, $alignments, true, 8);
+        }
+
+        $pdfFileName = 'company_performance_report_' . $reportPeriod['from'] . '_to_' . $reportPeriod['to'] . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+      /**
+     * Get doctor's entitlement from insurance companies for a given period.
+     */
+    private function getDoctorCompanyEntitlementData(Request $request): array
+    {
+        $validated = $request->validate([
+            'doctor_id' => 'required|integer|exists:doctors,id',
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+        ]);
+
+        $doctorId = $validated['doctor_id'];
+        $startDate = Carbon::parse($validated['date_from'])->startOfDay();
+        $endDate = Carbon::parse($validated['date_to'])->endOfDay();
+        
+        $doctor = Doctor::findOrFail($doctorId); // Ensure doctor exists
+
+        // Fetch doctor shifts for the specified doctor and date range
+        // The calculation relies on DoctorShift -> visits -> patient -> company
+        // and DoctorShift -> doctor -> doctor_credit() method
+        $doctorShifts = DoctorShift::with([
+                'doctor', // Needed for doctor_credit method context
+                'visits.patient.company', // Crucial for grouping by company and for doctor_credit context
+                'visits.requestedServices.service', // Needed if doctor_credit delves into services
+                'visits.labRequests.mainTest'   // Needed if doctor_credit delves into labs
+            ])
+            ->where('doctor_id', $doctorId)
+            // Filter shifts that were active *during* any part of the date range
+            ->where(function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('start_time', [$startDate, $endDate]) // Shifts started within period
+                      ->orWhere(function($q) use ($startDate, $endDate) { // Shifts started before but ended in period or are still open and started before end
+                          $q->where('start_time', '<', $startDate)
+                            ->where(function($q2) use ($startDate) {
+                                $q2->whereNull('end_time')
+                                   ->orWhere('end_time', '>=', $startDate); // Corrected: shift ended on or after start of period
+                            });
+                      });
+            })
+            ->get();
+        
+        $companyTotals = [];
+
+        foreach ($doctorShifts as $shift) {
+            // Ensure the doctor context for doctor_credit is the one from the shift
+            $currentShiftDoctor = $shift->doctor; 
+            if (!$currentShiftDoctor) continue;
+
+            $visitsForCompanyPatients = $shift->visits->filter(function ($visit) {
+                return $visit->patient && $visit->patient->company_id;
+            });
+
+            foreach ($visitsForCompanyPatients as $visit) {
+                $company = $visit->patient->company; // Company model instance
+                if (!$company) continue;
+
+                $companyId = $company->id;
+                // The doctor_credit method on Doctor model should calculate entitlement for THIS visit
+                $entitlementFromThisVisit = $currentShiftDoctor->doctor_credit($visit); // Pass 'company' if method requires type
+
+                if (!isset($companyTotals[$companyId])) {
+                    $companyTotals[$companyId] = [
+                        'company_id' => $companyId,
+                        'company_name' => $company->name,
+                        'total_entitlement' => 0,
+                    ];
+                }
+                $companyTotals[$companyId]['total_entitlement'] += $entitlementFromThisVisit;
+            }
+        }
+        
+        $reportData = array_values($companyTotals);
+        // Sort by company name or amount
+        usort($reportData, fn($a, $b) => $request->input('sort_by', 'company_name') === 'amount' 
+            ? ($b['total_entitlement'] <=> $a['total_entitlement']) // Desc by amount
+            : ($a['company_name'] <=> $b['company_name'])); // Asc by name
+
+        return [
+            'data' => $reportData,
+            'doctor_name' => $doctor->name,
+            'report_period' => [
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ],
+            'grand_total_entitlement' => collect($reportData)->sum('total_entitlement')
+        ];
+    }
+
+    public function doctorCompanyEntitlementReport(Request $request)
+    {
+        // $this->authorize('view doctor_company_entitlement_report');
+        $data = $this->getDoctorCompanyEntitlementData($request);
+        return response()->json($data);
+    }
+
+    public function exportDoctorCompanyEntitlementPdf(Request $request)
+    {
+        // $this->authorize('print doctor_company_entitlement_report');
+        $reportContent = $this->getDoctorCompanyEntitlementData($request);
+
+        $dataForPdf = $reportContent['data'];
+        $doctorName = $reportContent['doctor_name'];
+        $reportPeriod = $reportContent['report_period'];
+        $grandTotalEntitlement = $reportContent['grand_total_entitlement'];
+
+        if (empty($dataForPdf)) {
+            // Return a message or an empty PDF indicating no data
+        }
+
+        $reportTitle = 'تقرير مستحقات الطبيب من شركات التأمين';
+        $filterCriteria = "الطبيب: {$doctorName} | الفترة من: {$reportPeriod['from']} إلى: {$reportPeriod['to']}";
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'P', 'mm', 'A4');
+        $pdf->AddPage();
+        $fontname = $pdf->getDefaultFontFamily();
+
+        $headers = ['شركة التأمين', 'إجمالي المستحقات للطبيب'];
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $colWidths = [$pageWidth * 0.65, $pageWidth * 0.35];
+        $alignments = ['R', 'C'];
+        
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        $pdf->SetFont($fontname, '', 9);
+        $fill = false;
+        if (empty($dataForPdf)) {
+            $pdf->Cell(array_sum($colWidths), 10, 'لا توجد مستحقات من شركات لهذا الطبيب خلال الفترة المحددة.', 1, 1, 'C', $fill);
+        } else {
+            foreach ($dataForPdf as $row) {
+                $rowData = [
+                    $row['company_name'],
+                    number_format($row['total_entitlement'], 2),
+                ];
+                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 7);
+                $fill = !$fill;
+            }
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        if (!empty($dataForPdf)) {
+            $pdf->SetFont($fontname, 'B', 10);
+            $summaryRowPdf = [
+                'الإجمالي العام للمستحقات:',
+                number_format($grandTotalEntitlement, 2),
+            ];
+             $pdf->DrawTableRow($summaryRowPdf, $colWidths, $alignments, true, 8);
+        }
+
+        $pdfFileName = 'DoctorCompanyEntitlement_' . preg_replace('/[^A-Za-z0-9_]/', '_', $doctorName) . '_' . $reportPeriod['from'] . '_to_' . $reportPeriod['to'] . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+    public function yearlyIncomeComparisonByMonth(Request $request)
+    {
+        // $this->authorize('view yearly_income_comparison_report'); // Permission
+
+        $validated = $request->validate([
+            'year' => 'required|integer|digits:4|min:2000|max:' . (date('Y') + 5),
+        ]);
+
+        $year = $validated['year'];
+
+        // Fetch deposits, group by month, sum amounts
+        // We use created_at of the deposit for income recognition month
+        $monthlyIncomeData = RequestedServiceDeposit::selectRaw('MONTH(created_at) as month, SUM(amount) as total_income')
+            ->whereYear('created_at', $year)
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+
+        // Prepare data for chart (ensure all 12 months are present, even if with 0 income)
+        $chartData = [];
+        $monthNames = []; // For X-axis labels if needed directly from backend
+
+        for ($m = 1; $m <= 12; $m++) {
+            $monthData = $monthlyIncomeData->firstWhere('month', $m);
+            $monthName = Carbon::create()->month($m)->translatedFormat('F'); // Localized month name
+
+            $chartData[] = [
+                'month' => $m, // Could also send month number e.g., 'Jan', 'Feb'
+                'month_name' => $monthName,
+                'total_income' => $monthData ? (float) $monthData->total_income : 0,
+            ];
+            $monthNames[] = $monthName; // Collect month names
+        }
+        
+        // Additionally, you can calculate overall stats for the year
+        $totalYearlyIncome = $monthlyIncomeData->sum('total_income');
+        $averageMonthlyIncome = $totalYearlyIncome / 12;
+
+
+        return response()->json([
+            'data' => $chartData, // Array of { month_name: 'January', total_income: 12345.67 }
+            'meta' => [
+                'year' => (int) $year,
+                'total_yearly_income' => round($totalYearlyIncome, 2),
+                'average_monthly_income' => round($averageMonthlyIncome, 2),
+                // 'month_labels_for_chart' => $monthNames, // Frontend can generate this too
+            ]
+        ]);
+    }
+    public function yearlyPatientFrequencyByMonth(Request $request)
+    {
+        // $this->authorize('view yearly_patient_frequency_report'); // Permission
+
+        $validated = $request->validate([
+            'year' => 'required|integer|digits:4|min:2000|max:' . (date('Y') + 5),
+        ]);
+
+        $year = $validated['year'];
+
+        // Fetch distinct patient counts per month based on visit_date
+        $monthlyPatientCounts = DoctorVisit::selectRaw('MONTH(visit_date) as month, COUNT(DISTINCT patient_id) as patient_count')
+            ->whereYear('visit_date', $year)
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+
+        $chartData = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $monthData = $monthlyPatientCounts->firstWhere('month', $m);
+            $monthName = Carbon::create()->month($m)->translatedFormat('F'); 
+
+            $chartData[] = [
+                'month' => $m,
+                'month_name' => $monthName,
+                'patient_count' => $monthData ? (int) $monthData->patient_count : 0,
+            ];
+        }
+        
+        // Overall stats for the year
+        $totalUniquePatientsYearly = DoctorVisit::whereYear('visit_date', $year)->distinct('patient_id')->count('patient_id');
+        $averageMonthlyPatients = $totalUniquePatientsYearly > 0 ? round($totalUniquePatientsYearly / 12, 2) : 0;
+        // If you want average of monthly sums (different from distinct yearly patients / 12):
+        // $averageMonthlyPatientsAlternative = $monthlyPatientCounts->avg('patient_count') ?? 0;
+
+
+        return response()->json([
+            'data' => $chartData, // Array of { month_name: 'January', patient_count: 150 }
+            'meta' => [
+                'year' => (int) $year,
+                'total_unique_patients_yearly' => $totalUniquePatientsYearly,
+                'average_monthly_patients' => $averageMonthlyPatients,
+            ]
+        ]);
     }
 }

@@ -27,7 +27,12 @@ class ShiftResource extends JsonResource
             'pharmacy_entry' => $this->whenNotNull($this->pharmacy_entry), // Only include if not null
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-            
+            'user_opened' => new UserStrippedResource($this->whenLoaded('userOpened')),
+            'user_id_closed' => $this->user_id_closed,
+            'user_closed' => new UserStrippedResource($this->whenLoaded('userClosed')),
+            'is_closed' => (bool) $this->is_closed,
+            'closed_at' => $this->closed_at?->toIso8601String(),
+            'created_at' => $this->created_at?->toIso8601String(),
             // Optional: Counts or brief related data
             // 'patients_count' => $this->whenCounted('patients'),
             // 'doctor_shifts_count' => $this->whenCounted('doctorShifts'),

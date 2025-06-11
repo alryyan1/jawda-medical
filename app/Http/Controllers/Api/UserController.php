@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -7,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Resources\UserResource;
 use App\Models\RequestedServiceDeposit;
+use App\Models\Shift;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -43,8 +45,8 @@ class UserController extends Controller
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('username', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('email', 'LIKE', "%{$searchTerm}%"); // If you have email
+                    ->orWhere('username', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('email', 'LIKE', "%{$searchTerm}%"); // If you have email
             });
         }
 
@@ -55,9 +57,9 @@ class UserController extends Controller
                 $q->where('name', $roleName);
             });
         }
-        
+
         $users = $query->orderBy('id', 'desc')->paginate($perPage);
-        
+
         return UserResource::collection($users);
     }
     public function store(Request $request)
@@ -97,12 +99,12 @@ class UserController extends Controller
     {
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'username' => ['sometimes','required','string','max:255', Rule::unique('users')->ignore($user->id)],
+            'username' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             // 'email' => ['sometimes','required','string','email','max:255', Rule::unique('users')->ignore($user->id)],
             'password' => ['nullable', 'confirmed', Password::defaults()], // Password is optional on update
             'doctor_id' => 'nullable|exists:doctors,id',
             'is_nurse' => 'sometimes|required|boolean',
-            'user_money_collector_type' => ['sometimes','required', Rule::in(['lab','company','clinic','all'])],
+            'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,name',
         ]);
@@ -135,9 +137,9 @@ class UserController extends Controller
     // Endpoint to get all roles for dropdowns/checkboxes in user form
     public function getRolesList()
     {
-         if(!Auth::user()->can('assign roles') && !Auth::user()->can('list roles')) {
-              return response()->json(['message' => 'غير مصرح لك.'], 403);
-         }
+        if (!Auth::user()->can('assign roles') && !Auth::user()->can('list roles')) {
+            return response()->json(['message' => 'غير مصرح لك.'], 403);
+        }
         return RoleResource::collection(Role::orderBy('name')->get());
     }
 
@@ -191,14 +193,19 @@ class UserController extends Controller
         //     return response()->json(['message' => 'الوردية المحددة ليست مفتوحة أو غير موجودة.'], 404);
         // }
 
-        // Summing payments handled by this user in this shift
-        $depositsQuery = RequestedServiceDeposit::where('user_id', $user->id)
-                                                ->where('shift_id', $shiftId);
+        $shift = Shift::find($shiftId);
+        $totalPaid =  $shift->totalPaidService($user->id);
+        $totalBank =  $shift->totalPaidServiceBank($user->id);
+        // Costs specific to this user within this shift (if applicable)
+        $totalCostForUser = $shift->totalCost($user->id); // Ensure this method exists and is relevant
+        $totalCostBankForUser = $shift->totalCostBank($user->id);
+        $totalCost = $shift->totalCost($user->id);
+        $totalCostBank = $shift->totalCostBank($user->id);
+        $totalCash = $totalPaid - $totalBank;
+        $totalCostCash = $totalCost - $totalCostBank;
+        $netCash = $totalCash - $totalCostCash;
+        $netBank = $totalBank - $totalCostBank;
 
-        $totalCash = (clone $depositsQuery)->where('is_bank', false)->sum('amount');
-        $totalBank = (clone $depositsQuery)->where('is_bank', true)->sum('amount');
-        $totalIncome = $totalCash + $totalBank;
-        
         // You might also want to include other income sources or expenses handled by the user
         // For example, if users can record direct cash income/expenses not tied to services.
         // This would require querying other tables. For now, focusing on service deposits.
@@ -208,9 +215,11 @@ class UserController extends Controller
                 'user_id' => $user->id,
                 'user_name' => $user->name,
                 'shift_id' => (int) $shiftId,
-                'total_income' => (float) $totalIncome,
+                'total_income' => (float) $totalPaid,
                 'total_cash' => (float) $totalCash,
                 'total_bank' => (float) $totalBank,
+                'net_cash' => (float) $netCash,
+                'net_bank' => (float) $netBank,
                 // Add more details if needed, like number of transactions
             ]
         ]);

@@ -64,6 +64,8 @@ public function toArray(Request $request): array
         // ... other fields ...
         'created_at' => $this->created_at?->toIso8601String(),
         'requested_services_count' => $this->whenCounted('requestedServices', $this->requested_services_count, 0),
+        'doctor_shift_id' => $this->doctor_shift_id,
+        'doctorShift' => new DoctorShiftResource($this->whenLoaded('doctorShift')), // CRUCIAL
     ];
 }
 }

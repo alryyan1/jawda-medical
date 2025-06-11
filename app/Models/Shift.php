@@ -183,11 +183,11 @@ class Shift extends Model
         // For now, a simple calculation based on existing fields.
         return (float) $this->total - (float) $this->bank - (float) $this->expenses;
     }
-     /**
+    /**
      * Total amount paid for lab requests associated with this general shift,
      * optionally filtered by a specific user who handled the deposit.
      */
-      public function paidLab($user = null)
+    public function paidLab($user = null)
     {
         $total = 0;
         /** @var Doctorvisit $patient */
@@ -231,7 +231,7 @@ class Shift extends Model
         }
         // return $total;
     }
-    
+
     /**
      * Total amount paid via Bank for general services for this shift,
      * optionally filtered by a specific user.
@@ -281,12 +281,11 @@ class Shift extends Model
             if ($user) {
                 if ($cost->user_cost != $user) continue;
             }
-                $total += $cost->amount_bankak;
-
+            $total += $cost->amount_bankak;
         }
         return $total;
     }
-    
+
     /**
      * Clinic's service costs (not patient-specific, but general operational costs for services).
      * This is a complex one. It depends on how you define and link "service costs" that are not
@@ -328,5 +327,15 @@ class Shift extends Model
     public  function cost()
     {
         return $this->hasMany(Cost::class);
+    }
+    // In App/Models/Shift.php
+    public function userOpened() // Or just user() if user_id means opened_by
+    {
+        return $this->belongsTo(User::class, 'user_id'); // Or 'user_id_opened'
+    }
+
+    public function userClosed()
+    {
+        return $this->belongsTo(User::class, 'user_id_closed');
     }
 }

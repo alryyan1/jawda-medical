@@ -39,4 +39,11 @@ class RequestedServiceCost extends Model
     {
         return $this->belongsTo(ServiceCost::class,'service_cost_id');
     }
+    public function subServiceCost(){
+       return $this->belongsTo(SubServiceCost::class);
+    }
+    public function requestedService()
+    {
+        return $this->belongsTo(RequestedService::class);
+    }
 }

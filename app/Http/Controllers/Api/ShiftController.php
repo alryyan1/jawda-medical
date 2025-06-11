@@ -94,7 +94,7 @@ class ShiftController extends Controller
         $shift = Shift::create([
             'is_closed' => false,
             'touched' => false,
-            'pharamacy_entry' => $request->input('pharmacy_entry', null),
+            'pharmacy_entry' => $request->input('pharmacy_entry', null),
             // 'user_id_opened' => Auth::id(), // Or passed in request
             // 'name' => $validatedData['name'] ?? 'Shift - ' . Carbon::now()->toDateTimeString(),
             'total' => 0, // Initial values
@@ -238,15 +238,7 @@ class ShiftController extends Controller
             return response()->json(['message' => 'وردية العمل هذه مغلقة بالفعل.'], 400);
         }
 
-        // Validate financials provided at closing time
-        $validatedData = $request->validate([
-            'total' => 'required|numeric|min:0',
-            'bank' => 'required|numeric|min:0',
-            'expenses' => 'required|numeric|min:0',
-            'touched' => 'sometimes|boolean',
-            // 'user_id_closed' => 'nullable|exists:users,id', // Optional: if user closing is different
-        ]);
-
+    
         DB::beginTransaction();
         try {
             $closingTime = Carbon::now();
@@ -254,10 +246,8 @@ class ShiftController extends Controller
 
             // 1. Update and close the main clinic shift
             $shift->update([
-                'total' => $validatedData['total'],
-                'bank' => $validatedData['bank'],
-                'expenses' => $validatedData['expenses'],
-                'touched' => $request->input('touched', $shift->touched),
+                'user_id_closed' => Auth::id(),
+                 
                 'is_closed' => true,
                 'closed_at' => $closingTime,
                 // 'user_id_closed' => $closingUserId, // If you track this

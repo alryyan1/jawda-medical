@@ -400,4 +400,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/whatsapp/bulk-message-patients', [WhatsAppController::class, 'getPatientsForBulkMessage']);
 
     Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
+    // "The route api/reports/service-cost-breakdown could not be found."
+    Route::get('/reports/service-cost-breakdown', [ReportController::class, 'serviceCostBreakdownReport']);
+    // {message: "The route api/reports/service-cost-breakdown/pdf could not be found.",…}
+    Route::get('/reports/service-cost-breakdown/pdf', [ReportController::class, 'exportServiceCostBreakdownPdf']);
+    Route::get('/reports/doctor-statistics', [ReportController::class, 'doctorStatisticsReport']);
+    Route::get('/reports/doctor-statistics/pdf', [ReportController::class, 'exportDoctorStatisticsPdf']);
+    Route::get('/reports/company-performance', [ReportController::class, 'companyPerformanceReport']);
+    Route::get('/reports/company-performance/pdf', [ReportController::class, 'exportCompanyPerformancePdf']);
+    Route::get('/reports/doctor-company-entitlement', [ReportController::class, 'doctorCompanyEntitlementReport']);
+    Route::get('/reports/doctor-company-entitlement/pdf', [ReportController::class, 'exportDoctorCompanyEntitlementPdf']);
+    Route::get('/reports/yearly-income-comparison', [ReportController::class, 'yearlyIncomeComparisonByMonth']);
+    Route::get('/reports/yearly-patient-frequency', [ReportController::class, 'yearlyPatientFrequencyByMonth']);
+    // Route::get('/reports/yearly-patient-frequency/pdf', [ReportController::class, 'exportYearlyPatientFrequencyPdf']); // For future PDF
+
 });
