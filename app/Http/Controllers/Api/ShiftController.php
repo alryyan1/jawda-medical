@@ -254,8 +254,8 @@ class ShiftController extends Controller
             ]);
 
             // 2. Find and close all open DoctorShift records associated with this general Shift
-            $openDoctorShifts = DoctorShift::where('shift_id', $shift->id)
-                                          ->where('status', true) // Only active ones
+            $openDoctorShifts = DoctorShift
+                                          ::where('status', true) // Only active ones
                                           ->get();
 
             foreach ($openDoctorShifts as $doctorShift) {

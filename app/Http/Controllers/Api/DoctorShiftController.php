@@ -31,6 +31,7 @@ class DoctorShiftController extends Controller
         if ($request->has('clinic_shift_id')) {
             $query->where('shift_id', $request->clinic_shift_id);
         }
+        $query->where('status',1);
 
         $activeDoctorShifts = $query->get()->map(function ($doctorShift) {
             // Determine current patient status for the doctor
