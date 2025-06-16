@@ -235,6 +235,7 @@ class RequestedServiceDepositController extends Controller
 
             $requestedService->save();
             $requestedServiceDeposit->delete();
+            $requestedService->update(['is_paid'=>0]);
 
             DB::commit();
             return response()->json(null, 204);

@@ -66,6 +66,7 @@ class Shift extends Model
         'closed_at',
         'is_closed',
         'pharamacy_entry',
+        'user_closed',
         'user_id', // If you add this
         // 'user_id_opened', // If you add this
         // 'user_id_closed', // If you add this
@@ -73,6 +74,7 @@ class Shift extends Model
         // 'start_datetime', // If you add explicit start/end
         // 'end_datetime',
     ];
+
 
     protected $casts = [
         'total' => 'decimal:2',
@@ -108,6 +110,8 @@ class Shift extends Model
     {
         return $this->hasMany(DoctorVisit::class);
     }
+
+ 
 
     /**
      * Get all financial entries associated with this shift.
@@ -336,6 +340,6 @@ class Shift extends Model
 
     public function userClosed()
     {
-        return $this->belongsTo(User::class, 'user_id_closed');
+        return $this->belongsTo(User::class, 'user_closed');
     }
 }

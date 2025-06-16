@@ -447,9 +447,6 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                 }),
             ],
             'results.*.result' => 'nullable|string|max:2000', // Max length for a result value
-            'results.*.flags' => 'nullable|string|max:50',   // e.g., H, L, HH, LL, CRIT
-            'results.*.comment' => 'nullable|string|max:500', // Per-result comment
-            'main_test_comment' => 'nullable|string|max:2000', // Overall comment for the LabRequest
             // 'sample_received_at' => 'nullable|date_format:Y-m-d H:i:s', // If lab tracks this
             // 'results_entered_partially' => 'nullable|boolean', // If technician can mark as partial
         ]);
@@ -475,10 +472,6 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                         'patient_id' => $labrequest->pid,
                         'main_test_id' => $labrequest->main_test_id,
                         'result' => $resultInput['result'] ?? '',
-                        'flags' => $resultInput['flags'] ?? null,
-                        'result_comment' => $resultInput['comment'] ?? null,
-                        'entered_by_user_id' => $userId,
-                        'entered_at' => $now,
                         // Snapshot normal range and unit if not already done when placeholders were created
                         // Or if they can be updated during result entry (less common for locked-in ranges)
                         'normal_range' => $requestedResult->normal_range ?? // Keep existing if already set
@@ -486,8 +479,6 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                                           (($childTest->low !== null && $childTest->upper !== null) ? $childTest->low . ' - ' . $childTest->upper : null)),
                         'unit_name' => $requestedResult->unit_name ?? $childTest->unit?->name,
                         // Reset authorization if result is changed
-                        'authorized_at' => null, 
-                        'authorized_by_user_id' => null,
                     ]
                 );
                 $updatedResultIds[] = $requestedResult->id;
@@ -499,30 +490,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             // $labrequest->results()->whereNotIn('id', $updatedResultIds)->delete();
 
 
-            // Update LabRequest's overall comment
-            if ($request->has('main_test_comment')) {
-                $labrequest->comment = $validatedData['main_test_comment'];
-            }
-            
-            // Update LabRequest status based on results
-            // This logic is crucial and depends on your workflow
-            $allChildTestsCount = $labrequest->mainTest->childTests()->count();
-            $enteredResultsCount = $labrequest->results()->whereNotNull('result')->count();
-
-            if ($enteredResultsCount === 0) {
-                // $labrequest->result_status = 'pending_entry'; // Example status
-            } elseif ($enteredResultsCount < $allChildTestsCount) {
-                // $labrequest->result_status = 'results_partial';
-            } elseif ($enteredResultsCount >= $allChildTestsCount) {
-                // $labrequest->result_status = 'results_complete';
-                // $labrequest->done = true; // If 'done' means all results are in
-            }
-            // If you have a 'sample_received_at' field
-            // if ($request->filled('sample_received_at')) {
-            //    $labrequest->sample_received_at = Carbon::parse($request->sample_received_at);
-            // }
-            // If a sample_status field exists:
-            // $labrequest->sample_status = 'processed';
+   
 
 
             $labrequest->save(); // Save changes to LabRequest itself

@@ -61,9 +61,15 @@ class ShiftController extends Controller
     {
         $openShift = Shift::open()->latest('created_at')->first();
         if ($openShift) {
-            return new ShiftResource($openShift);
+            return new ShiftResource($openShift->loadMissing(['userOpened', 'userClosed']));
         }
         return response()->json(['message' => 'لا توجد وردية عمل مفتوحة حالياً.'], 404);
+    }
+
+    public function getCurrentShift()
+    {
+        $currentShift = Shift::latest('created_at')->first();
+        return new ShiftResource($currentShift->loadMissing(['userOpened', 'userClosed']));
     }
 
 
@@ -246,7 +252,7 @@ class ShiftController extends Controller
 
             // 1. Update and close the main clinic shift
             $shift->update([
-                'user_id_closed' => Auth::id(),
+                'user_closed' => Auth::id(),
                  
                 'is_closed' => true,
                 'closed_at' => $closingTime,

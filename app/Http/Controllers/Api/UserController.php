@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RoleResource;
+use App\Http\Resources\ShiftDefinitionResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Resources\UserResource;
 use App\Models\RequestedServiceDeposit;
 use App\Models\Shift;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -223,5 +225,38 @@ class UserController extends Controller
                 // Add more details if needed, like number of transactions
             ]
         ]);
+    }
+    public function updateAttendanceSettings(Request $request, User $user)
+    {
+        // if (!Auth::user()->can('edit_user_attendance_settings', $user)) { /* ... */ }
+
+        $validated = $request->validate([
+            'is_supervisor' => 'sometimes|boolean',
+            'default_shift_ids' => 'nullable|array', // User can be assigned to multiple default shifts (e.g., if working pattern varies)
+            'default_shift_ids.*' => 'integer|exists:shifts_definitions,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            if ($request->has('is_supervisor')) {
+                $user->update(['is_supervisor' => $validated['is_supervisor']]);
+            }
+
+            if ($request->has('default_shift_ids')) {
+                $user->defaultShifts()->sync($validated['default_shift_ids'] ?? []);
+            }
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'Failed to update user attendance settings.', 'error' => $e->getMessage()], 500);
+        }
+
+        return new UserResource($user->load(['roles', 'defaultShifts']));
+    }
+
+    public function getUserDefaultShifts(User $user)
+    {
+        // if (!Auth::user()->can('view_user_attendance_settings', $user)) { /* ... */ }
+        return ShiftDefinitionResource::collection($user->defaultShifts);
     }
 }

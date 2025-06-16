@@ -77,9 +77,9 @@ class MainTestController extends Controller
         // If not paginating for a selection list (e.g., for a specific package tab)
         if ($request->boolean('no_pagination')) {
             
-            $query->when('pack_id',function($q)use($request){
-                $q->where('pack_id','=',$request->get('pack_id'));
-            });
+            // $query->when('pack_id',function($q)use($request){
+            //     $q->where('pack_id','=',$request->get('pack_id'));
+            // });
             $mainTests = $query->orderBy('id')->get();
             return MainTestStrippedResource::collection($mainTests);
         }

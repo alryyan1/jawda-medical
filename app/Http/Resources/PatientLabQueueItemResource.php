@@ -2,7 +2,9 @@
 use Illuminate\Http\Request; use Illuminate\Http\Resources\Json\JsonResource;
 class PatientLabQueueItemResource extends JsonResource {
     public function toArray(Request $request): array {
-        // $this->resource is a DoctorVisit model instance with aggregated data
+        // $this->resource is a DoctorVisit model instance with aggreg
+        $allLabRequests = $this->labRequests()->get(); // Get all lab requests for this visit
+        $unpaidCount = $allLabRequests->where('is_paid', false)->count();
         return [
             'visit_id' => $this->visit_id,
             'patient_id' => $this->patient_id,
@@ -11,6 +13,8 @@ class PatientLabQueueItemResource extends JsonResource {
             'lab_request_ids' => $this->labRequests->pluck('id')->toArray(),
             'oldest_request_time' => $this->oldest_request_time, // Comes from withMin
             'test_count' => (int) $this->test_count, // Comes from withCount
+            'all_requests_paid' => $unpaidCount === 0 && $allLabRequests->isNotEmpty(), // NEW
+
             // 'status_summary' => ... // Calculate if needed
         ];
     }

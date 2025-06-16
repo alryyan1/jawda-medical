@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Api\AnalysisController;
+use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\AttendanceReportController;
+use App\Http\Controllers\Api\AttendanceSettingController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
@@ -13,6 +16,8 @@ use App\Http\Controllers\Api\CompanyServiceController;
 use App\Http\Controllers\Api\ContainerController;
 use App\Http\Controllers\Api\CostController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DeviceChildTestNormalRangeController;
+use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DoctorScheduleController;
 use App\Http\Controllers\Api\DoctorServiceController;
@@ -20,6 +25,7 @@ use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
 use App\Http\Controllers\Api\ExcelController;
 use App\Http\Controllers\Api\FinanceAccountController;
+use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\InsuranceAuditController;
 use App\Http\Controllers\Api\LabRequestController;
 use App\Http\Controllers\Api\MainTestController;
@@ -34,6 +40,7 @@ use App\Http\Controllers\Api\ServiceCostController;
 use App\Http\Controllers\Api\ServiceGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ShiftController;
+use App\Http\Controllers\Api\ShiftDefinitionController;
 use App\Http\Controllers\Api\SpecialistController;
 use App\Http\Controllers\Api\SubcompanyController;
 use App\Http\Controllers\Api\SubServiceCostController;
@@ -119,6 +126,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
   // General Shifts
   Route::get('/shifts/current-open', [ShiftController::class, 'getCurrentOpenShift']);
+  Route::get('/shifts/current-shift', [ShiftController::class, 'getCurrentShift']);
   Route::post('/shifts/open', [ShiftController::class, 'openShift']);
   Route::put('/shifts/{shift}/close', [ShiftController::class, 'closeShift']);
   Route::put('/shifts/{shift}/financials', [ShiftController::class, 'updateFinancials']);
@@ -413,5 +421,78 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/yearly-income-comparison', [ReportController::class, 'yearlyIncomeComparisonByMonth']);
     Route::get('/reports/yearly-patient-frequency', [ReportController::class, 'yearlyPatientFrequencyByMonth']);
     // Route::get('/reports/yearly-patient-frequency/pdf', [ReportController::class, 'exportYearlyPatientFrequencyPdf']); // For future PDF
+   /*
+    |--------------------------------------------------------------------------
+    | ATTENDANCE MODULE - CONFIGURATION ROUTES
+    |--------------------------------------------------------------------------
+    */
+
+    // 1. Global Attendance Settings
+    // Fetches the single global attendance settings record
+    Route::get('/attendance-settings', [AttendanceSettingController::class, 'show'])
+        ->name('attendanceSettings.show');
+    // Updates the single global attendance settings record
+    Route::put('/attendance-settings', [AttendanceSettingController::class, 'update'])
+        ->name('attendanceSettings.update');
+
+    // 2. Shift Definitions (e.g., Morning, Evening Shift timings)
+    // Provides a simplified list, often for dropdowns (e.g., only active shifts)
+    Route::get('/shifts-definitions/list', [ShiftDefinitionController::class, 'indexList'])
+        ->name('shiftDefinitions.list');
+    // Standard CRUD for shift definitions
+    Route::apiResource('shifts-definitions', ShiftDefinitionController::class);
+
+    // 3. Holiday Management
+    // Provides a simplified list, often for calendar highlighting or dropdowns
+    Route::get('/holidays/list', [HolidayController::class, 'indexList'])
+        ->name('holidays.list');
+    // Standard CRUD for holidays
+    Route::apiResource('holidays', HolidayController::class);
+
+    // 4. User-Specific Attendance Settings
+    // (Integrated into existing UserController or a dedicated UserAttendanceSettingController)
+
+    // Endpoint to update a user's supervisor status and their default shift assignments
+    Route::put('/users/{user}/attendance-settings', [UserController::class, 'updateAttendanceSettings'])
+        ->name('users.updateAttendanceSettings');
+    // Endpoint to get a user's currently assigned default shifts
+    Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts'])
+        ->name('users.getDefaultShifts');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ATTENDANCE MODULE - RECORDING & VIEWING (from previous steps, for context)
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/attendances/monthly-sheet', [AttendanceController::class, 'getMonthlySheet'])
+        ->name('attendances.monthlySheet');
+    Route::post('/attendances/record', [AttendanceController::class, 'recordOrUpdateAttendance'])
+        ->name('attendances.recordOrUpdate');
+    Route::delete('/attendances/{attendance}', [AttendanceController::class, 'destroyAttendance'])
+        ->name('attendances.destroy');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | ATTENDANCE MODULE - REPORTING (from previous steps, for context)
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/attendance/reports/monthly-employee-summary', [AttendanceReportController::class, 'monthlyEmployeeSummary'])
+        ->name('attendanceReports.monthlyEmployeeSummary');
+    Route::get('/attendance/reports/daily-detail', [AttendanceReportController::class, 'dailyAttendanceDetail'])
+        ->name('attendanceReports.dailyDetail');
+    Route::get('/attendance/reports/payroll', [AttendanceReportController::class, 'payrollAttendanceReport'])
+        ->name('attendanceReports.payroll');
+
+
+        
+    // Devices
+    Route::get('/devices-list', [DeviceController::class, 'indexList']);
+    Route::post('/devices', [DeviceController::class, 'store']); // If you add device creation dialog
+
+    // Device Specific Normal Ranges for Child Tests
+    Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
+    Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
 
 });

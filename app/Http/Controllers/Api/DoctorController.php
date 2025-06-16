@@ -62,7 +62,6 @@ class DoctorController extends Controller
             'start' => 'required|integer',
             'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // For file upload
             'finance_account_id' => 'nullable|exists:finance_accounts,id',
-            'finance_account_id_insurance' => 'nullable|exists:finance_accounts,id',
             'calc_insurance' => 'required|boolean',
             // Add validation for linking to a user if applicable
             // 'user_id_to_link' => 'nullable|exists:users,id|unique:doctors,user_id_column_if_doctor_has_user'
