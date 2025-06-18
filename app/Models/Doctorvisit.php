@@ -420,5 +420,25 @@ class DoctorVisit extends Model
        }
        return $this->total_services() - $total_paid;
     }
+    public function user(){
+        return $this->belongsTo(User::class, 'user_id');
+    }
+    public function scopeLoadDefaultLabReportRelations($query) {
+        return $query->with([
+            'patient.company', 
+            'doctor:id,name',
+            'labRequests' => fn ($q) => $q->where('hidden', false)->orderBy('id'),
+            'labRequests.mainTest.childTests' => fn($q_ct) => $q_ct->with(['unit:id,name', 'childGroup:id,name'])->orderBy('test_order')->orderBy('id'),
+            'labRequests.mainTest.package:package_id,package_name',
+            'labRequests.requestingUser:id,name',
+            'labRequests.results.unit:id,name',      // For result's own unit snapshot
+            'labRequests.results.childTest',        // For child test definition context
+            'labRequests.results.enteredBy:id,name', // If you have this field on RequestedResult
+            'labRequests.results.authorizedBy:id,name',// If you have this field on RequestedResult
+            'labRequests.authorizedBy:id,name',     // For overall LabRequest authorization
+            'labRequests.requestedOrganisms',
+            'user:id,name' // User who created visit
+        ]);
+    }
 
 }

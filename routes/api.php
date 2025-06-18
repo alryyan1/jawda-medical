@@ -251,6 +251,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/labrequests/{labrequest}/for-result-entry', [LabRequestController::class, 'getLabRequestForEntry']);
 
   Route::post('/labrequests/{labrequest}/results', [LabRequestController::class, 'saveResults']);
+  Route::patch('/labrequests/{labrequest}/childtests/{child_test}/result', [LabRequestController::class, 'saveSingleResult']);
 
   // Generic LabRequest CRUD (if needed separately from visit context for some actions)
   Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']);
@@ -494,5 +495,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Device Specific Normal Ranges for Child Tests
     Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
     Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
+    Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [ReportController::class, 'generateLabThermalReceiptPdf'])->name('reports.lab.thermalReceipt');
+    Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf'])->name('reports.lab.sampleLabels');
+    Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf'])->name('reports.lab.fullReport'); // For "View Report Preview"
+
 
 });

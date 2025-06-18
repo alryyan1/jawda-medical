@@ -139,6 +139,7 @@ class Setting extends Model
         'report_header_email',
         'report_header_vatin',
         'report_header_cr',
+        'default_lab_report_template',
         'report_header_logo_base64', // or 'report_header_logo_path'
     ];
 
@@ -158,6 +159,7 @@ class Setting extends Model
         'send_welcome_message' => 'boolean',
         'financial_year_start' => 'date',
         'financial_year_end' => 'date',
+        'default_lab_report_template' => 'string',
     ];
 
     // Helper to always get the first (and only) settings record

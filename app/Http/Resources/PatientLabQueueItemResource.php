@@ -9,6 +9,7 @@ class PatientLabQueueItemResource extends JsonResource {
             'visit_id' => $this->visit_id,
             'patient_id' => $this->patient_id,
             'patient_name' => $this->patient_name,
+            'lab_number' => $this->patient->visit_number,
             'sample_id' => $this->labRequests->first()->sample_id ?? ($this->labRequests->first()->id ?? $this->visit_id), // Example logic for display ID
             'lab_request_ids' => $this->labRequests->pluck('id')->toArray(),
             'oldest_request_time' => $this->oldest_request_time, // Comes from withMin

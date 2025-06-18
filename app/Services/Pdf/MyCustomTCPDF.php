@@ -13,7 +13,8 @@ class MyCustomTCPDF extends TCPDF
     protected ?Setting $currentSettings = null; // Type hint Setting model
     protected string $pageOrientation = 'P';
     protected string $defaultFont = 'arial'; // Default to arial as per your code
-
+    public $head ;
+    public $foot ;
     // Table header properties to be accessible for re-drawing
     protected array $tableHeaders = [];
     protected array $tableWidths = [];
@@ -25,7 +26,7 @@ class MyCustomTCPDF extends TCPDF
         string $filterCriteria = '',
         string $orientation = 'P',
         string $unit = 'mm',
-        string $format = 'A4',
+         $format = 'A4',
         bool $unicode = true,
         string $encoding = 'UTF-8',
         bool $diskcache = false,
@@ -71,6 +72,50 @@ class MyCustomTCPDF extends TCPDF
         $this->setPrintFooter(true);
     }
 
+    public function drawTextWatermark(string $text, string $font = '', int $fontSize = 45, int $angle = 45, array $color = [230, 230, 230])
+    {
+        // Save current graphic states
+        $this->StartTransform();
+
+        // Set transparency
+        $this->SetAlpha(0.2);
+
+        // Set font
+        $this->SetFont($font ?: $this->defaultFont, 'B', $fontSize);
+        $this->SetTextColor($color[0], $color[1], $color[2]);
+
+        // Calculate position for centering (this is where checkPageRegions was used)
+        // We can approximate center or use page dimensions
+        $pageWidth = $this->getPageWidth();
+        $pageHeight = $this->getPageHeight();
+        $textWidth = $this->GetStringWidth($text);
+
+        // Position the rotation point (approximately center of where text will be)
+        // This might need some trial and error to get perfect centering after rotation
+        $rotateX = $pageWidth / 2;
+        $rotateY = $pageHeight / 2; 
+        
+        $this->Rotate($angle, $rotateX, $rotateY);
+
+        // Calculate text position to be centered around the rotation point
+        // The exact calculation for centering rotated text is complex.
+        // A simpler approach is to position it before rotation and let TCPDF handle it.
+        // Or adjust based on StringWidth and angle.
+        // For a 45-degree angle, placing it somewhat offset from the rotation point often works.
+        $textX = $rotateX - ($textWidth / 2) ; // Start by centering before rotation effects
+        $textY = $rotateY - ($fontSize / 2);   // Adjust based on font size
+
+        // Adjustments based on empirical testing for 45 deg rotation might be needed.
+        // The original TCPDF example for watermark often just places it and rotates.
+        // Let's try a simpler positioning:
+        $this->Text($pageWidth * 0.2, $pageHeight * 0.4, $text);
+
+
+        // Restore transformations and alpha
+        $this->StopTransform();
+        $this->SetAlpha(1);
+        $this->SetTextColor(0); // Reset to black
+    }
     public function getDefaultFontFamily(): string
     {
         return $this->defaultFont;
@@ -160,11 +205,15 @@ class MyCustomTCPDF extends TCPDF
             $this->MultiCell(0, 3.5, $this->filterCriteria, 0, 'C', false, 1, '', '', true, 0, false, true, 0, 'T');
         }
         $this->Ln(2);
-
+        $func = $this->head;
+        if ($func != null){
+            $func($this);
+ 
+        }
         // Header Line
         $this->Line($this->getMargins()['left'], $this->GetY(), $this->getPageWidth() - $this->getMargins()['right'], $this->GetY());
         // $this->Ln(1); // Space for table header to start after this line, SetY will be PDF_MARGIN_TOP on new page
-
+    
         // After drawing all header elements, TCPDF will place content starting at PDF_MARGIN_TOP.
         // Ensure the sum of your header elements + Ln() calls doesn't exceed PDF_MARGIN_TOP.
         // The actual content drawing (like table headers) will start based on the Y cursor

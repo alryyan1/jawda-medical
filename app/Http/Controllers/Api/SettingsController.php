@@ -92,6 +92,7 @@ class SettingsController extends Controller
             'footer_image_file' => 'nullable|image|mimes:png,jpg,jpeg|max:1024', // For footer image if not base64
             'auditor_stamp_file' => 'nullable|image|mimes:png|max:512',
             'manager_stamp_file' => 'nullable|image|mimes:png|max:512',
+            'default_lab_report_template' => 'sometimes|string|in:template_a,template_b,template_c', // Allowed template keys
 
             'header_content' => 'nullable|string|max:255',
             'footer_content' => 'nullable|string|max:255',

@@ -31,5 +31,11 @@ Route::get('/', function () {
     $shift = Shift::find(168);
     return $shift->shiftClinicServiceCosts();
 });
+///api/visits/10664/lab-report/pdf
+Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf']);
+//phpinfo
+Route::get('/phpinfo', function () {
+    phpinfo();
+});
 
 

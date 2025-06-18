@@ -16,6 +16,8 @@ use Illuminate\Http\Request;
 use App\Http\Resources\LabRequestResource;
 use App\Http\Resources\MainTestStrippedResource;
 use App\Http\Resources\PatientLabQueueItemResource;
+use App\Http\Resources\RequestedResultResource;
+use App\Services\Pdf\MyCustomTCPDF;
 // If you create a specific resource for MainTestWithChildrenResults:
 // use App\Http\Resources\MainTestWithChildrenResultsResource; 
 use Illuminate\Support\Facades\Auth;
@@ -69,9 +71,6 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
             'per_page' => 'nullable|integer|min:5|max:100',
         ]);
 
-        $dateFrom = $request->filled('date_from') ? Carbon::parse($request->date_from)->startOfDay() : Carbon::today()->startOfDay();
-        $dateTo = $request->filled('date_to') ? Carbon::parse($request->date_to)->endOfDay() : Carbon::today()->endOfDay();
-        $perPage = $request->input('per_page', 20);
 
         $query = DoctorVisit::query()
             ->select('doctorvisits.id as visit_id', 
@@ -80,7 +79,6 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
                      'patients.name as patient_name'
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
-            ->whereBetween('doctorvisits.visit_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
             ->whereHas('labRequests', function ($q_lab) { // Only visits that have lab requests
                 $q_lab->where('valid', true); // Consider only valid requests
                 // Further filter for "pending results" based on your system's status logic
@@ -119,9 +117,7 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
         // It depends on how 'test_count' and the whereHas('labRequests'...) are defined.
         // $query->having('test_count', '>', 0); 
 
-        $pendingVisits = $query->orderBy('oldest_request_time', 'asc')
-                                 ->orderBy('visit_creation_time', 'asc')
-                                 ->paginate($perPage);
+        $pendingVisits = $query->orderBy('doctorvisits.id','desc')->get();
     
         return PatientLabQueueItemResource::collection($pendingVisits);
     }
@@ -250,6 +246,8 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         return response()->json(['message' => 'فشل تسجيل الدفعة المجمعة.', 'error' => 'خطأ داخلي.'], 500);
     }
 }
+
+
 
     // Store multiple lab requests for a visit
     public function storeBatchForVisit(Request $request, DoctorVisit $visit)
@@ -421,49 +419,304 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
 
 
     /**
-     * Save or Update results for a given LabRequest.
-     * The frontend sends an array of results, each corresponding to a ChildTest.
+     * Update a single requested result (autosave).
+     */
+    public function saveSingleResult(Request $request, LabRequest $labrequest, ChildTest $childTest)
+    {
+        // ... (Authorization checks) ...
+        if ($labrequest->main_test_id !== $childTest->main_test_id) {
+            return response()->json(['message' => 'Child test does not belong to this lab request.'], 422);
+        }
+
+        $validated = $request->validate([
+            'result_value' => 'nullable|string|max:65000', // MySQL TEXT can hold more
+            // 'result_flags' => 'nullable|string|max:50', // Not in new schema
+            // 'result_comment' => 'nullable|string|max:500', // Not in new schema
+            'normal_range_text' => 'nullable|string|max:1000', // For the snapshot
+            'unit_id_from_input' => 'nullable|integer|exists:units,id', // If unit can be overridden per result
+        ]);
+
+        $unitIdToSave = $validated['unit_id_from_input'] ?? $childTest->unit_id;
+        $normalRangeToSave = $validated['normal_range_text'] ?? $childTest->normalRange ??
+                              (($childTest->low !== null && $childTest->upper !== null) ? $childTest->low . ' - ' . $childTest->upper : 'N/A');
+
+
+        $requestedResult = RequestedResult::updateOrCreate(
+            [
+                'lab_request_id' => $labrequest->id,
+                'child_test_id' => $childTest->id,
+            ],
+            [
+                'patient_id' => $labrequest->pid,
+                'main_test_id' => $labrequest->main_test_id,
+                'result' => $validated['result_value'] ?? '',
+                'normal_range' => $normalRangeToSave,
+                'unit_id' => $unitIdToSave,
+                // 'entered_by_user_id' => Auth::id(), // Add if re-introducing these fields
+                // 'entered_at' => now(),             // Add if re-introducing these fields
+            ]
+        );
+
+        // ... (Update LabRequest status logic as before) ...
+        $expectedChildTestsCount = $labrequest->mainTest->childTests()->count();
+        $enteredResultsCount = $labrequest->results()->where(fn($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
+
+        if ($enteredResultsCount === 0) {
+            $labrequest->result_status = 'pending_entry';
+        } elseif ($enteredResultsCount < $expectedChildTestsCount) {
+            $labrequest->result_status = 'results_partial';
+        } elseif ($enteredResultsCount >= $expectedChildTestsCount) {
+            $labrequest->result_status = 'results_complete_pending_auth'; // Or 'results_complete' if no separate auth step
+        }
+        $labrequest->saveQuietly();
+
+
+        return new RequestedResultResource($requestedResult->load(['childTest.unit', /* 'enteredBy' */]));
+    }
+    public function generateLabThermalReceiptPdf(Request $request, DoctorVisit $visit)
+    {
+        // Permission Check: e.g., can('print lab_receipt', $visit)
+        // if (!Auth::user()->can('print lab_receipt', $visit)) { /* ... */ }
+
+        $visit->load([
+            'patient:id,name,phone,company_id',
+            'patient.company:id,name',
+            'labRequests' => function ($query) {
+                $query->where('is_paid', true) // Typically only paid items on receipt
+                      ->orWhere('amount_paid', '>', 0); // Or partially paid
+            },
+            'labRequests.mainTest:id,main_test_name',
+            'labRequests.depositUser:id,name', // User who handled deposit if tracked per request
+            'user:id,name', // User who created the visit (receptionist)
+            'doctor:id,name', // Doctor of the visit
+        ]);
+
+        $labRequestsToPrint = $visit->labRequests;
+
+        if ($labRequestsToPrint->isEmpty()) {
+            return response()->json(['message' => 'لا توجد طلبات مختبر مدفوعة لهذه الزيارة لإنشاء إيصال.'], 404);
+        }
+
+        $appSettings = Setting::instance();
+        $isCompanyPatient = !empty($visit->patient->company_id);
+        $cashierName = Auth::user()?->name ?? $visit->user?->name ?? $labRequestsToPrint->first()?->depositUser?->name ?? 'النظام';
+
+
+        // --- PDF Instantiation with Thermal Defaults ---
+        $pdf = new MyCustomTCPDF('إيصال مختبر', "زيارة رقم: {$visit->id}");
+        $thermalWidth = (float)($appSettings?->thermal_printer_width ?? 76); // Get from settings
+        $pdf->setThermalDefaults($thermalWidth); // Set narrow width, small margins, basic font
+        $pdf->AddPage();
+        
+        $fontName = $pdf->getDefaultFontFamily();
+        $isRTL = $pdf->getRTL(); // Should be true for Arabic
+        $alignStart = $isRTL ? 'R' : 'L';
+        $alignEnd = $isRTL ? 'L' : 'R';
+        $alignCenter = 'C';
+        $lineHeight = 3.5; // Small line height for thermal
+
+        // --- Clinic/Company Header ---
+        // (Simplified version of your generateThermalServiceReceipt header)
+        $logoData = null;
+        if ($appSettings?->logo_base64 && str_starts_with($appSettings->logo_base64, 'data:image')) {
+             try { $logoData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $appSettings->logo_base64)); } catch (\Exception $e) {}
+        }
+        
+        if ($logoData) {
+            $pdf->Image('@'.$logoData, '', $pdf->GetY() + 1, 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0, false, false, false);
+            $pdf->Ln($logoData ? 10 : 1); // Adjust Ln based on logo height
+        }
+
+        $pdf->SetFont($fontName, 'B', $logoData ? 8 : 9);
+        $pdf->MultiCell(0, $lineHeight, $appSettings?->hospital_name ?: ($appSettings?->lab_name ?: config('app.name')), 0, $alignCenter, false, 1);
+        
+        $pdf->SetFont($fontName, '', 6);
+        if ($appSettings?->address) $pdf->MultiCell(0, $lineHeight -0.5, $appSettings->address, 0, $alignCenter, false, 1);
+        if ($appSettings?->phone) $pdf->MultiCell(0, $lineHeight -0.5, ($isRTL ? "هاتف: " : "Tel: ") . $appSettings->phone, 0, $alignCenter, false, 1);
+        if ($appSettings?->vatin) $pdf->MultiCell(0, $lineHeight -0.5, ($isRTL ? "ر.ض: " : "VAT: ") . $appSettings->vatin, 0, $alignCenter, false, 1);
+        
+        $pdf->Ln(1);
+        $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
+        $pdf->Ln(1);
+
+        // --- Receipt Info ---
+        $pdf->SetFont($fontName, '', 6.5);
+        $receiptNumber = "LAB-" . $visit->id . "-" . $labRequestsToPrint->first()?->id;
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "إيصال رقم: " : "Receipt #: ") . $receiptNumber, 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "زيارة رقم: " : "Visit #: ") . $visit->id, 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "التاريخ: " : "Date: ") . Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "المريض: " : "Patient: ") . $visit->patient->name, 0, 1, $alignStart);
+        if ($visit->patient->phone) $pdf->Cell(0, $lineHeight, ($isRTL ? "الهاتف: " : "Phone: ") . $visit->patient->phone, 0, 1, $alignStart);
+        if ($isCompanyPatient && $visit->patient->company) $pdf->Cell(0, $lineHeight, ($isRTL ? "الشركة: " : "Company: ") . $visit->patient->company->name, 0, 1, $alignStart);
+        if ($visit->doctor) $pdf->Cell(0, $lineHeight, ($isRTL ? "الطبيب: " : "Doctor: ") . $visit->doctor->name, 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "الكاشير: " : "Cashier: ") . $cashierName, 0, 1, $alignStart);
+        
+        // Barcode for Visit ID or a specific Lab Request ID
+        if($appSettings?->barcode && $labRequestsToPrint->first()?->id){
+            $pdf->Ln(1);
+            $barcodeValue = (string)$labRequestsToPrint->first()->id; // Or a composite ID
+            $style = ['position' => '', 'align' => 'C', 'stretch' => false, 'fitwidth' => true, 'cellfitalign' => '', 'border' => false, 'hpadding' => 'auto', 'vpadding' => 'auto', 'fgcolor' => [0,0,0], 'bgcolor' => false, 'text' => true, 'font' => $fontName, 'fontsize' => 5, 'stretchtext' => 4 ];
+            $pdf->write1DBarcode($barcodeValue, 'C128B', '', '', '', 10, 0.3, $style, 'N');
+            $pdf->Ln(1);
+        }
+
+        $pdf->Ln(1);
+        $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
+        $pdf->Ln(0.5);
+
+        // --- Items Table ---
+        $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        // Adjust for thermal: Name takes most, Qty small, Price, Total
+        $nameWidth = $pageUsableWidth * 0.50; 
+        $qtyWidth  = $pageUsableWidth * 0.10; 
+        $priceWidth = $pageUsableWidth * 0.20; 
+        $totalWidth = $pageUsableWidth * 0.20; 
+
+        $pdf->SetFont($fontName, 'B', 6.5); // Bold for item headers
+        $pdf->Cell($nameWidth, $lineHeight, ($isRTL ? 'البيان' : 'Item'), 'B', 0, $alignStart);
+        $pdf->Cell($qtyWidth, $lineHeight, ($isRTL ? 'كمية' : 'Qty'), 'B', 0, $alignCenter);
+        $pdf->Cell($priceWidth, $lineHeight, ($isRTL ? 'سعر' : 'Price'), 'B', 0, $alignCenter);
+        $pdf->Cell($totalWidth, $lineHeight, ($isRTL ? 'إجمالي' : 'Total'), 'B', 1, $alignCenter);
+        $pdf->SetFont($fontName, '', 6.5);
+
+        $subTotalLab = 0;
+        $totalDiscountOnLab = 0;
+        $totalEnduranceOnLab = 0;
+
+        foreach ($labRequestsToPrint as $lr) {
+            $testName = $lr->mainTest?->main_test_name ?? 'فحص غير معروف';
+            $quantity = (int)($lr->count ?? 1);
+            $unitPrice = (float)($lr->price ?? 0);
+            $itemGrossTotal = $unitPrice * $quantity;
+            $subTotalLab += $itemGrossTotal;
+
+            $itemDiscountPercent = (float)($lr->discount_per ?? 0);
+            $itemDiscountAmount = ($itemGrossTotal * $itemDiscountPercent) / 100;
+            $totalDiscountOnLab += $itemDiscountAmount;
+            
+            $itemNetAfterDiscount = $itemGrossTotal - $itemDiscountAmount;
+
+            $itemEndurance = 0;
+            if ($isCompanyPatient) {
+                $itemEndurance = (float)($lr->endurance ?? 0) * $quantity;
+                $totalEnduranceOnLab += $itemEndurance;
+            }
+            
+            // For display in table, show gross total before endurance/patient payment for clarity
+            $currentYbeforeMultiCell = $pdf->GetY();
+            $pdf->MultiCell($nameWidth, $lineHeight-0.5, $testName, 0, $alignStart, false, 0, '', '', true, 0, false, true, 0, 'T');
+            $yAfterMultiCell = $pdf->GetY();
+            $pdf->SetXY($pdf->getMargins()['left'] + $nameWidth, $currentYbeforeMultiCell); // Reset X and Y for subsequent cells
+
+            $pdf->Cell($qtyWidth, $lineHeight-0.5, $quantity, 0, 0, $alignCenter);
+            $pdf->Cell($priceWidth, $lineHeight-0.5, number_format($unitPrice, 2), 0, 0, $alignCenter);
+            $pdf->Cell($totalWidth, $lineHeight-0.5, number_format($itemGrossTotal, 2), 0, 1, $alignCenter);
+            $pdf->SetY(max($yAfterMultiCell, $currentYbeforeMultiCell + $lineHeight-0.5)); // Ensure Y moves past tallest cell
+        }
+        $pdf->Ln(0.5);
+        $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
+        $pdf->Ln(0.5);
+
+        // --- Totals Section ---
+        $pdf->SetFont($fontName, '', 7);
+        
+        $this->drawThermalTotalRow($pdf, ($isRTL ? 'إجمالي الفحوصات:' : 'Subtotal:'), $subTotalLab, $pageUsableWidth);
+        if ($totalDiscountOnLab > 0) {
+            $this->drawThermalTotalRow($pdf, ($isRTL ? 'إجمالي الخصم:' : 'Discount:'), -$totalDiscountOnLab, $pageUsableWidth, false, 'text-red-500'); // No bold, is reduction
+        }
+        
+        $netAfterDiscount = $subTotalLab - $totalDiscountOnLab;
+        // $pdf->drawThermalTotalRow($pdf, ($isRTL ? 'الصافي بعد الخصم:' : 'Net After Discount:'), $netAfterDiscount, $pageUsableWidth);
+
+        if ($isCompanyPatient && $totalEnduranceOnLab > 0) {
+            $this->drawThermalTotalRow($pdf, ($isRTL ? 'تحمل الشركة:' : 'Company Share:'), -$totalEnduranceOnLab, $pageUsableWidth, false, 'text-blue-500');
+        }
+        
+        $netPayableByPatient = $netAfterDiscount - ($isCompanyPatient ? $totalEnduranceOnLab : 0);
+        $pdf->SetFont($fontName, 'B', 7.5); // Bold for final amount
+        $this->drawThermalTotalRow($pdf, ($isRTL ? 'صافي المطلوب من المريض:' : 'Patient Net Payable:'), $netPayableByPatient, $pageUsableWidth, true);
+        $pdf->SetFont($fontName, '', 7);
+
+        // Sum amount_paid from the $labRequestsToPrint collection for what was actually paid for these items
+        $totalActuallyPaidForTheseLabs = $labRequestsToPrint->sum('amount_paid');
+        $this->drawThermalTotalRow($pdf, ($isRTL ? 'المبلغ المدفوع:' : 'Amount Paid:'), $totalActuallyPaidForTheseLabs, $pageUsableWidth);
+        
+        $balanceDueForTheseLabs = $netPayableByPatient - $totalActuallyPaidForTheseLabs;
+        $pdf->SetFont($fontName, 'B', 7.5);
+        $this->drawThermalTotalRow($pdf, ($isRTL ? 'المبلغ المتبقي:' : 'Balance Due:'), $balanceDueForTheseLabs, $pageUsableWidth, true);
+
+        $pdf->Ln(2);
+        if($appSettings?->show_water_mark){ // Watermark
+            $pdf->SetFont($fontName, 'B', 30);
+            $pdf->SetTextColor(220,220,220);
+            $pdf->Rotate(45, $pdf->GetX()+($pageUsableWidth/3), $pdf->GetY()+10); // Adjust X,Y for watermark position
+            $pdf->Text($pdf->GetX()+($pageUsableWidth/4), $pdf->GetY(), $isCompanyPatient ? $visit->patient->company->name : "PAID");
+            $pdf->Rotate(0);
+            $pdf->SetTextColor(0,0,0);
+        }
+
+        $pdf->Ln(3);
+        $pdf->SetFont($fontName, 'I', 6);
+        $footerMessage = $appSettings?->receipt_footer_message ?: ($isRTL ? 'شكراً لزيارتكم!' : 'Thank you for your visit!');
+        $pdf->MultiCell(0, $lineHeight-1, $footerMessage, 0, $alignCenter, false, 1);
+        $pdf->Ln(3); // Extra space at the end for cutting
+
+        // --- Output PDF ---
+        $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
+        $pdfFileName = 'LabReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S'); // S returns as string
+
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+
+    // Helper from your existing ReportController (ensure it's accessible or duplicate here)
+    protected function drawThermalTotalRow(MyCustomTCPDF $pdf, string $label, float $value, float $pageUsableWidth, bool $isBoldValue = false, string $valueCssClass = '')
+    {
+        $fontName = $pdf->getDefaultFontFamily();
+        $currentFontSizePt = $pdf->getFontSizePt();
+        $currentFontStyle = $pdf->getFontStyle();
+        $lineHeight = 3.5;
+
+        $labelWidth = $pageUsableWidth * 0.60;
+        $valueWidth = $pageUsableWidth * 0.40;
+        $isRTL = $pdf->getRTL();
+        $alignStart = $isRTL ? 'R' : 'L';
+        $alignEnd = $isRTL ? 'L' : 'R';
+
+        if ($isBoldValue) $pdf->SetFont($fontName, 'B', $currentFontSizePt + 0.5);
+        // Could add color logic based on valueCssClass if TCPDF supported it easily here
+        
+        $pdf->Cell($labelWidth, $lineHeight, $label, 0, 0, $alignStart);  
+        $pdf->Cell($valueWidth, $lineHeight, number_format($value, 2), 0, 1, $alignEnd);
+        
+        if ($isBoldValue) $pdf->SetFont($fontName, $currentFontStyle, $currentFontSizePt);
+    }
+
+    /**
+     * Save/Update ALL results for a given LabRequest.
+     * This is kept if you still want a way to submit all results at once,
+     * but primary interaction is now single field autosave.
      */
     public function saveResults(Request $request, LabRequest $labrequest)
     {
-        // Permission Check: e.g., can('enter lab_results')
-        // if (!Auth::user()->can('enter lab_results', $labrequest)) { // Policy based on labrequest
-        //     return response()->json(['message' => 'Unauthorized to enter results for this request.'], 403);
-        // }
-
-        // Check if results can still be entered (e.g., not already fully authorized)
-        // if ($labrequest->isFullyAuthorized()) { // Assuming you add such a method to LabRequest model
-        //     return response()->json(['message' => 'لا يمكن تعديل النتائج بعد الاعتماد النهائي.'], 403);
-        // }
-
+        // ... (Authorization and validation as before, but adapt to new schema)
+        // Example simplified validation for the new schema:
         $validatedData = $request->validate([
-            'results' => 'present|array', // Must be present, can be empty array if clearing all results (unlikely)
-            'results.*.child_test_id' => [
-                'required', 
-                'integer', 
-                // Ensure child_test_id actually belongs to the main_test of this labrequest
-                Rule::exists('child_tests', 'id')->where(function ($query) use ($labrequest) {
-                    $query->where('main_test_id', $labrequest->main_test_id);
-                }),
-            ],
-            'results.*.result' => 'nullable|string|max:2000', // Max length for a result value
-            // 'sample_received_at' => 'nullable|date_format:Y-m-d H:i:s', // If lab tracks this
-            // 'results_entered_partially' => 'nullable|boolean', // If technician can mark as partial
+            'results' => 'present|array',
+            'results.*.child_test_id' => ['required', 'integer', Rule::exists('child_tests', 'id')->where('main_test_id', $labrequest->main_test_id)],
+            'results.*.result_value' => 'nullable|string|max:65000',
+            'results.*.normal_range_text' => 'required|string|max:1000', // Now normal_range is NOT NULL
+            'results.*.unit_id_from_input' => 'nullable|integer|exists:units,id', // From input
+            'main_test_comment' => 'nullable|string|max:2000',
         ]);
 
         DB::beginTransaction();
         try {
-            $userId = Auth::id();
-            $now = now();
-            $updatedResultIds = [];
-
             foreach ($validatedData['results'] as $resultInput) {
-                $childTest = ChildTest::with('unit')->find($resultInput['child_test_id']); // Find child test to get its unit/range if needed
-                if (!$childTest) continue; // Should not happen due to validation
-
-                // Find existing or create new RequestedResult
-                // Using updateOrCreate is efficient for this.
-                $requestedResult = RequestedResult::updateOrCreate(
+                $childTest = ChildTest::find($resultInput['child_test_id']); // Get child test for its default unit if needed
+                RequestedResult::updateOrCreate(
                     [
                         'lab_request_id' => $labrequest->id,
                         'child_test_id' => $resultInput['child_test_id'],
@@ -471,49 +724,26 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                     [
                         'patient_id' => $labrequest->pid,
                         'main_test_id' => $labrequest->main_test_id,
-                        'result' => $resultInput['result'] ?? '',
-                        // Snapshot normal range and unit if not already done when placeholders were created
-                        // Or if they can be updated during result entry (less common for locked-in ranges)
-                        'normal_range' => $requestedResult->normal_range ?? // Keep existing if already set
-                                          ($childTest->normalRange ?? 
-                                          (($childTest->low !== null && $childTest->upper !== null) ? $childTest->low . ' - ' . $childTest->upper : null)),
-                        'unit_name' => $requestedResult->unit_name ?? $childTest->unit?->name,
-                        // Reset authorization if result is changed
+                        'result' => $resultInput['result_value'] ?? '',
+                        'normal_range' => $resultInput['normal_range_text'], // Must be provided
+                        'unit_id' => $resultInput['unit_id_from_input'] ?? $childTest?->unit_id,
+                        // 'entered_by_user_id' => Auth::id(), 'entered_at' => now(), // If re-adding
                     ]
                 );
-                $updatedResultIds[] = $requestedResult->id;
             }
-
-            // Optionally, if results are removed from frontend, delete them from DB
-            // This requires frontend to send ALL results, even empty ones, or a separate mechanism.
-            // For now, we only update or create based on what's sent.
-            // $labrequest->results()->whereNotIn('id', $updatedResultIds)->delete();
-
-
-   
-
-
-            $labrequest->save(); // Save changes to LabRequest itself
-
+            // ... (update labrequest comment and status as before) ...
+            if ($request->has('main_test_comment')) {
+                $labrequest->comment = $validatedData['main_test_comment'];
+            }
+            // ... (status update logic) ...
+            $labrequest->save();
             DB::commit();
-
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to save lab results for LabRequest ID {$labrequest->id}: " . $e->getMessage(), ['exception' => $e]);
-            return response()->json(['message' => 'فشل حفظ النتائج.', 'error' => 'حدث خطأ داخلي.'.$e->getMessage()], 500);
+            Log::error("Full saveResults Error: " . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['message' => 'فشل حفظ النتائج.', 'error' => $e->getMessage()], 500);
         }
-
-        // Return the updated LabRequest with all necessary relations for the frontend to refresh
-        return new LabRequestResource(
-            $labrequest->fresh()->load([
-                'mainTest.childTests.unit', 
-                'mainTest.childTests.childGroup', 
-                'mainTest.childTests.options',
-                'results.childTest:id,child_test_name', // Load childTest for each result
-                'results.enteredBy:id,name',
-                'requestingUser:id,name'
-            ])
-        );
+        return new LabRequestResource($labrequest->fresh()->load(['mainTest.childTests.unit', 'results.childTest.unit', /* 'results.enteredBy' */]));
     }
 
     /**
