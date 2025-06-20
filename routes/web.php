@@ -2,6 +2,7 @@
         <?php
 
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\LabResultController;
 use App\Models\Shift;
 use Illuminate\Support\Facades\Route;
 
@@ -32,7 +33,9 @@ Route::get('/', function () {
     return $shift->shiftClinicServiceCosts();
 });
 ///api/visits/10664/lab-report/pdf
-Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf']);
+Route::get('/visits/{visit}/lab-report/pdf', [LabResultController::class, 'generateLabVisitReportPdf']);
+// Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf']);
+Route::get('/visits/{id}/lab-report-old/pdf', [ReportController::class, 'result']);
 //phpinfo
 Route::get('/phpinfo', function () {
     phpinfo();

@@ -22,4 +22,7 @@ use Illuminate\Database\Eloquent\Model;
 class CbcBinding extends Model
 {
     use HasFactory;
+    public $timestamps = false;
+    protected $guarded = [];
+    protected $table = 'cbc_bindings';
 }

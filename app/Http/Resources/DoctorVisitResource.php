@@ -57,6 +57,7 @@ public function toArray(Request $request): array
         'total_paid' => $totalPaid,
         'total_discount' => $totalDiscount,
         'balance_due' => $totalAmount - $totalDiscount - $totalPaid,
+        'lab_requests' => LabRequestResource::collection($this->whenLoaded('patientLabRequests')),
         'number' => $this->number,
         'company' => new CompanyStrippedResource($this->patient->company),
 

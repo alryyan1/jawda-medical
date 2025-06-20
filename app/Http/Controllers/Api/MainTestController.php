@@ -60,11 +60,11 @@ class MainTestController extends Controller
         // $query->where('available', true); // Only available tests
     
     
-        // if ($request->filled('pack_id') && $request->pack_id !== 'all') { // 'all' could mean no package filter
-        //     $query->where('pack_id', $request->pack_id);
-        // } elseif ($request->pack_id === 'none') { // Explicitly request tests with no package
-        //      $query->whereNull('pack_id');
-        // }
+        if ($request->filled('pack_id') && $request->pack_id !== 'all') { // 'all' could mean no package filter
+            $query->where('pack_id', $request->pack_id);
+        } elseif ($request->pack_id === 'none') { // Explicitly request tests with no package
+             $query->whereNull('pack_id');
+        }
         // // Exclude tests already requested for a specific visit if visit_id is provided
         // if ($request->filled('visit_id_to_exclude_requests')) {
         //     $visit = DoctorVisit::find($request->visit_id_to_exclude_requests);

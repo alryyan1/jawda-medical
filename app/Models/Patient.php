@@ -369,10 +369,14 @@ class Patient extends Model
         return $total;
 
     }
+    
     public function file()
     {
         return $this->belongsTo(File::class);
     }
+    public function tests_concatinated(){
+        return join(',',$this->labrequests->pluck('name')->all());
+     }
     /**
      * Calculate age from Date of Birth if you were to store DOB instead of age parts.
      * public function getAgeAttribute() {

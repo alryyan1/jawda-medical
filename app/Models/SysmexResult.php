@@ -16,4 +16,6 @@ use Illuminate\Database\Eloquent\Model;
 class SysmexResult extends Model
 {
     use HasFactory;
+    protected $table ='sysmex';
+
 }

@@ -274,7 +274,7 @@ class Shift extends Model
             if ($user) {
                 if ($cost->user_cost != $user) continue;
             }
-            $total += $cost->amount;
+            $total += ($cost->amount + $cost->amount_bankak);
         }
         return $total;
     }

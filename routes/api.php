@@ -145,6 +145,12 @@ Route::middleware('auth:sanctum')->group(function () {
     | Patient & Visit Management Routes
     |--------------------------------------------------------------------------
     */
+    
+    // New route for searching visits by patient name for autocomplete:
+      Route::get('/doctor-visits/search-by-patient', [PatientController::class, 'searchRecentDoctorVisitsByPatientName'])
+      ->name('doctor-visits.searchByPatientName');
+    Route::get('/patients/recent-lab-activity', [PatientController::class, 'getRecentLabActivityPatients']);
+
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
   Route::post('/patients/{doctorVisit}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
   // Patients
@@ -261,6 +267,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // api/main-tests/find/123
   Route::get('/main-tests/find/{identifier}', [MainTestController::class, 'findByIdOrCode']);
   Route::delete('/visits/{visit}/lab-requests/clear-pending', [LabRequestController::class, 'clearPendingRequests'])->middleware('auth:sanctum');
+  Route::post('/labrequests/{labrequest}/unpay', [LabRequestController::class, 'unpay'])->middleware('auth:sanctum');
   Route::post('/costs', [CostController::class, 'store']); // For the dialog
   // The route api/visits/48/lab-requests/batch-pay could not be foun
   Route::post('/visits/{visit}/lab-requests/batch-pay', [LabRequestController::class, 'batchPayLabRequests'])->middleware('auth:sanctum');
@@ -282,7 +289,8 @@ Route::middleware('auth:sanctum')->group(function () {
   // Route::get('/companies/{company}/subcompanies', [SubcompanyController::class, 'indexList'])->middleware('auth:sanctum');
   Route::apiResource('/companies/{company}/subcompanies', SubcompanyController::class);
 
-
+  // "The route api/reports/monthly-lab-income could not be found."
+  Route::get('/reports/monthly-lab-income', [ReportController::class, 'monthlyLabIncome']);
   Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
 
   //api/reports/clinic-report/1/financial-summary/pdf
@@ -392,7 +400,8 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // NEW: Route for creating a new visit for a patient by copying their data to a new shift
     Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift'])->name('patients.copyToNewVisit');
-    
+    Route::post('/labrequests/{labrequest}/set-default-results', [LabRequestController::class, 'setDefaultResults']);
+
     /*
     |--------------------------------------------------------------------------
     | WhatsApp Communication Routes
@@ -497,7 +506,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
     Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [ReportController::class, 'generateLabThermalReceiptPdf'])->name('reports.lab.thermalReceipt');
     Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf'])->name('reports.lab.sampleLabels');
-    Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf'])->name('reports.lab.fullReport'); // For "View Report Preview"
-
+    Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result'])->name('reports.lab.fullReport'); // For "View Report Preview"
 
 });

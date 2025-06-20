@@ -11,6 +11,8 @@ use App\Http\Requests\UpdatePatientRequest;
 use App\Http\Resources\DoctorVisitResource;
 use App\Http\Resources\PatientResource;
 use App\Http\Resources\PatientSearchResultResource;
+use App\Http\Resources\PatientStrippedResource;
+use App\Http\Resources\RecentDoctorVisitSearchResource;
 // use App\Http\Resources\PatientCollection; // If you have custom pagination
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,7 +38,7 @@ class PatientController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Patient::with(['company', 'primaryDoctor:id,name']); // Eager load common relations
+        $query = Patient::with(['company', 'primaryDoctor:id,name', 'doctor']); // Eager load common relations
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
@@ -251,28 +253,25 @@ class PatientController extends Controller
     }
     public function searchExisting(Request $request)
     {
-        // $this->authorize('view patients'); // Or a specific search permission
-        $request->validate([
-            'term' => 'required|string|min:2', // Min 2 chars to start search
-        ]);
-
-        $searchTerm = $request->term;
-
-        // Search by name or phone
-        $searchTerm = $request->input('search_term', '');
-
+        $searchTerm = $request->validate([
+            'term' => 'required|string|min:2',
+        ])['term'];
+    
         $visits = DoctorVisit::query()
-            ->whereHas('patient', function ($query) use ($searchTerm) { // Filter visits based on patient criteria
-                $query->where('name', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+            ->whereHas('patient', function ($query) use ($searchTerm) {
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+                });
             })
-            ->with(['patient', 'doctor']) // Eager load patient and doctor for each visit
-            ->orderBy('visit_date', 'desc') // Get latest visits first
-            ->limit(20) // Get more visits initially, then filter/group in PHP if needed
+            ->with(['patient', 'doctor'])
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
             ->get();
-
+    
         return PatientSearchResultResource::collection($visits);
     }
+    
 
     /**
      * Display the specified patient.
@@ -332,5 +331,80 @@ class PatientController extends Controller
             ->get();
 
         return DoctorVisitResource::collection($patients);
+    }
+    public function getRecentLabActivityPatients(Request $request)
+    {
+        // if (!Auth::user()->can('view lab_workstation_patient_dropdown')) { /* ... */ }
+
+        $limit = $request->input('limit', 30);
+
+        // Find patients who had lab requests, ordered by the most recent lab request's creation time or visit time.
+        // This query can be complex to optimize for "most recent based on lab activity".
+        // Simpler approach: Patients with most recent visits that included lab requests.
+        $patients = DoctorVisit::whereHas('patientLabRequests', function ($query) {
+            $query->where('valid', true);
+        })->with(['patient'=>function($query){
+            $query->select('id','name','phone');
+        }])
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+            
+        // The resource needs to handle 'latest_visit_id' if it's not a direct attribute
+        return PatientStrippedResource::collection($patients)->additional([
+            'meta' => ['note' => 'latest_visit_id refers to the DoctorVisit ID']
+        ]);
+    }
+      /**
+     * Search for DoctorVisits by patient name for Autocomplete.
+     * Returns recent visits matching the patient name.
+     */
+    public function searchRecentDoctorVisitsByPatientName(Request $request)
+    {
+        // if (!Auth::user()->can('search_doctor_visits')) { /* ... */ }
+
+        $request->validate([
+            'patient_name_search' => 'required|string|min:2',
+            'limit' => 'nullable|integer|min:1|max:50',
+        ]);
+
+        $searchTerm = $request->patient_name_search;
+        $limit = $request->input('limit', 15); // Default limit for autocomplete
+
+        $visits = DoctorVisit::with([
+                'patient:id,name,phone', // Eager load basic patient info
+                'doctor:id,name'         // Eager load basic doctor info
+            ])
+            ->whereHas('patient', function ($query) use ($searchTerm) {
+                $query->where('name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchTerm}%"); // Optionally search by phone too
+            })
+            // Optionally, filter for visits that actually have lab requests if this is for lab workstation
+            // ->whereHas('labRequests') 
+            ->orderBy('visit_date', 'desc') // Most recent visits first
+            ->orderBy('created_at', 'desc')
+            ->take($limit)
+            ->get();
+            
+        // Filter out visits that do not have lab requests (if strictly for lab workstation)
+        // Or do this in the initial whereHas if more performant for your DB
+        $visitsWithLabs = $visits->filter(function ($visit) {
+            // This requires labRequests relation to be defined on DoctorVisit
+            // If labRequests are linked via pid, this check is more complex here
+            // For now, assuming a direct or indirect link is checkable.
+            // If labRequests are linked via patient_id directly (pid), this could be:
+            // return $visit->patient->labRequests()->whereDate('created_at', $visit->visit_date)->exists();
+            // Or if LabRequest table has a visit_id (even if not an FK constraint, but populated):
+            // return \App\Models\LabRequest::where('doctor_visit_id_placeholder', $visit->id)->exists();
+
+            // Simpler: If you always create DoctorVisit even for lab, then just return.
+            // If the visit itself implies lab work, then no extra check needed.
+            // For now, let's assume any visit returned could be relevant.
+            // Frontend can later check if it has lab requests when loading full details.
+            return true; 
+        });
+
+
+        return RecentDoctorVisitSearchResource::collection($visitsWithLabs);
     }
 }

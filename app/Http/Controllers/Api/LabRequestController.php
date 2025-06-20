@@ -17,6 +17,9 @@ use App\Http\Resources\LabRequestResource;
 use App\Http\Resources\MainTestStrippedResource;
 use App\Http\Resources\PatientLabQueueItemResource;
 use App\Http\Resources\RequestedResultResource;
+use App\Models\CbcBinding;
+use App\Models\Setting;
+use App\Models\SysmexResult;
 use App\Services\Pdf\MyCustomTCPDF;
 // If you create a specific resource for MainTestWithChildrenResults:
 // use App\Http\Resources\MainTestWithChildrenResultsResource; 
@@ -25,6 +28,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log; // For logging errors
+use Illuminate\Support\Facades\Schema;
 
 class LabRequestController extends Controller
 {
@@ -43,91 +47,196 @@ class LabRequestController extends Controller
 public function clearPendingRequests(Request $request, DoctorVisit $visit)
 {
     // $this->authorize('cancel_multiple_lab_requests', $visit); // Permission
-    $count = $visit->labRequests()
-                   ->where('is_paid', false)
-                   ->where('done', false) // Assuming 'done' means processed/resulted
-                   // Add other conditions that define "cancellable"
-                   // ->whereNull('sample_id') // e.g., sample not yet taken
-                   ->delete(); // Performs a mass delete on the query
+    $count = $visit->patientLabRequests()->delete();
 
     if ($count > 0) {
         // Invalidate relevant caches or trigger events if needed
-        return response()->json(['message' => "تم إلغاء {$count} طلب فحص معلق بنجاح.", 'deleted_count' => $count]);
+        return response()->json(['message' => "تم إلغاء {$count} طلب فحص  بنجاح.", 'deleted_count' => $count]);
     }
-    return response()->json(['message' => 'لا توجد طلبات فحص معلقة قابلة للإلغاء لهذه الزيارة.', 'deleted_count' => 0]);
+    return response()->json(['message' => 'لا توجد طلبات فحص  قابلة للإلغاء لهذه الزيارة.', 'deleted_count' => 0]);
 }
 
     /**
      * Get the queue of patients with pending lab work.
      */
+    // public function getLabPendingQueue(Request $request)
+    // {
+    //     $request->validate([
+    //         'date_from' => 'nullable|date_format:Y-m-d',
+    //         'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+    //         'shift_id' => 'nullable|integer|exists:shifts,id',
+    //         'search' => 'nullable|string|max:100',
+    //         'page' => 'nullable|integer|min:1',
+    //         'per_page' => 'nullable|integer|min:5|max:100',
+    //     ]);
+
+
+    //     $query = DoctorVisit::query()
+    //         ->select('doctorvisits.id as visit_id', 
+    //                  'doctorvisits.created_at as visit_creation_time',
+    //                  'patients.id as patient_id', 
+    //                  'patients.name as patient_name'
+    //         )
+    //         ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
+    //         // ->whereHas('patient.labRequests')
+    //         // ->withCount('patient.labRequests as test_count')
+      
+    //         ->whereHas('patientLabRequests')
+    //         ->withCount('patientLabRequests as test_count')
+    //         ->withMin('patientLabRequests as oldest_request_time', 'created_at')
+    //         ->with(['patientLabRequests']);
+
+    //     if ($request->filled('shift_id')) {
+    //         $query->where('doctorvisits.shift_id', $request->shift_id);
+    //     }
+
+    //     if ($request->filled('search')) {
+    //         $searchTerm = $request->search;
+    //         $query->where(function ($q_search) use ($searchTerm) {
+    //             $q_search->where('patients.name', 'LIKE', "%{$searchTerm}%")
+    //                      ->orWhere('patients.id', $searchTerm)
+    //                      ->orWhereExists(function ($subQuery) use ($searchTerm) {
+    //                         $subQuery->select(DB::raw(1))
+    //                                  ->from('labrequests as lr_search_sub') // Use a different alias
+    //                                  ->whereColumn('lr_search_sub.doctor_visit_id', 'doctorvisits.id')
+    //                                  ->where(function ($lrInnerSearch) use ($searchTerm) {
+    //                                     $lrInnerSearch->where('lr_search_sub.sample_id', 'LIKE', "%{$searchTerm}%")
+    //                                                   ->orWhere('lr_search_sub.id', $searchTerm);
+    //                                  });
+    //                      });
+    //         });
+    //     }
+        
+    //     // This condition might be important to ensure only visits with truly pending tests are shown
+    //     // It depends on how 'test_count' and the whereHas('labRequests'...) are defined.
+    //     // $query->having('test_count', '>', 0); 
+
+    //     $pendingVisits = $query->orderBy('doctorvisits.id','desc')->get();
+    //     // return['sql' => $query->toSql(),'binds' => $query->getBindings()];
+    
+    //     return PatientLabQueueItemResource::collection($pendingVisits);
+    // }
     public function getLabPendingQueue(Request $request)
     {
         $request->validate([
+            'shift_id' => 'nullable|integer|exists:shifts,id',
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
-            'shift_id' => 'nullable|integer|exists:shifts,id',
-            'search' => 'nullable|string|max:100',
+            'search' => 'nullable|string|max:100', // Patient name/ID, Visit ID, Sample ID, Lab Request ID
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:5|max:100',
+            'package_id' => 'nullable|integer|exists:packages,package_id',
+            'has_unfinished_results' => 'nullable|boolean',
+            'main_test_id' => 'nullable|integer|exists:main_tests,id',
         ]);
 
+        $perPage = $request->input('per_page', 30);
 
+        // The core of the queue is still a "DoctorVisit" because it represents an encounter.
+        // We then filter these visits to only include those where the patient has relevant lab requests.
         $query = DoctorVisit::query()
-            ->select('doctorvisits.id as visit_id', 
-                     'doctorvisits.created_at as visit_creation_time',
-                     'patients.id as patient_id', 
-                     'patients.name as patient_name'
+            ->select(
+                'doctorvisits.id as visit_id', // This is the ID of the DoctorVisit encounter
+                'doctorvisits.created_at as visit_creation_time',
+                'doctorvisits.visit_date', // Keep for context
+                'patients.id as patient_id',
+                'patients.name as patient_name'
+                // Add other patient fields if needed by PatientLabQueueItemResource
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
-            ->whereHas('labRequests', function ($q_lab) { // Only visits that have lab requests
-                $q_lab->where('valid', true); // Consider only valid requests
-                // Further filter for "pending results" based on your system's status logic
-                // Example: If LabRequest has a 'result_status' column
-                // $q_lab->whereNotIn('result_status', ['completed', 'authorized', 'cancelled']);
-            })
-            ->withCount(['labRequests as test_count' => function ($q_lab_count) {
-                $q_lab_count->where('valid', true);
-                // Add specific pending status filter for count if needed
-            }])
-            ->withMin('labRequests as oldest_request_time', 'labrequests.created_at') // Ensure this table alias is correct
-            ->with(['labRequests:id,doctor_visit_id,sample_id']);
+            // Ensure this visit's patient has lab requests that match the criteria
+            ->whereHas('patientLabRequests', function ($lrQuery) use ($request) {
 
+               
+
+
+                // Apply NEW FILTERS to the lab requests
+                if ($request->filled('package_id')) {
+                    $lrQuery->whereHas('mainTest', function ($mtQuery) use ($request) {
+                        $mtQuery->where('pack_id', $request->package_id);
+                    });
+                }
+
+                if ($request->boolean('has_unfinished_results')) {
+                    $lrQuery->whereHas('results', function ($resQuery) {
+                        $resQuery->where(function($q_empty_res) {
+                            $q_empty_res->where('result', '=', '')->orWhereNull('result');
+                        });
+                    });
+                }
+
+                if ($request->filled('main_test_id')) {
+                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
+                }
+            });
+
+        // Context for DoctorVisit itself (shift or date range)
         if ($request->filled('shift_id')) {
             $query->where('doctorvisits.shift_id', $request->shift_id);
+        } elseif ($request->filled('date_from') && $request->filled('date_to')) {
+            $query->whereBetween('doctorvisits.visit_date', [
+                Carbon::parse($request->date_from)->startOfDay(),
+                Carbon::parse($request->date_to)->endOfDay()
+            ]);
+        } else {
+            $query->whereDate('doctorvisits.visit_date', Carbon::today());
         }
 
+        // Search functionality on DoctorVisit and related Patient/LabRequest attributes
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q_search) use ($searchTerm) {
                 $q_search->where('patients.name', 'LIKE', "%{$searchTerm}%")
-                         ->orWhere('patients.id', $searchTerm)
-                         ->orWhereExists(function ($subQuery) use ($searchTerm) {
-                            $subQuery->select(DB::raw(1))
-                                     ->from('labrequests as lr_search_sub') // Use a different alias
-                                     ->whereColumn('lr_search_sub.doctor_visit_id', 'doctorvisits.id')
-                                     ->where(function ($lrInnerSearch) use ($searchTerm) {
-                                        $lrInnerSearch->where('lr_search_sub.sample_id', 'LIKE', "%{$searchTerm}%")
-                                                      ->orWhere('lr_search_sub.id', $searchTerm);
-                                     });
+                         ->orWhere('patients.id', $searchTerm) // Patient ID
+                         ->orWhere('doctorvisits.id', $searchTerm) // Visit ID
+                         ->orWhereHas('patientLabRequests', function($lrSearchQuery) use ($searchTerm){
+                            $lrSearchQuery->where('labrequests.sample_id', 'LIKE', "%{$searchTerm}%")
+                                          ->orWhere('labrequests.id', $searchTerm); // LabRequest ID
                          });
             });
         }
         
-        // This condition might be important to ensure only visits with truly pending tests are shown
-        // It depends on how 'test_count' and the whereHas('labRequests'...) are defined.
-        // $query->having('test_count', '>', 0); 
+        // Eager load data needed for PatientLabQueueItemResource after filtering
+        // This uses the hypothetical 'patientLabRequests' relation on DoctorVisit model.
+        // If it doesn't exist, we have to construct this data manually or adjust the resource.
+        // The resource will effectively re-query lab requests for the patient within context.
+        // For now, let's assume the resource can handle getting the specific LRs.
+        
+        // Aggregates for display in the queue item (these define the "work unit" for the patient in context)
+        // We need to count lab requests for *this specific visit's patient* that match the filters.
+        $query->withCount(['patientLabRequests as test_count' => function ($lrQuery) use ($request) {
 
-        $pendingVisits = $query->orderBy('doctorvisits.id','desc')->get();
-    
+            // Re-apply filters to the count
+            if ($request->filled('package_id')) { $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id)); }
+            if ($request->boolean('has_unfinished_results')) { $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));}
+            if ($request->filled('main_test_id')) { $lrQuery->where('labrequests.main_test_id', $request->main_test_id); }
+            // Contextual filter for count based on how lab requests are tied to this visit's context
+            // (e.g., created on same day as visit_date)
+            $lrQuery->whereDate('labrequests.created_at', DB::raw('DATE(doctorvisits.visit_date)'));
+
+        }]);
+
+        $query->withMin(['patientLabRequests as oldest_request_time_for_patient_in_context' => function($lrQuery) use ($request){
+
+            // Re-apply filters for oldest time context
+            if ($request->filled('package_id')) { $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id)); }
+            if ($request->boolean('has_unfinished_results')) { $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));}
+            if ($request->filled('main_test_id')) { $lrQuery->where('labrequests.main_test_id', $request->main_test_id); }
+            $lrQuery->whereDate('labrequests.created_at', DB::raw('DATE(doctorvisits.visit_date)'));
+        }], 'labrequests.created_at');
+        
+        // This will fetch DoctorVisit records. The PatientLabQueueItemResource will need to correctly
+        // extract/derive lab_request_ids, sample_id, and all_requests_paid based on the DoctorVisit and its Patient.
+        $pendingVisits = $query->get();
+            
         return PatientLabQueueItemResource::collection($pendingVisits);
     }
-
     /**
      * List lab requests for a specific visit. (For TestSelectionPanel)
      */
     public function indexForVisit(Request $request, DoctorVisit $visit)
     {
-        $labRequests = $visit->labRequests()
+        $labRequests = $visit->patientLabRequests()
                              ->with(['mainTest:id,main_test_name,price', 'requestingUser:id,name'])
                              ->orderBy('created_at', 'asc') // Or by main_test.name
                              ->get();
@@ -139,7 +248,7 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
      */
     public function availableTestsForVisit(Request $request, DoctorVisit $visit)
     {
-        $requestedTestIds = $visit->labRequests()->pluck('main_test_id')->toArray();
+        $requestedTestIds = $visit->patient()->pluck('main_test_id')->toArray();
         $availableTests = MainTest::where('available', true)
                                 ->whereNotIn('id', $requestedTestIds)
                                 ->orderBy('main_test_name')
@@ -163,7 +272,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
     $userId = Auth::id();
 
     // Get all unpaid lab requests for this visit, ordered (e.g., by creation date)
-    $unpaidRequests = $visit->labRequests()
+    $unpaidRequests = $visit->patientLabRequests()
         ->where('is_paid', false)
         ->orderBy('created_at', 'asc') // Pay oldest first
         ->get();
@@ -176,7 +285,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
     foreach($unpaidRequests as $lr) {
         $price = (float) $lr->price;
         $count = (int) ($lr->count ?? 1);
-        $itemSubTotal = $price * $count;
+        $itemSubTotal = $price ;
         $discountAmount = ($itemSubTotal * ((int) ($lr->discount_per ?? 0) / 100));
         $enduranceAmount = (float) ($lr->endurance ?? 0);
         $netPayableByPatient = $itemSubTotal - $discountAmount - ($visit->patient->company_id ? $enduranceAmount : 0);
@@ -235,20 +344,98 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         // It's better to return the updated visit with all its lab requests
         // so the frontend can update everything at once.
         return new DoctorVisitResource($visit->fresh()->load([
-            'labRequests.mainTest', 
-            'labRequests.requestingUser:id,name', 
-            'labRequests.depositUser:id,name'
+            'patientLabRequests.mainTest', 
+            'patientLabRequests.requestingUser:id,name', 
+            'patientLabRequests.depositUser:id,name'
         ]));
 
     } catch (\Exception $e) {
         DB::rollBack();
         Log::error("Batch lab request payment failed for Visit ID {$visit->id}: " . $e->getMessage());
-        return response()->json(['message' => 'فشل تسجيل الدفعة المجمعة.', 'error' => 'خطأ داخلي.'], 500);
+        return response()->json(['message' => 'فشل تسجيل الدفعة المجمعة.', 'error' => 'خطأ داخلي.', 'error_details' => $e->getMessage()], 500);
     }
 }
 
 
+ /**
+     * Reset all child test results for a given LabRequest to their default values.
+     */
+    public function setDefaultResults(Request $request, LabRequest $labrequest)
+    {
+        // Authorization check: e.g., can user edit results for this lab request?
+        // if (!Auth::user()->can('edit lab_results', $labrequest)) {
+        //     return response()->json(['message' => 'Unauthorized to modify results.'], 403);
+        // }
+        // if ($labrequest->approve && !Auth::user()->can('edit_authorized_lab_results')) {
+        //    return response()->json(['message' => 'Cannot reset results for an authorized request without specific permission.'], 403);
+        // }
 
+
+        DB::beginTransaction();
+        try {
+            $updatedResultsCount = 0;
+            // Eager load childTest to access defval
+            foreach ($labrequest->results()->with('childTest')->get() as $requestedResult) {
+                if ($requestedResult->childTest) {
+                    $defaultValue = $requestedResult->childTest->defval ?? ''; // Use empty string if defval is null
+
+                    // Only update if the current result is different from the default
+                    // or if you want to force an update (e.g., to reset entered_by/at)
+                    if ($requestedResult->result !== $defaultValue /* || any_other_condition_to_force_update */) {
+                        $requestedResult->result = $defaultValue;
+                        // If you have tracking fields, you might want to update them or clear authorization
+                        // $requestedResult->entered_by_user_id = Auth::id();
+                        // $requestedResult->entered_at = now();
+                        // $requestedResult->flags = null; // Reset flags
+                        // $requestedResult->result_comment = null; // Reset comment
+                        // $requestedResult->authorized_at = null;
+                        // $requestedResult->authorized_by_user_id = null;
+                        $requestedResult->save();
+                        $updatedResultsCount++;
+                    }
+                }
+            }
+
+            // Update overall LabRequest status if needed
+            if ($updatedResultsCount > 0 || $labrequest->results()->doesntExist()) { // If any result changed or no results (all were blank)
+                // If all results are now effectively empty (matching their defval, which might be empty)
+                $allChildTestsCount = $labrequest->mainTest->childTests()->count();
+                $nonEmptyResultsCount = $labrequest->results()->where(fn($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
+
+                if ($nonEmptyResultsCount === 0) {
+                    $labrequest->result_status = 'pending_entry';
+                } elseif ($nonEmptyResultsCount < $allChildTestsCount) {
+                    $labrequest->result_status = 'results_partial';
+                } else { // All results have some value (even if it's the default)
+                    $labrequest->result_status = 'results_complete_pending_auth';
+                }
+                
+                // If resetting to default implies un-authorizing the main request
+                if ($labrequest->approve) {
+                    $labrequest->approve = false;
+                    $labrequest->authorized_at = null;
+                    $labrequest->authorized_by_user_id = null;
+                }
+                $labrequest->saveQuietly();
+            }
+
+            DB::commit();
+
+            // Return the updated LabRequest with its results
+            return new LabRequestResource(
+                $labrequest->fresh()->load([
+                    'mainTest.childTests.unit', 
+                    'results.childTest.unit', 
+                    // 'results.enteredBy' // if you have it
+                ])
+            );
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error resetting results to default for LabRequest ID {$labrequest->id}: " . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['message' => 'Failed to reset results to default values.', 'error' => $e->getMessage()], 500);
+        }
+    }
     // Store multiple lab requests for a visit
     public function storeBatchForVisit(Request $request, DoctorVisit $visit)
     {
@@ -269,7 +456,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                 $mainTest = MainTest::with('childTests.unit')->find($mainTestId); // Eager load child tests and their units
                 if (!$mainTest) continue;
 
-                $alreadyExists = $visit->labRequests()->where('main_test_id', $mainTestId)->exists();
+                $alreadyExists = $visit->patientLabRequests()->where('main_test_id', $mainTestId)->exists();
                 if ($alreadyExists && !$request->input('allow_duplicates', false)) {
                     // Handle or log duplicate, for now skipping
                     continue;
@@ -298,9 +485,9 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                     'main_test_id' => $mainTestId,
                     'pid' => $visit->patient_id,
                     'doctor_visit_id' => $visit->id,
-                    'hidden' => $request->input('hidden', false), // Assuming default is visible
+                    'hidden' => $request->input('hidden', true), // Assuming default is visible
                     'is_lab2lab' => $request->input('is_lab2lab', false),
-                    'valid' => true,
+                    'valid' => false,
                     'no_sample' => false, // Sample presumably will be collected
                     'price' => $price,
                     'amount_paid' => 0,
@@ -783,7 +970,16 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
     public function destroy(LabRequest $labrequest)
     {
         // ... (logic for cancellation/deletion with checks) ...
+        $labrequest->delete();
         return response()->json(null, 204);
+    }
+
+    public function unpay(LabRequest $labrequest)
+    {
+        $labrequest->is_paid = false;
+        $labrequest->amount_paid = 0;
+        $labrequest->save();
+        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser']));
     }
 
     /**
@@ -869,5 +1065,113 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         // ... (logic to check if all results entered, then update RequestedResult.authorized_at/by) ...
         // ... (update LabRequest status to 'authorized') ...
         return new LabRequestResource($labrequest->load(['mainTest.childTests.unit', 'results.authorizedBy', 'requestingUser']));
+    }
+    public function populateCbcResultsFromSysmex(Request $request, LabRequest $labrequest)
+    {
+        // Authorization
+        // if (!Auth::user()->can('populate_sysmex_results', $labrequest)) { /* ... */ }
+
+        $validated = $request->validate([
+            // The main_test_id is already known from $labrequest->main_test_id
+            // We might need the DoctorVisit ID if Sysmex table is linked to it.
+            'doctor_visit_id_for_sysmex' => 'required|integer|exists:doctorvisits,id' // Assuming Sysmex data is per visit
+        ]);
+        
+        $doctorVisitIdForSysmex = $validated['doctor_visit_id_for_sysmex'];
+
+        // Find the latest Sysmex result for the given DoctorVisit ID
+        $sysmexData = SysmexResult::where('doctorvisit_id', $doctorVisitIdForSysmex) // Ensure your Sysmex table has this FK
+                            ->orderBy('id', 'desc') // Or by a timestamp column like 'result_time'
+                            ->first();
+
+        if (!$sysmexData) {
+            return response()->json(['status' => false, 'message' => 'No Sysmex data found for this visit.'], 404);
+        }
+
+        $bindings = CbcBinding::all();
+        if ($bindings->isEmpty()){
+             return response()->json(['status' => false, 'message' => 'CBC Binder configuration is missing.'], 404);
+        }
+
+        $patientId = $labrequest->pid;
+        $mainTestIdForCBC = $labrequest->main_test_id; // The CBC panel's main_test_id
+
+        DB::beginTransaction();
+        try {
+            $updatedResultsCount = 0;
+            $debugObject = []; // For your cbcObj return
+
+            foreach ($bindings as $binding) {
+                // Check if the column exists in the fetched $sysmexData model/object
+                if (!isset($sysmexData->{$binding->name_in_sysmex_table})) {
+                    Log::warning("Sysmex column '{$binding->name_in_sysmex_table}' not found in fetched Sysmex data for visit ID: {$doctorVisitIdForSysmex}");
+                    continue;
+                }
+                
+                $sysmexValue = $sysmexData->{$binding->name_in_sysmex_table};
+                $debugObject[$binding->name_in_sysmex_table] = [
+                    'child_id_array_str' => $binding->child_id_array, // Keep original string for debug
+                    'sysmex_result' => $sysmexValue
+                ];
+
+                $childIdArray = explode(',', $binding->child_id_array);
+
+                foreach ($childIdArray as $childId) {
+                    if (empty(trim($childId))) continue;
+
+                    $requestedResult = RequestedResult::where('lab_request_id', $labrequest->id) // Scope to current lab request
+                                                      ->where('child_test_id', trim($childId))
+                                                      // ->where('main_test_id', $mainTestIdForCBC) // Already implicitly handled by lab_request_id
+                                                      // ->where('patient_id', $patientId) // Already implicitly handled by lab_request_id
+                                                      ->first();
+
+                    if ($requestedResult) {
+                        $requestedResult->result = (string) $sysmexValue; // Cast to string as 'result' is text
+                        // You might want to update 'entered_by_user_id' and 'entered_at' here too
+                        // $requestedResult->entered_by_user_id = Auth::id();
+                        // $requestedResult->entered_at = now();
+                        // $requestedResult->flags = null; // Reset flags or calculate them
+                        // $requestedResult->authorized_at = null; // Reset authorization
+                        // $requestedResult->authorized_by_user_id = null;
+                        $requestedResult->save();
+                        $updatedResultsCount++;
+                    } else {
+                        Log::info("No RequestedResult found for LabRequest ID {$labrequest->id}, ChildTest ID {$childId} to populate Sysmex data.");
+                    }
+                }
+            }
+
+            // Update overall LabRequest status if results were populated
+            if ($updatedResultsCount > 0) {
+                $expectedChildTestsCount = $labrequest->mainTest->childTests()->count();
+                $enteredResultsCount = $labrequest->results()->where(fn($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
+
+                if ($enteredResultsCount === 0) $labrequest->result_status = 'pending_entry';
+                elseif ($enteredResultsCount < $expectedChildTestsCount) $labrequest->result_status = 'results_partial';
+                else $labrequest->result_status = 'results_complete_pending_auth';
+                
+                // If LabRequest was approved, populating results should likely un-approve it
+                if($labrequest->approve){
+                    $labrequest->approve = false;
+                    $labrequest->authorized_at = null;
+                    $labrequest->authorized_by_user_id = null;
+                }
+                $labrequest->saveQuietly();
+            }
+            
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => $updatedResultsCount > 0 ? 'CBC results populated successfully.' : 'No matching results found to update, or values were already current.',
+                'data' => new LabRequestResource($labrequest->fresh()->loadDefaultRelations()), // Assuming loadDefaultRelations loads what UI needs
+                'cbcObj' => $debugObject // Your debug object
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Error populating CBC results for LabRequest ID {$labrequest->id}: " . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['status' => false, 'message' => 'Failed to populate CBC results.', 'error' => $e->getMessage()], 500);
+        }
     }
 }

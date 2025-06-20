@@ -24,7 +24,7 @@ class PatientResource extends JsonResource
             'age_month' => $this->age_month,
             'age_day' => $this->age_day,
             'full_age' => $this->getFullAgeAttribute(), // Accessor for display
-
+            'doctor'=> new DoctorStrippedResource($this->whenLoaded('doctor')), 
             'address' => $this->address,
             'gov_id' => $this->gov_id, // Governorate ID or name
             // 'country_id' => $this->country_id, // If you have country management

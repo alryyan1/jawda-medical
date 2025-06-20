@@ -68,7 +68,7 @@ class ShiftController extends Controller
 
     public function getCurrentShift()
     {
-        $currentShift = Shift::latest('created_at')->first();
+        $currentShift = Shift::latest('id')->first();
         return new ShiftResource($currentShift->loadMissing(['userOpened', 'userClosed']));
     }
 

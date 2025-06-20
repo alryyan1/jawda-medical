@@ -166,13 +166,18 @@ class DoctorVisit extends Model
         return $this->hasMany(RequestedService::class, 'doctorvisits_id'); 
     }
 
-    /**
-     * Get all lab requests associated with this visit.
-     */
-    public function labRequests()
+    public function patientLabRequests()
     {
-        return $this->hasMany(LabRequest::class, 'doctor_visit_id');
+        return $this->hasManyThrough(
+            \App\Models\LabRequest::class,
+            \App\Models\Patient::class,
+            'id',               // Foreign key on Patient (usually 'id')
+            'pid',       // Foreign key on LabRequest
+            'patient_id',       // Local key on DoctorVisit
+            'id'                // Local key on Patient
+        );
     }
+    
     
     /**
      * Get all prescriptions issued during this visit.
@@ -427,16 +432,16 @@ class DoctorVisit extends Model
         return $query->with([
             'patient.company', 
             'doctor:id,name',
-            'labRequests' => fn ($q) => $q->where('hidden', false)->orderBy('id'),
-            'labRequests.mainTest.childTests' => fn($q_ct) => $q_ct->with(['unit:id,name', 'childGroup:id,name'])->orderBy('test_order')->orderBy('id'),
-            'labRequests.mainTest.package:package_id,package_name',
-            'labRequests.requestingUser:id,name',
-            'labRequests.results.unit:id,name',      // For result's own unit snapshot
-            'labRequests.results.childTest',        // For child test definition context
-            'labRequests.results.enteredBy:id,name', // If you have this field on RequestedResult
-            'labRequests.results.authorizedBy:id,name',// If you have this field on RequestedResult
-            'labRequests.authorizedBy:id,name',     // For overall LabRequest authorization
-            'labRequests.requestedOrganisms',
+            'patient.labRequests' => fn ($q) => $q->where('hidden', false)->orderBy('id'),
+            'patient.labRequests.mainTest.childTests' => fn($q_ct) => $q_ct->with(['unit:id,name', 'childGroup:id,name'])->orderBy('test_order')->orderBy('id'),
+            'patient.labRequests.mainTest.package:package_id,package_name',
+            'patient.labRequests.requestingUser:id,name',
+            'patient.labRequests.results.unit:id,name',      // For result's own unit snapshot
+            'patient.labRequests.results.childTest',        // For child test definition context
+            'patient.labRequests.results.enteredBy:id,name', // If you have this field on RequestedResult
+            'patient.labRequests.results.authorizedBy:id,name',// If you have this field on RequestedResult
+            'patient.labRequests.authorizedBy:id,name',     // For overall LabRequest authorization
+            'patient.labRequests.requestedOrganisms',
             'user:id,name' // User who created visit
         ]);
     }

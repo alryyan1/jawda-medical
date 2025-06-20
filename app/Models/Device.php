@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
+ * App\Models\Device
  *
  * @property int $id
  * @property string $name
@@ -20,4 +20,8 @@ use Illuminate\Database\Eloquent\Model;
 class Device extends Model
 {
     use HasFactory;
+    protected $fillable = ['name'];
+    public $timestamps = false;
+    //table name
+    protected $table = 'devices'; // This explicitly sets the table name
 }

@@ -2,8 +2,10 @@
 
 namespace App\Services\Pdf; // Make sure this namespace is correct for your application
 
+use App\Models\DoctorVisit;
 use App\Models\Setting;   // Assuming Setting model is in App\Models
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use TCPDF;
 
 class MyCustomTCPDF extends TCPDF
@@ -20,13 +22,16 @@ class MyCustomTCPDF extends TCPDF
     protected array $tableWidths = [];
     protected array $tableAlignments = [];
     protected int $defaultCellHeight = 7; // Default height for a single line cell
+    public  $currentVisit = null; // Made public for easier access if needed
 
+    // Store concatenated test names for header
+    protected string $concatenatedTestNamesForHeader = '';
     public function __construct(
         string $reportTitle = 'Report',
-        string $filterCriteria = '',
+         $visitContext = null,
         string $orientation = 'P',
         string $unit = 'mm',
-         $format = 'A4',
+        $format = 'A4',
         bool $unicode = true,
         string $encoding = 'UTF-8',
         bool $diskcache = false,
@@ -35,42 +40,33 @@ class MyCustomTCPDF extends TCPDF
         parent::__construct($orientation, $unit, $format, $unicode, $encoding, $diskcache, $pdfa);
 
         $this->reportTitle = $reportTitle;
-        $this->filterCriteria = $filterCriteria;
-        $this->currentSettings = Setting::first(); // Fetch settings once
-        $this->pageOrientation = $orientation;
+        $this->currentVisit = $visitContext;
+        $this->currentSettings = Setting::instance(); // Make sure Setting::instance() is reliable
 
-        // Set Meta Information
-        $this->SetCreator(PDF_CREATOR);
-        $this->SetAuthor($this->currentSettings?->hospital_name ?? config('app.name', 'System'));
-        $this->SetTitle($this->reportTitle);
-        $this->SetSubject('Report Details');
-        $this->SetKeywords('Report, PDF, Data');
+        // Font setup should ideally be global or in a base PDF class constructor
+        // For this example, assuming defaultFont is set and available
+        // Example: $this->defaultFont = TCPDF_FONTS::addTTFfont(public_path('fonts/aealarabiya.ttf'), 'TrueTypeUnicode', '', 32);
 
-        // Set default font
-       
-            $this->defaultFont = 'arial'; // Fallback
-            // Log::warning("Arial font not found at public/arial.ttf. Falling back to Helvetica.");
-        
-        $this->SetFont($this->defaultFont, '', 10);
+        $this->SetCreator(config('app.name', 'Lab System'));
+        $this->SetAuthor($this->currentSettings?->hospital_name ?? $this->currentSettings?->lab_name ?? config('app.name'));
+        $this->SetTitle($this->reportTitle . ($this->currentVisit ? " - Visit #{$this->currentVisit->id}" : ""));
+        $this->SetSubject('Lab Result Report');
+        $this->setLanguageArray(['a_meta_charset' => 'UTF-8', 'a_meta_dir' => 'rtl', 'a_meta_language' => 'ar', 'w_page' => 'صفحة']);
+        $this->setRTL(true);
 
-        // Set RTL and Language
-        $this->setLanguageArray($this->getCustomLanguageArray());
-        $this->setRTL(app()->getLocale() === 'ar'); // Assuming 'ar' for Arabic
+        $this->SetMargins(10, 45, 10); // L, T, R - Top margin increased for letterhead
+        $this->SetHeaderMargin(5);
+        $this->SetFooterMargin(20); // Increased for more robust footer
+        $this->SetAutoPageBreak(true, 25); // Bottom margin for auto page break
 
-        // Page settings (Margins crucial for AutoPageBreak)
-        // These values are examples, adjust as needed.
-        $topMargin = 38; // Increased to accommodate a more detailed header
-        if ($this->pageOrientation === 'L') { // Landscape might need different margins
-            $topMargin = 35;
+        if ($this->currentVisit) {
+            $this->concatenatedTestNamesForHeader = $this->currentVisit->patientLabRequests
+                ->where('hidden', false)->where('valid', true)
+                ->map(fn($lr) => $lr->mainTest?->main_test_name)
+                ->filter()->unique()->implode(' | '); // Use a clear separator
         }
-        $this->SetMargins(10, $topMargin, 10); // Left, Top, Right
-        $this->SetHeaderMargin(5);      // From top of page to start of Header() content
-        $this->SetFooterMargin(10);     // From bottom of page to start of Footer() content
-        $this->SetAutoPageBreak(true, 20); // Enable auto page break, 20mm from bottom
-
-        $this->setPrintHeader(true);
-        $this->setPrintFooter(true);
     }
+
 
     public function drawTextWatermark(string $text, string $font = '', int $fontSize = 45, int $angle = 45, array $color = [230, 230, 230])
     {
@@ -134,106 +130,198 @@ class MyCustomTCPDF extends TCPDF
 
     public function Header()
     {
+        if (!$this->currentSettings) return; // Should not happen if Setting::instance() is robust
+
+        $settings = $this->currentSettings;
         $isRTL = $this->getRTL();
-        $settings = $this->currentSettings; // Use the fetched settings
+        $pageWidth = $this->getPageWidth();
+        $lMargin = $this->getMargins()['left'];
+        $rMargin = $this->getMargins()['right'];
+        $contentWidth = $pageWidth - $lMargin - $rMargin;
 
-        $logoPath = $settings?->report_header_logo_base64 ?? $settings?->logo_base64; // Prioritize report specific logo
-        $companyName = $settings?->report_header_company_name ?? $settings?->hospital_name ?? config('app.name');
-        $address1 = $settings?->report_header_address_line1 ?? $settings?->address;
-        $phone = $settings?->report_header_phone ?? $settings?->phone;
-        // Add more header fields (email, VATIN, CR) similarly if needed
+        // --- Letterhead Section ---
+        $logoBase64 = $settings->report_header_logo_base64 ?? $settings->logo_base64;
+        $headerTextLine1 = $settings->report_header_company_name ?? $settings->hospital_name ?? $settings->lab_name ?? config('app.name');
+        $headerTextLine2 = $settings->report_header_address_line1 ?? $settings->address;
+        $headerTextLine3 = ($settings->report_header_phone ? ($isRTL ? "هاتف: " : "Phone: ") . $settings->report_header_phone : '') .
+                           ($settings->report_header_email ? ($isRTL ? " | إيميل: " : " | Email: ") . $settings->report_header_email : '');
+        $headerTextLine4 = ($settings->report_header_cr ? ($isRTL ? "س.ت: " : "CR: ") . $settings->report_header_cr : '') .
+                           ($settings->report_header_vatin ? ($isRTL ? " | ر.ض: " : " | VATIN: ") . $settings->report_header_vatin : '');
 
-        $imageX = $isRTL ? $this->getPageWidth() - $this->original_rMargin - 25 : $this->original_lMargin;
-        $textBlockX = $isRTL ? $this->original_rMargin : $this->original_lMargin;
-        $textBlockWidth = $this->getPageWidth() - $this->original_lMargin - $this->original_rMargin;
+
+        $logoHeight = 20; // Max logo height
+        $logoWidth = 20;  // Max logo width
+        $logoX = $isRTL ? $pageWidth - $rMargin - $logoWidth : $lMargin;
+        $textX = $isRTL ? $lMargin : $lMargin + $logoWidth + 5;
+        $textWidth = $contentWidth - ($logoWidth + 5); // Adjust text width if logo is present
         $logoRendered = false;
 
-        if ($logoPath) {
-            // Check if it's a base64 string
-            if (str_starts_with($logoPath, 'data:image')) {
-                try {
-                    $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $logoPath));
-                    if ($imgData) {
-                        $this->Image('@'.$imgData, $imageX, $this->GetY(), 20, 12, '', '', 'T', false, 300, '', false, false, 0);
-                        $logoRendered = true;
-                    }
-                } catch (\Exception $e) {/* Log error if needed */}
-            } elseif (file_exists(storage_path('app/public/' . $logoPath))) { // Assuming path relative to storage/app/public
-                $this->Image(storage_path('app/public/' . $logoPath), $imageX, $this->GetY(), 20, 12, '', '', 'T', false, 300, '', false, false, 0);
-                $logoRendered = true;
-            }
+        if ($logoBase64 && str_starts_with($logoBase64, 'data:image')) {
+            try {
+                $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $logoBase64));
+                if ($imgData) {
+                    $this->Image('@'.$imgData, $logoX, $this->getHeaderMargin() + 2, $logoWidth, $logoHeight, '', '', 'T', false, 300, '', false, false, 0);
+                    $logoRendered = true;
+                }
+            } catch (\Exception $e) { Log::error("PDF Header Logo Error: ".$e->getMessage()); }
+        }
+        if (!$logoRendered) { // If no logo, text takes full width
+            $textX = $lMargin;
+            $textWidth = $contentWidth;
         }
         
-        // If logo is rendered on one side, text block width might need adjustment if side-by-side
-        if ($logoRendered) {
-            $textBlockWidth -= 25; // Reduce width for text block if logo takes space
-            if (!$isRTL) { // If LTR and logo is on left, text starts after logo
-                $textBlockX += 25;
-            }
-        }
-
         $this->SetFont($this->defaultFont, 'B', 11);
-        $this->SetXY($textBlockX, $this->getHeaderMargin() + 2); // Start text near top margin
-        $this->MultiCell($textBlockWidth, 5, $companyName, 0, $isRTL ? 'R' : 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
+        $this->SetXY($textX, $this->getHeaderMargin() + 2);
+        $this->MultiCell($textWidth, 5, $headerTextLine1, 0, $isRTL ? 'R' : 'L', false, 1);
+        
+        $this->SetFont($this->defaultFont, '', 7.5);
+        if ($headerTextLine2) {
+            $this->SetX($textX); $this->MultiCell($textWidth, 3.5, $headerTextLine2, 0, $isRTL ? 'R' : 'L', false, 1);
+        }
+        if ($headerTextLine3) {
+            $this->SetX($textX); $this->MultiCell($textWidth, 3.5, $headerTextLine3, 0, $isRTL ? 'R' : 'L', false, 1);
+        }
+        if ($headerTextLine4) {
+            $this->SetX($textX); $this->MultiCell($textWidth, 3.5, $headerTextLine4, 0, $isRTL ? 'R' : 'L', false, 1);
+        }
 
-        $this->SetFont($this->defaultFont, '', 7);
-        if ($address1) {
-            $this->SetX($textBlockX);
-            $this->MultiCell($textBlockWidth, 3.5, $address1, 0, $isRTL ? 'R' : 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
-        }
-        if ($phone) {
-            $this->SetX($textBlockX);
-            $this->MultiCell($textBlockWidth, 3.5, ($isRTL ? 'الهاتف: ' : 'Phone: ') . $phone, 0, $isRTL ? 'R' : 'L', false, 1, '', '', true, 0, false, true, 0, 'T');
-        }
-        // ... Add other details like email, VATIN, CR ...
+        // Determine Y position after letterhead details, considering logo height
+        $currentY = $this->GetY();
+        $logoEndY = $logoRendered ? ($this->getHeaderMargin() + 2 + $logoHeight) : $this->getHeaderMargin() + 2;
+        $this->SetY(max($currentY, $logoEndY) + 1); // Ensure Y is below tallest element
 
-        // Y position after header details block (consider logo height if taller)
-        $yAfterHeaderBlock = $this->GetY();
-        if ($logoRendered) {
-            $yAfterHeaderBlock = max($yAfterHeaderBlock, $this->getHeaderMargin() + 2 + 12 + 2); // currentY + imageHeight + padding
-        }
-        $this->SetY($yAfterHeaderBlock);
-        $this->Ln(1); // Small space
+        // --- Report Title ---
+        $this->SetFont($this->defaultFont, 'B', 14); // Main report title font
+        $this->Cell(0, 7, $this->reportTitle, 0, 1, 'C'); // Centered report title
+        $this->Ln(1);
 
-        // Report Title
-        $this->SetFont($this->defaultFont, 'B', $this->pageOrientation === 'L' ? 10 : 12);
-        $this->Cell(0, 5, $this->reportTitle, 0, 1, 'C');
-
-        // Filter Criteria
-        if ($this->filterCriteria) {
-            $this->SetFont($this->defaultFont, '', $this->pageOrientation === 'L' ? 7 : 8);
-            $this->MultiCell(0, 3.5, $this->filterCriteria, 0, 'C', false, 1, '', '', true, 0, false, true, 0, 'T');
+        // --- Patient Info Block ---
+        if ($this->currentVisit) {
+            // Call the dedicated method to draw patient info. This method is now in ReportController.
+            // For this to work directly, ReportController needs to be passed or its method made static
+            // Or, move this logic *into* MyCustomTCPDF if it's always the same header structure.
+            // For now, let's assume ReportController will call a method to draw this *after* AddPage()
+            // and before drawSingleMainTestBlock.
+            // The alternative is to pass ReportController instance or make drawPatientDoctorInfo public static.
+            // The original request implied a custom header *within TCPDF*.
+            $this->drawPatientDoctorInfoForHeader(); // New helper method within MyCustomTCPDF
         }
-        $this->Ln(2);
-        $func = $this->head;
-        if ($func != null){
-            $func($this);
- 
-        }
-        // Header Line
-        $this->Line($this->getMargins()['left'], $this->GetY(), $this->getPageWidth() - $this->getMargins()['right'], $this->GetY());
-        // $this->Ln(1); // Space for table header to start after this line, SetY will be PDF_MARGIN_TOP on new page
-    
-        // After drawing all header elements, TCPDF will place content starting at PDF_MARGIN_TOP.
-        // Ensure the sum of your header elements + Ln() calls doesn't exceed PDF_MARGIN_TOP.
-        // The actual content drawing (like table headers) will start based on the Y cursor
-        // which should be at PDF_MARGIN_TOP after AddPage() or where this Header() method leaves it.
+        
+        // Final line before main content area begins
+        $this->Line($lMargin, $this->GetY(), $pageWidth - $rMargin, $this->GetY());
+        // SetY below this line is important for where the content starts.
+        // The Top Margin in $this->SetMargins(10, 45, 10) is what dictates the start of content after header.
+        // Header() method draws *within* this top margin area.
     }
 
+    // New helper within MyCustomTCPDF for the patient info block
+    protected function drawPatientDoctorInfoForHeader()
+    {
+        if (!$this->currentVisit) return;
+        $patient = $this->currentVisit->patient;
+        $visit = $this->currentVisit;
+        $isRTL = $this->getRTL();
+        $contentWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
+        $lineHeight = 4.5;
+        $labelWidth = 28;
+        $valueIndent = 2;
+
+        $this->SetFont($this->defaultFont, '', 8.5);
+        $yStartBlock = $this->GetY();
+
+        // Column 1 (Right in RTL, Left in LTR)
+        $col1X = $isRTL ? ($this->getPageWidth() - $this->getMargins()['right'] - ($contentWidth / 2)) : $this->getMargins()['left'];
+        $colWidth = $contentWidth / 2 - 2; // -2 for a small gap between columns
+
+        $this->SetXY($col1X, $yStartBlock);
+        $this->SetFont($this->defaultFont, 'B', 8.5); $this->Cell($labelWidth, $lineHeight, ($isRTL ? 'اسم المريض:' : 'Patient Name:'), 0, 0, $isRTL ? 'R' : 'L');
+        $this->SetFont($this->defaultFont, '', 8.5); $this->MultiCell($colWidth - $labelWidth - $valueIndent, $lineHeight, $patient->name, 0, $isRTL ? 'R' : 'L', false, 1, $col1X + $labelWidth + $valueIndent);
+        
+        $this->SetX($col1X);
+        $this->SetFont($this->defaultFont, 'B', 8.5); $this->Cell($labelWidth, $lineHeight, ($isRTL ? 'رقم المريض:' : 'Patient ID:'), 0, 0, $isRTL ? 'R' : 'L');
+        $this->SetFont($this->defaultFont, '', 8.5); $this->Cell($colWidth - $labelWidth - $valueIndent, $lineHeight, $patient->id, 0, 1, $isRTL ? 'R' : 'L');
+
+        $ageGender = ($patient->age_year ?? 'N/A') . ($isRTL ? 'س' : 'Y') . " / " . ($patient->gender ? substr(strtoupper($patient->gender),0,1) : 'U');
+        $this->SetX($col1X);
+        $this->SetFont($this->defaultFont, 'B', 8.5); $this->Cell($labelWidth, $lineHeight, ($isRTL ? 'العمر/الجنس:' : 'Age/Sex:'), 0, 0, $isRTL ? 'R' : 'L');
+        $this->SetFont($this->defaultFont, '', 8.5); $this->Cell($colWidth - $labelWidth - $valueIndent, $lineHeight, $ageGender, 0, 1, $isRTL ? 'R' : 'L');
+
+        $this->SetX($col1X);
+        $this->SetFont($this->defaultFont, 'B', 8.5); $this->Cell($labelWidth, $lineHeight, ($isRTL ? 'طبيب محول:' : 'Ref. Doctor:'), 0, 0, $isRTL ? 'R' : 'L');
+        $this->SetFont($this->defaultFont, '', 8.5); $this->Cell($colWidth - $labelWidth - $valueIndent, $lineHeight, $visit->doctor?->name ?? ($isRTL ? 'غير محدد' : 'N/A'), 0, 1, $isRTL ? 'R' : 'L');
+
+
+        // Column 2 (Left in RTL, Right in LTR)
+        $yCol1End = $this->GetY(); // Y after drawing Col1
+        $this->SetY($yStartBlock);   // Reset Y to start of block for Col2
+        $col2X = $isRTL ? $this->getMargins()['left'] : $col1X + $colWidth + 4; // +4 for gap
+
+        $this->SetXY($col2X, $this->GetY());
+        $this->SetFont($this->defaultFont, 'B', 8.5); $this->Cell($labelWidth, $lineHeight, ($isRTL ? 'رقم الزيارة:' : 'Visit ID:'), 0, 0, $isRTL ? 'R' : 'L');
+        $this->SetFont($this->defaultFont, '', 8.5); $this->Cell($colWidth - $labelWidth - $valueIndent, $lineHeight, $visit->id, 0, 1, $isRTL ? 'R' : 'L');
+        
+        $sampleIds = $visit->patientLabRequests->pluck('sample_id')->filter()->unique()->implode(', ') ?: $visit->patientLabRequests->pluck('id')->filter()->unique()->implode('REQ-');
+        $this->SetX($col2X);
+        $this->SetFont($this->defaultFont, 'B', 8.5); $this->Cell($labelWidth, $lineHeight, ($isRTL ? 'رقم العينة:' : 'Sample ID:'), 0, 0, $isRTL ? 'R' : 'L');
+        $this->SetFont($this->defaultFont, '', 8.5); $this->MultiCell($colWidth - $labelWidth - $valueIndent, $lineHeight, $sampleIds ?: ($isRTL ? 'غير محدد' : 'N/A'), 0, $isRTL ? 'R' : 'L', false, 1, $col2X + $labelWidth + $valueIndent);
+        
+        $this->SetX($col2X);
+        $this->SetFont($this->defaultFont, 'B', 8.5); $this->Cell($labelWidth, $lineHeight, ($isRTL ? 'تاريخ الطلب:' : 'Request Date:'), 0, 0, $isRTL ? 'R' : 'L');
+        $this->SetFont($this->defaultFont, '', 8.5); $this->Cell($colWidth - $labelWidth - $valueIndent, $lineHeight, $visit->created_at->format('Y-m-d H:i'), 0, 1, $isRTL ? 'R' : 'L');
+
+        $this->SetX($col2X);
+        $this->SetFont($this->defaultFont, 'B', 8.5); $this->Cell($labelWidth, $lineHeight, ($isRTL ? 'تاريخ التقرير:' : 'Report Date:'), 0, 0, $isRTL ? 'R' : 'L');
+        $this->SetFont($this->defaultFont, '', 8.5); $this->Cell($colWidth - $labelWidth - $valueIndent, $lineHeight, Carbon::now()->format('Y-m-d H:i'), 0, 1, $isRTL ? 'R' : 'L');
+        
+        // Set Y to be below the tallest of the two columns
+        $this->SetY(max($yCol1End, $this->GetY()));
+        $this->Ln(2); // Space after patient info block
+
+        // Display concatenated test names if they exist
+        if ($this->currentVisit->patient->tests_concatinated()) {
+            $this->SetFont($this->defaultFont, 'B', 7.5);
+            $this->SetFillColor(245,245,245);
+            $this->MultiCell($contentWidth, $lineHeight - 1, ($isRTL ? 'الفحوصات المطلوبة: ' : 'Requested Tests: ') . $this->concatenatedTestNamesForHeader, 'LTRB', $isRTL ? 'R' : 'L', true, 1);
+            $this->Ln(1);
+        }
+    }
+    // public function Footer()
+    // {
+    //     $isRTL = $this->getRTL();
+    //     $this->SetY(-15); // Position at 1.5 cm from bottom
+    //     $this->SetFont($this->defaultFont, 'I', 7);
+    //     $this->SetTextColor(100, 100, 100);
+
+    //     $pageNumberText = ($isRTL ? 'صفحة ' : 'Page ') . $this->getAliasNumPage() . ($isRTL ? ' من ' : ' of ') . $this->getAliasNbPages();
+    //     $this->Cell(0, 10, $pageNumberText, 0, false, 'C', 0, '', 0, false, 'T', 'M');
+
+    //     $printDate = ($isRTL ? 'تاريخ الطباعة: ' : 'Printed: ') . Carbon::now()->setTimezone(config('app.timezone', 'UTC'))->format('Y-m-d h:i A');
+    //     $this->Cell(0, 10, $printDate, 0, false, $isRTL ? 'L' : 'R', 0, '', 0, false, 'T', 'M');
+    // }
     public function Footer()
     {
+        // ... (Your detailed signature and page number footer from previous version) ...
+        // ... Or a simplified version:
         $isRTL = $this->getRTL();
-        $this->SetY(-15); // Position at 1.5 cm from bottom
+        $this->SetY(-23); // Adjusted for potentially more signature lines
         $this->SetFont($this->defaultFont, 'I', 7);
-        $this->SetTextColor(100, 100, 100);
+        $this->SetTextColor(100);
+        $this->Cell(0, 5, ($isRTL ? 'صفحة ' : 'Page ') . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 'T', 0, 'C');
+        $this->Cell(0, 5, ($isRTL ? 'تاريخ الطباعة: ' : 'Printed: ') . Carbon::now()->format('Y-m-d H:i'), 'T', 0, $isRTL ? 'L' : 'R');
 
-        $pageNumberText = ($isRTL ? 'صفحة ' : 'Page ') . $this->getAliasNumPage() . ($isRTL ? ' من ' : ' of ') . $this->getAliasNbPages();
-        $this->Cell(0, 10, $pageNumberText, 0, false, 'C', 0, '', 0, false, 'T', 'M');
+        // Example simplified signature lines
+        $this->Ln(6);
+        $sigBlockWidth = ($this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right']) / 2 - 5;
+        $this->Cell($sigBlockWidth, 5, ($isRTL ? 'فني المختبر:' : 'Lab Technician:'), 'T', 0, 'C');
+        $this->Cell(10,5,'',0,0); // Spacer
+        $this->Cell($sigBlockWidth, 5, ($isRTL ? 'مدير المختبر/المراجع:' : 'Lab Director/Auditor:'), 'T', 1, 'C');
 
-        $printDate = ($isRTL ? 'تاريخ الطباعة: ' : 'Printed: ') . Carbon::now()->setTimezone(config('app.timezone', 'UTC'))->format('Y-m-d h:i A');
-        $this->Cell(0, 10, $printDate, 0, false, $isRTL ? 'L' : 'R', 0, '', 0, false, 'T', 'M');
+        if ($this->currentSettings?->footer_content) {
+            $this->SetY(-10); // Closer to bottom for fixed footer text
+            $this->SetFont($this->defaultFont, '', 7);
+            $this->MultiCell(0, 4, $this->currentSettings->footer_content, 0, 'C', false, 1);
+        }
     }
-
     // Call this once before starting to draw the table rows for the first time
     public function SetTableDefinition(array $headers, array $widths, array $alignments)
     {

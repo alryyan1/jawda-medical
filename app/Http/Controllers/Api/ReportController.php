@@ -27,6 +27,8 @@ use App\Models\MainTest;
 use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\User;
+use App\Mypdf\Pdf;
+
 use App\Services\Pdf\MyCustomTCPDF;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Log;
@@ -541,175 +543,175 @@ class ReportController extends Controller
     }
   
 
-    public function generateMonthlyLabIncomePdf(Request $request)
-    {
-        // Permission Check: e.g., can('view monthly_lab_income_report')
-        // if (!auth()->user()->can('view monthly_lab_income_report')) { ... }
+    // public function generateMonthlyLabIncomePdf(Request $request)
+    // {
+    //     // Permission Check: e.g., can('view monthly_lab_income_report')
+    //     // if (!auth()->user()->can('view monthly_lab_income_report')) { ... }
 
-        $validated = $request->validate([
-            'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2000|max:' . (date('Y') + 1),
-        ]);
+    //     $validated = $request->validate([
+    //         'month' => 'required|integer|min:1|max:12',
+    //         'year' => 'required|integer|min:2000|max:' . (date('Y') + 1),
+    //     ]);
 
-        $year = $validated['year'];
-        $month = $validated['month'];
+    //     $year = $validated['year'];
+    //     $month = $validated['month'];
 
-        $startDate = Carbon::create($year, $month, 1)->startOfDay();
-        $endDate = $startDate->copy()->endOfMonth()->endOfDay();
-        $period = CarbonPeriod::create($startDate, $endDate);
+    //     $startDate = Carbon::create($year, $month, 1)->startOfDay();
+    //     $endDate = $startDate->copy()->endOfMonth()->endOfDay();
+    //     $period = CarbonPeriod::create($startDate, $endDate);
 
-        $reportTitle = 'تقرير إيرادات المختبر الشهري';
-        $filterCriteria = "لشهر: {$startDate->translatedFormat('F Y')} ( {$startDate->format('Y-m-d')} - {$endDate->format('Y-m-d')} )";
+    //     $reportTitle = 'تقرير إيرادات المختبر الشهري';
+    //     $filterCriteria = "لشهر: {$startDate->translatedFormat('F Y')} ( {$startDate->format('Y-m-d')} - {$endDate->format('Y-m-d')} )";
 
-        // --- Data Aggregation ---
-        $dailyData = [];
-        $grandTotals = [
-            'income' => 0,
-            'discount' => 0,
-            'cash' => 0,
-            'bank' => 0,
-        ];
+    //     // --- Data Aggregation ---
+    //     $dailyData = [];
+    //     $grandTotals = [
+    //         'income' => 0,
+    //         'discount' => 0,
+    //         'cash' => 0,
+    //         'bank' => 0,
+    //     ];
 
-        // Fetch all relevant lab requests for the month for efficiency
-        // Eager load patient for company check
-        $labRequestsForMonth = LabRequest::with('patient')
-            ->whereBetween('created_at', [$startDate, $endDate]) // Filter by request creation date
-            // Or filter by payment date if that's more relevant for "income"
-            // ->whereHas('payments', function($q) use ($startDate, $endDate) { // If using a payments relation
-            //     $q->whereBetween('payment_date', [$startDate, $endDate]);
-            // })
-            ->get();
+    //     // Fetch all relevant lab requests for the month for efficiency
+    //     // Eager load patient for company check
+    //     $labRequestsForMonth = LabRequest::with('patient')
+    //         ->whereBetween('created_at', [$startDate, $endDate]) // Filter by request creation date
+    //         // Or filter by payment date if that's more relevant for "income"
+    //         // ->whereHas('payments', function($q) use ($startDate, $endDate) { // If using a payments relation
+    //         //     $q->whereBetween('payment_date', [$startDate, $endDate]);
+    //         // })
+    //         ->get();
 
-        // Group lab requests by creation date (day)
-        $requestsByDate = $labRequestsForMonth->groupBy(function ($request) {
-            return Carbon::parse($request->created_at)->format('Y-m-d');
-        });
-
-
-        foreach ($period as $date) {
-            $currentDateStr = $date->format('Y-m-d');
-            $dailyIncome = 0;
-            $dailyDiscount = 0;
-            $dailyCash = 0;
-            $dailyBank = 0;
-
-            if ($requestsByDate->has($currentDateStr)) {
-                foreach ($requestsByDate[$currentDateStr] as $lr) {
-                    $price = (float) ($lr->price ?? 0);
-                    $count = (int) ($lr->count ?? 1);
-                    $itemSubTotal = $price * $count;
-
-                    $discountAmount = ($itemSubTotal * ((int) ($lr->discount_per ?? 0) / 100));
-                    // Add fixed discount if you have it: + (float)($lr->fixed_discount_amount ?? 0);
-
-                    $enduranceAmount = (float) ($lr->endurance ?? 0);
-                    $isCompanyPatient = !!$lr->patient?->company_id;
-
-                    $netPayableByPatient = $itemSubTotal - $discountAmount - ($isCompanyPatient ? $enduranceAmount : 0);
-
-                    // Income is based on the net amount the patient is supposed to pay for services rendered ON this day
-                    // This assumes 'created_at' of LabRequest signifies the service rendering day for income recognition
-                    $dailyIncome += $netPayableByPatient;
-                    $dailyDiscount += $discountAmount; // Summing calculated discount for the day
-
-                    // For cash/bank, we sum what was ACTUALLY collected for requests of this day
-                    // This assumes labrequests.is_paid and labrequests.amount_paid reflect collection for that request.
-                    // If payments are separate, this logic needs to change.
-                    if ($lr->is_paid || $lr->amount_paid > 0) {
-                        // This is tricky: amount_paid might be partial.
-                        // For simplicity of this report based on current LabRequest model:
-                        // If you want actual collected cash/bank for THIS DAY, you need a payment date on LabRequest
-                        // or join with a payment/deposit table filtered by payment_date.
-                        // Let's assume if it's paid, the amount_paid is the collected amount for that item on its creation day.
-                        $collectedAmountForItem = (float) $lr->amount_paid;
-
-                        if ($lr->is_bankak) { // Or your field for bank payment
-                            $dailyBank += $collectedAmountForItem;
-                        } else {
-                            $dailyCash += $collectedAmountForItem;
-                        }
-                    }
-                }
-            }
-
-            $dailyData[$currentDateStr] = [
-                'date' => $currentDateStr,
-                'income' => $dailyIncome,
-                'discount' => $dailyDiscount,
-                'cash' => $dailyCash,
-                'bank' => $dailyBank,
-            ];
-
-            $grandTotals['income'] += $dailyIncome;
-            $grandTotals['discount'] += $dailyDiscount;
-            $grandTotals['cash'] += $dailyCash;
-            $grandTotals['bank'] += $dailyBank;
-        }
+    //     // Group lab requests by creation date (day)
+    //     $requestsByDate = $labRequestsForMonth->groupBy(function ($request) {
+    //         return Carbon::parse($request->created_at)->format('Y-m-d');
+    //     });
 
 
-        // --- PDF Generation ---
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
-        $pdf->AddPage();
-        $pdf->SetLineWidth(0.1);
+    //     foreach ($period as $date) {
+    //         $currentDateStr = $date->format('Y-m-d');
+    //         $dailyIncome = 0;
+    //         $dailyDiscount = 0;
+    //         $dailyCash = 0;
+    //         $dailyBank = 0;
 
-        // Table Header
-        $headers = ['التاريخ', 'إجمالي الإيراد (الصافي)', 'إجمالي الخصومات', 'المحصل نقداً', 'المحصل بنك/شبكة'];
-        // A4 Landscape width ~277mm usable
-        $colWidths = [40, 60, 50, 60, 0];
-        $colWidths[count($colWidths) - 1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
-        $alignments = ['C', 'C', 'C', 'C', 'C'];
-        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+    //         if ($requestsByDate->has($currentDateStr)) {
+    //             foreach ($requestsByDate[$currentDateStr] as $lr) {
+    //                 $price = (float) ($lr->price ?? 0);
+    //                 $count = (int) ($lr->count ?? 1);
+    //                 $itemSubTotal = $price * $count;
 
-        // Table Body
-        $fill = false;
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
-        foreach ($dailyData as $dayData) {
-            if ($dayData['income'] == 0 && $dayData['cash'] == 0 && $dayData['bank'] == 0 && $dayData['discount'] == 0) {
-                // Optionally skip days with no activity to make report shorter
-                // continue; 
-            }
-            $rowData = [
-                Carbon::parse($dayData['date'])->format('Y-m-d (D)'), // Format date with day name
-                number_format($dayData['income'], 2),
-                number_format($dayData['discount'], 2),
-                number_format($dayData['cash'], 2),
-                number_format($dayData['bank'], 2),
-            ];
-            $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
-            $fill = !$fill;
-        }
-        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY()); // Bottom line for table
-        $pdf->Ln(5);
+    //                 $discountAmount = ($itemSubTotal * ((int) ($lr->discount_per ?? 0) / 100));
+    //                 // Add fixed discount if you have it: + (float)($lr->fixed_discount_amount ?? 0);
 
-        // Grand Totals Section
-        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 10);
-        $pdf->Cell(0, 8, 'ملخص إجمالي للشهر', 0, 1, $pdf->getRTL() ? 'R' : 'L');
+    //                 $enduranceAmount = (float) ($lr->endurance ?? 0);
+    //                 $isCompanyPatient = !!$lr->patient?->company_id;
 
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 9);
-        $totalLabelWidth = 60;
-        $totalValueWidth = 50;
+    //                 $netPayableByPatient = $itemSubTotal - $discountAmount - ($isCompanyPatient ? $enduranceAmount : 0);
 
-        $pdf->Cell($totalLabelWidth, 7, 'إجمالي الإيرادات (الصافي):', 'LTRB', 0, 'R');
-        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['income'], 2), 'LTRB', 1, 'C');
-        $pdf->Cell($totalLabelWidth, 7, 'إجمالي الخصومات الممنوحة:', 'LTRB', 0, 'R');
-        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['discount'], 2), 'LTRB', 1, 'C');
-        $pdf->Cell($totalLabelWidth, 7, 'إجمالي المحصل نقداً:', 'LTRB', 0, 'R');
-        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['cash'], 2), 'LTRB', 1, 'C');
-        $pdf->Cell($totalLabelWidth, 7, 'إجمالي المحصل بنك/شبكة:', 'LTRB', 0, 'R');
-        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['bank'], 2), 'LTRB', 1, 'C');
-        $pdf->Ln(2);
-        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 9);
-        $pdf->Cell($totalLabelWidth, 7, 'إجمالي صافي الدخل المحصل:', 'LTRB', 0, 'R');
-        $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['cash'] + $grandTotals['bank'], 2), 'LTRB', 1, 'C');
+    //                 // Income is based on the net amount the patient is supposed to pay for services rendered ON this day
+    //                 // This assumes 'created_at' of LabRequest signifies the service rendering day for income recognition
+    //                 $dailyIncome += $netPayableByPatient;
+    //                 $dailyDiscount += $discountAmount; // Summing calculated discount for the day
+
+    //                 // For cash/bank, we sum what was ACTUALLY collected for requests of this day
+    //                 // This assumes labrequests.is_paid and labrequests.amount_paid reflect collection for that request.
+    //                 // If payments are separate, this logic needs to change.
+    //                 if ($lr->is_paid || $lr->amount_paid > 0) {
+    //                     // This is tricky: amount_paid might be partial.
+    //                     // For simplicity of this report based on current LabRequest model:
+    //                     // If you want actual collected cash/bank for THIS DAY, you need a payment date on LabRequest
+    //                     // or join with a payment/deposit table filtered by payment_date.
+    //                     // Let's assume if it's paid, the amount_paid is the collected amount for that item on its creation day.
+    //                     $collectedAmountForItem = (float) $lr->amount_paid;
+
+    //                     if ($lr->is_bankak) { // Or your field for bank payment
+    //                         $dailyBank += $collectedAmountForItem;
+    //                     } else {
+    //                         $dailyCash += $collectedAmountForItem;
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //         $dailyData[$currentDateStr] = [
+    //             'date' => $currentDateStr,
+    //             'income' => $dailyIncome,
+    //             'discount' => $dailyDiscount,
+    //             'cash' => $dailyCash,
+    //             'bank' => $dailyBank,
+    //         ];
+
+    //         $grandTotals['income'] += $dailyIncome;
+    //         $grandTotals['discount'] += $dailyDiscount;
+    //         $grandTotals['cash'] += $dailyCash;
+    //         $grandTotals['bank'] += $dailyBank;
+    //     }
 
 
-        // --- Output PDF ---
-        $pdfFileName = 'monthly_lab_income_' . $year . '_' . str_pad($month, 2, '0', STR_PAD_LEFT) . '.pdf';
-        $pdfContent = $pdf->Output($pdfFileName, 'S');
-        return response($pdfContent, 200)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
-    }
+    //     // --- PDF Generation ---
+    //     $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
+    //     $pdf->AddPage();
+    //     $pdf->SetLineWidth(0.1);
+
+    //     // Table Header
+    //     $headers = ['التاريخ', 'إجمالي الإيراد (الصافي)', 'إجمالي الخصومات', 'المحصل نقداً', 'المحصل بنك/شبكة'];
+    //     // A4 Landscape width ~277mm usable
+    //     $colWidths = [40, 60, 50, 60, 0];
+    //     $colWidths[count($colWidths) - 1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
+    //     $alignments = ['C', 'C', 'C', 'C', 'C'];
+    //     $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+    //     // Table Body
+    //     $fill = false;
+    //     $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
+    //     foreach ($dailyData as $dayData) {
+    //         if ($dayData['income'] == 0 && $dayData['cash'] == 0 && $dayData['bank'] == 0 && $dayData['discount'] == 0) {
+    //             // Optionally skip days with no activity to make report shorter
+    //             // continue; 
+    //         }
+    //         $rowData = [
+    //             Carbon::parse($dayData['date'])->format('Y-m-d (D)'), // Format date with day name
+    //             number_format($dayData['income'], 2),
+    //             number_format($dayData['discount'], 2),
+    //             number_format($dayData['cash'], 2),
+    //             number_format($dayData['bank'], 2),
+    //         ];
+    //         $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
+    //         $fill = !$fill;
+    //     }
+    //     $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY()); // Bottom line for table
+    //     $pdf->Ln(5);
+
+    //     // Grand Totals Section
+    //     $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 10);
+    //     $pdf->Cell(0, 8, 'ملخص إجمالي للشهر', 0, 1, $pdf->getRTL() ? 'R' : 'L');
+
+    //     $pdf->SetFont($pdf->getDefaultFontFamily(), '', 9);
+    //     $totalLabelWidth = 60;
+    //     $totalValueWidth = 50;
+
+    //     $pdf->Cell($totalLabelWidth, 7, 'إجمالي الإيرادات (الصافي):', 'LTRB', 0, 'R');
+    //     $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['income'], 2), 'LTRB', 1, 'C');
+    //     $pdf->Cell($totalLabelWidth, 7, 'إجمالي الخصومات الممنوحة:', 'LTRB', 0, 'R');
+    //     $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['discount'], 2), 'LTRB', 1, 'C');
+    //     $pdf->Cell($totalLabelWidth, 7, 'إجمالي المحصل نقداً:', 'LTRB', 0, 'R');
+    //     $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['cash'], 2), 'LTRB', 1, 'C');
+    //     $pdf->Cell($totalLabelWidth, 7, 'إجمالي المحصل بنك/شبكة:', 'LTRB', 0, 'R');
+    //     $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['bank'], 2), 'LTRB', 1, 'C');
+    //     $pdf->Ln(2);
+    //     $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 9);
+    //     $pdf->Cell($totalLabelWidth, 7, 'إجمالي صافي الدخل المحصل:', 'LTRB', 0, 'R');
+    //     $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['cash'] + $grandTotals['bank'], 2), 'LTRB', 1, 'C');
+
+
+    //     // --- Output PDF ---
+    //     $pdfFileName = 'monthly_lab_income_' . $year . '_' . str_pad($month, 2, '0', STR_PAD_LEFT) . '.pdf';
+    //     $pdfContent = $pdf->Output($pdfFileName, 'S');
+    //     return response($pdfContent, 200)
+    //         ->header('Content-Type', 'application/pdf')
+    //         ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    // }
     public function clinicReport(Request $request, DoctorShift $doctorShift)
     {
         
@@ -1474,7 +1476,7 @@ class ReportController extends Controller
         $isCompanyPatient = !empty($visit->patient->company_id);
 
         // --- PDF Instantiation with Thermal Defaults ---
-        $pdf = new MyCustomTCPDF('إيصال خدمات', "زيارة رقم: {$visit->id}"); // Title and filter less prominent on thermal
+        $pdf = new MyCustomTCPDF('إيصال خدمات', $visit); // Title and filter less prominent on thermal
         $pdf->setThermalDefaults( (float)($appSettings?->thermal_printer_width ?? 76) ); // Use setting or default
         $pdf->AddPage();
         
@@ -3053,19 +3055,14 @@ class ReportController extends Controller
         $visit->load([
             'patient:id,name,phone,company_id',
             'patient.company:id,name',
-            'labRequests' => function ($query) {
-                $query->where(function ($q) {
-                        $q->where('is_paid', true)->orWhere('amount_paid', '>', 0);
-                    })
-                    ->where('valid', true);
-            },
-            'labRequests.mainTest:id,main_test_name',
-            'labRequests.depositUser:id,name',
+         
+            'patientLabRequests.mainTest:id,main_test_name',
+            'patientLabRequests.depositUser:id,name',
             'user:id,name', // User who created visit
             'doctor:id,name',
         ]);
 
-        $labRequestsToPrint = $visit->labRequests;
+        $labRequestsToPrint = $visit->patientLabRequests;
 
         if ($labRequestsToPrint->isEmpty()) {
             return response()->json(['message' => 'No paid/partially paid lab requests for this visit to create a receipt.'], 404);
@@ -3075,8 +3072,10 @@ class ReportController extends Controller
         $isCompanyPatient = !empty($visit->patient->company_id);
         $cashierName = Auth::user()?->name ?? $visit->user?->name ?? $labRequestsToPrint->first()?->depositUser?->name ?? 'System';
 
-        $pdf = new MyCustomTCPDF('Lab Receipt', "Visit #: {$visit->id}");
-        $thermalWidth = (float)($appSettings?->thermal_printer_width ?? 76);
+        $pdf = new MyCustomTCPDF('Lab Receipt', $visit);
+        $pdf->SetRightMargin(5);
+        $pdf->SetLeftMargin(5);
+        $thermalWidth = (float)($appSettings?->thermal_printer_width ?? 70);
         $pdf->setThermalDefaults($thermalWidth);
         $pdf->AddPage();
         
@@ -3106,7 +3105,7 @@ class ReportController extends Controller
         // Receipt Info
         $pdf->SetFont($fontName, '', 6.5);
         $receiptNumber = "LAB-" . $visit->id . "-" . $labRequestsToPrint->first()?->id;
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "إيصال رقم: " : "Receipt #: ") . $receiptNumber, 0, 1, $alignStart);
+        // $pdf->Cell(0, $lineHeight, ($isRTL ? "إيصال رقم: " : "Receipt #: ") . $receiptNumber, 0, 1, $alignStart);
         $pdf->Cell(0, $lineHeight, ($isRTL ? "زيارة رقم: " : "Visit #: ") . $visit->id, 0, 1, $alignStart);
         $pdf->Cell(0, $lineHeight, ($isRTL ? "التاريخ: " : "Date: ") . Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignStart);
         $pdf->Cell(0, $lineHeight, ($isRTL ? "المريض: " : "Patient: ") . $visit->patient->name, 0, 1, $alignStart);
@@ -3122,12 +3121,12 @@ class ReportController extends Controller
         $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
         $nameWidth = $pageUsableWidth * 0.50; $qtyWidth = $pageUsableWidth * 0.10; 
         $priceWidth = $pageUsableWidth * 0.20; $totalWidth = $pageUsableWidth * 0.20;
-        $pdf->SetFont($fontName, 'B', 6.5);
+        $pdf->SetFont($fontName, 'B', 7.5);
         $pdf->Cell($nameWidth, $lineHeight, ($isRTL ? 'البيان' : 'Item'), 'B', 0, $alignStart);
         $pdf->Cell($qtyWidth, $lineHeight, ($isRTL ? 'كمية' : 'Qty'), 'B', 0, $alignCenter);
         $pdf->Cell($priceWidth, $lineHeight, ($isRTL ? 'سعر' : 'Price'), 'B', 0, $alignCenter);
         $pdf->Cell($totalWidth, $lineHeight, ($isRTL ? 'إجمالي' : 'Total'), 'B', 1, $alignCenter);
-        $pdf->SetFont($fontName, '', 6.5);
+        $pdf->SetFont($fontName, '', 7.5);
 
         $subTotalLab = 0; $totalDiscountOnLab = 0; $totalEnduranceOnLab = 0;
         foreach ($labRequestsToPrint as $lr) {
@@ -3195,11 +3194,11 @@ class ReportController extends Controller
 
         $visit->load([
             'patient:id,name,age_year,gender',
-            'labRequests' => function($query) { $query->where('valid', true)->where('no_sample', false); },
-            'labRequests.mainTest:id,main_test_name',
+            'patientLabRequests' => function($query) { $query->where('valid', true)->where('no_sample', false); },
+            'patientLabRequests.mainTest:id,main_test_name',
         ]);
 
-        if ($visit->labRequests->isEmpty()) {
+        if ($visit->patientLabRequests->isEmpty()) {
             return response()->json(['message' => 'No valid lab requests requiring samples found for this visit.'], 404);
         }
 
@@ -3211,13 +3210,13 @@ class ReportController extends Controller
         $barcodeHeight = (float)($appSettings->label_barcode_height_mm ?? 8);
         $barcodeText = $appSettings->label_show_barcode_text ?? true;
 
-        $pdf = new MyCustomTCPDF('Lab Sample Labels', "Visit #{$visit->id}", 'P', 'mm', [$labelWidth, $labelHeight]); // Portrait, custom size
+        $pdf = new MyCustomTCPDF('Lab Sample Labels', $visit, 'P', 'mm', [$labelWidth, $labelHeight]); // Portrait, custom size
         $pdf->setPrintHeader(false); $pdf->setPrintFooter(false);
         $pdf->SetMargins($labelMargin, $labelMargin, $labelMargin);
         $pdf->SetAutoPageBreak(false);
         $pdf->SetFont($pdf->getDefaultFontFamily(), '', $fontSize);
 
-        foreach ($visit->labRequests as $lr) {
+        foreach ($visit->patientLabRequests as $lr) {
             if (!$lr->sample_id) {
                  $lr->sample_id = LabRequest::generateSampleId($visit); // Use model helper
                  $lr->saveQuietly();
@@ -3263,238 +3262,16 @@ class ReportController extends Controller
 
  
 
-    // --- Helper methods for PDF drawing (drawPatientDoctorInfo, drawMainTestResults, drawReportSignatures) ---
-    // These should be the same as previously provided and adapted for the new RequestedResult schema.
-    // Ensure drawMainTestResults uses $result->unit?->name and $result->normal_range (from snapshot).
-    // Ensure drawReportSignatures refers to LabRequest.authorizedBy for overall report authorization if applicable.
-
-    protected function drawPatientDoctorInfo(MyCustomTCPDF $pdf, DoctorVisit $visit, ?Setting $settings)
-    {
-        $isRTL = $pdf->getRTL();
-        $defaultFont = $pdf->getDefaultFontFamily();
-        $labelWidth = 28; $valueWidth = 62; $lineHeight = 5; $spacer = 5;
-
-        $pdf->SetFont($defaultFont, 'B', 9);
-        $pdf->Cell(0, 6, 'Patient Information / بيانات المريض', 0, 1, $isRTL ? 'R' : 'L');
-        $pdf->SetFont($defaultFont, '', 8);
-        
-        $col1X = $pdf->GetX();
-        $col2X = $col1X + $labelWidth + $valueWidth + $spacer;
-
-        // Row 1
-        $y1 = $pdf->GetY();
-        $pdf->SetXY($col1X, $y1);
-        $pdf->Cell($labelWidth, $lineHeight, 'Patient Name:', 0, 0, 'L');
-        $pdf->MultiCell($valueWidth, $lineHeight, $visit->patient->name, 0, 'L', false, 0);
-        $pdf->SetXY($col2X, $y1);
-        $pdf->Cell($labelWidth, $lineHeight, 'اسم المريض:', 0, 0, 'R');
-        $pdf->MultiCell($valueWidth, $lineHeight, $visit->patient->name, 0, 'R', false, 1);
-        $maxY = $pdf->GetY();
-
-        // Row 2
-        $y2 = $maxY;
-        $pdf->SetXY($col1X, $y2);
-        $pdf->Cell($labelWidth, $lineHeight, 'Patient ID:', 0, 0, 'L');
-        $pdf->Cell($valueWidth, $lineHeight, $visit->patient->id, 0, 0, 'L');
-        $pdf->SetXY($col2X, $y2);
-        $pdf->Cell($labelWidth, $lineHeight, 'رقم المريض:', 0, 0, 'R');
-        $pdf->Cell($valueWidth, $lineHeight, $visit->patient->id, 0, 1, 'R');
-        $maxY = max($maxY, $pdf->GetY());
-
-        // Row 3
-        $y3 = $maxY;
-        $ageGenderEn = ($visit->patient->age_year ?? 'N/A') . 'Y / ' . ($visit->patient->gender ? strtoupper(substr($visit->patient->gender,0,1)) : 'U');
-        $ageGenderAr = ($visit->patient->age_year ?? 'غ/م') . 'س / ' . ($visit->patient->gender === 'male' ? 'ذكر' : ($visit->patient->gender === 'female' ? 'أنثى' : 'غ/م'));
-        $pdf->SetXY($col1X, $y3);
-        $pdf->Cell($labelWidth, $lineHeight, 'Age/Sex:', 0, 0, 'L');
-        $pdf->Cell($valueWidth, $lineHeight, $ageGenderEn, 0, 0, 'L');
-        $pdf->SetXY($col2X, $y3);
-        $pdf->Cell($labelWidth, $lineHeight, 'العمر/الجنس:', 0, 0, 'R');
-        $pdf->Cell($valueWidth, $lineHeight, $ageGenderAr, 0, 1, 'R');
-        $maxY = max($maxY, $pdf->GetY());
-        
-        // Row 4
-        $y4 = $maxY;
-        $sampleIdText = $visit->labRequests->pluck('sample_id')->filter()->unique()->implode(', ') ?: $visit->labRequests->pluck('id')->implode(', ');
-        $pdf->SetXY($col1X, $y4);
-        $pdf->Cell($labelWidth, $lineHeight, 'Sample ID(s):', 0, 0, 'L');
-        $pdf->MultiCell($valueWidth, $lineHeight, $sampleIdText, 0, 'L', false, 0);
-        $pdf->SetXY($col2X, $y4);
-        $pdf->Cell($labelWidth, $lineHeight, 'رقم العينة (العينات):', 0, 0, 'R');
-        $pdf->MultiCell($valueWidth, $lineHeight, $sampleIdText, 0, 'R', false, 1);
-        $maxY = max($maxY, $pdf->GetY());
-        
-        // Row 5
-        $y5 = $maxY;
-        $pdf->SetXY($col1X, $y5);
-        $pdf->Cell($labelWidth, $lineHeight, 'Collected Date:', 0, 0, 'L'); // Assuming visit_date is collection date
-        $pdf->Cell($valueWidth, $lineHeight, $visit->visit_date->format('Y-m-d'), 0, 0, 'L');
-        $pdf->SetXY($col2X, $y5);
-        $pdf->Cell($labelWidth, $lineHeight, 'تاريخ الجمع:', 0, 0, 'R');
-        $pdf->Cell($valueWidth, $lineHeight, $visit->visit_date->format('Y-m-d'), 0, 1, 'R');
-        $maxY = max($maxY, $pdf->GetY());
-
-        // Row 6
-        $y6 = $maxY;
-        $pdf->SetXY($col1X, $y6);
-        $pdf->Cell($labelWidth, $lineHeight, 'Report Date:', 0, 0, 'L');
-        $pdf->Cell($valueWidth, $lineHeight, now()->format('Y-m-d H:i A'), 0, 0, 'L');
-        $pdf->SetXY($col2X, $y6);
-        $pdf->Cell($labelWidth, $lineHeight, 'تاريخ التقرير:', 0, 0, 'R');
-        $pdf->Cell($valueWidth, $lineHeight, now()->format('Y-m-d H:i A'), 0, 1, 'R');
-        $maxY = max($maxY, $pdf->GetY());
-        
-        // Row 7
-        $y7 = $maxY;
-        $pdf->SetXY($col1X, $y7);
-        $pdf->Cell($labelWidth, $lineHeight, 'Referring Dr:', 0, 0, 'L');
-        $pdf->Cell($valueWidth, $lineHeight, $visit->doctor?->name ?? 'N/A', 0, 0, 'L');
-        $pdf->SetXY($col2X, $y7);
-        $pdf->Cell($labelWidth, $lineHeight, 'الطبيب المعالج:', 0, 0, 'R');
-        $pdf->Cell($valueWidth, $lineHeight, $visit->doctor?->name ?? 'غ/م', 0, 1, 'R');
-        $maxY = max($maxY, $pdf->GetY());
-
-        $pdf->SetY($maxY); // Ensure Y is past the tallest MultiCell in the block
-        $pdf->Ln(1);
-        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
-        $pdf->Ln(2);
-    }
-
-
+ 
+ 
 
     
 
-    public function generateLabVisitReportPdf(Request $request, DoctorVisit $doctorvisit) // Changed $visit to $doctorvisit to match your old code
-    {
-        // Start output buffering to capture any unwanted output
-        ob_start();
-        
-        // Permission Check
-        // if (!Auth::user()->can('print lab_report', $doctorvisit)) { /* ... */ }
-
-        $patient = $doctorvisit->patient;
-        if (!$patient) {
-            return response()->json(['message' => 'Patient not found for this visit.'], 404);
-        }
-        
-        // Update result_print_date (from your old code)
-        if ($patient->result_print_date == null && !$request->boolean('no_update_print_date')) {
-            $patient->update(['result_print_date' => now()]);
-        }
-
-        // Eager load all necessary data
-        $doctorvisit->loadDefaultLabReportRelations(); // Ensure this scope loads everything needed
-
-        $appSettings = Setting::instance(); // Your method to get settings
-        $selectedTemplate = $appSettings?->default_lab_report_template ?? 'template_a'; // Default to 'template_a'
-
-        // --- PDF Instantiation ---
-        // The MyCustomTCPDF constructor should now handle setting default fonts, margins, RTL, etc.
-        // and its Header() and Footer() methods should draw your specific lab report header/footer.
-        $pdf = new MyCustomTCPDF(
-            'Lab Result Report', // Title for PDF metadata
-            'Visit ID: ' . $doctorvisit->id . ' | Patient: ' . ($patient->name ?? 'N/A'), // Filter criteria as string
-            'P', 'mm', 'A4'
-        );
-        // Ensure fonts are available to TCPDF (arial, roboto, aealarabiya)
-        // This might be done in MyCustomTCPDF constructor or a service provider
-        // For ex: $pdf->SetFont($pdf->arialFontName, '', 10);
-
-        $pdf->AddPage(); // This will trigger MyCustomTCPDF::Header()
-
-        // Watermark (from your old code, after AddPage and potentially after content)
-        if ($appSettings->show_water_mark && $appSettings->logo_base64) {
-            $pdf->SetAlpha(0.15); // Adjust transparency
-            // Position for watermark - might need adjustment depending on header/footer space
-            if (str_starts_with($appSettings->logo_base64, 'data:image')) {
-                try {
-                    $imgData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $appSettings->logo_base64));
-                    if ($imgData) $pdf->Image('@'.$imgData, 30, 90, 150, 150, '', '', '', false, 300, 'C', false, false, 0, false, false, false);
-                } catch (\Exception $e) {}
-            } else {
-                 $logoPath = public_path('storage/' . $appSettings->logo_base64); // Adjust if path is different
-                 if(file_exists($logoPath)) $pdf->Image($logoPath, 30, 90, 150, 150, '', '', '', false, 300, 'C');
-            }
-            $pdf->SetAlpha(1);
-        }
-        
-        $pdf->SetY(71); // Ensure cursor is below the custom header area (adjust based on your MyCustomTCPDF::Header height)
-
-        // --- Content Drawing Loop (mimicking your package -> main_test -> results structure) ---
-        $mypakages = Package::orderBy('package_id')->get(); // Assuming you want to iterate packages
-        $page_width = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-
-
-        foreach ($mypakages as $package) {
-            $labRequestsInPackage = $doctorvisit->labRequests->filter(function ($lr) use ($package) {
-                return $lr->mainTest?->pack_id == $package->package_id && !$lr->hidden;
-            });
-
-            if ($labRequestsInPackage->isEmpty()) continue;
-
-            // Optional: Print Package Name as a section header if needed
-            // $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 14);
-            // $pdf->Cell(0, 7, $package->package_name, 0, 1, $pdf->getRTL() ? 'R' : 'L');
-            // $pdf->Ln(2);
-            $patient = $doctorvisit->patient;
-            foreach ($labRequestsInPackage as $labRequest) {
-                $this->drawLabRequestContent($pdf, $labRequest, $page_width, $appSettings);
-            }
-        }
-
-        // Handle tests not in any package (if any)
-        $labRequestsNotInPackage = $doctorvisit->labRequests->filter(function ($lr) {
-            return !$lr->mainTest?->pack_id && !$lr->hidden;
-        });
-        if ($labRequestsNotInPackage->isNotEmpty()) {
-            // Optional: Header for "Miscellaneous Tests"
-            // $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 14);
-            // $pdf->Cell(0, 7, 'Miscellaneous Tests', 0, 1, $pdf->getRTL() ? 'R' : 'L');
-            // $pdf->Ln(2);
-            foreach ($labRequestsNotInPackage as $labRequest) {
-                $this->drawLabRequestContent($pdf, $labRequest, $page_width, $appSettings);
-            }
-        }
-
-        // Footer is drawn automatically by MyCustomTCPDF::Footer()
-
-        // --- Output ---
-        try {
-            // Clean any output buffer to prevent "data already output" error
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
-            
-            // Ensure no whitespace or content is output
-            ob_start();
-            
-            $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $patient->name ?? 'Patient');
-            $pdfFileName = 'LabResult_Visit_' . $doctorvisit->id . '_' . $patientNameSanitized . '.pdf';
-            
-            // Generate PDF content
-            $pdfContent = $pdf->Output($pdfFileName, 'S');
-            
-            // Clean any remaining output buffer
-            ob_end_clean();
-
-            return response($pdfContent, 200)
-                ->header('Content-Type', 'application/pdf')
-                ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"")
-                ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
-                ->header('Pragma', 'no-cache')
-                ->header('Expires', '0');
-                
-        } catch (\Exception $e) {
-            // Clean output buffer on error too
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
-            return response()->json(['message' => 'Error generating PDF: ' . $e->getMessage()], 500);
-        }
-        
-    }
+    
     public function result(Request $request, $id = null, $base64 = false)
     {
+        ob_start();
+
         if ($id !== null) {
             /** @var DoctorVisit $doctorvisit */
             $doctorvisit = Doctorvisit::find($id);
@@ -3507,7 +3284,8 @@ class ReportController extends Controller
         if ($patient?->result_print_date == null) {
             $patient->update(['result_print_date' => now()]);
         }
-        $pdf = new MyCustomTCPDF('portrait', PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+        $pdf = new Pdf('portrait', PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+
         $pdf->setCreator(PDF_CREATOR);
         $pdf->setAuthor('alryyan mahjoob');
         $pdf->setTitle('النتيحه');
@@ -3688,7 +3466,7 @@ class ReportController extends Controller
                     return   $curr->result == ''  || $curr->result == 'no sample';
                 }, 0)->count();
                 //empty test
-                if ($m_test->requested_organisms()->count() == 0) {
+                if ($m_test->requestedOrganisms()->count() == 0) {
                     if ($children_count_empty ==  $children_count) continue;
                 }
 
@@ -3706,7 +3484,6 @@ class ReportController extends Controller
                     $is_columns = true;
                 }
 
-                /** @var RequestedResult $requested_result */
                 foreach ($m_test->results as $requested_result) {
                     $nr = $requested_result->normal_range;
                     $number_of_lines_in_normal_range = substr_count($nr, "\n");
@@ -3730,17 +3507,17 @@ class ReportController extends Controller
                     $pdf->addpage();
                 }
                 $is_columns = false;
-                if ($m_test->requested_organisms()->count() > 0) {
+                if ($m_test->requestedOrganisms()->count() > 0) {
                     $is_columns = false;
                     $pdf->SetFont('arial', '', 18, '', true);
 
                     $pdf->cell(180, 5, "Isolated organisms :", 0, 1, 'L', 0);
                     $pdf->Ln(5);
 
-                    $pdf->setEqualColumns($m_test->requested_organisms()->count(), $page_width / $m_test->requested_organisms()->count() - 5);
+                    $pdf->setEqualColumns($m_test->requestedOrganisms()->count(), $page_width / $m_test->requestedOrganisms()->count() - 5);
 
                     $pdf->selectColumn(0);
-                    $column_width = $page_width / (($m_test->requested_organisms()->count()) * 2);
+                    $column_width = $page_width / (($m_test->requestedOrganisms()->count()) * 2);
                 }
                 $col_number = 0;
 
@@ -3777,7 +3554,7 @@ class ReportController extends Controller
                 if ($has_more_than1_child) //only show main test name if has more than 1 child test
                 {
                     $pdf->SetFont('arial', 'u', 17, '', true);
-                    if ($m_test->requested_organisms()->count() > 0) {
+                    if ($m_test->requestedOrganisms()->count() > 0) {
                         $pdf->Ln(5);
                         $pdf->resetColumns();
                         $pdf->Ln(5);
@@ -3806,7 +3583,6 @@ class ReportController extends Controller
                 $old = '';
                 $index_to_start_new_column = 0;
                 $children_count_with_result_empty = 0;
-                /** @var RequestedResult $result */
                 foreach ($m_test->results as $result) {
                     if ($result->result == '') {
                         $children_count_with_result_empty++;
@@ -3999,265 +3775,511 @@ class ReportController extends Controller
             }
         }
 
-        if ($request->has('base64') || $base64) {
-            $result_as_bs64 = $pdf->output('name.pdf', 'E');
-            $pdfData = substr($result_as_bs64, strpos($result_as_bs64, "JVB"));
+        $pdfContent = $pdf->Output('name.pdf', 'S');
+            
+            // Clean any remaining output buffer
+            ob_end_clean();
 
-            return ['data' => $pdfData, 'patient' => $doctorvisit];
-        } else {
-            $pdf->output();
-        }
+            return response($pdfContent, 200)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', "inline; filename=\"name.pdf\"")
+                ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                ->header('Pragma', 'no-cache')
+                ->header('Expires', '0');
+    
     }
-    protected function drawLabRequestContent(MyCustomTCPDF $pdf, LabRequest $labRequest,float $page_width, ?Setting $settings)
-    {
-        $mainTest = $labRequest->mainTest;
-        if (!$mainTest) {
-            return;
-        }
+   
+   public function generateLabVisitReportPdf(Request $request, DoctorVisit $doctorvisit)
+   {
+
+    // return $doctorvisit;
+       // Permission Check (Example)
+       // if (!Auth::user()->can('print lab_report', $visit)) {
+       //     return response()->json(['message' => 'Unauthorized'], 403);
+       // }
+
+       // Eager load all necessary data
+       // Ensure DoctorVisit model has this scope defined:
+       // public function scopeLoadDefaultLabReportRelations($query) { /* see previous response for implementation */ }
+       $doctorvisit->loadDefaultLabReportRelations();
+
+       $labRequestsToReport = $doctorvisit->patientLabRequests->filter(function ($lr) {
+           if (!$lr->mainTest) return false; // Skip if mainTest relation isn't loaded properly
+           return $lr->results->where(fn($r) => $r->result !== null && $r->result !== '')->isNotEmpty() ||
+                  !$lr->mainTest->divided ||
+                  $lr->requestedOrganisms->isNotEmpty();
+       });
+
+       if ($labRequestsToReport->isEmpty()) {
+           return response()->json(['message' => 'No results or relevant tests to report for this visit.'], 404);
+       }
+
+       $appSettings = Setting::instance();
+
+       // Pass the $visit context to MyCustomTCPDF constructor
+       // MyCustomTCPDF will use this in its Header() and Footer()
+       $pdf = new MyCustomTCPDF(
+           'Lab Result Report', // Title for PDF metadata
+           $doctorvisit,              // Visit context for Header/Footer of MyCustomTCPDF
+           'P', 'mm', 'A4'      // Default orientation, unit, format
+       );
+       
+       // Font setup is now primarily handled by MyCustomTCPDF's constructor and its defaultFont
+       // $fontMain = $pdf->getDefaultFontFamily(); // e.g., 'aealarabiya' or 'arial'
+       // $fontEnglish = 'helvetica'; // A fallback or specific English font if needed
+
+       $pdf->AddPage(); // This triggers MyCustomTCPDF::Header()
+
+       // The cursor (Y position) is now set by MyCustomTCPDF::Header() to be below the header content.
+
+       $firstTestOnPage = true;
+       
+       foreach ($labRequestsToReport as $labRequest) {
+           $mainTest = $labRequest->mainTest;
+           if (!$mainTest) continue;
+
+           $estimatedHeight = $this->estimateMainTestBlockHeightForReport($pdf, $labRequest);
+           
+           if (!$firstTestOnPage && 
+               ($mainTest->pageBreak || ($pdf->GetY() + $estimatedHeight > ($pdf->getPageHeight() - $pdf->getBreakMargin())))) {
+               $pdf->AddPage(); // This also calls MyCustomTCPDF::Header()
+           } elseif (!$firstTestOnPage) {
+               $pdf->Ln(3); // Space between main test blocks on the same page
+           }
+           
+           // Draw the content specific to this MainTest (results, organisms, comments)
+           $this->drawMainTestContentBlock($pdf, $labRequest, $appSettings);
+           $firstTestOnPage = false;
+       }
+       
+       // MyCustomTCPDF::Footer() will be called automatically by TCPDF on Output or AddPage.
+
+       $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $doctorvisit->patient->name);
+       $pdfFileName = 'LabReport_Visit_' . $doctorvisit->id . '_' . $patientNameSanitized . '.pdf';
+       $pdfContent = $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
+
+       return response($pdfContent, 200)
+           ->header('Content-Type', 'application/pdf')
+           ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+   }
+
+   protected function estimateMainTestBlockHeightForReport(MyCustomTCPDF $pdf, LabRequest $labRequest): float
+   {
+       $fontMain = $pdf->getDefaultFontFamily();
+       $pdf->SetFont($fontMain, '', 8); // Use a typical content font size for estimation
+       $lineHeight = 5;
+       $height = 10; // For main test name and spacing
+
+       if ($labRequest->results->isNotEmpty() && $labRequest->mainTest && $labRequest->mainTest->divided) {
+           $height += ($lineHeight + 1); // For child test table headers
+           foreach($labRequest->results as $result) {
+               $childTest = $result->childTest;
+               if (!$childTest) continue;
+               $texts = [
+                   $childTest->child_test_name, $result->result ?? '-',
+                   $result->unit?->name ?? $childTest->unit?->name ?? '-',
+                   $result->normal_range ?? '-', $result->flags ?? '-'
+               ];
+               $maxLines = 1;
+               // Estimate lines for each cell (rough estimate)
+               for($i=0; $i<count($texts); $i++) $maxLines = max($maxLines, ceil(strlen($texts[$i]) / 20) ); // Assume ~20 chars per line
+               $height += $maxLines * ($lineHeight -1);
+               if(!empty($result->result_comment)) $height += $lineHeight -1;
+           }
+       }
+       if ($labRequest->requestedOrganisms->isNotEmpty()) {
+           $height += ($lineHeight+2); // Header for organisms
+           foreach ($labRequest->requestedOrganisms as $org) {
+               $height += $lineHeight; // Organism name
+               $height += $lineHeight; // Sensitive/Resistant headers
+               $maxRowsAB = max(substr_count($org->sensitive ?? '', "\n") + 1, substr_count($org->resistant ?? '', "\n") + 1);
+               $height += $maxRowsAB * ($lineHeight - 1.5);
+           }
+       }
+       if ($labRequest->comment) $height += ($lineHeight * 2); // Comment + heading
+       return $height;
+   }
+
+   protected function drawMainTestContentBlock(MyCustomTCPDF $pdf, LabRequest $labRequest, ?Setting $settings)
+   {
+       $isRTL = false;
+       $fontMain = $pdf->getDefaultFontFamily(); // Primary font (e.g., aealarabiya)
+       $fontDetail = 'helvetica'; // Fallback for potentially mixed content, or use $fontMain
+       $lineHeight = 5;
+       $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+       $mainTest = $labRequest->mainTest;
+
+       // Main Test Name Header
+       $pdf->SetFont($fontMain, 'BU', 11); // Bold Underline, size matching patient info headers
+       $pdf->SetFillColor(230, 235, 245); // Light background for emphasis
+       $pdf->Cell(0, $lineHeight + 2, $mainTest->main_test_name, 0, 1, $isRTL ? 'R' : 'L', true); // Fill added
+       $pdf->Ln(1.5);
+
+       // Child Results Table
+       if ($mainTest->divided && $labRequest->results->isNotEmpty()) {
+           $this->drawChildResultsTableForReport($pdf, $labRequest->results, $fontMain, $pageUsableWidth, $lineHeight, $isRTL, true);
+       } elseif (!$mainTest->divided && $labRequest->results->isNotEmpty()) { // Non-divided but uses RequestedResult
+            $this->drawChildResultsTableForReport($pdf, $labRequest->results, $fontMain, $pageUsableWidth, $lineHeight, $isRTL, false); // No headers
+       } elseif ($mainTest->divided && $labRequest->results->isEmpty()) { // Divided but no results entered
+           $pdf->SetFont($fontMain, 'I', 8);
+           $pdf->Cell(0, $lineHeight, ($isRTL ? 'لم يتم إدخال نتائج فرعية بعد.' : 'No sub-results entered yet.'), 0, 1, 'C');
+       } elseif (!$mainTest->divided && $labRequest->comment) { // Non-divided, result might be in main comment
+            $pdf->SetFont($fontMain, '', 9);
+            $pdf->SetX($pdf->GetX() + ($isRTL ? 0 : 5));
+            $pdf->MultiCell(0, $lineHeight, ($isRTL ? "النتيجة: " : "Result: ") . $labRequest->comment, 0, $isRTL ? 'R' : 'L', false, 1);
+       }
+       $pdf->Ln(0.5);
+
+       // Organisms Section
+       if ($labRequest->requestedOrganisms->isNotEmpty()) {
+           $this->drawOrganismsSectionForReport($pdf, $labRequest->requestedOrganisms, $fontMain, $pageUsableWidth, $lineHeight, $isRTL);
+       }
+
+       // Overall Main Test Comment (if it's distinct from a non-divided result)
+       if ($labRequest->comment && ($mainTest->divided || (!$mainTest->divided && $labRequest->results->isNotEmpty()))) {
+           $pdf->Ln(1.5);
+           $pdf->SetFont($fontMain, 'B', 8.5);
+           $pdf->Cell(0, $lineHeight, ($isRTL ? "ملاحظات إضافية:" : "Additional Comment:"), 0, 1, $isRTL ? 'R' : 'L');
+           $pdf->SetFont($fontMain, '', 8.5);
+           $pdf->SetX($pdf->GetX() + ($isRTL ? 0 : 3));
+           $pdf->MultiCell(0, $lineHeight - 1, $labRequest->comment, 0, $isRTL ? 'R' : 'L', false, 1);
+       }
+
+       // Watermark (using method from MyCustomTCPDF)
+       if ($settings?->show_water_mark && $labRequest->approve) {
+           $pdf->drawTextWatermark(($isRTL ? "معتمد" : "AUTHORIZED"), $fontMain);
+       }
+       $pdf->Ln(1);
+   }
+   
+   protected function drawChildResultsTableForReport(MyCustomTCPDF $pdf, $results, $fontMain, $pageUsableWidth, $baseLineHeight, $isRTL, $drawHeaders = true) {
+    $colWidths = [$pageUsableWidth*0.33, $pageUsableWidth*0.17, $pageUsableWidth*0.12, $pageUsableWidth*0.28, $pageUsableWidth*0.10];
+    $colAligns = [$isRTL ? 'R' : 'L', 'C', 'C', $isRTL ? 'R' : 'L', 'C'];
     
-        $isRTL = $pdf->getRTL();
-        // Assuming these fonts are set as default or made available in MyCustomTCPDF
-        $arialFont = 'arial'; 
-        $robotoFont = 'arial'; 
-        $defaultArabicFont = $pdf->getDefaultFontFamily(); 
-        $currentFont = $defaultArabicFont; // Start with default
-    
-        $lineHeight = 5; // Base line height for tables
-        $contentLineHeight = 4.5; // Slightly smaller for content within cells
-    
-        // --- Page Break Check for the ENTIRE MainTest block ---
-        $estimatedBlockHeight = $this->estimateMainTestBlockHeight($pdf, $labRequest);
-        $pageBreakTriggerY = $pdf->getPageHeight() - $pdf->getFooterMargin() - 10; // Buffer for footer
-    
-        // Check if we are close to the top after a header. If so, no need for an immediate extra break.
-        // MyCustomTCPDF::Header() is assumed to set Y to around 71mm.
-        $isNearTopOfPageAfterHeader = $pdf->GetY() < 75; // Approx (header_margin + typical_header_height)
-    
-        if (!$isNearTopOfPageAfterHeader && ($pdf->GetY() + $estimatedBlockHeight > $pageBreakTriggerY)) {
-            $pdf->AddPage(); // This will call MyCustomTCPDF::Header()
-            // Header() sets Y to its defined starting point (e.g., 71mm)
-        }
-        // --- End Page Break Check ---
-    
-        // --- Main Test Name (Mimicking your old style) ---
-        $pdf->SetFont($robotoFont, 'U', 13); // Your old: roboto, u, 17. Size 13 for better fit.
-        $pdf->Cell(0, $lineHeight + 2, $mainTest->main_test_name, 0, 1, $isRTL ? 'R' : 'L');
-        $pdf->Ln(1);
-        $yPosForDividedSectionStart = $pdf->GetY(); // Store Y position before child results table or divided columns
-    
-        // --- Child Results ---
-        $isCurrentlyInColumns = false;
-        $numberOfColumnsForDivided = 2;
-        $columnGap = 2; // Gap between columns for divided tests
-        $columnWidthIfDivided = ($page_width / $numberOfColumnsForDivided) - ($columnGap / ($numberOfColumnsForDivided -1 ?: 1));
-    
-        if ($mainTest->divided && $labRequest->results->filter(fn($r) => !empty($r->result) || $r->result === '0')->isNotEmpty()) {
-            $pdf->setEqualColumns($numberOfColumnsForDivided, $columnWidthIfDivided);
-            $pdf->selectColumn(0);
-            $isCurrentlyInColumns = true;
-        }
-    
-        // Define column widths for the child results table
-        $currentDrawingWidth = $isCurrentlyInColumns ? $columnWidthIfDivided : $page_width;
-        $wTest   = $currentDrawingWidth * 0.30;
-        $wResult = $currentDrawingWidth * 0.35;
-        $wUnit   = $currentDrawingWidth * 0.15;
-        $wRange  = $currentDrawingWidth * 0.20;
-        
-        // Draw child result table headers IF the test is divided AND has results to show
-        if ($mainTest->divided && $labRequest->results->filter(fn($r) => !empty($r->result) || $r->result === '0')->isNotEmpty()) {
-            $this->drawChildResultTableHeaders($pdf, $robotoFont, $lineHeight, $wTest, $wResult, $wUnit, $wRange);
-        }
-    
-        $pdf->SetFont($robotoFont, '', 8.5); // Font for result data
-        $childCountInCurrentColumn = 0;
-        $resultsToDisplay = $labRequest->results->filter(fn($r) => !empty($r->result) || $r->result === '0');
-        $approxChildrenPerColumn = $isCurrentlyInColumns && $numberOfColumnsForDivided > 0 
-                                   ? ceil($resultsToDisplay->count() / $numberOfColumnsForDivided) 
-                                   : $resultsToDisplay->count();
-        if ($approxChildrenPerColumn == 0 && $isCurrentlyInColumns) $approxChildrenPerColumn = 1; // Avoid division by zero if results are empty but columns set
-    
-        $previousChildGroupName = null;
-    
-        foreach ($resultsToDisplay->sortBy(fn($r) => $r->childTest?->test_order ?? $r->childTest?->id ?? 0) as $result) {
-            $childTest = $result->childTest;
-            if (!$childTest) continue;
-    
-            // Column switching logic for divided tests
-            if ($isCurrentlyInColumns && $approxChildrenPerColumn > 0 && $childCountInCurrentColumn >= $approxChildrenPerColumn && $pdf->getColumn() == 0) {
-                $pdf->selectColumn(1);
-                $pdf->SetY($yPosForDividedSectionStart); // Reset Y for the new column
-                $this->drawChildResultTableHeaders($pdf, $robotoFont, $lineHeight, $wTest, $wResult, $wUnit, $wRange);
-                $pdf->SetFont($robotoFont, '', 8.5);
-                $childCountInCurrentColumn = 0; // Reset for new column
-                $previousChildGroupName = null; // Reset group name for new column
-            }
-            
-            // Display Child Group Name if it changes (from your old code)
-            $currentChildGroupName = $childTest->childGroup?->name;
-            if ($mainTest->divided && $currentChildGroupName && $currentChildGroupName !== $previousChildGroupName) {
-                $pdf->SetFont($robotoFont, 'BU', 9); // Bold Underline for group name
-                $pdf->Cell(0, $lineHeight, $currentChildGroupName, 0, 1, $isRTL ? 'R' : 'L'); // Use 0 width for full column/page width
-                $pdf->SetFont($robotoFont, '', 8.5);
-                $previousChildGroupName = $currentChildGroupName;
-            }
-            
-            $resultText = $result->result;
-            if (in_array($childTest->id, [46, 70, 213]) && is_numeric($resultText) && (float)$resultText != 0) {
-                $percent = round(((float)$resultText / 15) * 100);
-                $resultText = "{$resultText} ({$percent}%)";
-            }
-    
-            $texts = [
-                $childTest->child_test_name, $resultText,
-                $result->unit?->name ?? $childTest->unit?->name ?? '-',
-                $result->normal_range ?? '-',
-                $result->flags ?? '-' // Assuming flags are on $result now
-            ];
-    
-            // Dynamic row height
-            $widthsForCalc = [$wTest, $wResult, $wUnit, $wRange]; // Assuming flags are not drawn in main table or part of result
-            $maxLines = 0;
-            for($i=0; $i < count($texts) -1; $i++) { // -1 because flags are separate or implicit
-                 if (isset($widthsForCalc[$i])) $maxLines = max($maxLines, $pdf->getNumLines($texts[$i], $widthsForCalc[$i]));
-            }
-            if ($maxLines == 0) $maxLines = 1;
-            $rowH = $contentLineHeight * $maxLines + (($maxLines > 1) ? ($maxLines-1)*0.5 : 0) ;
-            if($rowH < $contentLineHeight) $rowH = $contentLineHeight;
-    
-            // Page break check before drawing the row
-            if ($pdf->GetY() + $rowH > $pageBreakTriggerY) {
-                if ($isCurrentlyInColumns) {
-                    $currentCol = $pdf->getColumn();
-                    if ($currentCol < ($numberOfColumnsForDivided - 1)) {
-                        $pdf->selectColumn($currentCol + 1); $pdf->SetY($yPosForDividedSectionStart);
-                        $this->drawChildResultTableHeaders($pdf, $robotoFont, $lineHeight, $wTest, $wResult, $wUnit, $wRange);
-                        $pdf->SetFont($robotoFont, '', 8.5); $childCountInCurrentColumn = 0; $previousChildGroupName = null;
-                    } else {
-                        $pdf->resetColumns(); $pdf->AddPage(); $pdf->SetY(71); $isCurrentlyInColumns = false;
-                        if ($mainTest->divided) { // Re-apply if still in divided test context
-                             $pdf->setEqualColumns($numberOfColumnsForDivided, $columnWidthIfDivided);
-                             $pdf->selectColumn(0); $isCurrentlyInColumns = true;
-                             $yPosForDividedSectionStart = $pdf->GetY();
-                             $this->drawChildResultTableHeaders($pdf, $robotoFont, $lineHeight, $wTest, $wResult, $wUnit, $wRange);
-                             $pdf->SetFont($robotoFont, '', 8.5); $childCountInCurrentColumn = 0; $previousChildGroupName = null;
-                        }
-                    }
-                } else { 
-                    $pdf->AddPage(); $pdf->SetY(71);
-                    if ($mainTest->divided) {
-                         $this->drawChildResultTableHeaders($pdf, $robotoFont, $lineHeight, $wTest, $wResult, $wUnit, $wRange);
-                         $pdf->SetFont($robotoFont, '', 8.5);
-                    }
-                }
-            }
-    
-            $currentX = $pdf->GetX(); $currentYpdf = $pdf->GetY();
-            $isAbnormal = false;
-    
-            $pdf->SetFont($robotoFont, '', 8.5); // Base font for row
-            $pdf->MultiCell($wTest, $rowH, $texts[0], 'L', $isRTL ? 'R' : 'L', false, 0, $currentX, $currentYpdf, true,0,false,true,$rowH,'M'); $currentX += $wTest;
-            
-            $pdf->SetFont($robotoFont, $isAbnormal ? 'B' : '', 8.5);
-            $pdf->MultiCell($wResult, $rowH, $texts[1], 'L', 'C', false, 0, $currentX, $currentYpdf, true,0,false,true,$rowH,'M'); $currentX += $wResult;
-            $pdf->SetFont($robotoFont, '', 8.5);
-    
-            $pdf->MultiCell($wUnit, $rowH, $texts[2], 'L', 'C', false, 0, $currentX, $currentYpdf, true,0,false,true,$rowH,'M'); $currentX += $wUnit;
-            $pdf->MultiCell($wRange, $rowH, $texts[3], 'LR', 'C', false, 1, $currentX, $currentYpdf, true,0,false,true,$rowH,'M'); // ln=1
-    
-            // Line after row (within column or full width)
-            $lineStartX = $pdf->GetX(); // Start of current column drawing area
-            $lineWidth = $isCurrentlyInColumns ? $columnWidthIfDivided : $page_width;
-            $pdf->Line($lineStartX, $pdf->GetY(), $lineStartX + $lineWidth, $pdf->GetY());
-    
-            if(!empty($result->result_comment)){ 
-                $pdf->SetFont($defaultArabicFont, 'I', 7.5); // Use default for comments
-                $pdf->MultiCell($lineWidth, $contentLineHeight, ($isRTL ? "تعليق: " : "Comment: ") . $result->result_comment, 'LRB', $isRTL ? 'R' : 'L', false, 1, $lineStartX);
-                $pdf->SetFont($robotoFont, '', 8.5);
-            }
-            $childCountInCurrentColumn++;
-        }
-    
-        if ($isCurrentlyInColumns) {
-            $pdf->resetColumns();
-        }
-        $pdf->Ln(0.5);
-    
-        // Organisms
-        if ($labRequest->requestedOrganisms->isNotEmpty()) {
-            $this->drawOrganismsSection($pdf, $labRequest->requestedOrganisms, $arialFont, $page_width, $lineHeight, $isRTL);
-        }
-    
-        // Main Test Comment (if not handled as non-divided result)
-        if ($labRequest->comment && ($mainTest->divided || $labRequest->results->isEmpty())) {
-            $pdf->Ln(1);
-            $pdf->SetFont($arialFont, 'BUI', 10);
-            $pdf->Cell(0, $lineHeight + 1, ($isRTL ? "ملاحظات:" : "Comment:"), 0, 1, $isRTL ? 'R' : 'L');
-            $pdf->SetFont($arialFont, 'I', 9); // Your: 'b', 12
-            $pdf->MultiCell(0, $contentLineHeight, "♠ " . $labRequest->comment, 0, $isRTL ? 'R' : 'L', false, 1);
-        }
-    
-        // Watermark
-        if ($settings?->show_water_mark && $labRequest->approve) { // Watermark "Authorized" if request is approved
-            $watermarkText = $isRTL ? "معتمد" : "AUTHORIZED";
-            $pdf->drawTextWatermark($watermarkText, $arialFont); // Call the new public method
-        }
-        $pdf->Ln(1);
-    }
-    
-    protected function drawChildResultTableHeaders(MyCustomTCPDF $pdf, string $font, float $lineHeight, float $wTest, float $wResult, float $wUnit, float $wRange)
-    {
-        $pdf->SetFont($font, 'B', 8);
+    if ($drawHeaders) {
+        $pdf->SetFont($fontMain, 'B', 7.5);
         $pdf->SetFillColor(240, 240, 240);
-        $pdf->Cell($wTest, $lineHeight, "Test", 'TB', 0, 'C', true);
-        $pdf->Cell($wResult, $lineHeight, "Result", 'TB', 0, 'C', true);
-        $pdf->Cell($wUnit, $lineHeight, "Unit", 'TB', 0, 'C', true);
-        $pdf->Cell($wRange, $lineHeight, "R.Values", 'TB', 1, 'C', true);
-        // $pdf->Ln(0.5); // Removed this to keep headers tighter with rows
+        $pdf->SetLineWidth(0.15);
+        $pdf->Cell($colWidths[0], $baseLineHeight, ($isRTL ? 'الفحص' : "Test"), 'TB', 0, 'C', true);
+        $pdf->Cell($colWidths[1], $baseLineHeight, ($isRTL ? 'النتيجة' : "Result"), 'TB', 0, 'C', true);
+        $pdf->Cell($colWidths[2], $baseLineHeight, ($isRTL ? 'الوحدة' : "Unit"), 'TB', 0, 'C', true);
+        $pdf->Cell($colWidths[3], $baseLineHeight, ($isRTL ? 'المعدل الطبيعي' : "Normal Range"), 'TB', 0, 'C', true);
+        $pdf->Cell($colWidths[4], $baseLineHeight, ($isRTL ? 'علامات' : "Flags"), 'TB', 1, 'C', true);
+        $pdf->Ln(0.2);
+        $pdf->SetLineWidth(0.1);
     }
-    
-    
-    protected function estimateMainTestBlockHeight(MyCustomTCPDF $pdf, LabRequest $labRequest): float
-    {
-        $lineHeight = 5;
-        $height = 8; // For main test name and initial spacing
+    $pdf->SetFont($fontMain, '', 8); // Results font
+    $fill = false;
 
-        if ($labRequest->results->isNotEmpty()) {
-            if($labRequest->mainTest->divided) $height += ($lineHeight + 0.5); // Headers for divided test
+    foreach ($results as $result) {
+        $childTest = $result->childTest;
+        if(!$childTest) continue;
 
-            foreach($labRequest->results as $result) {
-                if (empty($result->result) && $result->result !== '0') continue;
-                // Simplified estimation: assume 1-2 lines per result row element
-                $height += ($lineHeight * 1.5); // Average height per result row
-                if(!empty($result->result_comment)) $height += ($lineHeight -1);
+        $isAbnormal = false;
+        $numericResult = filter_var($result->result, FILTER_VALIDATE_FLOAT);
+        if ($numericResult !== false && $childTest->low !== null && $childTest->upper !== null) {
+            if ($numericResult < (float)$childTest->low || $numericResult > (float)$childTest->upper) $isAbnormal = true;
+        } elseif (!empty($result->flags) && in_array(strtoupper($result->flags), ['H', 'L', 'A', 'ABN', 'ABNORMAL', '+', '++'])) {
+            $isAbnormal = true;
+        }
+
+        $texts = [
+            $childTest->child_test_name,
+            $result->result ?? '-',
+            $result->unit?->name ?? $childTest->unit?->name ?? '-',
+            $result->normal_range ?? '-', 
+            $result->flags ?? '-'
+        ];
+        
+        // --- CORRECTED DYNAMIC ROW HEIGHT CALCULATION ---
+        $maxLines = 1; // Assume at least one line
+        for($i=0; $i<count($texts); $i++) {
+            // GetNumLines can be tricky with MultiCell internal calculations.
+            // A more reliable way is to estimate based on string length and font,
+            // or use a fixed height and allow MultiCell to auto-adjust (though this can lead to uneven rows if not careful).
+            // For precise dynamic height with MultiCell, you often draw it once off-page to get height, then redraw.
+            // Simpler approach: Estimate lines or use GetNumLines carefully.
+            $numCurrentLines = $pdf->getNumLines((string)$texts[$i], $colWidths[$i], false, true, '', 1);
+            if ($numCurrentLines > $maxLines) {
+                $maxLines = $numCurrentLines;
             }
-        } elseif (!$labRequest->mainTest->divided && $labRequest->comment) {
-            $height += $pdf->getNumLines($labRequest->comment, $pdf->getPageWidth() - 20) * $lineHeight;
         }
+        // Calculate row height based on max lines and font size/line height ratio
+        // $currentFontSize = $pdf->getFontSizePt(); // Get current font size in points
+        // $lineHeightRatio = $pdf->getCellHeightRatio();
+        // $singleLineHeight = ($currentFontSize / $pdf->getScaleFactor()) * $lineHeightRatio; // Height of one line in user units (mm)
+        // $dynamicRowHeight = $maxLines * $singleLineHeight + ($pdf->getCellPaddings()['T'] + $pdf->getCellPaddings()['B']);
+        // Fallback to a simpler estimation or a slightly generous fixed height if GetNumLines is problematic with MultiCell auto-height
+        $dynamicRowHeight = $baseLineHeight * $maxLines;
+        if ($maxLines > 1) $dynamicRowHeight += ($maxLines-1) * 0.5; // Small padding for multi-lines
+        if($dynamicRowHeight < $baseLineHeight) $dynamicRowHeight = $baseLineHeight;
+        // --- END OF CORRECTION ---
 
 
-        if ($labRequest->requestedOrganisms->isNotEmpty()) {
-            $height += ($lineHeight + 1.5); // Header for organisms
-            foreach ($labRequest->requestedOrganisms as $org) {
-                $height += $lineHeight; // Organism name header
-                $height += ($lineHeight -1); // Sensitive/Resistant headers
-                $maxRows = max(substr_count($org->sensitive ?? '', "\n") + 1, substr_count($org->resistant ?? '', "\n") + 1);
-                $height += $maxRows * ($lineHeight - 2);
-                $height += 2; // Spacing
+         if ($pdf->GetY() + $dynamicRowHeight > ($pdf->getPageHeight() - $pdf->getBreakMargin())) {
+            $pdf->AddPage(); 
+            if ($drawHeaders) { 
+                $pdf->SetFont($fontMain, 'B', 7.5); $pdf->SetFillColor(240,240,240); $pdf->SetLineWidth(0.15);
+                $pdf->Cell($colWidths[0], $baseLineHeight, ($isRTL ? 'الفحص' : "Test"), 'TB', 0, 'C', true);
+                $pdf->Cell($colWidths[1], $baseLineHeight, ($isRTL ? 'النتيجة' : "Result"), 'TB', 0, 'C', true);
+                $pdf->Cell($colWidths[2], $baseLineHeight, ($isRTL ? 'الوحدة' : "Unit"), 'TB', 0, 'C', true);
+                $pdf->Cell($colWidths[3], $baseLineHeight, ($isRTL ? 'المعدل الطبيعي' : "Normal Range"), 'TB', 0, 'C', true);
+                $pdf->Cell($colWidths[4], $baseLineHeight, ($isRTL ? 'علامات' : "Flags"), 'TB', 1, 'C', true);
+                $pdf->Ln(0.2); $pdf->SetLineWidth(0.1);
             }
+            $pdf->SetFont($fontMain, '', 8);
+         }
+        
+        $curY = $pdf->GetY(); $curX = $pdf->GetX();
+        $pdf->SetFillColor($fill ? 248 : 255, $fill ? 248 : 255, $fill ? 248 : 255);
+        
+        // Use 'M' for vertical alignment (middle) in MultiCell
+        $pdf->MultiCell($colWidths[0], $dynamicRowHeight, $texts[0], 1, $colAligns[0], $fill, 0, $curX, $curY, true,0,false,true,$dynamicRowHeight,'M'); $curX += $colWidths[0];
+        $pdf->SetFont($fontMain, $isAbnormal ? 'B' : '', 8);
+        $pdf->MultiCell($colWidths[1], $dynamicRowHeight, $texts[1], 1, $colAligns[1], $fill, 0, $curX, $curY, true,0,false,true,$dynamicRowHeight,'M'); $curX += $colWidths[1];
+        $pdf->SetFont($fontMain, '', 8); 
+        $pdf->MultiCell($colWidths[2], $dynamicRowHeight, $texts[2], 1, $colAligns[2], $fill, 0, $curX, $curY, true,0,false,true,$dynamicRowHeight,'M'); $curX += $colWidths[2];
+        $pdf->MultiCell($colWidths[3], $dynamicRowHeight, $texts[3], 1, $colAligns[3], $fill, 0, $curX, $curY, true,0,false,true,$dynamicRowHeight,'M'); $curX += $colWidths[3];
+        $pdf->MultiCell($colWidths[4], $dynamicRowHeight, $texts[4], 1, $colAligns[4], $fill, 1, $curX, $curY, true,0,false,true,$dynamicRowHeight,'M');
+        
+        // No explicit $pdf->Line needed after each row if MultiCell border is '1' or 'LTRB'
+        $fill = !$fill;
+        
+        if(!empty($result->result_comment)){ 
+             $pdf->SetFont($fontMain, 'I', 7.5);
+             $pdf->SetFillColor($fill ? 248 : 255, $fill ? 248 : 255, $fill ? 248 : 255);
+             $pdf->MultiCell(0, $baseLineHeight -1.5, ($isRTL ? "تعليق: " : "Comment: ") . $result->result_comment, 'LRB', $isRTL ? 'R' : 'L', $fill, 1); // Changed to LRB to connect to previous row
+             $pdf->SetFont($fontMain, '', 8);
+             $fill = !$fill; 
         }
-        if ($labRequest->comment && ($labRequest->mainTest->divided || $labRequest->results->isEmpty())) {
-             $height += $lineHeight + 1; // Comment header
-             $height += $pdf->getNumLines($labRequest->comment, $pdf->getPageWidth() - 20) * ($lineHeight -1);
-        }
-        return $height + 5; // Add a general buffer
     }
-  
-
-    
-
-
-
-
-
 }
+
+   protected function drawOrganismsSection(MyCustomTCPDF $pdf, $organisms, $fontMain, $pageWidth, $baseLineHeight, $isRTL) {
+       if ($organisms->isEmpty()) return;
+       $pdf->Ln(2);
+       $pdf->SetFont($fontMain, 'B', 10);
+       $pdf->Cell(0, $baseLineHeight, ($isRTL ? "مزرعة وحساسية:" : "Culture & Sensitivity:"), 0, 1, $isRTL ? 'R' : 'L');
+       $pdf->Ln(0.5);
+       
+       foreach ($organisms as $org) {
+           if ($pdf->GetY() + 40 > ($pdf->getPageHeight() - $pdf->getBreakMargin())) $pdf->AddPage();
+
+           $pdf->SetFont($fontMain, 'BU', 9);
+           $pdf->Cell($pageWidth, $baseLineHeight, $org->organism, 0, 1, 'C'); // Organism Name centered
+           
+           $pdf->SetFont($fontMain, 'B', 8);
+           $halfWidth = $pageWidth / 2 - 1; // -1 for small gap/border
+           $pdf->Cell($halfWidth, $baseLineHeight-1, ($isRTL ? 'حساس لـ:' : 'Sensitive To:'), 'B', 0, 'C');
+           $pdf->Cell(2, $baseLineHeight-1, '', 0,0); // Gap
+           $pdf->Cell($halfWidth, $baseLineHeight-1, ($isRTL ? 'مقاوم لـ:' : 'Resistant To:'), 'B', 1, 'C');
+
+           $pdf->SetFont($fontMain, '', 7.5);
+           $sensArr = !empty($org->sensitive) ? array_filter(array_map('trim', preg_split('/[\n,]+/', $org->sensitive))) : [];
+           $resArr = !empty($org->resistant) ? array_filter(array_map('trim', preg_split('/[\n,]+/', $org->resistant))) : [];
+           $maxRows = max(count($sensArr), count($resArr));
+           if ($maxRows == 0) $maxRows = 1; 
+           $cellH = $baseLineHeight - 2; // Reduced height for antibiotic list items
+
+           for ($i = 0; $i < $maxRows; $i++) {
+               $s_text = $sensArr[$i] ?? ''; $r_text = $resArr[$i] ?? '';
+               $curY = $pdf->GetY();
+               $s_height = $pdf->getNumLines($s_text, $halfWidth) * $cellH;
+               $r_height = $pdf->getNumLines($r_text, $halfWidth) * $cellH;
+               $rowDynamicHeight = max($s_height, $r_height, $cellH);
+
+               if ($pdf->GetY() + $rowDynamicHeight > ($pdf->getPageHeight() - $pdf->getBreakMargin())) {
+                    $pdf->AddPage();
+                    // Could redraw organism name if it spans pages
+                    $pdf->SetFont($fontMain, 'B', 8);
+                    $pdf->Cell($halfWidth, $baseLineHeight-1, 'Sensitive To:', 'B', 0, 'C');
+                    $pdf->Cell($halfWidth, $baseLineHeight-1, 'Resistant To:', 'B', 1, 'C');
+                    $pdf->SetFont($fontMain, '', 7.5);
+                    $curY = $pdf->GetY();
+               }
+
+               $pdf->MultiCell($halfWidth, $rowDynamicHeight, $s_text, 0, ($isRTL ? 'R' : 'L'), false, 0, $pdf->getMargins()['left'], $curY, true, 0, false, true, $rowDynamicHeight, 'T');
+               $pdf->MultiCell($halfWidth, $rowDynamicHeight, $r_text, 0, ($isRTL ? 'R' : 'L'), false, 1, $pdf->getMargins()['left'] + $halfWidth + 2, $curY, true, 0, false, true, $rowDynamicHeight, 'T');
+           }
+           $pdf->Ln(2); // Space after an organism block
+       }
+   }
+    /**
+     * Get daily lab income data for a specified month and year.
+     * Focuses on total_paid, cash_paid, bank_paid for lab requests.
+     */
+    public function monthlyLabIncome(Request $request)
+    {
+        // if (!Auth::user()->can('view monthly_lab_income_report')) { /* ... */ }
+
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:' . (date('Y') + 5),
+            // 'user_id_deposited' => 'nullable|integer|exists:users,id', // Optional filter by user who handled payment
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+
+        $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $period = CarbonPeriod::create($startDate, '1 day', $endDate);
+
+        $dailyData = [];
+        $grandTotals = [
+            'total_lab_income_paid' => 0,
+            'total_lab_cash_paid' => 0,
+            'total_lab_bank_paid' => 0,
+        ];
+
+        // Fetch all relevant lab requests for the month once for efficiency.
+        // We need to consider when the income is recognized:
+        // Option 1: When the LabRequest is created (service rendered date)
+        // Option 2: When the payment is actually recorded (payment date)
+        // Let's assume for now it's based on LabRequest's `updated_at` when `is_paid` becomes true,
+        // or more simply, `created_at` if payments usually happen on the same day.
+        // For simplicity, we'll use `created_at` of LabRequest and filter by `is_paid = true`.
+        // A more accurate system would have a dedicated `payment_date` on the LabRequest or a separate payments table.
+
+        $paidLabRequestsForMonth = LabRequest::query()
+            ->where('is_paid', true) // Only consider paid requests for "income"
+            ->whereBetween('created_at', [$startDate, $endDate]) // Filter by request creation date
+            // ->when($request->filled('user_id_deposited'), fn($q) => $q->where('user_deposited', $request->user_id_deposited))
+            ->get();
+
+        foreach ($period as $date) {
+            $currentDateStr = $date->format('Y-m-d');
+            
+            $requestsOnThisDay = $paidLabRequestsForMonth->filter(function ($lr) use ($date) {
+                return Carbon::parse($lr->created_at)->isSameDay($date);
+            });
+
+            $dailyTotalPaid = $requestsOnThisDay->sum(function ($lr) {
+                // Net amount paid for this request (price * count - discount - endurance)
+                // For simplicity, let's assume amount_paid already reflects this net amount
+                return (float)$lr->amount_paid;
+            });
+            $dailyCashPaid = $requestsOnThisDay->where('is_bankak', false)->sum(fn($lr) => (float)$lr->amount_paid);
+            $dailyBankPaid = $requestsOnThisDay->where('is_bankak', true)->sum(fn($lr) => (float)$lr->amount_paid);
+
+
+            if ($dailyTotalPaid > 0 || $request->boolean('show_empty_days', false)) {
+                 $dailyData[] = [
+                    'date' => $currentDateStr,
+                    'total_lab_income_paid' => $dailyTotalPaid,
+                    'total_lab_cash_paid' => $dailyCashPaid,
+                    'total_lab_bank_paid' => $dailyBankPaid,
+                ];
+            }
+
+            $grandTotals['total_lab_income_paid'] += $dailyTotalPaid;
+            $grandTotals['total_lab_cash_paid'] += $dailyCashPaid;
+            $grandTotals['total_lab_bank_paid'] += $dailyBankPaid;
+        }
+        
+        return response()->json([
+            'daily_data' => $dailyData,
+            'summary' => $grandTotals,
+            'report_period' => [
+                'month_name' => $startDate->translatedFormat('F Y'),
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ]
+        ]);
+    }
+
+    /**
+     * Generate PDF for Monthly Lab Income Report.
+     * This was provided in a previous response, make sure it's in this controller.
+     * This method is distinct from the JSON data endpoint.
+     */
+    public function generateMonthlyLabIncomePdf(Request $request)
+    {
+        // if (!Auth::user()->can('print monthly_lab_income_report')) { /* ... */ }
+
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:' . (date('Y') + 1),
+        ]);
+
+        // Use the same data fetching logic as the JSON endpoint by calling it internally
+        $reportContentRequest = new Request($validated + ['show_empty_days' => true]); // Ensure all days for PDF
+        $dataResponse = $this->monthlyLabIncome($reportContentRequest);
+        $jsonData = json_decode($dataResponse->getContent(), true);
+
+        $dailyData = $jsonData['daily_data'] ?? [];
+        $summary = $jsonData['summary'] ?? [
+            'total_lab_income_paid' => 0, 'total_lab_cash_paid' => 0, 'total_lab_bank_paid' => 0
+        ];
+        $reportPeriod = $jsonData['report_period'] ?? [
+            'month_name' => Carbon::create($validated['year'], $validated['month'])->translatedFormat('F Y'),
+            'from' => Carbon::create($validated['year'], $validated['month'], 1)->toDateString(),
+            'to' => Carbon::create($validated['year'], $validated['month'], 1)->endOfMonth()->toDateString()
+        ];
+
+        // --- PDF Generation ---
+        $reportTitle = 'تقرير إيرادات المختبر الشهرية (المدفوع)';
+        $filterCriteria = "لشهر: {$reportPeriod['month_name']}";
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'P', 'mm', 'A4'); // Portrait
+        $pdf->AddPage();
+        $pdf->SetLineWidth(0.1);
+        $isRTL = $pdf->getRTL();
+
+        // Table Header
+        $headers = [($isRTL ? 'التاريخ' : 'Date'), ($isRTL ? 'إجمالي المدفوع' : 'Total Paid'), ($isRTL ? 'المدفوع نقداً' : 'Cash Paid'), ($isRTL ? 'المدفوع بنك/شبكة' : 'Bank Paid')];
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $colWidths = [$pageWidth*0.30, $pageWidth*0.25, $pageWidth*0.20, 0];
+        $colWidths[count($colWidths)-1] = $pageWidth - array_sum(array_slice($colWidths, 0, -1));
+        $alignments = ['C', 'C', 'C', 'C'];
+        
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        // Table Body
+        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
+        $fill = false;
+        if (empty($dailyData)) {
+            $pdf->Cell(array_sum($colWidths), 10, ($isRTL ? 'لا توجد بيانات لهذه الفترة.' : 'No data for this period.'), 1, 1, 'C', $fill);
+        } else {
+            foreach ($dailyData as $day) {
+                $rowData = [
+                    Carbon::parse($day['date'])->translatedFormat('D, M j, Y'),
+                    number_format((float)$day['total_lab_income_paid'], 2),
+                    number_format((float)$day['total_lab_cash_paid'], 2),
+                    number_format((float)$day['total_lab_bank_paid'], 2),
+                ];
+                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
+                $fill = !$fill;
+            }
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        // Summary Footer for Table
+        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 8.5);
+        $summaryRow = [
+            ($isRTL ? 'الإجمالي الشهري:' : 'Monthly Total:'),
+            number_format((float)$summary['total_lab_income_paid'], 2),
+            number_format((float)$summary['total_lab_cash_paid'], 2),
+            number_format((float)$summary['total_lab_bank_paid'], 2),
+        ];
+        $pdf->DrawSummaryRow($summaryRow, $colWidths, $alignments, 8, [220,220,220]); // Use DrawSummaryRow
+
+        $pdfFileName = 'monthly_lab_income_paid_' . $reportPeriod['from'] . '_' . $reportPeriod['to'] . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+
+   // Ensure MyCustomTCPDF has drawTextWatermark and drawReportSignatures methods, or define them here
+   // ... other helper methods like drawReportSignatures ...
+}
+
+
+    
+
+
+
+
+
+

@@ -196,32 +196,53 @@ class UserController extends Controller
         // }
 
         $shift = Shift::find($shiftId);
-        $totalPaid =  $shift->totalPaidService($user->id);
-        $totalBank =  $shift->totalPaidServiceBank($user->id);
+        $totalPaidService =  $shift->totalPaidService($user->id);
+        $totalBankService =  $shift->totalPaidServiceBank($user->id);
+        $totalLab =  $shift->paidLab($user->id);
+        $totalLabBank =  $shift->bankakLab($user->id);
+        $totallabCash = $totalLab - $totalLabBank;
         // Costs specific to this user within this shift (if applicable)
         $totalCostForUser = $shift->totalCost($user->id); // Ensure this method exists and is relevant
         $totalCostBankForUser = $shift->totalCostBank($user->id);
         $totalCost = $shift->totalCost($user->id);
         $totalCostBank = $shift->totalCostBank($user->id);
-        $totalCash = $totalPaid - $totalBank;
+        $totalCashService = $totalPaidService - $totalBankService;
         $totalCostCash = $totalCost - $totalCostBank;
-        $netCash = $totalCash - $totalCostCash;
-        $netBank = $totalBank - $totalCostBank;
+        $netCash = ($totalCashService + $totallabCash )- $totalCostCash;
+        $netBank = ($totalBankService + $totalLabBank) - $totalCostBank;
 
         // You might also want to include other income sources or expenses handled by the user
         // For example, if users can record direct cash income/expenses not tied to services.
         // This would require querying other tables. For now, focusing on service deposits.
-
+        $expenses = [
+            'total_cash_expenses' => (float) $totalCostCash,
+            'total_bank_expenses' => (float) $totalCostBank,
+        ];
         return response()->json([
+
             'data' => [
                 'user_id' => $user->id,
                 'user_name' => $user->name,
                 'shift_id' => (int) $shiftId,
-                'total_income' => (float) $totalPaid,
-                'total_cash' => (float) $totalCash,
-                'total_bank' => (float) $totalBank,
+                'service_income' => [
+                    'total' => (float) $totalPaidService,
+                    'bank' => (float) $totalBankService,
+                    'cash' => (float) $totalCashService,
+                ],
+                'total' => (float) $totalPaidService + $totalLab,
+                'total_cash' => (float) $totalCashService + $totallabCash,
+                'total_bank' => (float) $totalBankService + $totalLabBank,
+                'total_cash_expenses' => (float) $totalCostCash,
+                'total_bank_expenses' => (float) $totalCostBank,
+                'total_cost' => (float) $totalCost,
                 'net_cash' => (float) $netCash,
                 'net_bank' => (float) $netBank,
+                'expenses' => $expenses,
+                'lab_income' => [
+                    'total' => (float) $totalLab,
+                    'bank' => (float) $totalLabBank,
+                    'cash' => (float) $totallabCash,
+                ],
                 // Add more details if needed, like number of transactions
             ]
         ]);
