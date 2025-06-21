@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientStrippedResource;
+use App\Models\DoctorVisit;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use App\Models\Setting; // To get instanceId and token if not passed
 use App\Models\Patient; // To get patient phone number
 use Carbon\Carbon;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\File; // For handling file path if PDF is generated on server
 
@@ -115,18 +117,50 @@ class WhatsAppController extends Controller
              return response()->json(['message' => 'محتوى الوسائط مطلوب (base64 أو مسار الملف).'], 422);
         }
 
-        $result = $this->whatsAppService->sendMediaMessage(
-            $chatId,
-            $mediaBase64,
-            $validated['media_name'],
-            $validated['media_caption'] ?? null,
-            $validated['as_document'] ?? true // Default to true for things like PDFs
-        );
+        $result = $this->sendDocument($request, $chatId,$mediaBase64);
+        return $result;
 
-        if ($result['success']) {
-            return response()->json(['message' => 'تم إرسال الوسائط بنجاح.', 'data' => $result['data']]);
-        } else {
-            return response()->json(['message' => $result['error'] ?? 'فشل إرسال الوسائط.', 'details' => $result['data']], 500);
+    }
+    public function sendDocument(Request $request, $chatId,$data)
+    {
+        //        return $data;
+        $settings = Setting::first();
+        $data = $request->get('pdfData');
+        $instance = $settings->instance_id;
+        $token = $settings->token;
+        $client = new \GuzzleHttp\Client();
+        try {
+
+
+
+            $client = new \GuzzleHttp\Client();
+
+            $response = $client->request('POST', "https://waapi.app/api/v1/instances/$instance/client/action/send-media", [
+                'body' => json_encode([
+                    "mediaBase64" => "$data",
+                    "mediaName" => "file.pdf",
+                    "chatId" => $chatId,
+                    "mediaCaption" => "Laboratory Result",
+                    "asSticker" => false,
+                    "asVoice" => false,
+                    "asDocument" => true
+                ]),
+                'headers' => [
+                    'accept' => 'application/json',
+                    'authorization' => "Bearer $token",
+                    'content-type' => 'application/json',
+                ],
+            ]);
+            $body = $response->getBody()->getContents();
+
+            return ["Response" => json_decode($body), 'show' => true, 'message' => json_decode($body)->status];
+        } catch (RequestException $e) {
+            if ($e->hasResponse()) {
+                $error = $e->getResponse()->getBody()->getContents();
+                return "Error: " . $error;
+            } else {
+                return "Error: " . $e->getMessage();
+            }
         }
     }
     public function getPatientsForBulkMessage(Request $request)

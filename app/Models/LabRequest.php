@@ -112,7 +112,7 @@ class LabRequest extends Model
         return $this->belongsTo(Patient::class, 'pid');
     }
 
-    
+
 
     public function requestingUser(): BelongsTo
     {
@@ -200,6 +200,15 @@ class LabRequest extends Model
     public static function generateSampleId(DoctorVisit $visit = null): string
     {
         $prefix = $visit ? "V{$visit->id}-" : "S-";
-        return $prefix . strtoupper(substr(md5(uniqid((string)mt_rand(), true)), 0, 6));
+        return $prefix . strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 6));
+    }
+    // In app/Models/LabRequest.php
+    public function scopeLoadDefaultRelations($query)
+    {
+        return $query->with([
+            'mainTest.childTests.unit',
+            'results.childTest.unit',
+            'results.enteredBy:id,name' // If you have this
+        ]);
     }
 }

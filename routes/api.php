@@ -401,6 +401,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // NEW: Route for creating a new visit for a patient by copying their data to a new shift
     Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift'])->name('patients.copyToNewVisit');
     Route::post('/labrequests/{labrequest}/set-default-results', [LabRequestController::class, 'setDefaultResults']);
+    Route::post('/labrequests/{labrequest}/populate-cbc-from-sysmex', [LabRequestController::class, 'populateCbcResultsFromSysmex']);
+    Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
 
     /*
     |--------------------------------------------------------------------------

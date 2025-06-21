@@ -22,9 +22,9 @@ class WhatsAppService
         $appSettings = Setting::first(); // Or your method to get the single settings record
 
         $this->baseUrl = config('services.waapi.base_url'); // WAAPI base URL is less likely to change per clinic instance
-        $this->instanceId =  config('services.waapi.instance_id') ?? $appSettings?->instance_id;
-        $this->token =  config('services.waapi.token') ?? $appSettings?->token; // DECRYPT if stored encrypted
-        $this->defaultCountryCode = $appSettings?->whatsapp_default_country_code ?? config('services.waapi.default_country_code', '249');
+        $this->instanceId =$appSettings?->instance_id;
+        $this->token =   $appSettings?->token; // DECRYPT if stored encrypted
+        $this->defaultCountryCode = '249';
     }
 
     /**
@@ -66,8 +66,8 @@ class WhatsAppService
             return ['success' => false, 'error' => 'WhatsApp service not configured.', 'data' => null];
         }
 
-        $endpoint = "{$this->baseUrl}/{$this->instanceId}/client/action/send-message";
-        
+        $endpoint = "$this->baseUrl/$this->instanceId/client/action/send-message";
+   
         try {
             $response = Http::withToken($this->token)
                 ->acceptJson()
@@ -106,13 +106,17 @@ class WhatsAppService
             Log::error('WhatsAppService: Service not configured.');
             return ['success' => false, 'error' => 'WhatsApp service not configured.', 'data' => null];
         }
-
-        $endpoint = "{$this->baseUrl}/{$this->instanceId}/client/action/send-media";
+        $pdfData = substr($mediaBase64, strpos($mediaBase64, "JVB"));
+        $endpoint = "$this->baseUrl/$this->instanceId/client/action/send-media";
         $payload = [
             'chatId' => $chatId,
-            'mediaBase64' => $mediaBase64,
+            'mediaBase64' => $pdfData,
             'mediaName' => $mediaName,
             'asDocument' => $asDocument,
+            "mediaCaption" => $mediaCaption,
+            "previewLink"=> true,
+            "asSticker"=> false,
+            "asVoice"=> false,
         ];
         if ($mediaCaption) {
             $payload['mediaCaption'] = $mediaCaption;

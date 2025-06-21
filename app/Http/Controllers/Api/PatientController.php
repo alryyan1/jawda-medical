@@ -158,6 +158,18 @@ class PatientController extends Controller
         }
     }
 
+    public function toggleResultLock(Request $request, Patient $patient)
+    {
+        // Add permission check: e.g., can('manage patient_result_lock', $patient)
+        // if (!Auth::user()->can('manage_patient_result_lock')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
+        $patient->result_is_locked = !$patient->result_is_locked;
+        $patient->save();
+
+        return new PatientResource($patient->loadMissing(['company', 'primaryDoctor'])); // Return updated patient
+    }
     /**
      * Create a new Patient record by cloning data, and then create a new DoctorVisit.
      * A new File record is created and linked if no previous_visit_id is provided,

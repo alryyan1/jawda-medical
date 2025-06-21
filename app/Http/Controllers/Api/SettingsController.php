@@ -38,10 +38,8 @@ class SettingsController extends Controller
                 'footer_content' => '',
                 'lab_name' => 'المختبر',
                 'hospital_name' => 'المستشفى',
-                'print_direct' => false,
                 'inventory_notification_number' => '10',
                 'disable_doctor_service_check' => false,
-                'currency' => 'SAR',
                 'phone' => '',
                 'gov' => false,
                 'country' => false,
@@ -98,11 +96,9 @@ class SettingsController extends Controller
             'footer_content' => 'nullable|string|max:255',
             'lab_name' => 'nullable|string|max:255',
             'hospital_name' => 'nullable|string|max:255',
-            'print_direct' => 'sometimes|boolean',
             'inventory_notification_number' => 'nullable|string|max:50',
             'disable_doctor_service_check' => 'sometimes|boolean',
-            'currency' => 'sometimes|string|max:10',
-            'phone' => 'sometimes|max:20',
+            'phone' => 'sometimes|max:20|nullable',
             'gov' => 'sometimes|boolean', // Or 'nullable|exists:govs,id'
             'country' => 'sometimes|boolean', // Or 'nullable|exists:countries,id'
             'barcode' => 'sometimes|boolean',

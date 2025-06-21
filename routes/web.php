@@ -33,7 +33,7 @@ Route::get('/', function () {
     return $shift->shiftClinicServiceCosts();
 });
 ///api/visits/10664/lab-report/pdf
-Route::get('/visits/{visit}/lab-report/pdf', [LabResultController::class, 'generateLabVisitReportPdf']);
+Route::get('/visits/{visit}/lab-report/pdf', [ReportController::class, 'result']);
 // Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf']);
 Route::get('/visits/{id}/lab-report-old/pdf', [ReportController::class, 'result']);
 //phpinfo

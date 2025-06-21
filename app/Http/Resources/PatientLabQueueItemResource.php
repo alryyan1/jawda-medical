@@ -9,6 +9,8 @@ class PatientLabQueueItemResource extends JsonResource {
             'visit_id' => $this->visit_id,
             'patient_id' => $this->patient_id,
             'patient_name' => $this->patient_name,
+             'result_is_locked' => $this->patient->result_is_locked,
+             'phone' => $this->patient->phone,
             'lab_number' => $this->patient->visit_number,
             'sample_id' => $this->patientLabRequests->first()->sample_id ?? ($this->patientLabRequests->first()->id ?? $this->visit_id), // Example logic for display ID
             'lab_request_ids' => $this->patientLabRequests->pluck('id')->toArray(),

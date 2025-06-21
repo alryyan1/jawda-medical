@@ -3775,8 +3775,14 @@ class ReportController extends Controller
             }
         }
 
-        $pdfContent = $pdf->Output('name.pdf', 'S');
-            
+  if ($request->has('base64') || $base64) {
+            $result_as_bs64 = $pdf->output('name.pdf', 'E');
+            $pdfData = substr($result_as_bs64, strpos($result_as_bs64, "JVB"));
+
+            return $pdfData;
+        } else {
+            $pdfContent = $pdf->output();
+        }            
             // Clean any remaining output buffer
             ob_end_clean();
 

@@ -30,29 +30,59 @@ class ShiftController extends Controller
      * Display a listing of the shifts.
      * Filters can be added: e.g., date range, open/closed status.
      */
+    // public function index(Request $request)
+    // {
+    //     $query = Shift::latest(); // Default order by most recent
+
+    //     if ($request->has('is_closed') && $request->is_closed !== '') {
+    //         // $query->where('is_closed', (bool)$request->is_closed);
+    //     }
+    //     if ($request->filled('date_from')) {
+    //         $query->whereDate('created_at', '>=', $request->date_from);
+    //     }
+    //     if ($request->filled('date_to')) {
+    //         $query->whereDate('created_at', '<=', $request->date_to);
+    //     }
+
+    //     //if perpage = 0 return all
+    //     if ($request->get('per_page') == 0) {
+    //         $shifts = $query->get();
+    //     } else {
+    //         $shifts = $query->paginate($request->get('per_page', 15));
+    //     }
+    //     return ShiftResource::collection($shifts);
+    // }
     public function index(Request $request)
     {
-        $query = Shift::latest(); // Default order by most recent
+        $query = Shift::with(['userOpened:id,name', 'userClosed:id,name']) // Eager load users
+                      ->latest('created_at'); 
 
-        if ($request->has('is_closed') && $request->is_closed !== '') {
-            // $query->where('is_closed', (bool)$request->is_closed);
+        if ($request->has('is_closed') && $request->is_closed !== '' && $request->is_closed !== 'all') {
+            $query->where('is_closed', (bool)$request->is_closed);
         }
-        if ($request->filled('date_from')) {
+        
+        // If a single date is provided, treat it as filtering for that day
+        if ($request->filled('date')) { // Expecting 'YYYY-MM-DD'
+            $query->whereDate('created_at', '=', Carbon::parse($request->date)->toDateString());
+        } 
+        // Keep existing date_from/date_to logic if still needed for other use cases
+        elseif ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
         }
         if ($request->filled('date_to')) {
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        //if perpage = 0 return all
-        if ($request->get('per_page') == 0) {
+
+        $perPage = $request->input('per_page');
+        if ($perPage === '0' || $perPage === 0 || filter_var($perPage, FILTER_VALIDATE_INT) === 0) {
             $shifts = $query->get();
-        } else {
-            $shifts = $query->paginate($request->get('per_page', 15));
+            return ShiftResource::collection($shifts); // Return as collection if not paginating
         }
+        
+        $shifts = $query->paginate($perPage ?: 15);
         return ShiftResource::collection($shifts);
     }
-
     /**
      * Get the current open shift, if any.
      * This is useful for the frontend to know which shift operations are happening under.
