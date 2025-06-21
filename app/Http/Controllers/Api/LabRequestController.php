@@ -227,7 +227,7 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
         
         // This will fetch DoctorVisit records. The PatientLabQueueItemResource will need to correctly
         // extract/derive lab_request_ids, sample_id, and all_requests_paid based on the DoctorVisit and its Patient.
-        $pendingVisits = $query->get();
+        $pendingVisits = $query->orderBy('doctorvisits.id','desc')->get();
             
         return PatientLabQueueItemResource::collection($pendingVisits);
     }
@@ -487,7 +487,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                     'doctor_visit_id' => $visit->id,
                     'hidden' => $request->input('hidden', true), // Assuming default is visible
                     'is_lab2lab' => $request->input('is_lab2lab', false),
-                    'valid' => false,
+                    'valid' => true,
                     'no_sample' => false, // Sample presumably will be collected
                     'price' => $price,
                     'amount_paid' => 0,
@@ -1068,110 +1068,38 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
     }
     public function populateCbcResultsFromSysmex(Request $request, LabRequest $labrequest)
     {
-        // Authorization
-        // if (!Auth::user()->can('populate_sysmex_results', $labrequest)) { /* ... */ }
+        $doctorvisit = Doctorvisit::find($request->get('doctor_visit_id_for_sysmex'));
+        $patient = $doctorvisit->patient;
+        $main_test_id = $request->get('main_test_id');
+            $sysmex = SysmexResult::where('doctorvisit_id', $doctorvisit->id)
+            ->orderBy('id', 'desc')
+            ->first();
+        if ($sysmex == null) {
+            return  ['status' => false, 'message' => 'no data found'];
+        }
+        $bindings =   CbcBinding::all();
+        /** @var \App\Models\CbcBinder $binding */
+        $object = null;
+        foreach ($bindings as $binding) {
+            $object[$binding->name_in_sysmex_table] = [
+                'child_id' => [$binding->child_id_array],
+                'result' => $sysmex[$binding->name_in_sysmex_table]
+            ];
+            $child_array =  explode(',', $binding->child_id_array);
+            foreach ($child_array as $child_id) {
+                $requested_result = RequestedResult::whereChildTestId($child_id)->where('main_test_id', '=', $main_test_id)->where('patient_id', '=', $patient->id)->first();
+                if ($requested_result != null) {
 
-        $validated = $request->validate([
-            // The main_test_id is already known from $labrequest->main_test_id
-            // We might need the DoctorVisit ID if Sysmex table is linked to it.
-            'doctor_visit_id_for_sysmex' => 'required|integer|exists:doctorvisits,id' // Assuming Sysmex data is per visit
+                    $requested_result->update(['result' => $sysmex[$binding->name_in_sysmex_table]]);
+                }
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' =>  'CBC results populated successfully.' ,
+            'data' => new LabRequestResource($labrequest->fresh()->loadDefaultRelations()), // Assuming loadDefaultRelations loads what UI needs
+            'cbcObj' => $object // Your debug object
         ]);
-        
-        $doctorVisitIdForSysmex = $validated['doctor_visit_id_for_sysmex'];
-
-        // Find the latest Sysmex result for the given DoctorVisit ID
-        $sysmexData = SysmexResult::where('doctorvisit_id', $doctorVisitIdForSysmex) // Ensure your Sysmex table has this FK
-                            ->orderBy('id', 'desc') // Or by a timestamp column like 'result_time'
-                            ->first();
-
-        if (!$sysmexData) {
-            return response()->json(['status' => false, 'message' => 'No Sysmex data found for this visit.'], 404);
-        }
-
-        $bindings = CbcBinding::all();
-        if ($bindings->isEmpty()){
-             return response()->json(['status' => false, 'message' => 'CBC Binder configuration is missing.'], 404);
-        }
-
-        $patientId = $labrequest->pid;
-        $mainTestIdForCBC = $labrequest->main_test_id; // The CBC panel's main_test_id
-
-        DB::beginTransaction();
-        try {
-            $updatedResultsCount = 0;
-            $debugObject = []; // For your cbcObj return
-
-            foreach ($bindings as $binding) {
-                // Check if the column exists in the fetched $sysmexData model/object
-                if (!isset($sysmexData->{$binding->name_in_sysmex_table})) {
-                    Log::warning("Sysmex column '{$binding->name_in_sysmex_table}' not found in fetched Sysmex data for visit ID: {$doctorVisitIdForSysmex}");
-                    continue;
-                }
-                
-                $sysmexValue = $sysmexData->{$binding->name_in_sysmex_table};
-                $debugObject[$binding->name_in_sysmex_table] = [
-                    'child_id_array_str' => $binding->child_id_array, // Keep original string for debug
-                    'sysmex_result' => $sysmexValue
-                ];
-
-                $childIdArray = explode(',', $binding->child_id_array);
-
-                foreach ($childIdArray as $childId) {
-                    if (empty(trim($childId))) continue;
-
-                    $requestedResult = RequestedResult::where('lab_request_id', $labrequest->id) // Scope to current lab request
-                                                      ->where('child_test_id', trim($childId))
-                                                      // ->where('main_test_id', $mainTestIdForCBC) // Already implicitly handled by lab_request_id
-                                                      // ->where('patient_id', $patientId) // Already implicitly handled by lab_request_id
-                                                      ->first();
-
-                    if ($requestedResult) {
-                        $requestedResult->result = (string) $sysmexValue; // Cast to string as 'result' is text
-                        // You might want to update 'entered_by_user_id' and 'entered_at' here too
-                        // $requestedResult->entered_by_user_id = Auth::id();
-                        // $requestedResult->entered_at = now();
-                        // $requestedResult->flags = null; // Reset flags or calculate them
-                        // $requestedResult->authorized_at = null; // Reset authorization
-                        // $requestedResult->authorized_by_user_id = null;
-                        $requestedResult->save();
-                        $updatedResultsCount++;
-                    } else {
-                        Log::info("No RequestedResult found for LabRequest ID {$labrequest->id}, ChildTest ID {$childId} to populate Sysmex data.");
-                    }
-                }
-            }
-
-            // Update overall LabRequest status if results were populated
-            if ($updatedResultsCount > 0) {
-                $expectedChildTestsCount = $labrequest->mainTest->childTests()->count();
-                $enteredResultsCount = $labrequest->results()->where(fn($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
-
-                if ($enteredResultsCount === 0) $labrequest->result_status = 'pending_entry';
-                elseif ($enteredResultsCount < $expectedChildTestsCount) $labrequest->result_status = 'results_partial';
-                else $labrequest->result_status = 'results_complete_pending_auth';
-                
-                // If LabRequest was approved, populating results should likely un-approve it
-                if($labrequest->approve){
-                    $labrequest->approve = false;
-                    $labrequest->authorized_at = null;
-                    $labrequest->authorized_by_user_id = null;
-                }
-                $labrequest->saveQuietly();
-            }
-            
-            DB::commit();
-
-            return response()->json([
-                'status' => true,
-                'message' => $updatedResultsCount > 0 ? 'CBC results populated successfully.' : 'No matching results found to update, or values were already current.',
-                'data' => new LabRequestResource($labrequest->fresh()->loadDefaultRelations()), // Assuming loadDefaultRelations loads what UI needs
-                'cbcObj' => $debugObject // Your debug object
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Error populating CBC results for LabRequest ID {$labrequest->id}: " . $e->getMessage(), ['exception' => $e]);
-            return response()->json(['status' => false, 'message' => 'Failed to populate CBC results.', 'error' => $e->getMessage()], 500);
-        }
     }
 }

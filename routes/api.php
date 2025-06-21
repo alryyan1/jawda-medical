@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RequestedServiceCostController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\SampleCollectionController;
 use App\Http\Controllers\Api\ServiceController;
 use App\Http\Controllers\Api\ServiceCostController;
 use App\Http\Controllers\Api\ServiceGroupController;
@@ -509,5 +510,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [ReportController::class, 'generateLabThermalReceiptPdf'])->name('reports.lab.thermalReceipt');
     Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf'])->name('reports.lab.sampleLabels');
     Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result'])->name('reports.lab.fullReport'); // For "View Report Preview"
-
+    Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns
+    Route::apiResource('service-groups', ServiceGroupController::class);
+    Route::prefix('sample-collection')->name('sample.collection.')->group(function () {
+      Route::get('/queue', [SampleCollectionController::class, 'getQueue'])->name('queue');
+      Route::patch('/labrequests/{labrequest}/mark-collected', [SampleCollectionController::class, 'markSampleCollected'])->name('markCollected');
+      Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit'])->name('markAllCollected');
+      Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest'])->name('generateSampleId');
+  });
 });

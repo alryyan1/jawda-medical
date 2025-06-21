@@ -81,6 +81,8 @@ class LabRequest extends Model
         'authorized_by_user_id', // NEW
         'authorized_at',         // NEW
         'payment_shift_id',      // NEW
+        'sample_collected_at', // NEW
+        'sample_collected_by_user_id', // NEW
     ];
 
     protected $casts = [
@@ -100,6 +102,7 @@ class LabRequest extends Model
         'authorized_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'sample_collected_at' => 'datetime',
     ];
 
     public function mainTest(): BelongsTo
@@ -132,6 +135,10 @@ class LabRequest extends Model
     public function requestedOrganisms(): HasMany
     {
         return $this->hasMany(RequestedOrganism::class);
+    }
+    public function sampleCollectedBy(): BelongsTo // NEW
+    {
+        return $this->belongsTo(User::class, 'sample_collected_by_user_id');
     }
 
     public function authorizedBy(): BelongsTo

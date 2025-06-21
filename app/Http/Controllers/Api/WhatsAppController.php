@@ -125,7 +125,6 @@ class WhatsAppController extends Controller
     {
         //        return $data;
         $settings = Setting::first();
-        $data = $request->get('pdfData');
         $instance = $settings->instance_id;
         $token = $settings->token;
         $client = new \GuzzleHttp\Client();

@@ -258,70 +258,162 @@ class ShiftController extends Controller
      * Close an open clinic shift.
      * This action will also close any associated active doctor shifts.
      */
+    // public function closeShift(Request $request, Shift $shift)
+    // {
+
+    //       if (!Auth::user()->can('close financials_shift')) {   
+    //         return response()->json(['message' => 'ليس لديك صلاحية لإغلاق وردية عمل.'], 403);
+    //       }
+
+    //     // Permission Check: e.g., can('close clinic_shifts')
+    //     // if (!Auth::user()->can('close clinic_shifts')) {
+    //     //     return response()->json(['message' => 'Unauthorized'], 403);
+    //     // }
+
+    //     if ($shift->is_closed) {
+    //         return response()->json(['message' => 'وردية العمل هذه مغلقة بالفعل.'], 400);
+    //     }
+
+    
+    //     DB::beginTransaction();
+    //     try {
+    //         $closingTime = Carbon::now();
+    //         $closingUserId = Auth::id(); // User performing the close action
+
+    //         // 1. Update and close the main clinic shift
+    //         $shift->update([
+    //             'user_closed' => Auth::id(),
+                 
+    //             'is_closed' => true,
+    //             'closed_at' => $closingTime,
+    //             // 'user_id_closed' => $closingUserId, // If you track this
+    //         ]);
+
+    //         // 2. Find and close all open DoctorShift records associated with this general Shift
+    //         $openDoctorShifts = DoctorShift
+    //                                       ::where('status', true) // Only active ones
+    //                                       ->get();
+
+    //         foreach ($openDoctorShifts as $doctorShift) {
+    //             $doctorShift->update([
+    //                 'status' => false,
+    //                 'end_time' => $closingTime, // Set their end time to the general shift's closing time
+    //                 // Optionally, if a different user is closing, or log who closed it.
+    //                 // This assumes the DoctorShift model doesn't have a specific 'closed_by_user_id'.
+    //                 // If it does, you might want to update that too.
+    //             ]);
+    //         }
+            
+    //         // TODO: Add logic for financial reconciliation here if needed.
+    //         // E.g., compare system calculated totals with manually entered totals.
+    //         // The 'touched' flag could be set if there's a discrepancy or manual override.
+
+    //         // TODO: Potentially trigger events, like generating end-of-shift reports.
+    //         // event(new ClinicShiftClosed($shift));
+
+    //         DB::commit();
+
+    //         return new ShiftResource($shift->loadMissing(['doctorShifts', /* other relations for resource */]));
+
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         // Log the error: Log::error('Failed to close clinic shift and associated doctor shifts: ' . $e->getMessage());
+    //         return response()->json(['message' => 'حدث خطأ أثناء إغلاق الوردية.', 'error' => $e->getMessage()], 500);
+    //     }
+    // }
+  /**
+     * Close an open clinic shift.
+     * This action will only proceed if all associated doctor shifts for THIS general shift are closed.
+     * If doctor shifts (for this general shift) are open, it will return an error.
+     * It will also close any *unrelated* active doctor shifts if that's the intended system behavior upon general shift close.
+     */
     public function closeShift(Request $request, Shift $shift)
     {
-
-          if (!Auth::user()->can('close financials_shift')) {   
+        if (!Auth::user()->can('close financials_shift')) {
             return response()->json(['message' => 'ليس لديك صلاحية لإغلاق وردية عمل.'], 403);
-          }
-
-        // Permission Check: e.g., can('close clinic_shifts')
-        // if (!Auth::user()->can('close clinic_shifts')) {
-        //     return response()->json(['message' => 'Unauthorized'], 403);
-        // }
+        }
 
         if ($shift->is_closed) {
             return response()->json(['message' => 'وردية العمل هذه مغلقة بالفعل.'], 400);
         }
 
-    
+        // Check for any open DoctorShift records specifically associated with THIS general Shift ($shift)
+        $openDoctorShiftsForThisGeneralShift = DoctorShift::where('shift_id', $shift->id)
+                                                          ->where('status', true) // Active
+                                                          ->with('doctor:id,name') // Load doctor names for the message
+                                                          ->get();
+
+        if ($openDoctorShiftsForThisGeneralShift->isNotEmpty()) {
+            $doctorNames = $openDoctorShiftsForThisGeneralShift->pluck('doctor.name')->filter()->implode(', ');
+            return response()->json([
+                'message' => "$doctorNames \n  لا يمكن إغلاق الوردية العامة. لا تزال هناك ورديات أطباء مفتوحة مرتبطة بهذه الوردية.",
+                'open_doctor_shifts' => 'الأطباء الذين لديهم ورديات مفتوحة حالياً: ' . $doctorNames,
+                // Optionally return the list of open shifts for frontend handling
+                // 'data' => $openDoctorShiftsForThisGeneralShift->map(fn($ds) => ['doctor_id' => $ds->doctor_id, 'doctor_name' => $ds->doctor?->name, 'doctor_shift_id' => $ds->id])
+            ], 409); // 409 Conflict
+        }
+        
+        // Additional consideration: What about doctor shifts that might be open but NOT tied to this specific $shift->id,
+        // but perhaps tied to older general shifts that were never properly closed?
+        // The original code `DoctorShift::where('status', true)->get()` would close ALL active doctor shifts regardless
+        // of which general shift they belonged to. This might be desired if closing the current general shift
+        // implies ending ALL doctor activity.
+        // If you ONLY want to ensure doctor shifts for *this* general shift are closed, the check above is sufficient.
+        // If you want to close ALL globally active doctor shifts upon closing THIS general shift:
+        $allGloballyOpenDoctorShifts = DoctorShift::where('status', true)->get();
+
+
         DB::beginTransaction();
         try {
             $closingTime = Carbon::now();
-            $closingUserId = Auth::id(); // User performing the close action
+            $closingUserId = Auth::id();
 
-            // 1. Update and close the main clinic shift
-            $shift->update([
-                'user_closed' => Auth::id(),
-                 
+            // 1. Close all globally open Doctor Shifts (if this is the desired behavior)
+            // If you only cared about doctor shifts associated with $shift->id, this loop is not needed
+            // because the check above would have already ensured they are closed.
+            if ($allGloballyOpenDoctorShifts->isNotEmpty()) {
+                foreach ($allGloballyOpenDoctorShifts as $doctorShift) {
+                    $doctorShift->update([
+                        'status' => false,
+                        'end_time' => $closingTime,
+                        // 'user_id_closed_by_general_shift' => $closingUserId, // Optional: if you want to track this
+                    ]);
+                }
+            }
+
+            // 2. Update and close the main clinic shift
+            $shiftDataToUpdate = [
                 'is_closed' => true,
                 'closed_at' => $closingTime,
-                // 'user_id_closed' => $closingUserId, // If you track this
-            ]);
+                'user_id_closed' => $closingUserId, // Assuming user_id_closed column exists on shifts table
+            ];
 
-            // 2. Find and close all open DoctorShift records associated with this general Shift
-            $openDoctorShifts = DoctorShift
-                                          ::where('status', true) // Only active ones
-                                          ->get();
-
-            foreach ($openDoctorShifts as $doctorShift) {
-                $doctorShift->update([
-                    'status' => false,
-                    'end_time' => $closingTime, // Set their end time to the general shift's closing time
-                    // Optionally, if a different user is closing, or log who closed it.
-                    // This assumes the DoctorShift model doesn't have a specific 'closed_by_user_id'.
-                    // If it does, you might want to update that too.
-                ]);
+            // Financial reconciliation fields if provided (ensure validation if they are optional or required)
+            if ($request->has('total')) {
+                $shiftDataToUpdate['total'] = $request->input('total');
+            }
+            if ($request->has('bank')) {
+                $shiftDataToUpdate['bank'] = $request->input('bank');
+            }
+            if ($request->has('expenses')) {
+                $shiftDataToUpdate['expenses'] = $request->input('expenses');
+            }
+            if ($request->has('touched')) {
+                $shiftDataToUpdate['touched'] = $request->boolean('touched');
             }
             
-            // TODO: Add logic for financial reconciliation here if needed.
-            // E.g., compare system calculated totals with manually entered totals.
-            // The 'touched' flag could be set if there's a discrepancy or manual override.
-
-            // TODO: Potentially trigger events, like generating end-of-shift reports.
-            // event(new ClinicShiftClosed($shift));
-
+            $shift->update($shiftDataToUpdate);
+            
             DB::commit();
 
-            return new ShiftResource($shift->loadMissing(['doctorShifts', /* other relations for resource */]));
+            return new ShiftResource($shift->loadMissing(['userClosed', 'doctorShifts']));
 
         } catch (\Exception $e) {
             DB::rollBack();
-            // Log the error: Log::error('Failed to close clinic shift and associated doctor shifts: ' . $e->getMessage());
+            Log::error("Failed to close clinic shift {$shift->id}: " . $e->getMessage(), ['exception' => $e]);
             return response()->json(['message' => 'حدث خطأ أثناء إغلاق الوردية.', 'error' => $e->getMessage()], 500);
         }
     }
-
 
     /**
      * Update financial details of a shift (e.g., by an accountant after review).

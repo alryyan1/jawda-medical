@@ -3194,7 +3194,6 @@ class ReportController extends Controller
 
         $visit->load([
             'patient:id,name,age_year,gender',
-            'patientLabRequests' => function($query) { $query->where('valid', true)->where('no_sample', false); },
             'patientLabRequests.mainTest:id,main_test_name',
         ]);
 
@@ -3775,14 +3774,8 @@ class ReportController extends Controller
             }
         }
 
-  if ($request->has('base64') || $base64) {
-            $result_as_bs64 = $pdf->output('name.pdf', 'E');
-            $pdfData = substr($result_as_bs64, strpos($result_as_bs64, "JVB"));
-
-            return $pdfData;
-        } else {
-            $pdfContent = $pdf->output();
-        }            
+        $pdfContent = $pdf->Output('name.pdf', 'S');
+            
             // Clean any remaining output buffer
             ob_end_clean();
 
