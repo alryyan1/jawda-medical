@@ -21,6 +21,7 @@ class MyCustomTCPDF extends TCPDF
     protected array $tableHeaders = [];
     protected array $tableWidths = [];
     protected array $tableAlignments = [];
+    public bool $isLab = false;
     protected int $defaultCellHeight = 7; // Default height for a single line cell
     public  $currentVisit = null; // Made public for easier access if needed
 
@@ -35,7 +36,8 @@ class MyCustomTCPDF extends TCPDF
         bool $unicode = true,
         string $encoding = 'UTF-8',
         bool $diskcache = false,
-        bool $pdfa = false
+        bool $pdfa = false,
+        string $filterCriteria = ''
     ) {
         parent::__construct($orientation, $unit, $format, $unicode, $encoding, $diskcache, $pdfa);
 
@@ -52,8 +54,8 @@ class MyCustomTCPDF extends TCPDF
         $this->SetTitle($this->reportTitle . ($this->currentVisit ? " - Visit #{$this->currentVisit->id}" : ""));
         $this->SetSubject('Lab Result Report');
         $this->setLanguageArray(['a_meta_charset' => 'UTF-8', 'a_meta_dir' => 'rtl', 'a_meta_language' => 'ar', 'w_page' => 'صفحة']);
-        $this->setRTL(true);
-
+        $this->setRTL(enable: true);
+        $this->filterCriteria = $filterCriteria;
         $this->SetMargins(10, 45, 10); // L, T, R - Top margin increased for letterhead
         $this->SetHeaderMargin(5);
         $this->SetFooterMargin(20); // Increased for more robust footer
@@ -184,6 +186,9 @@ class MyCustomTCPDF extends TCPDF
         if ($headerTextLine4) {
             $this->SetX($textX); $this->MultiCell($textWidth, 3.5, $headerTextLine4, 0, $isRTL ? 'R' : 'L', false, 1);
         }
+        if($this->filterCriteria){
+            $this->SetX($textX); $this->MultiCell($textWidth, 3.5, $this->filterCriteria, 0, $isRTL ? 'R' : 'L', false, 1);
+        }
 
         // Determine Y position after letterhead details, considering logo height
         $currentY = $this->GetY();
@@ -306,7 +311,8 @@ class MyCustomTCPDF extends TCPDF
         $this->SetY(-23); // Adjusted for potentially more signature lines
         $this->SetFont($this->defaultFont, 'I', 7);
         $this->SetTextColor(100);
-        $this->Cell(0, 5, ($isRTL ? 'صفحة ' : 'Page ') . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 'T', 0, 'C');
+        if($this->isLab){
+                $this->Cell(0, 5, ($isRTL ? 'صفحة ' : 'Page ') . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 'T', 0, 'C');
         $this->Cell(0, 5, ($isRTL ? 'تاريخ الطباعة: ' : 'Printed: ') . Carbon::now()->format('Y-m-d H:i'), 'T', 0, $isRTL ? 'L' : 'R');
 
         // Example simplified signature lines
@@ -316,6 +322,8 @@ class MyCustomTCPDF extends TCPDF
         $this->Cell(10,5,'',0,0); // Spacer
         $this->Cell($sigBlockWidth, 5, ($isRTL ? 'مدير المختبر/المراجع:' : 'Lab Director/Auditor:'), 'T', 1, 'C');
 
+        }
+    
         if ($this->currentSettings?->footer_content) {
             $this->SetY(-10); // Closer to bottom for fixed footer text
             $this->SetFont($this->defaultFont, '', 7);
@@ -354,7 +362,7 @@ class MyCustomTCPDF extends TCPDF
         $this->Ln($lineHeight);
     }
 
-    public function DrawTableRow(array $rowData, array $widths = null, array $alignments = null, bool $fill = false, int $baseLineHeight = 6)
+    public function DrawTableRow(array $rowData, array $widths = null, array $alignments = null, bool $fill = false, int $baseLineHeight = 6,$fontSize = 10)
     {
         $_widths = $widths ?? $this->tableWidths;
         $_alignments = $alignments ?? $this->tableAlignments;
@@ -363,7 +371,7 @@ class MyCustomTCPDF extends TCPDF
             return;
         }
         
-        $this->SetFont($this->defaultFont, '', 7); // Regular font for data
+        $this->SetFont($this->defaultFont, '', $fontSize); // Regular font for data
         $this->SetFillColor($fill ? 240 : 255, $fill ? 240 : 255, $fill ? 240 : 255);
         $this->SetTextColor(0);
         $this->SetDrawColor(150,150,150); // Lighter border for data rows
@@ -410,7 +418,7 @@ class MyCustomTCPDF extends TCPDF
                 else if (is_numeric($data) && !is_string($data) && $this->getRTL()) $align = 'L';
 
 
-                $this->MultiCell($_widths[$key], $rowHeight, (string)$data, 1, $align, $fill, 0, $currentX, $currentY, true, 0, false, true, $rowHeight, 'M');
+                $this->MultiCell($_widths[$key], $rowHeight, (string)$data, 1, 'C', $fill, 0, $currentX, $currentY, true, 0, false, true, $rowHeight, 'M');
                 $currentX += $_widths[$key];
             }
         }

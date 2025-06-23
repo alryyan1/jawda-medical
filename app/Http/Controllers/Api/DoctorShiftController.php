@@ -169,47 +169,153 @@ class DoctorShiftController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      */
+    // public function index(Request $request)
+    // {
+    //     // Permission check: e.g., can('list all_doctor_shifts') or 'view doctor_shift_reports'
+    //     // if (!Auth::user()->can('list all_doctor_shifts')) {
+    //     //     return response()->json(['message' => 'Unauthorized'], 403);
+    //     // }
+
+    //     $request->validate([
+    //         'page' => 'nullable|integer|min:1',
+    //         'per_page' => 'nullable|integer|min:5|max:100', // Control items per page
+    //         'date_from' => 'nullable|date_format:Y-m-d',
+    //         'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+    //         'doctor_id' => 'nullable|integer|exists:doctors,id',
+    //         'doctor_name_search' => 'nullable|string|max:255', // For searching by doctor name
+    //         'user_id_opened' => 'nullable|integer|exists:users,id', // User who started the DoctorShift
+    //         'status' => 'nullable|string|in:0,1,all', // '0' for closed, '1' for open, 'all' for both
+    //         'shift_id' => 'nullable|integer|exists:shifts,id', // Filter by general clinic shift ID
+    //         'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status', // Allowed sort fields
+    //         'sort_direction' => 'nullable|string|in:asc,desc',
+    //     ]);
+
+    //     $query = DoctorShift::with([
+    //         'doctor:id,name,specialist_id', // Eager load doctor with specialist_id
+    //         'doctor.specialist:id,name',    // Eager load specialist details
+    //         'user:id,name,username',        // User who opened/managed the DoctorShift record
+    //         'generalShift:id,created_at,closed_at', // The main clinic shift
+    //         // Optional: Eager load counts for quick display if needed, but can make query heavier
+    //         // 'doctorVisitsCount' => fn($q) => $q->selectRaw('count(*) as aggregate'),
+    //     ]);
+
+    //     // Filtering
+    //     if ($request->filled('doctor_id')) {
+    //         $query->where('doctor_id', $request->doctor_id);
+    //     }
+    //     if ($request->filled('doctor_name_search')) {
+    //         $searchTerm = $request->doctor_name_search;
+    //         $query->whereHas('doctor', function ($q) use ($searchTerm) {
+    //             $q->where('name', 'LIKE', "%{$searchTerm}%");
+    //         });
+    //     }
+    //     if ($request->filled('user_id_opened')) {
+    //         $query->where('user_id', $request->user_id_opened);
+    //     }
+    //     if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
+    //         $query->where('status', (bool)$request->status);
+    //     }
+    //     if ($request->filled('date_from')) {
+    //         $query->whereDate('start_time', '>=', Carbon::parse($request->date_from)->startOfDay());
+    //     }
+    //     if ($request->filled('date_to')) {
+    //         // If filtering by end_time, need to be careful if end_time can be null for open shifts
+    //         // For start_time based filtering:
+    //         $query->whereDate('start_time', '<=', Carbon::parse($request->date_to)->endOfDay());
+    //         // Or if you want to include shifts that *ended* within the range:
+    //         // $query->where(function ($q) use ($request) {
+    //         //     $q->whereBetween('start_time', [Carbon::parse($request->date_from)->startOfDay(), Carbon::parse($request->date_to)->endOfDay()])
+    //         //       ->orWhereBetween('end_time', [Carbon::parse($request->date_from)->startOfDay(), Carbon::parse($request->date_to)->endOfDay()]);
+    //         // });
+    //     }
+    //     if ($request->filled('shift_id')) {
+    //         $query->where('shift_id', $request->shift_id);
+    //     }
+
+    //     // Sorting
+    //     $sortBy = $request->input('sort_by', 'start_time');
+    //     $sortDirection = $request->input('sort_direction', 'desc');
+
+    //     if ($sortBy === 'doctor_name') {
+    //         // Sort by related table requires join or more complex subquery for optimal performance
+    //         // For simplicity with eager loading, you might sort on collection after fetching,
+    //         // or use a join. Let's try with a join for DB-level sorting.
+    //         $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
+    //               ->orderBy('doctors.name', $sortDirection)
+    //               ->select('doctor_shifts.*'); // Important to select all columns from doctor_shifts
+    //     } elseif ($sortBy === 'user_name') {
+    //         $query->join('users', 'doctor_shifts.user_id', '=', 'users.id')
+    //               ->orderBy('users.name', $sortDirection)
+    //               ->select('doctor_shifts.*');
+    //     } else {
+    //         $query->orderBy($sortBy, $sortDirection);
+    //     }
+    //      // Add secondary sort for consistency
+    //     if ($sortBy !== 'start_time') {
+    //         $query->orderBy('start_time', 'desc');
+    //     }
+
+
+    //     $perPage = $request->input('per_page', 15); // Default items per page
+    //     $doctorShifts = $query->paginate($perPage);
+
+    //     return DoctorShiftResource::collection($doctorShifts);
+    // }
+   /**
+     * Display a listing of the DoctorShift resources for reporting.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+     */
     public function index(Request $request)
     {
         // Permission check: e.g., can('list all_doctor_shifts') or 'view doctor_shift_reports'
-        // if (!Auth::user()->can('list all_doctor_shifts')) {
-        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // if (!Auth::user()->can('list all_doctor_shifts')) { // Example
+        //     if (!Auth::user()->can('list_own_doctor_shifts')) {
+        //          return response()->json(['message' => 'Unauthorized'], 403);
+        //     }
+        //     // If user can only list their own (as opener), add this condition by default
+        //     $request->merge(['user_id_opened' => Auth::id()]);
         // }
+
 
         $request->validate([
             'page' => 'nullable|integer|min:1',
-            'per_page' => 'nullable|integer|min:5|max:100', // Control items per page
+            'per_page' => 'nullable|integer|min:5|max:100',
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'doctor_id' => 'nullable|integer|exists:doctors,id',
-            'doctor_name_search' => 'nullable|string|max:255', // For searching by doctor name
-            'user_id_opened' => 'nullable|integer|exists:users,id', // User who started the DoctorShift
-            'status' => 'nullable|string|in:0,1,all', // '0' for closed, '1' for open, 'all' for both
-            'shift_id' => 'nullable|integer|exists:shifts,id', // Filter by general clinic shift ID
-            'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status', // Allowed sort fields
+            'doctor_name_search' => 'nullable|string|max:255',    // NEW
+            'user_id_opened' => 'nullable|integer|exists:users,id', // NEW (user_id on doctor_shifts table)
+            'status' => 'nullable|string|in:0,1,all',
+            'shift_id' => 'nullable|integer|exists:shifts,id',    // General clinic shift ID
+            'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status,total_entitlement', // Added total_entitlement
             'sort_direction' => 'nullable|string|in:asc,desc',
         ]);
 
         $query = DoctorShift::with([
-            'doctor:id,name,specialist_id', // Eager load doctor with specialist_id
-            'doctor.specialist:id,name',    // Eager load specialist details
-            'user:id,name,username',        // User who opened/managed the DoctorShift record
+            'doctor:id,name,specialist_id,static_wage,cash_percentage,company_percentage,lab_percentage', // Crucial for entitlement calculation
+            'doctor.specialist:id,name',
+            'user:id,name,username', // User who opened/managed the DoctorShift (aliased as 'user' in model)
             'generalShift:id,created_at,closed_at', // The main clinic shift
-            // Optional: Eager load counts for quick display if needed, but can make query heavier
-            // 'doctorVisitsCount' => fn($q) => $q->selectRaw('count(*) as aggregate'),
+            // Eager load relations needed for entitlement calculations if done in PHP/Resource
+            // These are needed by the doctor_credit_cash/company methods in DoctorShift model
+            'visits.patient.company', // company_id for patient is enough for isCompany check
+            'visits.requestedServices.service',
+            'visits.patientLabRequests.mainTest',
         ]);
 
         // Filtering
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
         }
-        if ($request->filled('doctor_name_search')) {
+        if ($request->filled('doctor_name_search')) { // NEW
             $searchTerm = $request->doctor_name_search;
             $query->whereHas('doctor', function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%");
             });
         }
-        if ($request->filled('user_id_opened')) {
+        if ($request->filled('user_id_opened')) { // NEW (filters by the user_id on doctor_shifts table)
             $query->where('user_id', $request->user_id_opened);
         }
         if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
@@ -219,16 +325,9 @@ class DoctorShiftController extends Controller
             $query->whereDate('start_time', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            // If filtering by end_time, need to be careful if end_time can be null for open shifts
-            // For start_time based filtering:
             $query->whereDate('start_time', '<=', Carbon::parse($request->date_to)->endOfDay());
-            // Or if you want to include shifts that *ended* within the range:
-            // $query->where(function ($q) use ($request) {
-            //     $q->whereBetween('start_time', [Carbon::parse($request->date_from)->startOfDay(), Carbon::parse($request->date_to)->endOfDay()])
-            //       ->orWhereBetween('end_time', [Carbon::parse($request->date_from)->startOfDay(), Carbon::parse($request->date_to)->endOfDay()]);
-            // });
         }
-        if ($request->filled('shift_id')) {
+        if ($request->filled('shift_id')) { // Filter by general clinic shift ID
             $query->where('shift_id', $request->shift_id);
         }
 
@@ -237,28 +336,41 @@ class DoctorShiftController extends Controller
         $sortDirection = $request->input('sort_direction', 'desc');
 
         if ($sortBy === 'doctor_name') {
-            // Sort by related table requires join or more complex subquery for optimal performance
-            // For simplicity with eager loading, you might sort on collection after fetching,
-            // or use a join. Let's try with a join for DB-level sorting.
             $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
                   ->orderBy('doctors.name', $sortDirection)
-                  ->select('doctor_shifts.*'); // Important to select all columns from doctor_shifts
-        } elseif ($sortBy === 'user_name') {
+                  ->select('doctor_shifts.*');
+        } elseif ($sortBy === 'user_name') { // User who opened the shift
             $query->join('users', 'doctor_shifts.user_id', '=', 'users.id')
                   ->orderBy('users.name', $sortDirection)
                   ->select('doctor_shifts.*');
-        } else {
+        } elseif ($sortBy === 'total_entitlement') {
+            // Sorting by calculated field requires either calculating in DB (complex)
+            // or fetching all then sorting in PHP (inefficient for large datasets).
+            // For pagination, it's best if the DB can handle it.
+            // This is a placeholder; a raw expression or a stored generated column would be better for performance.
+            // For now, this will sort by ID as a fallback if 'total_entitlement' is not a direct column.
+            // $query->orderBy($sortBy, $sortDirection); // This will fail if not a DB column
+            // To make this work, you'd typically sort on the collection AFTER pagination,
+            // or add a raw select for the calculated entitlement and sort by that alias.
+            // For simplicity of this response, we'll rely on the Resource to calculate it for display.
+            // Sorting will be on DB columns for now. If you need to sort by calculated,
+            // you'll need a more complex query or sort the collection after fetching.
+            // $query->orderBy('id', $sortDirection); // Fallback sort
+        }
+        else {
             $query->orderBy($sortBy, $sortDirection);
         }
-         // Add secondary sort for consistency
-        if ($sortBy !== 'start_time') {
+        // Add secondary sort for consistency if primary sort isn't unique enough
+        if ($sortBy !== 'start_time' && $sortBy !== 'id') {
             $query->orderBy('start_time', 'desc');
         }
+        $query->orderBy('doctor_shifts.id', 'desc'); // Final tie-breaker
 
 
-        $perPage = $request->input('per_page', 15); // Default items per page
+        $perPage = $request->input('per_page', 15);
         $doctorShifts = $query->paginate($perPage);
 
+        // The DoctorShiftResource will handle calculating the entitlement values
         return DoctorShiftResource::collection($doctorShifts);
     }
     public function showFinancialSummary(Request $request, DoctorShift $doctorShift)

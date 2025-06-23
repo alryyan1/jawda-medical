@@ -79,51 +79,43 @@ class CostController extends Controller
 
         $query = Cost::with(['costCategory:id,name', 'userCost:id,name', 'shift:id', 'doctorShift.doctor:id,name']); // Eager load
 
-        if ($request->filled('date_from')) {
-            $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
-        }
-        if ($request->filled('cost_category_id')) {
-            $query->where('cost_category_id', $request->cost_category_id);
-        }
-        if ($request->filled('user_cost_id')) {
-            $query->where('user_cost', $request->user_cost_id);
-        }
-        if ($request->filled('shift_id')) {
-            $query->where('shift_id', $request->shift_id);
-        }
-        if ($request->filled('payment_method')) {
-            if ($request->payment_method === 'cash') {
-                $query->where('amount', '>', 0)->where('amount_bankak', '=', 0); // Or however you distinguish
-            } elseif ($request->payment_method === 'bank') {
-                $query->where('amount_bankak', '>', 0);
-            }
-        }
-        if ($request->filled('search_description')) {
-            $query->where('description', 'LIKE', '%' . $request->search_description . '%');
-        }
-
-        $sortBy = $request->input('sort_by', 'created_at');
-        $sortDirection = $request->input('sort_direction', 'desc');
-        if ($sortBy === 'amount') { // Special handling for total amount
-             $query->orderByRaw('(amount + amount_bankak) ' . $sortDirection);
+        if ($request->input('sort_by') === 'total_cost') {
+            $query->orderByRaw('(amount + amount_bankak) ' . ($request->input('sort_direction', 'desc')));
         } else {
-             $query->orderBy($sortBy, $sortDirection);
+            $query->orderBy($request->input('sort_by', 'created_at'), $request->input('sort_direction', 'desc'));
         }
-
 
         $perPage = $request->input('per_page', 15);
         $costs = $query->paginate($perPage);
 
-        // Optionally add a summary of totals for the current filtered view
-        $summaryQuery = clone $query;
-        $summaryQuery->getQuery()->orders = []; // Remove any ORDER BY clauses
-        $totals = $summaryQuery->selectRaw('(SUM(amount) - SUM(amount_bankak)) as total_cash_paid, SUM(amount_bankak) as total_bank_paid, SUM(amount)  as grand_total_paid')->first();
-        
-        return CostResource::collection($costs)->additional(['meta' => ['summary' => $totals]]);
+        // Corrected Summary Calculation
+        $summaryQuery = Cost::query(); // Start a new query for summary based on same filters
+        // Re-apply all filters to summaryQuery similar to how they are applied to $query
+        if ($request->filled('date_from')) { $summaryQuery->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay()); }
+        if ($request->filled('date_to')) { $summaryQuery->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay()); }
+        if ($request->filled('cost_category_id')) { $summaryQuery->where('cost_category_id', $request->cost_category_id); }
+        if ($request->filled('user_cost_id')) { $summaryQuery->where('user_cost', $request->user_cost_id); } // Assuming user_cost stores user ID
+        if ($request->filled('shift_id')) { $summaryQuery->where('shift_id', $request->shift_id); }
+        if ($request->filled('payment_method') && $request->payment_method !== 'all') {
+            if ($request->payment_method === 'cash') { $summaryQuery->where('amount', '>', 0)->where('amount_bankak', '=', 0); }
+            elseif ($request->payment_method === 'bank') { $summaryQuery->where('amount_bankak', '>', 0)->where('amount', '=', 0); }
+            elseif ($request->payment_method === 'mixed') { $summaryQuery->where('amount', '>', 0)->where('amount_bankak', '>', 0); }
+        }
+        if ($request->filled('search_description')) { $summaryQuery->where('description', 'LIKE', '%' . $request->search_description . '%');}
+
+
+        $summaryTotals = $summaryQuery->selectRaw('SUM(amount) as total_cash_paid, SUM(amount_bankak) as total_bank_paid, SUM(amount + amount_bankak) as grand_total_paid')
+                                 ->first();
+
+        return CostResource::collection($costs)->additional(['meta' => [
+            'summary' => [
+                'total_cash_paid' => (float)($summaryTotals->total_cash_paid ?? 0),
+                'total_bank_paid' => (float)($summaryTotals->total_bank_paid ?? 0),
+                'grand_total_paid' => (float)($summaryTotals->grand_total_paid ?? 0),
+            ]
+        ]]);
     }
+    
     // ... (show, update, destroy if full CRUD management page for costs exists) ...
       
     // ... index, show, update, destroy for managing costs ...

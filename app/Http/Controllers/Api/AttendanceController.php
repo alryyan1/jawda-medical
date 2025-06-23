@@ -53,7 +53,9 @@ class AttendanceController extends Controller
         $attendancesForMonth = Attendance::whereBetween('attendance_date', [$startDate, $endDate])
             ->with(['user:id,name', 'supervisor:id,name']) // Eager load for display
             ->get()
-            ->groupBy('attendance_date') // Group by date string "YYYY-MM-DD"
+            ->groupBy(function ($attendance) {
+                return $attendance->attendance_date->format('Y-m-d'); // Group by date string "YYYY-MM-DD"
+            })
             ->map(function ($dailyAttendances) {
                 return $dailyAttendances->groupBy('shift_definition_id')
                     ->map(function ($shiftAttendances) {

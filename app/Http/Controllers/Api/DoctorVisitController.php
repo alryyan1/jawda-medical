@@ -60,48 +60,61 @@ class DoctorVisitController extends Controller
     // }
     public function index(Request $request)
     {
-        $query = DoctorVisit::with([
-            'patient:id,name,phone,gender,age_year,age_month,age_day', // Select specific patient fields
-            'doctor:id,name',
-            'createdByUser:id,name',
-            'requestedServices' // Eager load requested services to calculate totals
-        ])
-            ->latest('visit_date') // Order by visit date first
-            ->latest('visit_time');  // Then by visit time or created_at
+        $request->validate([
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'status' => 'nullable|string', // Add validation for allowed statuses if needed
+            'search' => 'nullable|string|max:255',
+            'per_page' => 'nullable|integer|min:5|max:100',
+        ]);
 
-        // Default to today's visits if no date is specified
-        $visitDate = $request->filled('visit_date') ? Carbon::parse($request->visit_date) : Carbon::today();
-        $query->whereDate('visit_date', $visitDate);
+        $query = DoctorVisit::with([
+            'patient:id,name,phone,gender,age_year,age_month,age_day,company_id',
+            'patient.company:id,name', // Eager load company for patient
+            'doctor:id,name',          // EAGER LOAD DOCTOR
+            'createdByUser:id,name',
+            'requestedServices.service', // For calculating totals
+            'patientLabRequests.mainTest'       // For calculating totals
+        ])
+        ->latest('created_at'); // Or created_at if visit_time is not reliable
+
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            $query->whereBetween('created_at', [
+                Carbon::parse($request->date_from)->startOfDay(),
+                Carbon::parse($request->date_to)->endOfDay()
+            ]);
+        } elseif ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        } elseif ($request->filled('date_to')) {
+             $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+         else {
+            // Default to today if no date range is specified
+            $query->whereDate('created_at', Carbon::today());
+        }
 
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
         }
-
-        if ($request->filled('status') && $request->status !== 'all') { // Allow 'all' to bypass status filter
+        if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);
         }
-
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->whereHas('patient', function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('id', $searchTerm); // Allow search by patient ID
+                  ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('id', $searchTerm);
             });
         }
 
         $visits = $query->paginate($request->get('per_page', 15));
 
-        // Add total_amount and total_paid to each visit resource if not already there
-        // This can be done in the resource or by transforming the collection here.
-        // For simplicity, we'll assume DoctorVisitResource can handle this.
+        // The DoctorVisitResource will need to calculate/include total_discount
         return DoctorVisitResource::collection($visits);
     }
-    /**
-     * Store a newly created doctor visit.
-     * This might be called directly or as part of Patient Registration.
-     * If called from PatientController@store, that method might handle most of this.
-     */
+    
     public function store(Request $request)
     {
         $validatedData = $request->validate([

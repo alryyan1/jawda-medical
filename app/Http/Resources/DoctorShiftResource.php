@@ -1,50 +1,62 @@
 <?php
-
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Carbon\Carbon;
 
 class DoctorShiftResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(Request $request): array
     {
+        $startTime = $this->start_time ? Carbon::parse($this->start_time) : null;
+        $endTime = $this->end_time ? Carbon::parse($this->end_time) : null;
         $duration = null;
-        if ($this->start_time && $this->end_time) {
-            $duration = $this->start_time->diff($this->end_time)->format('%Hh %Im'); // Format as Hh Mm
-        } elseif ($this->start_time && $this->status) { // If active and started
-            $duration = $this->start_time->diff(now())->format('%Hh %Im') . ' (مستمرة)';
+        if ($startTime && $endTime) {
+            $duration = $startTime->diff($endTime)->format('%Hh %Im');
+        } elseif ($startTime && $this->status) {
+            $duration = $startTime->diffForHumans(now(), true) . ' (open)';
         }
+
+        // Calculate entitlements here (using methods from DoctorShift model)
+        $cashEntitlement = $this->doctor_credit_cash(); // Assumes this method exists on DoctorShift
+        $insuranceEntitlement = $this->doctor_credit_company(); // Assumes this method exists
+        $staticWageApplied = ($this->status == false && $this->doctor) ? (float)$this->doctor->static_wage : 0; // Apply static wage only if shift is closed and doctor exists
+        $totalDoctorEntitlement = $cashEntitlement + $insuranceEntitlement + $staticWageApplied;
 
         return [
             'id' => $this->id,
             'doctor_id' => $this->doctor_id,
-            'doctor_name' => $this->whenLoaded('doctor', optional($this->doctor)->name),
-            'shift_id' => $this->shift_id,
-            'general_shift_name' => $this->whenLoaded('generalShift', optional($this->generalShift)->name), // Assuming Shift model has 'name'
-            'user_id' => $this->user_id,
-            'user_name' => $this->whenLoaded('user', optional($this->user)->name),
+            'doctor_name' => $this->whenLoaded('doctor', $this->doctor?->name),
+            'doctor_specialist_name' => $this->whenLoaded('doctor', $this->doctor?->specialist?->name),
+            'user_id_opened' => $this->user_id,
+            'user_name_opened' => $this->whenLoaded('user', $this->user?->name),
+            
+            'shift_id' => $this->shift_id, // General clinic shift_id
+            'general_shift_name' => $this->whenLoaded('generalShift', $this->generalShift?->name ?? ('Shift #'.$this->generalShift?->id)),
+            
             'status' => (bool) $this->status,
-            'status_text' => $this->status ? 'مفتوحة' : 'مغلقة',
+            'status_text' => $this->status ? 'Open' : 'Closed',
             'start_time' => $this->start_time?->toIso8601String(),
             'end_time' => $this->end_time?->toIso8601String(),
-            'doctor_specialist_name' => $this->doctor->specialist->name, // Get specialist name
-            'formatted_start_time' => $this->start_time?->format('Y-m-d H:i A'),
-            'formatted_end_time' => $this->end_time?->format('Y-m-d H:i A'),
-            'duration' => $duration, // Calculated duration
+            'formatted_start_time' => $startTime ? $startTime->format('Y-m-d h:i A') : 'N/A',
+            'formatted_end_time' => $endTime ? $endTime->format('Y-m-d h:i A') : ($this->status ? 'Still Open' : 'N/A'),
+            'duration' => $duration,
+
+            // Financials
+            'total_doctor_entitlement' => round($totalDoctorEntitlement, 2),
+            'cash_entitlement' => round($cashEntitlement, 2),
+            'insurance_entitlement' => round($insuranceEntitlement, 2),
+            'static_wage_applied' => round($staticWageApplied, 2),
+
+            // Proofing Flags
             'is_cash_revenue_prooved' => (bool) $this->is_cash_revenue_prooved,
-            'doctor_avatar_url' => $this->whenLoaded('doctor', optional($this->doctor)->image_url), // If doctor model has image_url accessor
-            // ... other proof flags ...
+            'is_cash_reclaim_prooved' => (bool) $this->is_cash_reclaim_prooved,
+            'is_company_revenue_prooved' => (bool) $this->is_company_revenue_prooved,
+            'is_company_reclaim_prooved' => (bool) $this->is_company_reclaim_prooved,
+
             'created_at' => $this->created_at?->toIso8601String(),
-            // New fields computed in controller
-            'is_examining' => (bool) ($this->is_examining ?? false), // Default to false if not set
-            'patients_count' => (int) ($this->patients_count ?? 0), // Default 
-            // 'visits_count' => $this->whenCounted('doctorVisits'), // If you add withCount
+            'updated_at' => $this->updated_at?->toIso8601String(),
         ];
     }
 }

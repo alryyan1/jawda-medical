@@ -1078,8 +1078,9 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             return  ['status' => false, 'message' => 'no data found'];
         }
         $bindings =   CbcBinding::all();
-        /** @var \App\Models\CbcBinder $binding */
         $object = null;
+
+        // return ['patient'=>$patient->id,'main_test_id'=>$main_test_id];
         foreach ($bindings as $binding) {
             $object[$binding->name_in_sysmex_table] = [
                 'child_id' => [$binding->child_id_array],
@@ -1087,8 +1088,9 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             ];
             $child_array =  explode(',', $binding->child_id_array);
             foreach ($child_array as $child_id) {
-                $requested_result = RequestedResult::whereChildTestId($child_id)->where('main_test_id', '=', $main_test_id)->where('patient_id', '=', $patient->id)->first();
+                $requested_result = RequestedResult::where('child_test_id', $child_id)->where('main_test_id', '=', $main_test_id)->where('patient_id', '=', $patient->id)->first();
                 if ($requested_result != null) {
+                    // return ['status' => false, 'message' => 'requested result found'];
 
                     $requested_result->update(['result' => $sysmex[$binding->name_in_sysmex_table]]);
                 }
@@ -1098,7 +1100,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         return response()->json([
             'status' => true,
             'message' =>  'CBC results populated successfully.' ,
-            'data' => new LabRequestResource($labrequest->fresh()->loadDefaultRelations()), // Assuming loadDefaultRelations loads what UI needs
+            'data' => new LabRequestResource($labrequest), // Assuming loadDefaultRelations loads what UI needs
             'cbcObj' => $object // Your debug object
         ]);
     }
