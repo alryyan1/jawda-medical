@@ -322,10 +322,10 @@ class DoctorShiftController extends Controller
             $query->where('status', (bool)$request->status);
         }
         if ($request->filled('date_from')) {
-            $query->whereDate('start_time', '>=', Carbon::parse($request->date_from)->startOfDay());
+            $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            $query->whereDate('start_time', '<=', Carbon::parse($request->date_to)->endOfDay());
+            $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
         if ($request->filled('shift_id')) { // Filter by general clinic shift ID
             $query->where('shift_id', $request->shift_id);

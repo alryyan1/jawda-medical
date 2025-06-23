@@ -53,7 +53,7 @@ class DoctorController extends Controller
     {
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20|unique:doctors,phone',
+            'phone' => 'required|string',
             'cash_percentage' => 'required|numeric|min:0|max:100',
             'company_percentage' => 'required|numeric|min:0|max:100',
             'static_wage' => 'required|numeric|min:0',
@@ -94,7 +94,7 @@ class DoctorController extends Controller
     {
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'phone' => ['sometimes','required','string','max:20', Rule::unique('doctors')->ignore($doctor->id)],
+            'phone' => ['sometimes','required','string'],
             'cash_percentage' => 'sometimes|required|numeric|min:0|max:100',
             'company_percentage' => 'sometimes|required|numeric|min:0|max:100',
             'static_wage' => 'sometimes|required|numeric|min:0',
