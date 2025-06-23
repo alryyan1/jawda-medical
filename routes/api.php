@@ -497,6 +497,44 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('attendanceReports.dailyDetail');
     Route::get('/attendance/reports/payroll', [AttendanceReportController::class, 'payrollAttendanceReport'])
         ->name('attendanceReports.payroll');
+        Route::prefix('attendance/reports')->name('attendance.reports.')->group(function () {
+          Route::get('/monthly-summary', [ReportController::class, 'getMonthlyAttendanceSummary'])->name('monthlySummary.show');
+          Route::get('/monthly-summary/pdf', [ReportController::class, 'generateMonthlyAttendancePdf'])->name('monthlySummary.pdf');
+      });
+         /*
+    |--------------------------------------------------------------------------
+    | Attendance Configuration Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('attendance-config')->name('attendance.config.')->group(function () {
+      // Attendance Global Settings
+      Route::get('/settings', [AttendanceSettingController::class, 'show'])->name('settings.show');
+      Route::post('/settings', [AttendanceSettingController::class, 'storeOrUpdate'])->name('settings.update'); // Use POST for create or update
+
+      // Shift Definitions
+      Route::get('/shift-definitions/list', [ShiftDefinitionController::class, 'indexList'])->name('shift_definitions.list'); // For dropdowns
+      Route::apiResource('/shift-definitions', ShiftDefinitionController::class);
+
+      // Holidays
+      Route::apiResource('/holidays', HolidayController::class);
+
+      // User Default Shift Assignments (assuming these are part of UserController)
+      Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts'])->name('users.default_shifts.show');
+      Route::put('/users/{user}/default-shifts', [UserController::class, 'updateUserDefaultShifts'])->name('users.default_shifts.update');
+  });
+
+  /*
+  |--------------------------------------------------------------------------
+  | Attendance Recording & Reporting Routes (To be created)
+  |--------------------------------------------------------------------------
+  */
+  Route::prefix('attendance')->name('attendance.')->group(function () {
+      Route::get('/daily-sheet', [AttendanceController::class, 'getDailySheet'])->name('daily_sheet');
+      Route::post('/record', [AttendanceController::class, 'recordAttendance'])->name('record');
+      Route::put('/record/{attendance}', [AttendanceController::class, 'updateAttendanceStatus'])->name('update_status'); // For changing status later
+      // Add more routes for reports later
+      // Route::get('/reports/monthly', [AttendanceController::class, 'getMonthlyReport'])->name('reports.monthly');
+  });
 
 
         

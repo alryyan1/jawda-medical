@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB; // For aggregate functions
 use Carbon\Carbon;
 // You might create a specific Resource for this report item if needed
 use App\Http\Resources\ServiceResource; // Can be adapted or a new one created
+use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Cost;
 use App\Models\Doctor;
@@ -33,8 +34,10 @@ use App\Services\Pdf\MyCustomTCPDF;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Log;
 use App\Models\CostCategory;
+use App\Models\Holiday;
 use App\Models\RequestedServiceCost;
 use App\Models\RequestedServiceDeposit;
+use App\Models\ShiftDefinition;
 use App\Models\SubServiceCost;
 use Illuminate\Support\Facades\Auth;
 
@@ -295,8 +298,218 @@ class ReportController extends Controller
         $pdfContent = $pdf->Output($pdfFileName, 'S');
         return response($pdfContent, 200)->header('Content-Type', 'application/pdf')->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+    private function getMonthlyAttendanceSummaryData(Request $request): array
+    {
+        $validated = $request->validate([
+            'year' => 'required|integer|digits:4',
+            'month' => 'required|integer|min:1|max:12',
+            'shift_definition_id' => 'nullable|integer|exists:shifts_definitions,id',
+        ]);
+
+        $year = $validated['year'];
+        $month = $validated['month'];
+        $shiftDefinitionId = $validated['shift_definition_id'] ?? null;
+
+        $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $endDate = $startDate->copy()->endOfMonth();
+
+        // 1. Get all distinct user IDs that have attendance in the period/shift
+        $userIdsWithAttendanceQuery = Attendance::query()
+            ->whereBetween('attendance_date', [$startDate, $endDate]);
+
+        if ($shiftDefinitionId) {
+            $userIdsWithAttendanceQuery->where('shift_definition_id', $shiftDefinitionId);
+        }
+        
+        $userIdsWithAttendance = $userIdsWithAttendanceQuery->distinct()->pluck('user_id');
+
+        if ($userIdsWithAttendance->isEmpty()) {
+            // No users had any attendance, return empty data structure
+            $shiftName = $shiftDefinitionId ? ShiftDefinition::find($shiftDefinitionId)?->name : null;
+            return [
+                'data' => [],
+                'meta' => [
+                    'year' => (int)$year,
+                    'month' => (int)$month,
+                    'month_name' => $startDate->translatedFormat('F Y'),
+                    'shift_definition_id' => $shiftDefinitionId ? (int)$shiftDefinitionId : null,
+                    'shift_name' => $shiftName,
+                    'total_working_days_in_month' => $this->calculateWorkingDaysInMonth($startDate, $endDate), // Helper for this
+                ]
+            ];
+        }
+
+        // 2. Fetch User models for these IDs
+        $users = User::whereIn('id', $userIdsWithAttendance)
+                     ->with('defaultShifts') // Eager load default shifts if needed for display
+                     ->orderBy('name')
+                     ->get(['id', 'name', 'is_supervisor']); // Select only needed columns
+
+        $holidaysInMonth = Holiday::whereBetween('holiday_date', [$startDate, $endDate])
+            ->pluck('holiday_date')->map(fn($d) => $d->format('Y-m-d'));
+
+        $totalWorkingDaysInMonth = $this->calculateWorkingDaysInMonth($startDate, $endDate, $holidaysInMonth->all());
+        
+        $summaryData = [];
+        foreach ($users as $user) {
+            // Fetch attendance records specifically for this user and period/shift
+            $userAttendanceQuery = Attendance::where('user_id', $user->id)
+                ->whereBetween('attendance_date', [$startDate, $endDate]);
+
+            if ($shiftDefinitionId) {
+                $userAttendanceQuery->where('shift_definition_id', $shiftDefinitionId);
+            }
+            
+            $userAttendanceRecords = $userAttendanceQuery->get();
+
+            $present_days = $userAttendanceRecords->where('status', 'present')->count();
+            $late_present_days = $userAttendanceRecords->where('status', 'late_present')->count();
+            // According to your previous frontend, late_present also counts towards present_days for display
+            $total_present_for_display = $present_days + $late_present_days;
+            
+            $absent_days = $userAttendanceRecords->where('status', 'absent')->count();
+            $on_leave_days = $userAttendanceRecords->where('status', 'on_leave')->count();
+            $sick_leave_days = $userAttendanceRecords->where('status', 'sick_leave')->count();
+            $early_leave_days = $userAttendanceRecords->where('status', 'early_leave')->count();
+            
+            // Calculate holidays that fell on workdays for *this user*
+            // This requires a more complex check against the user's actual working pattern.
+            // For simplicity, if we assume all users have the same Mon-Fri pattern:
+            $userHolidaysOnWorkdays = 0;
+            foreach (CarbonPeriod::create($startDate, $endDate) as $dateInPeriod) {
+                if (!$dateInPeriod->isWeekend() && $holidaysInMonth->contains($dateInPeriod->format('Y-m-d'))) {
+                    // If this user was *not* on leave or absent for another reason on this holiday, count it.
+                    // This depends on how you want to report it.
+                    // If a user was on leave on a public holiday, does it count as leave or holiday?
+                    // A simple approach: count holidays that were potential workdays.
+                    $userHolidaysOnWorkdays++;
+                }
+            }
+            
+            // Scheduled days: total working days in month minus holidays that were workdays
+            // This is a general calculation. For individual scheduled days, it would need their work pattern.
+            $scheduledDays = $totalWorkingDaysInMonth; // Start with total business days
+            // If a user took 'on_leave' or 'sick_leave', those are not absences from scheduled days,
+            // but rather excused absences.
+            // A more accurate 'total_scheduled_days' would subtract non-working days for THIS user
+            // and holidays that fell on THEIR workdays.
+            // The 'absent_days' would then be total_scheduled_days - present_days - leave_days - sick_days.
+
+            $summaryData[] = [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'is_supervisor' => (bool) $user->is_supervisor,
+                'default_shift_label' => $user->defaultShifts->first()?->shift_label,
+                'total_scheduled_days' => $scheduledDays, // This needs careful definition
+                'present_days' => $total_present_for_display,
+                'absent_days' => $absent_days, // Could be calculated as scheduled - (present + leaves)
+                'late_present_days' => $late_present_days,
+                'early_leave_days' => $early_leave_days,
+                'on_leave_days' => $on_leave_days,
+                'sick_leave_days' => $sick_leave_days,
+                'holidays_on_workdays' => $userHolidaysOnWorkdays, // Count of holidays falling on their workdays
+            ];
+        }
+        
+        $shiftName = $shiftDefinitionId ? ShiftDefinition::find($shiftDefinitionId)?->name : null;
+
+        return [
+            'data' => $summaryData,
+            'meta' => [
+                'year' => (int)$year,
+                'month' => (int)$month,
+                'month_name' => $startDate->translatedFormat('F Y'),
+                'shift_definition_id' => $shiftDefinitionId ? (int)$shiftDefinitionId : null,
+                'shift_name' => $shiftName,
+                'total_working_days_in_month' => $totalWorkingDaysInMonth,
+            ]
+        ];
+    }
+
+    // Helper function to calculate working days in a month, excluding weekends and provided holidays
+    private function calculateWorkingDaysInMonth(Carbon $startDate, Carbon $endDate, array $holidayDates = []): int
+    {
+        $workingDays = 0;
+        $period = CarbonPeriod::create($startDate, $endDate);
+        foreach ($period as $date) {
+            if (!$date->isWeekend() && !in_array($date->format('Y-m-d'), $holidayDates)) {
+                $workingDays++;
+            }
+        }
+        return $workingDays;
+    }
+
+    // Make sure getMonthlyAttendanceSummary calls the private helper
+    public function getMonthlyAttendanceSummary(Request $request)
+    {
+        // if (!Auth::user()->can('view monthly_attendance_report')) { /* ... */ }
+        $data = $this->getMonthlyAttendanceSummaryData($request);
+        return response()->json($data);
+    }
+
+    // And generateMonthlyAttendancePdf also calls the private helper
+    public function generateMonthlyAttendancePdf(Request $request)
+    {
+        // if (!Auth::user()->can('print monthly_attendance_report')) { /* ... */ }
+        $reportContent = $this->getMonthlyAttendanceSummaryData($request);
+        
+        $summaryList = $reportContent['data'];
+        $meta = $reportContent['meta'];
+
+        if (empty($summaryList)) {
+            // For PDF, we can generate an empty report or a message
+            // For API response, a 404 or empty data is fine
+             return response()->json(['message' => 'No attendance data to generate PDF for the selected criteria.'], 404);
+        }
+
+        // ... (rest of your PDF generation logic using $summaryList and $meta) ...
+        $reportTitle = 'Monthly Staff Attendance Summary'; // Translate as needed
+        $filterCriteria = "For: {$meta['month_name']}";
+        if ($meta['shift_name']) {
+            $filterCriteria .= " | Shift: {$meta['shift_name']}";
+        }
+
+        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
+        $pdf->AddPage();
+        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
+
+        $headers = [ /* ... Your headers ... */
+            '#', 'Employee Name', 'Scheduled', 'Present', 'Late', 'Early Leave', 'Absent', 'On Leave', 'Sick Leave', 'Holidays'
+        ];
+        // ... (Define $colWidths and $aligns for these headers) ...
+        // This is just an example, adjust to your needs
+        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $colWidths = [8, 55, 20, 20, 20, 22, 20, 25, 25, 0]; 
+        $colWidths[count($colWidths)-1] = $pageWidth - array_sum(array_slice($colWidths,0,-1));
+        $aligns = ['C', 'L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'];
 
 
+        $pdf->DrawTableHeader($headers, $colWidths, $aligns, 7);
+
+        $fill = false;
+        foreach ($summaryList as $idx => $summary) {
+            $rowData = [
+                $idx + 1,
+                $summary['user_name'],
+                $summary['total_scheduled_days'],
+                $summary['present_days'],
+                $summary['late_present_days'],
+                $summary['early_leave_days'],
+                $summary['absent_days'],
+                $summary['on_leave_days'],
+                $summary['sick_leave_days'],
+                $summary['holidays_on_workdays'],
+            ];
+            $pdf->DrawTableRow($rowData, $colWidths, $aligns, $fill, 6);
+            $fill = !$fill;
+        }
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        // ... (Footer, output logic as before) ...
+        $pdfFileName = "MonthlyAttendance_{$meta['year']}-{$meta['month']}" . ($meta['shift_name'] ? '_' . str_replace(' ', '_', $meta['shift_name']) : '') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
+        return response($pdfContent, 200)->header('Content-Type', 'application/pdf')->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
     public function generatePriceListPdf(Request $request)
     {
         // Permission Check
