@@ -3,6 +3,7 @@
 
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\LabResultController;
+use App\Models\DoctorShift;
 use App\Models\Shift;
 use Illuminate\Support\Facades\Route;
 
@@ -38,6 +39,11 @@ Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDo
 Route::get('/visits/{visit}/lab-report/pdf', [ReportController::class, 'result']);
 // Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf']);
 Route::get('/visits/{id}/lab-report-old/pdf', [ReportController::class, 'result']);
+
+Route::get('/reports/doctor-shifts/test',function(){
+    $doctorShifts = DoctorShift::whereRaw('Date(created_at) between ? and ?', ['2025-06-24','2025-06-24'])->get();
+    return $doctorShifts;
+});
 //phpinfo
 Route::get('/phpinfo', function () {
     phpinfo();

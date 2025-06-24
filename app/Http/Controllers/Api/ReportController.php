@@ -181,11 +181,8 @@ class ReportController extends Controller
         ]);
 
         $filterCriteria = [];
-        if ($request->filled('date_from') && $request->filled('date_to')) {
-            $from = Carbon::parse($request->date_from)->startOfDay(); $to = Carbon::parse($request->date_to)->endOfDay();
-            $query->whereBetween('start_time', [$from, $to]);
-            $filterCriteria[] = "Date: " . $from->format('d-M-Y') . " - " . $to->format('d-M-Y');
-        }
+       
+        $query->whereRaw('Date(doctor_shifts.created_at) between ? and ?', [$request->date_from,$request->date_to]);
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
             if($doc = Doctor::find($request->doctor_id)) $filterCriteria[] = "Doctor: ".$doc->name;
@@ -211,7 +208,6 @@ class ReportController extends Controller
         $doctorShifts = $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id') // Join for sorting by doctor name
                                ->select('doctor_shifts.*') // Select all from doctor_shifts to avoid ambiguity
                                ->orderBy('doctors.name', 'asc')
-                               ->orderBy('doctor_shifts.start_time', 'desc')
                                ->get();
 
         if ($doctorShifts->isEmpty()) {

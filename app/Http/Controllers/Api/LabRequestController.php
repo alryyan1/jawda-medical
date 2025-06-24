@@ -212,7 +212,6 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
             if ($request->filled('main_test_id')) { $lrQuery->where('labrequests.main_test_id', $request->main_test_id); }
             // Contextual filter for count based on how lab requests are tied to this visit's context
             // (e.g., created on same day as visit_date)
-            $lrQuery->whereDate('labrequests.created_at', DB::raw('DATE(doctorvisits.visit_date)'));
 
         }]);
 
