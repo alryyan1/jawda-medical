@@ -9,7 +9,7 @@ class PatientSearchResultResource extends JsonResource {
             'gender' => $this?->patient?->gender,
             'age_year' => $this?->patient?->age_year, // For quick display
             'last_visit_id' => $this?->id,
-            'last_visit_date' => $this?->visit_date?->toDateString(),
+            'last_visit_date' => $this?->created_at?->toDateString(),
             'last_visit_doctor_name' => $this?->doctor?->name,
             'last_visit_file_id' => $this?->file_id, // For copying
         ];
