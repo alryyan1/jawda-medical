@@ -27,6 +27,18 @@ class DoctorShiftController extends Controller
             'doctor.specialist', // Eager load specialist name from doctor
         ]);
             // ->activeToday(); // Your scope for active shifts today
+            
+        // Additional withCount examples:
+        // Count doctor visits with specific conditions:
+        // ])->withCount([
+        //     'doctorVisits as total_visits_count',
+        //     'doctorVisits as waiting_visits_count' => function ($query) {
+        //         $query->where('status', 'waiting');
+        //     },
+        //     'doctorVisits as completed_visits_count' => function ($query) {
+        //         $query->where('status', 'completed');
+        //     }
+        // ]);
 
         if ($request->has('clinic_shift_id')) {
             $query->where('shift_id', $request->clinic_shift_id);
@@ -303,7 +315,7 @@ class DoctorShiftController extends Controller
             'visits.patient.company', // company_id for patient is enough for isCompany check
             'visits.requestedServices.service',
             'visits.patientLabRequests.mainTest',
-        ]);
+                 ]);
 
         // Filtering
         if ($request->filled('doctor_id')) {

@@ -81,13 +81,14 @@ class DoctorVisitResource extends JsonResource
             'visit_time_formatted' => $this->visit_time ? Carbon::parse($this->visit_time)->format('h:i A') : null, // Formatted time
             'status' => $this->status,
             'visit_type' => $this->visit_type,
+            'company' => $this->patient?->company,
             'queue_number' => $this->queue_number,
             'number' => $this->number, // If this is also queue number or visit specific number
             'reason_for_visit' => $this->reason_for_visit,
             'visit_notes' => $this->visit_notes,
             'is_new' => (bool) $this->is_new,
             'only_lab' => (bool) $this->only_lab,
-            
+            'requested_services_count' => $this->requested_services_count,
             'patient_id' => $this->patient_id,
             'patient' => new PatientStrippedResource($this->whenLoaded('patient')), // Assuming PatientStrippedResource
             

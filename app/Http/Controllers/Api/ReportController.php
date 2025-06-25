@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\LabTestStatisticResource;
 use App\Models\Service;
 use App\Models\Package;
 use App\Models\ServiceGroup; // For filter
@@ -125,35 +126,7 @@ class ReportController extends Controller
         // The 'request_count' (and 'total_revenue' if added) will be available as attributes on each service model in the collection
         // We can use a simple collection resource or adapt ServiceResource if needed.
         // Using a custom transformation here for clarity.
-        return response()->json([
-            'data' => $statistics->through(function ($service) {
-                return [
-                    'id' => $service->id,
-                    'name' => $service->name,
-                    'price' => (float) $service->price,
-                    'activate' => (bool) $service->activate,
-                    'service_group_id' => $service->service_group_id,
-                    'service_group_name' => $service->serviceGroup?->name, // From with('serviceGroup')
-                    'request_count' => (int) $service->request_count,
-                    // 'total_revenue' => (float) ($service->total_revenue ?? 0),
-                ];
-            }),
-            'links' => [
-                'first' => $statistics->url(1),
-                'last' => $statistics->url($statistics->lastPage()),
-                'prev' => $statistics->previousPageUrl(),
-                'next' => $statistics->nextPageUrl(),
-            ],
-            'meta' => [
-                'current_page' => $statistics->currentPage(),
-                'from' => $statistics->firstItem(),
-                'last_page' => $statistics->lastPage(),
-                'path' => $statistics->path(),
-                'per_page' => $statistics->perPage(),
-                'to' => $statistics->lastItem(),
-                'total' => $statistics->total(),
-            ],
-        ]);
+        return $statistics;
     }
 
     public function doctorShiftsReportPdf(Request $request)
@@ -3696,7 +3669,7 @@ class ReportController extends Controller
             //     $pdf->Image( $logo_path.'/'.$footer_name, 10, 245, $page_width + 10, 10);
             // }
         }
-
+        $patient->update(['result_print_date' => now()]);
         // $fontname = TCPDF_FONTS::addTTFfont('font/Roboto-Regular.ttf', 'TrueTypeUnicode', '', 96);
         $pdf->SetFont('arial', '', 10, '', true);
         foreach ($mypakages as $package) {
@@ -4558,7 +4531,73 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+    public function labTestStatistics(Request $request)
+    {
+        // if (!Auth::user()->can('view lab_test_statistics_report')) { /* ... */ }
 
+        $request->validate([
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'search_test_name' => 'nullable|string|max:255',
+            // Remove container_id, package_id filters if only name and count are needed
+            'sort_by' => 'nullable|string|in:main_test_name,request_count', // Simplified sort options
+            'sort_direction' => 'nullable|string|in:asc,desc',
+            'per_page' => 'nullable|integer|min:5|max:100',
+        ]);
+
+        $query = LabRequest::query()
+            ->join('main_tests', 'labrequests.main_test_id', '=', 'main_tests.id')
+            ->select([
+                'labrequests.main_test_id',
+                'main_tests.main_test_name',
+                DB::raw('COUNT(labrequests.id) as request_count')
+            ])
+            ->groupBy('labrequests.main_test_id', 'main_tests.main_test_name');
+
+        // Apply date filters on labrequests.created_at
+        if ($request->filled('date_from')) {
+            $query->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+
+        // Filter by test name (search) directly on the joined main_tests table
+        if ($request->filled('search_test_name')) {
+            $query->where('main_tests.main_test_name', 'LIKE', '%' . $request->search_test_name . '%');
+        }
+        
+        // Remove container_id and package_id filters if they are not part of the requirement anymore
+        // if ($request->filled('container_id')) {
+        //     $query->where('main_tests.container_id', $request->container_id);
+        // }
+        // if ($request->filled('package_id')) {
+        //     $query->where('main_tests.pack_id', $request->package_id);
+        // }
+
+        // Sorting
+        $sortBy = $request->input('sort_by', 'request_count');
+        $sortDirection = $request->input('sort_direction', 'desc');
+
+        if ($sortBy === 'main_test_name') {
+            $query->orderBy('main_tests.main_test_name', $sortDirection);
+        } else { // Default to request_count
+            $query->orderBy('request_count', $sortDirection);
+        }
+        // Add a secondary sort for consistency if primary sort isn't unique
+        if ($sortBy !== 'main_test_name') {
+            $query->orderBy('main_tests.main_test_name', 'asc');
+        }
+
+
+        $perPage = $request->input('per_page', 15);
+        $statistics = $query->paginate($perPage);
+        
+        // The items in $statistics will now have main_test_id, main_test_name, and request_count.
+        // We can still use LabTestStatisticResource, but it will only populate these fields.
+        return \App\Http\Resources\LabTestStatisticResource::collection($statistics); // Ensure resource is imported
+    }
+  
     // Ensure MyCustomTCPDF has drawTextWatermark and drawReportSignatures methods, or define them here
     // ... other helper methods like drawReportSignatures ...
 }

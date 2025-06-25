@@ -31,7 +31,7 @@ class DoctorShiftResource extends JsonResource
             'doctor_specialist_name' => $this->whenLoaded('doctor', $this->doctor?->specialist?->name),
             'user_id_opened' => $this->user_id,
             'user_name_opened' => $this->whenLoaded('user', $this->user?->name),
-            
+            'patients_count' => $this->patients_count,
             'shift_id' => $this->shift_id, // General clinic shift_id
             'general_shift_name' => $this->whenLoaded('generalShift', $this->generalShift?->name ?? ('Shift #'.$this->generalShift?->id)),
             
