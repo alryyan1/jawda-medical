@@ -396,7 +396,14 @@ class DoctorVisit extends Model
     }
 
  
-
+    public function hasCbc()
+    {
+        return SysmexResult::where('doctorvisit_id', '=', $this->id)->get()->count() > 0;
+    }
+    public function getHascbcAttribute()
+    {
+        return $this->hasCbc();
+    }
 
       /**
      * Get the audit record associated with this doctor visit.

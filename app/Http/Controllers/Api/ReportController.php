@@ -41,11 +41,16 @@ use App\Models\RequestedServiceDeposit;
 use App\Models\ShiftDefinition;
 use App\Models\SubServiceCost;
 use Illuminate\Support\Facades\Auth;
+use App\Services\WhatsAppService;
 
 class ReportController extends Controller
 {
     // ... (other report methods) ...
-
+    protected WhatsAppService $whatsAppService;
+    public function __construct(WhatsAppService $whatsAppService)
+    {
+        $this->whatsAppService = $whatsAppService;
+    }
     public function serviceStatistics(Request $request)
     {
         // Permission check: e.g., can('view service_statistics_report')
@@ -633,7 +638,7 @@ class ReportController extends Controller
         $reportTitle = 'تقرير عقد الخدمات لشركة: ' . $company->name;
         $filterCriteriaString = $searchTerm ? "بحث: " . $searchTerm : "جميع الخدمات المتعاقد عليها";
 
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteriaString, 'P', 'mm', 'A4');
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4',true, 'UTF-8', false,false,$filterCriteriaString);
         $pdf->AddPage();
 
         $headers = ['اسم الخدمة', 'المجموعة', 'سعر العقد', 'تحمل الشركة', 'موافقة'];
@@ -3245,6 +3250,297 @@ class ReportController extends Controller
     }
 
     // === LAB RELATED PDFS ===
+    public function sendVisitReportViaWhatsApp(Request $request, DoctorVisit $visit)
+    {
+        // Add permission check: e.g., can('send_whatsapp_reports', $visit)
+        $validated = $request->validate([
+            'chat_id' => 'required|string', // Expecting raw phone, will be formatted
+            'caption' => 'nullable|string|max:1000',
+            'report_type' => 'required|string|in:full_lab_report,thermal_lab_receipt',
+        ]);
+
+        if (!$this->whatsAppService->isConfigured()) {
+            return response()->json(['message' => 'WhatsApp service is not configured on the server.'], 503);
+        }
+
+        $patient = $visit->patient;
+        if (!$patient) {
+            return response()->json(['message' => 'Patient not found for this visit.'], 404);
+        }
+        
+        // Format phone number using your service (it uses default country code from settings)
+        $formattedChatId = WhatsAppService::formatPhoneNumberForWaApi($validated['chat_id']);
+        if (!$formattedChatId) {
+            return response()->json(['message' => 'Invalid phone number format for WhatsApp.'], 422);
+        }
+
+        $pdfContentBase64 = null;
+        $pdfFileName = 'report.pdf';
+
+        try {
+            // Generate PDF based on report type
+            if ($validated['report_type'] === 'full_lab_report') {
+                // Get the PDF content directly by modifying how generateLabVisitReportPdf works
+                $pdfContent = $this->generateLabVisitReportPdfContent($request, $visit);
+                $pdfFileName = 'Lab_Report_Visit_' . $visit->id . '.pdf';
+            } elseif ($validated['report_type'] === 'thermal_lab_receipt') {
+                // Get the PDF content directly by modifying how generateLabThermalReceiptPdf works
+                $pdfContent = $this->generateLabThermalReceiptPdfContent($request, $visit);
+                $pdfFileName = 'Lab_Receipt_Visit_' . $visit->id . '.pdf';
+            } else {
+                return response()->json(['message' => 'Invalid report type specified.'], 422);
+            }
+
+            if (empty($pdfContent)) {
+                Log::error("WhatsApp Send: PDF generation failed or returned empty for visit {$visit->id}, type {$validated['report_type']}.");
+                return response()->json(['message' => 'Failed to generate PDF content.'], 500);
+            }
+            
+            $pdfContentBase64 = base64_encode($pdfContent);
+        } catch (\Exception $e) {
+            Log::error("WhatsApp Send: PDF generation error for visit {$visit->id}, type {$validated['report_type']}: " . $e->getMessage());
+            return response()->json(['message' => 'Failed to generate PDF content: ' . $e->getMessage()], 500);
+        }
+
+        $caption = $validated['caption'] ?? "Lab results for {$patient->name}";
+    
+
+        $result = $this->whatsAppService->sendMediaMessage(
+            $formattedChatId,
+            $pdfContentBase64,
+            $pdfFileName,
+            $caption,
+            true // asDocument = true for PDFs
+        );
+
+        if ($result['success']) {
+            // Log successful sending if needed
+            // ActivityLog::create([...]);
+            return response()->json(['message' => 'Report sent successfully via WhatsApp.', 'data' => $result['data']]);
+        } else {
+            return response()->json(['message' => $result['error'] ?? 'Failed to send report via WhatsApp.', 'details' => $result['data']], 500);
+        }
+    }
+
+    /**
+     * Generate PDF content for lab visit report (for WhatsApp sending)
+     * This is a helper method that returns raw PDF content instead of a Response
+     */
+    private function generateLabVisitReportPdfContent(Request $request, DoctorVisit $doctorvisit): string
+    {
+        // Eager load all necessary data
+        $doctorvisit->loadDefaultLabReportRelations();
+
+        $labRequestsToReport = $doctorvisit->patientLabRequests->filter(function ($lr) {
+            if (!$lr->mainTest)
+                return false; // Skip if mainTest relation isn't loaded properly
+            return $lr->results->where(fn($r) => $r->result !== null && $r->result !== '')->isNotEmpty() ||
+                !$lr->mainTest->divided ||
+                $lr->requestedOrganisms->isNotEmpty();
+        });
+
+        if ($labRequestsToReport->isEmpty()) {
+            throw new \Exception('No results or relevant tests to report for this visit.');
+        }
+
+        $appSettings = Setting::instance();
+
+        // Pass the $visit context to MyCustomTCPDF constructor
+        $pdf = new MyCustomTCPDF(
+            'Lab Result Report', // Title for PDF metadata
+            $doctorvisit,              // Visit context for Header/Footer of MyCustomTCPDF
+            'P',
+            'mm',
+            'A4'      // Default orientation, unit, format
+        );
+
+        $pdf->AddPage(); // This triggers MyCustomTCPDF::Header()
+        $pdf->setRTL(false);
+        $firstTestOnPage = true;
+
+        foreach ($labRequestsToReport as $labRequest) {
+            $mainTest = $labRequest->mainTest;
+            if (!$mainTest)
+                continue;
+
+            $estimatedHeight = $this->estimateMainTestBlockHeightForReport($pdf, $labRequest);
+
+            if (
+                !$firstTestOnPage &&
+                ($mainTest->pageBreak || ($pdf->GetY() + $estimatedHeight > ($pdf->getPageHeight() - $pdf->getBreakMargin())))
+            ) {
+                $pdf->AddPage(); // This also calls MyCustomTCPDF::Header()
+            } elseif (!$firstTestOnPage) {
+                $pdf->Ln(3); // Space between main test blocks on the same page
+            }
+
+            // Draw the content specific to this MainTest (results, organisms, comments)
+            $this->drawMainTestContentBlock($pdf, $labRequest, $appSettings);
+            $firstTestOnPage = false;
+        }
+
+        $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $doctorvisit->patient->name);
+        $pdfFileName = 'LabReport_Visit_' . $doctorvisit->id . '_' . $patientNameSanitized . '.pdf';
+        return $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
+    }
+
+    /**
+     * Generate PDF content for lab thermal receipt (for WhatsApp sending)
+     * This is a helper method that returns raw PDF content instead of a Response
+     */
+    private function generateLabThermalReceiptPdfContent(Request $request, DoctorVisit $visit): string
+    {
+        $visit->load([
+            'patient:id,name,phone,company_id',
+            'patient.company:id,name',
+            'patientLabRequests.mainTest:id,main_test_name',
+            'patientLabRequests.depositUser:id,name',
+            'user:id,name', // User who created visit
+            'doctor:id,name',
+        ]);
+
+        $labRequestsToPrint = $visit->patientLabRequests;
+
+        if ($labRequestsToPrint->isEmpty()) {
+            throw new \Exception('No paid/partially paid lab requests for this visit to create a receipt.');
+        }
+
+        $appSettings = Setting::instance();
+        $isCompanyPatient = !empty($visit->patient->company_id);
+        $cashierName = Auth::user()?->name ?? $visit->user?->name ?? $labRequestsToPrint->first()?->depositUser?->name ?? 'System';
+
+        $pdf = new MyCustomTCPDF('Lab Receipt', $visit);
+        $pdf->SetRightMargin(5);
+        $pdf->SetLeftMargin(5);
+        $thermalWidth = (float) ($appSettings?->thermal_printer_width ?? 70);
+        $pdf->setThermalDefaults($thermalWidth);
+        $pdf->AddPage();
+
+        $fontName = $pdf->getDefaultFontFamily();
+        $isRTL = $pdf->getRTL();
+        $alignStart = $isRTL ? 'R' : 'L';
+        $alignCenter = 'C';
+        $lineHeight = 3.5;
+
+        // Clinic Header
+        $logoData = null;
+        if ($appSettings?->logo_base64 && str_starts_with($appSettings->logo_base64, 'data:image')) {
+            try {
+                $logoData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $appSettings->logo_base64));
+            } catch (\Exception $e) {
+            }
+        }
+        if ($logoData) {
+            $pdf->Image('@' . $logoData, '', $pdf->GetY() + 1, 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0);
+            $pdf->Ln($logoData ? 10 : 1);
+        }
+        $pdf->SetFont($fontName, 'B', $logoData ? 8 : 9);
+        $pdf->MultiCell(0, $lineHeight, $appSettings?->hospital_name ?: ($appSettings?->lab_name ?: config('app.name')), 0, $alignCenter, false, 1);
+        $pdf->SetFont($fontName, '', 6);
+        if ($appSettings?->address)
+            $pdf->MultiCell(0, $lineHeight - 0.5, $appSettings->address, 0, $alignCenter, false, 1);
+        if ($appSettings?->phone)
+            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? "هاتف: " : "Tel: ") . $appSettings->phone, 0, $alignCenter, false, 1);
+        if ($appSettings?->vatin)
+            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? "ر.ض: " : "VAT: ") . $appSettings->vatin, 0, $alignCenter, false, 1);
+        $pdf->Ln(1);
+        $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
+        $pdf->Ln(1);
+
+        // Receipt Info
+        $pdf->SetFont($fontName, '', 6.5);
+        $receiptNumber = "LAB-" . $visit->id . "-" . $labRequestsToPrint->first()?->id;
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "زيارة رقم: " : "Visit #: ") . $visit->id, 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "التاريخ: " : "Date: ") . Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "المريض: " : "Patient: ") . $visit->patient->name, 0, 1, $alignStart);
+        if ($visit->patient->phone)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "الهاتف: " : "Phone: ") . $visit->patient->phone, 0, 1, $alignStart);
+        if ($isCompanyPatient && $visit->patient->company)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "الشركة: " : "Company: ") . $visit->patient->company->name, 0, 1, $alignStart);
+        if ($visit->doctor)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "الطبيب: " : "Doctor: ") . $visit->doctor->name, 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? "الكاشير: " : "Cashier: ") . $cashierName, 0, 1, $alignStart);
+
+        if ($appSettings?->barcode && $labRequestsToPrint->first()?->id) { /* ... Barcode ... */
+        }
+        $pdf->Ln(1);
+        $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
+        $pdf->Ln(0.5);
+
+        // Items Table
+        $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
+        $nameWidth = $pageUsableWidth * 0.50;
+        $qtyWidth = $pageUsableWidth * 0.10;
+        $priceWidth = $pageUsableWidth * 0.20;
+        $totalWidth = $pageUsableWidth * 0.20;
+        $pdf->SetFont($fontName, 'B', 7.5);
+        $pdf->Cell($nameWidth, $lineHeight, ($isRTL ? 'البيان' : 'Item'), 'B', 0, $alignStart);
+        $pdf->Cell($qtyWidth, $lineHeight, ($isRTL ? 'كمية' : 'Qty'), 'B', 0, $alignCenter);
+        $pdf->Cell($priceWidth, $lineHeight, ($isRTL ? 'سعر' : 'Price'), 'B', 0, $alignCenter);
+        $pdf->Cell($totalWidth, $lineHeight, ($isRTL ? 'إجمالي' : 'Total'), 'B', 1, $alignCenter);
+        $pdf->SetFont($fontName, '', 7.5);
+
+        $subTotalLab = 0;
+        $totalDiscountOnLab = 0;
+        $totalEnduranceOnLab = 0;
+        foreach ($labRequestsToPrint as $lr) {
+            $testName = $lr->mainTest?->main_test_name ?? 'Test N/A';
+            $quantity = (int) ($lr->count ?? 1);
+            $unitPrice = (float) ($lr->price ?? 0);
+            $itemGrossTotal = $unitPrice * $quantity;
+            $subTotalLab += $itemGrossTotal;
+            $itemDiscountPercent = (float) ($lr->discount_per ?? 0);
+            $itemDiscountAmount = ($itemGrossTotal * $itemDiscountPercent) / 100;
+            $totalDiscountOnLab += $itemDiscountAmount;
+            if ($isCompanyPatient) {
+                $itemEndurance = (float) ($lr->endurance ?? 0) * $quantity;
+                $totalEnduranceOnLab += $itemEndurance;
+            }
+            $currentYbeforeMultiCell = $pdf->GetY();
+            $pdf->MultiCell($nameWidth, $lineHeight - 0.5, $testName, 0, $alignStart, false, 0, '', '', true, 0, false, true, 0, 'T');
+            $yAfterMultiCell = $pdf->GetY();
+            $pdf->SetXY($pdf->getMargins()['left'] + $nameWidth, $currentYbeforeMultiCell);
+            $pdf->Cell($qtyWidth, $lineHeight - 0.5, $quantity, 0, 0, $alignCenter);
+            $pdf->Cell($priceWidth, $lineHeight - 0.5, number_format($unitPrice, 2), 0, 0, $alignCenter);
+            $pdf->Cell($totalWidth, $lineHeight - 0.5, number_format($itemGrossTotal, 2), 0, 1, $alignCenter);
+            $pdf->SetY(max($yAfterMultiCell, $currentYbeforeMultiCell + $lineHeight - 0.5));
+        }
+        $pdf->Ln(0.5);
+        $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
+        $pdf->Ln(0.5);
+
+        // Totals Section
+        $pdf->SetFont($fontName, '', 7);
+        $netAfterDiscount = $subTotalLab - $totalDiscountOnLab;
+        $netPayableByPatient = $netAfterDiscount - ($isCompanyPatient ? $totalEnduranceOnLab : 0);
+        $totalActuallyPaidForTheseLabs = $labRequestsToPrint->sum(fn($lr) => (float) $lr->amount_paid);
+        $balanceDueForTheseLabs = $netPayableByPatient - $totalActuallyPaidForTheseLabs;
+
+        $this->drawThermalTotalRow($pdf, ($isRTL ? 'الإجمالي الفرعي:' : 'Subtotal:'), $subTotalLab, $pageUsableWidth);
+        if ($totalDiscountOnLab > 0)
+            $this->drawThermalTotalRow($pdf, ($isRTL ? 'الخصم:' : 'Discount:'), -$totalDiscountOnLab, $pageUsableWidth);
+        if ($isCompanyPatient && $totalEnduranceOnLab > 0)
+            $this->drawThermalTotalRow($pdf, ($isRTL ? 'تحمل الشركة:' : 'Company Share:'), -$totalEnduranceOnLab, $pageUsableWidth);
+        $pdf->SetFont($fontName, 'B', 7.5);
+        $this->drawThermalTotalRow($pdf, ($isRTL ? 'الصافي المطلوب:' : 'Net Payable:'), $netPayableByPatient, $pageUsableWidth, true);
+        $pdf->SetFont($fontName, '', 7);
+        $this->drawThermalTotalRow($pdf, ($isRTL ? 'المدفوع:' : 'Paid:'), $totalActuallyPaidForTheseLabs, $pageUsableWidth);
+        $pdf->SetFont($fontName, 'B', 7.5);
+        $this->drawThermalTotalRow($pdf, ($isRTL ? 'المتبقي:' : 'Balance:'), $balanceDueForTheseLabs, $pageUsableWidth, true);
+
+        // Footer Message, Watermark
+        if ($appSettings?->show_water_mark) { /* ... Watermark logic ... */
+        }
+        $pdf->Ln(3);
+        $pdf->SetFont($fontName, 'I', 6);
+        $footerMessage = $appSettings?->receipt_footer_message ?: ($isRTL ? 'شكراً لزيارتكم!' : 'Thank you for your visit!');
+        $pdf->MultiCell(0, $lineHeight - 1, $footerMessage, 0, $alignCenter, false, 1);
+        $pdf->Ln(3);
+
+        $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
+        $pdfFileName = 'LabReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+        return $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
+    }
 
     /**
      * Generate a thermal receipt for lab requests associated with a visit.
@@ -4173,7 +4469,7 @@ class ReportController extends Controller
 
         // Organisms Section
         if ($labRequest->requestedOrganisms->isNotEmpty()) {
-            $this->drawOrganismsSectionForReport($pdf, $labRequest->requestedOrganisms, $fontMain, $pageUsableWidth, $lineHeight, $isRTL);
+            $this->drawOrganismsSection($pdf, $labRequest->requestedOrganisms, $fontMain, $pageUsableWidth, $lineHeight, $isRTL);
         }
 
         // Overall Main Test Comment (if it's distinct from a non-divided result)

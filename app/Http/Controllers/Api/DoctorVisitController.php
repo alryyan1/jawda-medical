@@ -294,7 +294,6 @@ class DoctorVisitController extends Controller
             // Note: This simple count might lead to race conditions in a high-traffic system.
             // More robust queue numbering might involve a dedicated sequence or atomic operations.
             $newQueueNumber = DoctorVisit::where('doctor_shift_id', $targetDoctorShift->id)
-                                        ->whereDate('visit_date', $doctorVisit->visit_date) // Consider queue per day
                                         ->count() + 1;
             $doctorVisit->queue_number = $newQueueNumber;
             $doctorVisit->number = $newQueueNumber; // Assuming 'number' is also queue number
@@ -329,7 +328,7 @@ class DoctorVisitController extends Controller
      * This is typically used when a patient from one active visit needs to be
      * immediately seen by another doctor in a different active shift.
      */
-    public function createCopiedVisitForNewShift(Request $request, Patient $sourcePatient) // $sourcePatient is the patient from the current visit
+    public function  createCopiedVisitForNewShift(Request $request, Patient $sourcePatient) // $sourcePatient is the patient from the current visit
     {
         // Authorization: User needs permission to create patients and visits,
         // and potentially to assign visits to the target doctor/shift.
@@ -364,15 +363,13 @@ class DoctorVisitController extends Controller
 
         DB::beginTransaction();
         try {
-            // 1. Determine the File ID to use (reuse from source patient's latest visit or create new)
-            $fileToUseId = null;
-            $latestVisitOfSourcePatient = $sourcePatient->doctorVisits()->latest('visit_date')->first();
-            if ($latestVisitOfSourcePatient && $latestVisitOfSourcePatient->file_id) {
-                $fileToUseId = $latestVisitOfSourcePatient->file_id;
-            } else {
-                $file = File::create();
-                $fileToUseId = $file->id;
+            $doctorvist = DoctorVisit::whereHas('patient', function ($query) use ($sourcePatient) {
+                $query->where('id', $sourcePatient->id);
+            })->latest('created_at')->first();
+            if (!$doctorvist) {
+                return response()->json(['message' => 'لا يوجد زيارة للمريض.'], 400);
             }
+            $fileToUseId = $doctorvist->file_id;
 
             // 2. Create a new Patient record (snapshot) by replicating the source patient
             $newPatientData = $sourcePatient->replicate()->fill([
@@ -389,6 +386,7 @@ class DoctorVisitController extends Controller
                 'doctor_finish' => false,
                 'doctor_lab_request_confirm' => false,
                 'doctor_lab_urgent_confirm' => false,
+                'auth_date' => null,
             ])->toArray();
             unset($newPatientData['id']); // Ensure a new patient record is created
 
@@ -396,7 +394,6 @@ class DoctorVisitController extends Controller
 
             // 3. Create the new DoctorVisit for this new patient snapshot and target shift
             $newQueueNumber = DoctorVisit::where('doctor_shift_id', $targetDoctorShift->id)
-                                        ->whereDate('visit_date', Carbon::today())
                                         ->count() + 1;
 
             $newDoctorVisit = $newPatientSnapshot->doctorVisit()->create([

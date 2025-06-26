@@ -119,10 +119,17 @@ class CompanyServiceController extends Controller
      */
     public function importAllServices(Request $request, Company $company)
     {
-        // Permission check: e.g., can('manage company_contracts') or a specific 'import_all_services_to_company_contract'
-        // if (!Auth::user()->can('manage company_contracts')) {
-        //     return response()->json(['message' => 'Unauthorized'], 403);
-        // }
+        // $this->authorize('manage company_contracts', $company); // Example permission
+
+        $validated = $request->validate([
+            'default_static_endurance' => 'nullable|numeric|min:0',
+            'default_percentage_endurance' => 'nullable|numeric|min:0|max:100',
+            'default_static_wage' => 'nullable|numeric|min:0',
+            'default_percentage_wage' => 'nullable|numeric|min:0|max:100',
+            'default_use_static' => 'nullable|boolean',
+            'default_approval' => 'nullable|boolean',
+            'price_preference' => 'required|string|in:standard_price,zero_price', // NEW
+        ]);
 
         $allActiveServices = Service::where('activate', true)->get();
         $existingContractedServiceIds = $company->contractedServices()->pluck('services.id')->toArray();
@@ -132,36 +139,33 @@ class CompanyServiceController extends Controller
         });
 
         if ($servicesToImport->isEmpty()) {
-            return response()->json(['message' => 'جميع الخدمات النشطة مضافة بالفعل إلى عقد هذه الشركة.', 'imported_count' => 0]);
+            return response()->json(['message' => 'All active services are already contracted for this company.', 'imported_count' => 0]);
         }
 
+        // Use company's default service endurance if specific default_percentage_endurance is not provided
+        $companyServiceEndurancePercent = $company->service_endurance ?? 0;
+
         $defaultContractTerms = [
-            // Define your default terms for newly imported services.
-            // Option 1: Use the service's standard price, others zero or default.
-            // 'price' => null, // This will be set per service below
-            'static_endurance' => $request->input('default_static_endurance', 0.00),
-            'percentage_endurance' => $request->input('default_percentage_endurance', $company->service_endurance ?? 0.00), // Use company default or 0
-            'static_wage' => $request->input('default_static_wage', 0.00),
-            'percentage_wage' => $request->input('default_percentage_wage', 0.00),
-            'use_static' => $request->input('default_use_static', false),
-            'approval' => $request->input('default_approval', true), // Default to approved
-            'created_at' => now(), // If your pivot table uses timestamps explicitly
-            'updated_at' => now(), // If your pivot table uses timestamps explicitly
+            'static_endurance' => (float)($validated['default_static_endurance'] ?? 0.00),
+            'percentage_endurance' => (float)($validated['default_percentage_endurance'] ?? $companyServiceEndurancePercent),
+            'static_wage' => (float)($validated['default_static_wage'] ?? 0.00),
+            'percentage_wage' => (float)($validated['default_percentage_wage'] ?? 0.00),
+            'use_static' => $validated['default_use_static'] ?? false,
+            'approval' => $validated['default_approval'] ?? true,
+            // Timestamps are handled by Eloquent if using attach with array
         ];
-
-        // Validate default terms if they are passed in request body
-        // $request->validate([...rules for default_static_endurance etc...]);
-
-
-        $importedCount = 0;
+        
         $attachData = [];
-
         foreach ($servicesToImport as $service) {
+            $contractPrice = 0.00; // Default to zero
+            if ($validated['price_preference'] === 'standard_price') {
+                $contractPrice = (float)($service->price ?? 0.00);
+            }
+
             $attachData[$service->id] = array_merge(
                 $defaultContractTerms,
-                ['price' => $service->price] // Use the service's own price as the default contract price
+                ['price' => $contractPrice] 
             );
-            $importedCount++;
         }
 
         DB::beginTransaction();
@@ -173,13 +177,12 @@ class CompanyServiceController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to import services to company contract {$company->id}: " . $e->getMessage());
-            return response()->json(['message' => 'حدث خطأ أثناء استيراد الخدمات.', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'An error occurred while importing services.', 'error_details' => $e->getMessage()], 500);
         }
 
-
         return response()->json([
-            'message' => "تم استيراد {$importedCount} خدمة بنجاح إلى عقد الشركة.",
-            'imported_count' => $importedCount,
+            'message' => count($attachData) . " services imported successfully to the company's contract.",
+            'imported_count' => count($attachData),
         ]);
     }
     // Add a new service contract to a company

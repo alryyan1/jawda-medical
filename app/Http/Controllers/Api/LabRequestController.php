@@ -44,17 +44,17 @@ class LabRequestController extends Controller
     }
     // Example in LabRequestController or VisitServiceController
 // app/Http/Controllers/Api/LabRequestController.php
-public function clearPendingRequests(Request $request, DoctorVisit $visit)
-{
-    // $this->authorize('cancel_multiple_lab_requests', $visit); // Permission
-    $count = $visit->patientLabRequests()->delete();
+    public function clearPendingRequests(Request $request, DoctorVisit $visit)
+    {
+        // $this->authorize('cancel_multiple_lab_requests', $visit); // Permission
+        $count = $visit->patientLabRequests()->delete();
 
-    if ($count > 0) {
-        // Invalidate relevant caches or trigger events if needed
-        return response()->json(['message' => "تم إلغاء {$count} طلب فحص  بنجاح.", 'deleted_count' => $count]);
+        if ($count > 0) {
+            // Invalidate relevant caches or trigger events if needed
+            return response()->json(['message' => "تم إلغاء {$count} طلب فحص  بنجاح.", 'deleted_count' => $count]);
+        }
+        return response()->json(['message' => 'لا توجد طلبات فحص  قابلة للإلغاء لهذه الزيارة.', 'deleted_count' => 0]);
     }
-    return response()->json(['message' => 'لا توجد طلبات فحص  قابلة للإلغاء لهذه الزيارة.', 'deleted_count' => 0]);
-}
 
     /**
      * Get the queue of patients with pending lab work.
@@ -80,7 +80,7 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
     //         ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
     //         // ->whereHas('patient.labRequests')
     //         // ->withCount('patient.labRequests as test_count')
-      
+
     //         ->whereHas('patientLabRequests')
     //         ->withCount('patientLabRequests as test_count')
     //         ->withMin('patientLabRequests as oldest_request_time', 'created_at')
@@ -106,14 +106,14 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
     //                      });
     //         });
     //     }
-        
+
     //     // This condition might be important to ensure only visits with truly pending tests are shown
     //     // It depends on how 'test_count' and the whereHas('labRequests'...) are defined.
     //     // $query->having('test_count', '>', 0); 
 
     //     $pendingVisits = $query->orderBy('doctorvisits.id','desc')->get();
     //     // return['sql' => $query->toSql(),'binds' => $query->getBindings()];
-    
+
     //     return PatientLabQueueItemResource::collection($pendingVisits);
     // }
     public function getLabPendingQueue(Request $request)
@@ -147,7 +147,7 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
             // Ensure this visit's patient has lab requests that match the criteria
             ->whereHas('patientLabRequests', function ($lrQuery) use ($request) {
 
-               
+
 
 
                 // Apply NEW FILTERS to the lab requests
@@ -159,7 +159,7 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
 
                 if ($request->boolean('has_unfinished_results')) {
                     $lrQuery->whereHas('results', function ($resQuery) {
-                        $resQuery->where(function($q_empty_res) {
+                        $resQuery->where(function ($q_empty_res) {
                             $q_empty_res->where('result', '=', '')->orWhereNull('result');
                         });
                     });
@@ -182,52 +182,119 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
             $query->whereDate('doctorvisits.visit_date', Carbon::today());
         }
 
+
+        // Filter by Main Test
+        if ($request->filled('main_test_id')) {
+            $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
+                $q_lr->where('main_test_id', $request->main_test_id);
+            });
+        }
+
+        // Filter by Package
+        if ($request->filled('package_id')) {
+            $query->whereHas('patientLabRequests.mainTest', function ($q_mt) use ($request) {
+                $q_mt->where('pack_id', $request->package_id);
+            });
+        }
+
+        // Filter by Company
+        if ($request->filled('company_id')) {
+            $query->whereHas('patient', function ($q_pat) use ($request) {
+                $q_pat->where('company_id', $request->company_id);
+            });
+        }
+
+        // Filter by Doctor (referring doctor of the visit)
+        if ($request->filled('doctor_id')) {
+            $query->where('doctorvisits.doctor_id', $request->doctor_id);
+        }
+
+        // Filter by Result Status (this is complex for a visit with multiple lab requests)
+// You might need an aggregated status on the visit or a more complex subquery.
+// Simple example: Show visit if *any* lab request matches the status.
+        if ($request->filled('result_status_filter') && $request->result_status_filter !== 'all') {
+            $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
+                if ($request->result_status_filter === 'finished') {
+                    $q_lr->whereIn('result_status', ['authorized', 'results_complete_pending_auth']);
+                } elseif ($request->result_status_filter === 'pending') {
+                    $q_lr->whereNotIn('result_status', ['authorized', 'results_complete_pending_auth', 'cancelled']);
+                }
+            });
+        }
+
+        // Filter by Print Status (Patient.result_print_date)
+        if ($request->filled('print_status_filter') && $request->print_status_filter !== 'all') {
+            $query->whereHas('patient', function ($q_pat) use ($request) {
+                if ($request->print_status_filter === 'printed') {
+                    $q_pat->whereNotNull('result_print_date');
+                } elseif ($request->print_status_filter === 'not_printed') {
+                    $q_pat->whereNull('result_print_date');
+                }
+            });
+        }
+
         // Search functionality on DoctorVisit and related Patient/LabRequest attributes
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q_search) use ($searchTerm) {
                 $q_search->where('patients.name', 'LIKE', "%{$searchTerm}%")
-                         ->orWhere('patients.id', $searchTerm) // Patient ID
-                         ->orWhere('doctorvisits.id', $searchTerm) // Visit ID
-                         ->orWhereHas('patientLabRequests', function($lrSearchQuery) use ($searchTerm){
-                            $lrSearchQuery->where('labrequests.sample_id', 'LIKE', "%{$searchTerm}%")
-                                          ->orWhere('labrequests.id', $searchTerm); // LabRequest ID
-                         });
+                    ->orWhere('patients.id', $searchTerm) // Patient ID
+                    ->orWhere('doctorvisits.id', $searchTerm) // Visit ID
+                    ->orWhereHas('patientLabRequests', function ($lrSearchQuery) use ($searchTerm) {
+                        $lrSearchQuery->where('labrequests.sample_id', 'LIKE', "%{$searchTerm}%")
+                            ->orWhere('labrequests.id', $searchTerm); // LabRequest ID
+                    });
             });
         }
-        
+
         // Eager load data needed for PatientLabQueueItemResource after filtering
         // This uses the hypothetical 'patientLabRequests' relation on DoctorVisit model.
         // If it doesn't exist, we have to construct this data manually or adjust the resource.
         // The resource will effectively re-query lab requests for the patient within context.
         // For now, let's assume the resource can handle getting the specific LRs.
-        
+
         // Aggregates for display in the queue item (these define the "work unit" for the patient in context)
         // We need to count lab requests for *this specific visit's patient* that match the filters.
-        $query->withCount(['patientLabRequests as test_count' => function ($lrQuery) use ($request) {
+        $query->withCount([
+            'patientLabRequests as test_count' => function ($lrQuery) use ($request) {
 
-            // Re-apply filters to the count
-            if ($request->filled('package_id')) { $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id)); }
-            if ($request->boolean('has_unfinished_results')) { $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));}
-            if ($request->filled('main_test_id')) { $lrQuery->where('labrequests.main_test_id', $request->main_test_id); }
-            // Contextual filter for count based on how lab requests are tied to this visit's context
-            // (e.g., created on same day as visit_date)
+                // Re-apply filters to the count
+                if ($request->filled('package_id')) {
+                    $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
+                }
+                if ($request->boolean('has_unfinished_results')) {
+                    $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));
+                }
+                if ($request->filled('main_test_id')) {
+                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
+                }
+                // Contextual filter for count based on how lab requests are tied to this visit's context
+                // (e.g., created on same day as visit_date)
+    
+            }
+        ]);
 
-        }]);
+        $query->withMin([
+            'patientLabRequests as oldest_request_time_for_patient_in_context' => function ($lrQuery) use ($request) {
 
-        $query->withMin(['patientLabRequests as oldest_request_time_for_patient_in_context' => function($lrQuery) use ($request){
+                // Re-apply filters for oldest time context
+                if ($request->filled('package_id')) {
+                    $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
+                }
+                if ($request->boolean('has_unfinished_results')) {
+                    $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));
+                }
+                if ($request->filled('main_test_id')) {
+                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
+                }
+                $lrQuery->whereDate('labrequests.created_at', DB::raw('DATE(doctorvisits.visit_date)'));
+            }
+        ], 'labrequests.created_at');
 
-            // Re-apply filters for oldest time context
-            if ($request->filled('package_id')) { $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id)); }
-            if ($request->boolean('has_unfinished_results')) { $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));}
-            if ($request->filled('main_test_id')) { $lrQuery->where('labrequests.main_test_id', $request->main_test_id); }
-            $lrQuery->whereDate('labrequests.created_at', DB::raw('DATE(doctorvisits.visit_date)'));
-        }], 'labrequests.created_at');
-        
         // This will fetch DoctorVisit records. The PatientLabQueueItemResource will need to correctly
         // extract/derive lab_request_ids, sample_id, and all_requests_paid based on the DoctorVisit and its Patient.
-        $pendingVisits = $query->orderBy('doctorvisits.id','desc')->get();
-            
+        $pendingVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
+
         return PatientLabQueueItemResource::collection($pendingVisits);
     }
     /**
@@ -236,12 +303,12 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
     public function indexForVisit(Request $request, DoctorVisit $visit)
     {
         $labRequests = $visit->patientLabRequests()
-                             ->with(['mainTest:id,main_test_name,price', 'requestingUser:id,name'])
-                             ->orderBy('created_at', 'asc') // Or by main_test.name
-                             ->get();
+            ->with(['mainTest:id,main_test_name,price', 'requestingUser:id,name'])
+            ->orderBy('created_at', 'asc') // Or by main_test.name
+            ->get();
         return LabRequestResource::collection($labRequests);
     }
-    
+
     /**
      * List available MainTests for selection (excluding already requested for this visit).
      */
@@ -249,114 +316,116 @@ public function clearPendingRequests(Request $request, DoctorVisit $visit)
     {
         $requestedTestIds = $visit->patient()->pluck('main_test_id')->toArray();
         $availableTests = MainTest::where('available', true)
-                                ->whereNotIn('id', $requestedTestIds)
-                                ->orderBy('main_test_name')
-                                ->get(['id', 'main_test_name', 'price']);
+            ->whereNotIn('id', $requestedTestIds)
+            ->orderBy('main_test_name')
+            ->get(['id', 'main_test_name', 'price']);
         return MainTestStrippedResource::collection($availableTests);
     }
     // app/Http/Controllers/Api/LabRequestController.php
-public function batchPayLabRequests(Request $request, DoctorVisit $visit)
-{
-    // $this->authorize('record_batch_lab_payment', $visit);
-    $validated = $request->validate([
-        'total_payment_amount' => 'required|numeric|min:0.01',
-        'is_bankak' => 'required|boolean',
-        'shift_id' => ['required', 'integer', 'exists:shifts,id', Rule::exists('shifts','id')->where('is_closed',false)],
-        'payment_notes' => 'nullable|string|max:255', // Optional overall payment note
-    ]);
+    public function batchPayLabRequests(Request $request, DoctorVisit $visit)
+    {
+        // $this->authorize('record_batch_lab_payment', $visit);
+        $validated = $request->validate([
+            'total_payment_amount' => 'required|numeric|min:0.01',
+            'is_bankak' => 'required|boolean',
+            'shift_id' => ['required', 'integer', 'exists:shifts,id', Rule::exists('shifts', 'id')->where('is_closed', false)],
+            'payment_notes' => 'nullable|string|max:255', // Optional overall payment note
+        ]);
 
-    $totalPaymentAmount = (float) $validated['total_payment_amount'];
-    $isBankak = (bool) $validated['is_bankak'];
-    $currentShiftId = $validated['shift_id'];
-    $userId = Auth::id();
+        $totalPaymentAmount = (float) $validated['total_payment_amount'];
+        $isBankak = (bool) $validated['is_bankak'];
+        $currentShiftId = $validated['shift_id'];
+        $userId = Auth::id();
 
-    // Get all unpaid lab requests for this visit, ordered (e.g., by creation date)
-    $unpaidRequests = $visit->patientLabRequests()
-        ->where('is_paid', false)
-        ->orderBy('created_at', 'asc') // Pay oldest first
-        ->get();
+        // Get all unpaid lab requests for this visit, ordered (e.g., by creation date)
+        $unpaidRequests = $visit->patientLabRequests()
+            ->where('is_paid', false)
+            ->orderBy('created_at', 'asc') // Pay oldest first
+            ->get();
 
-    if ($unpaidRequests->isEmpty()) {
-        return response()->json(['message' => 'جميع طلبات المختبر لهذه الزيارة مدفوعة بالفعل.'], 400);
-    }
-
-    $totalBalanceDueForAll = 0;
-    foreach($unpaidRequests as $lr) {
-        $price = (float) $lr->price;
-        $count = (int) ($lr->count ?? 1);
-        $itemSubTotal = $price ;
-        $discountAmount = ($itemSubTotal * ((int) ($lr->discount_per ?? 0) / 100));
-        $enduranceAmount = (float) ($lr->endurance ?? 0);
-        $netPayableByPatient = $itemSubTotal - $discountAmount - ($visit->patient->company_id ? $enduranceAmount : 0);
-        $totalBalanceDueForAll += ($netPayableByPatient - (float) $lr->amount_paid);
-    }
-    
-    // Prevent overpayment for the batch
-    if ($totalPaymentAmount > $totalBalanceDueForAll + 0.009) { // Allow for small float inaccuracies
-        return response()->json(['message' => 'المبلغ الإجمالي المدفوع يتجاوز إجمالي الرصيد المستحق لطلبات المختبر.', 'total_due' => $totalBalanceDueForAll], 422);
-    }
-
-    DB::beginTransaction();
-    try {
-        $remainingPaymentToDistribute = $totalPaymentAmount;
-        $paidRequestsCount = 0;
-
-        foreach ($unpaidRequests as $labrequest) {
-            if ($remainingPaymentToDistribute <= 0) break;
-
-            $price = (float) $labrequest->price;
-            $count = (int) ($labrequest->count ?? 1);
-            $itemSubTotal = $price * $count;
-            $discountAmount = ($itemSubTotal * ((int) ($labrequest->discount_per ?? 0) / 100));
-            $enduranceAmount = (float) ($labrequest->endurance ?? 0);
-            $netPayableByPatient = $itemSubTotal - $discountAmount - ($visit->patient->company_id ? $enduranceAmount : 0);
-            
-            $balanceForItem = $netPayableByPatient - (float) $labrequest->amount_paid;
-
-            if ($balanceForItem <= 0) continue; // Already paid or overpaid somehow
-
-            $paymentForThisItem = min($remainingPaymentToDistribute, $balanceForItem);
-
-            // Create a deposit record if you have a lab_request_deposits table
-            // LabRequestDeposit::create([
-            //     'lab_request_id' => $labrequest->id,
-            //     'amount' => $paymentForThisItem,
-            //     'is_bank' => $isBankak,
-            //     'user_id' => $userId,
-            //     'shift_id' => $currentShiftId,
-            //     'notes' => $request->input('payment_notes'), // Overall note for all payments in this batch
-            // ]);
-
-            $labrequest->amount_paid += $paymentForThisItem;
-            $labrequest->is_bankak = $isBankak; // Set payment method for the latest payment part
-            $labrequest->user_deposited = $userId;
-
-            if ($labrequest->amount_paid >= $netPayableByPatient - 0.009) {
-                $labrequest->is_paid = true;
-                $labrequest->amount_paid = $netPayableByPatient; // Ensure exact amount if fully paid
-            }
-            $labrequest->save();
-            $paidRequestsCount++;
-            $remainingPaymentToDistribute -= $paymentForThisItem;
+        if ($unpaidRequests->isEmpty()) {
+            return response()->json(['message' => 'جميع طلبات المختبر لهذه الزيارة مدفوعة بالفعل.'], 400);
         }
-        DB::commit();
-        // It's better to return the updated visit with all its lab requests
-        // so the frontend can update everything at once.
-        return new DoctorVisitResource($visit->fresh()->load([
-            'patientLabRequests.mainTest', 
-            'patientLabRequests.requestingUser:id,name', 
-            'patientLabRequests.depositUser:id,name'
-        ]));
 
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error("Batch lab request payment failed for Visit ID {$visit->id}: " . $e->getMessage());
-        return response()->json(['message' => 'فشل تسجيل الدفعة المجمعة.', 'error' => 'خطأ داخلي.', 'error_details' => $e->getMessage()], 500);
+        $totalBalanceDueForAll = 0;
+        foreach ($unpaidRequests as $lr) {
+            $price = (float) $lr->price;
+            $count = (int) ($lr->count ?? 1);
+            $itemSubTotal = $price;
+            $discountAmount = ($itemSubTotal * ((int) ($lr->discount_per ?? 0) / 100));
+            $enduranceAmount = (float) ($lr->endurance ?? 0);
+            $netPayableByPatient = $itemSubTotal - $discountAmount - ($visit->patient->company_id ? $enduranceAmount : 0);
+            $totalBalanceDueForAll += ($netPayableByPatient - (float) $lr->amount_paid);
+        }
+
+        // Prevent overpayment for the batch
+        if ($totalPaymentAmount > $totalBalanceDueForAll + 0.009) { // Allow for small float inaccuracies
+            return response()->json(['message' => 'المبلغ الإجمالي المدفوع يتجاوز إجمالي الرصيد المستحق لطلبات المختبر.', 'total_due' => $totalBalanceDueForAll], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $remainingPaymentToDistribute = $totalPaymentAmount;
+            $paidRequestsCount = 0;
+
+            foreach ($unpaidRequests as $labrequest) {
+                if ($remainingPaymentToDistribute <= 0)
+                    break;
+
+                $price = (float) $labrequest->price;
+                $count = (int) ($labrequest->count ?? 1);
+                $itemSubTotal = $price * $count;
+                $discountAmount = ($itemSubTotal * ((int) ($labrequest->discount_per ?? 0) / 100));
+                $enduranceAmount = (float) ($labrequest->endurance ?? 0);
+                $netPayableByPatient = $itemSubTotal - $discountAmount - ($visit->patient->company_id ? $enduranceAmount : 0);
+
+                $balanceForItem = $netPayableByPatient - (float) $labrequest->amount_paid;
+
+                if ($balanceForItem <= 0)
+                    continue; // Already paid or overpaid somehow
+
+                $paymentForThisItem = min($remainingPaymentToDistribute, $balanceForItem);
+
+                // Create a deposit record if you have a lab_request_deposits table
+                // LabRequestDeposit::create([
+                //     'lab_request_id' => $labrequest->id,
+                //     'amount' => $paymentForThisItem,
+                //     'is_bank' => $isBankak,
+                //     'user_id' => $userId,
+                //     'shift_id' => $currentShiftId,
+                //     'notes' => $request->input('payment_notes'), // Overall note for all payments in this batch
+                // ]);
+
+                $labrequest->amount_paid += $paymentForThisItem;
+                $labrequest->is_bankak = $isBankak; // Set payment method for the latest payment part
+                $labrequest->user_deposited = $userId;
+
+                if ($labrequest->amount_paid >= $netPayableByPatient - 0.009) {
+                    $labrequest->is_paid = true;
+                    $labrequest->amount_paid = $netPayableByPatient; // Ensure exact amount if fully paid
+                }
+                $labrequest->save();
+                $paidRequestsCount++;
+                $remainingPaymentToDistribute -= $paymentForThisItem;
+            }
+            DB::commit();
+            // It's better to return the updated visit with all its lab requests
+            // so the frontend can update everything at once.
+            return new DoctorVisitResource($visit->fresh()->load([
+                'patientLabRequests.mainTest',
+                'patientLabRequests.requestingUser:id,name',
+                'patientLabRequests.depositUser:id,name'
+            ]));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Batch lab request payment failed for Visit ID {$visit->id}: " . $e->getMessage());
+            return response()->json(['message' => 'فشل تسجيل الدفعة المجمعة.', 'error' => 'خطأ داخلي.', 'error_details' => $e->getMessage()], 500);
+        }
     }
-}
 
 
- /**
+    /**
      * Reset all child test results for a given LabRequest to their default values.
      */
     public function setDefaultResults(Request $request, LabRequest $labrequest)
@@ -408,7 +477,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                 } else { // All results have some value (even if it's the default)
                     $labrequest->result_status = 'results_complete_pending_auth';
                 }
-                
+
                 // If resetting to default implies un-authorizing the main request
                 if ($labrequest->approve) {
                     $labrequest->approve = false;
@@ -423,8 +492,8 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             // Return the updated LabRequest with its results
             return new LabRequestResource(
                 $labrequest->fresh()->load([
-                    'mainTest.childTests.unit', 
-                    'results.childTest.unit', 
+                    'mainTest.childTests.unit',
+                    'results.childTest.unit',
                     // 'results.enteredBy' // if you have it
                 ])
             );
@@ -453,7 +522,8 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         try {
             foreach ($validated['main_test_ids'] as $mainTestId) {
                 $mainTest = MainTest::with('childTests.unit')->find($mainTestId); // Eager load child tests and their units
-                if (!$mainTest) continue;
+                if (!$mainTest)
+                    continue;
 
                 $alreadyExists = $visit->patientLabRequests()->where('main_test_id', $mainTestId)->exists();
                 if ($alreadyExists && !$request->input('allow_duplicates', false)) {
@@ -542,15 +612,20 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
     public function show(LabRequest $labrequest)
     {
         $labrequest->load([
-            'mainTest.childTests.unit', 'mainTest.childTests.childGroup', 'mainTest.childTests.options',
+            'mainTest.childTests.unit',
+            'mainTest.childTests.childGroup',
+            'mainTest.childTests.options',
             'patient:id,name,phone,gender,age_year,age_month,age_day,company_id', // Load company_id for patient
             'patient.company:id,name', // Load patient's company if exists
-            'requestingUser:id,name', 'depositUser:id,name',
-            'results.childTest:id,child_test_name', 'results.enteredBy:id,name', 'results.authorizedBy:id,name',
+            'requestingUser:id,name',
+            'depositUser:id,name',
+            'results.childTest:id,child_test_name',
+            'results.enteredBy:id,name',
+            'results.authorizedBy:id,name',
         ]);
         return new LabRequestResource($labrequest);
     }
-    
+
     /**
      * Get a specific LabRequest prepared for result entry.
      * Includes MainTest, its ChildTests (with options, units), and existing results.
@@ -561,7 +636,8 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             'mainTest' => function ($query) {
                 $query->with([
                     'childTests' => fn($q_ct) => $q_ct->orderBy('test_order')->orderBy('child_test_name'),
-                    'childTests.unit:id,name', 'childTests.childGroup:id,name',
+                    'childTests.unit:id,name',
+                    'childTests.childGroup:id,name',
                     'childTests.options:id,child_test_id,name'
                 ]);
             },
@@ -581,11 +657,15 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                     'id' => $childTest->id, // ChildTest ID
                     'main_test_id' => $childTest->main_test_id,
                     'child_test_name' => $childTest->child_test_name,
-                    'low' => $childTest->low, 'upper' => $childTest->upper, 'defval' => $childTest->defval,
-                    'unit_id' => $childTest->unit_id, 'unit_name' => $childTest->unit->name ?? null,
+                    'low' => $childTest->low,
+                    'upper' => $childTest->upper,
+                    'defval' => $childTest->defval,
+                    'unit_id' => $childTest->unit_id,
+                    'unit_name' => $childTest->unit->name ?? null,
                     'unit' => $childTest->unit ? ['id' => $childTest->unit->id, 'name' => $childTest->unit->name] : null,
                     'normalRange' => $childTest->normalRange,
-                    'max' => $childTest->max, 'lowest' => $childTest->lowest,
+                    'max' => $childTest->max,
+                    'lowest' => $childTest->lowest,
                     'test_order' => $childTest->test_order,
                     'child_group_id' => $childTest->child_group_id,
                     'child_group_name' => $childTest->childGroup->name ?? null,
@@ -624,7 +704,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
 
         $unitIdToSave = $validated['unit_id_from_input'] ?? $childTest->unit_id;
         $normalRangeToSave = $validated['normal_range_text'] ?? $childTest->normalRange ??
-                              (($childTest->low !== null && $childTest->upper !== null) ? $childTest->low . ' - ' . $childTest->upper : 'N/A');
+            (($childTest->low !== null && $childTest->upper !== null) ? $childTest->low . ' - ' . $childTest->upper : 'N/A');
 
 
         $requestedResult = RequestedResult::updateOrCreate(
@@ -669,7 +749,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             'patient.company:id,name',
             'labRequests' => function ($query) {
                 $query->where('is_paid', true) // Typically only paid items on receipt
-                      ->orWhere('amount_paid', '>', 0); // Or partially paid
+                    ->orWhere('amount_paid', '>', 0); // Or partially paid
             },
             'labRequests.mainTest:id,main_test_name',
             'labRequests.depositUser:id,name', // User who handled deposit if tracked per request
@@ -690,10 +770,10 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
 
         // --- PDF Instantiation with Thermal Defaults ---
         $pdf = new MyCustomTCPDF('إيصال مختبر', "زيارة رقم: {$visit->id}");
-        $thermalWidth = (float)($appSettings?->thermal_printer_width ?? 76); // Get from settings
+        $thermalWidth = (float) ($appSettings?->thermal_printer_width ?? 76); // Get from settings
         $pdf->setThermalDefaults($thermalWidth); // Set narrow width, small margins, basic font
         $pdf->AddPage();
-        
+
         $fontName = $pdf->getDefaultFontFamily();
         $isRTL = $pdf->getRTL(); // Should be true for Arabic
         $alignStart = $isRTL ? 'R' : 'L';
@@ -705,22 +785,28 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         // (Simplified version of your generateThermalServiceReceipt header)
         $logoData = null;
         if ($appSettings?->logo_base64 && str_starts_with($appSettings->logo_base64, 'data:image')) {
-             try { $logoData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $appSettings->logo_base64)); } catch (\Exception $e) {}
+            try {
+                $logoData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $appSettings->logo_base64));
+            } catch (\Exception $e) {
+            }
         }
-        
+
         if ($logoData) {
-            $pdf->Image('@'.$logoData, '', $pdf->GetY() + 1, 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0, false, false, false);
+            $pdf->Image('@' . $logoData, '', $pdf->GetY() + 1, 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0, false, false, false);
             $pdf->Ln($logoData ? 10 : 1); // Adjust Ln based on logo height
         }
 
         $pdf->SetFont($fontName, 'B', $logoData ? 8 : 9);
         $pdf->MultiCell(0, $lineHeight, $appSettings?->hospital_name ?: ($appSettings?->lab_name ?: config('app.name')), 0, $alignCenter, false, 1);
-        
+
         $pdf->SetFont($fontName, '', 6);
-        if ($appSettings?->address) $pdf->MultiCell(0, $lineHeight -0.5, $appSettings->address, 0, $alignCenter, false, 1);
-        if ($appSettings?->phone) $pdf->MultiCell(0, $lineHeight -0.5, ($isRTL ? "هاتف: " : "Tel: ") . $appSettings->phone, 0, $alignCenter, false, 1);
-        if ($appSettings?->vatin) $pdf->MultiCell(0, $lineHeight -0.5, ($isRTL ? "ر.ض: " : "VAT: ") . $appSettings->vatin, 0, $alignCenter, false, 1);
-        
+        if ($appSettings?->address)
+            $pdf->MultiCell(0, $lineHeight - 0.5, $appSettings->address, 0, $alignCenter, false, 1);
+        if ($appSettings?->phone)
+            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? "هاتف: " : "Tel: ") . $appSettings->phone, 0, $alignCenter, false, 1);
+        if ($appSettings?->vatin)
+            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? "ر.ض: " : "VAT: ") . $appSettings->vatin, 0, $alignCenter, false, 1);
+
         $pdf->Ln(1);
         $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
         $pdf->Ln(1);
@@ -732,16 +818,19 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         $pdf->Cell(0, $lineHeight, ($isRTL ? "زيارة رقم: " : "Visit #: ") . $visit->id, 0, 1, $alignStart);
         $pdf->Cell(0, $lineHeight, ($isRTL ? "التاريخ: " : "Date: ") . Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignStart);
         $pdf->Cell(0, $lineHeight, ($isRTL ? "المريض: " : "Patient: ") . $visit->patient->name, 0, 1, $alignStart);
-        if ($visit->patient->phone) $pdf->Cell(0, $lineHeight, ($isRTL ? "الهاتف: " : "Phone: ") . $visit->patient->phone, 0, 1, $alignStart);
-        if ($isCompanyPatient && $visit->patient->company) $pdf->Cell(0, $lineHeight, ($isRTL ? "الشركة: " : "Company: ") . $visit->patient->company->name, 0, 1, $alignStart);
-        if ($visit->doctor) $pdf->Cell(0, $lineHeight, ($isRTL ? "الطبيب: " : "Doctor: ") . $visit->doctor->name, 0, 1, $alignStart);
+        if ($visit->patient->phone)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "الهاتف: " : "Phone: ") . $visit->patient->phone, 0, 1, $alignStart);
+        if ($isCompanyPatient && $visit->patient->company)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "الشركة: " : "Company: ") . $visit->patient->company->name, 0, 1, $alignStart);
+        if ($visit->doctor)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "الطبيب: " : "Doctor: ") . $visit->doctor->name, 0, 1, $alignStart);
         $pdf->Cell(0, $lineHeight, ($isRTL ? "الكاشير: " : "Cashier: ") . $cashierName, 0, 1, $alignStart);
-        
+
         // Barcode for Visit ID or a specific Lab Request ID
-        if($appSettings?->barcode && $labRequestsToPrint->first()?->id){
+        if ($appSettings?->barcode && $labRequestsToPrint->first()?->id) {
             $pdf->Ln(1);
-            $barcodeValue = (string)$labRequestsToPrint->first()->id; // Or a composite ID
-            $style = ['position' => '', 'align' => 'C', 'stretch' => false, 'fitwidth' => true, 'cellfitalign' => '', 'border' => false, 'hpadding' => 'auto', 'vpadding' => 'auto', 'fgcolor' => [0,0,0], 'bgcolor' => false, 'text' => true, 'font' => $fontName, 'fontsize' => 5, 'stretchtext' => 4 ];
+            $barcodeValue = (string) $labRequestsToPrint->first()->id; // Or a composite ID
+            $style = ['position' => '', 'align' => 'C', 'stretch' => false, 'fitwidth' => true, 'cellfitalign' => '', 'border' => false, 'hpadding' => 'auto', 'vpadding' => 'auto', 'fgcolor' => [0, 0, 0], 'bgcolor' => false, 'text' => true, 'font' => $fontName, 'fontsize' => 5, 'stretchtext' => 4];
             $pdf->write1DBarcode($barcodeValue, 'C128B', '', '', '', 10, 0.3, $style, 'N');
             $pdf->Ln(1);
         }
@@ -753,10 +842,10 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         // --- Items Table ---
         $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
         // Adjust for thermal: Name takes most, Qty small, Price, Total
-        $nameWidth = $pageUsableWidth * 0.50; 
-        $qtyWidth  = $pageUsableWidth * 0.10; 
-        $priceWidth = $pageUsableWidth * 0.20; 
-        $totalWidth = $pageUsableWidth * 0.20; 
+        $nameWidth = $pageUsableWidth * 0.50;
+        $qtyWidth = $pageUsableWidth * 0.10;
+        $priceWidth = $pageUsableWidth * 0.20;
+        $totalWidth = $pageUsableWidth * 0.20;
 
         $pdf->SetFont($fontName, 'B', 6.5); // Bold for item headers
         $pdf->Cell($nameWidth, $lineHeight, ($isRTL ? 'البيان' : 'Item'), 'B', 0, $alignStart);
@@ -771,33 +860,33 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
 
         foreach ($labRequestsToPrint as $lr) {
             $testName = $lr->mainTest?->main_test_name ?? 'فحص غير معروف';
-            $quantity = (int)($lr->count ?? 1);
-            $unitPrice = (float)($lr->price ?? 0);
+            $quantity = (int) ($lr->count ?? 1);
+            $unitPrice = (float) ($lr->price ?? 0);
             $itemGrossTotal = $unitPrice * $quantity;
             $subTotalLab += $itemGrossTotal;
 
-            $itemDiscountPercent = (float)($lr->discount_per ?? 0);
+            $itemDiscountPercent = (float) ($lr->discount_per ?? 0);
             $itemDiscountAmount = ($itemGrossTotal * $itemDiscountPercent) / 100;
             $totalDiscountOnLab += $itemDiscountAmount;
-            
+
             $itemNetAfterDiscount = $itemGrossTotal - $itemDiscountAmount;
 
             $itemEndurance = 0;
             if ($isCompanyPatient) {
-                $itemEndurance = (float)($lr->endurance ?? 0) * $quantity;
+                $itemEndurance = (float) ($lr->endurance ?? 0) * $quantity;
                 $totalEnduranceOnLab += $itemEndurance;
             }
-            
+
             // For display in table, show gross total before endurance/patient payment for clarity
             $currentYbeforeMultiCell = $pdf->GetY();
-            $pdf->MultiCell($nameWidth, $lineHeight-0.5, $testName, 0, $alignStart, false, 0, '', '', true, 0, false, true, 0, 'T');
+            $pdf->MultiCell($nameWidth, $lineHeight - 0.5, $testName, 0, $alignStart, false, 0, '', '', true, 0, false, true, 0, 'T');
             $yAfterMultiCell = $pdf->GetY();
             $pdf->SetXY($pdf->getMargins()['left'] + $nameWidth, $currentYbeforeMultiCell); // Reset X and Y for subsequent cells
 
-            $pdf->Cell($qtyWidth, $lineHeight-0.5, $quantity, 0, 0, $alignCenter);
-            $pdf->Cell($priceWidth, $lineHeight-0.5, number_format($unitPrice, 2), 0, 0, $alignCenter);
-            $pdf->Cell($totalWidth, $lineHeight-0.5, number_format($itemGrossTotal, 2), 0, 1, $alignCenter);
-            $pdf->SetY(max($yAfterMultiCell, $currentYbeforeMultiCell + $lineHeight-0.5)); // Ensure Y moves past tallest cell
+            $pdf->Cell($qtyWidth, $lineHeight - 0.5, $quantity, 0, 0, $alignCenter);
+            $pdf->Cell($priceWidth, $lineHeight - 0.5, number_format($unitPrice, 2), 0, 0, $alignCenter);
+            $pdf->Cell($totalWidth, $lineHeight - 0.5, number_format($itemGrossTotal, 2), 0, 1, $alignCenter);
+            $pdf->SetY(max($yAfterMultiCell, $currentYbeforeMultiCell + $lineHeight - 0.5)); // Ensure Y moves past tallest cell
         }
         $pdf->Ln(0.5);
         $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
@@ -805,19 +894,19 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
 
         // --- Totals Section ---
         $pdf->SetFont($fontName, '', 7);
-        
+
         $this->drawThermalTotalRow($pdf, ($isRTL ? 'إجمالي الفحوصات:' : 'Subtotal:'), $subTotalLab, $pageUsableWidth);
         if ($totalDiscountOnLab > 0) {
             $this->drawThermalTotalRow($pdf, ($isRTL ? 'إجمالي الخصم:' : 'Discount:'), -$totalDiscountOnLab, $pageUsableWidth, false, 'text-red-500'); // No bold, is reduction
         }
-        
+
         $netAfterDiscount = $subTotalLab - $totalDiscountOnLab;
         // $pdf->drawThermalTotalRow($pdf, ($isRTL ? 'الصافي بعد الخصم:' : 'Net After Discount:'), $netAfterDiscount, $pageUsableWidth);
 
         if ($isCompanyPatient && $totalEnduranceOnLab > 0) {
             $this->drawThermalTotalRow($pdf, ($isRTL ? 'تحمل الشركة:' : 'Company Share:'), -$totalEnduranceOnLab, $pageUsableWidth, false, 'text-blue-500');
         }
-        
+
         $netPayableByPatient = $netAfterDiscount - ($isCompanyPatient ? $totalEnduranceOnLab : 0);
         $pdf->SetFont($fontName, 'B', 7.5); // Bold for final amount
         $this->drawThermalTotalRow($pdf, ($isRTL ? 'صافي المطلوب من المريض:' : 'Patient Net Payable:'), $netPayableByPatient, $pageUsableWidth, true);
@@ -826,25 +915,25 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         // Sum amount_paid from the $labRequestsToPrint collection for what was actually paid for these items
         $totalActuallyPaidForTheseLabs = $labRequestsToPrint->sum('amount_paid');
         $this->drawThermalTotalRow($pdf, ($isRTL ? 'المبلغ المدفوع:' : 'Amount Paid:'), $totalActuallyPaidForTheseLabs, $pageUsableWidth);
-        
+
         $balanceDueForTheseLabs = $netPayableByPatient - $totalActuallyPaidForTheseLabs;
         $pdf->SetFont($fontName, 'B', 7.5);
         $this->drawThermalTotalRow($pdf, ($isRTL ? 'المبلغ المتبقي:' : 'Balance Due:'), $balanceDueForTheseLabs, $pageUsableWidth, true);
 
         $pdf->Ln(2);
-        if($appSettings?->show_water_mark){ // Watermark
+        if ($appSettings?->show_water_mark) { // Watermark
             $pdf->SetFont($fontName, 'B', 30);
-            $pdf->SetTextColor(220,220,220);
-            $pdf->Rotate(45, $pdf->GetX()+($pageUsableWidth/3), $pdf->GetY()+10); // Adjust X,Y for watermark position
-            $pdf->Text($pdf->GetX()+($pageUsableWidth/4), $pdf->GetY(), $isCompanyPatient ? $visit->patient->company->name : "PAID");
+            $pdf->SetTextColor(220, 220, 220);
+            $pdf->Rotate(45, $pdf->GetX() + ($pageUsableWidth / 3), $pdf->GetY() + 10); // Adjust X,Y for watermark position
+            $pdf->Text($pdf->GetX() + ($pageUsableWidth / 4), $pdf->GetY(), $isCompanyPatient ? $visit->patient->company->name : "PAID");
             $pdf->Rotate(0);
-            $pdf->SetTextColor(0,0,0);
+            $pdf->SetTextColor(0, 0, 0);
         }
 
         $pdf->Ln(3);
         $pdf->SetFont($fontName, 'I', 6);
         $footerMessage = $appSettings?->receipt_footer_message ?: ($isRTL ? 'شكراً لزيارتكم!' : 'Thank you for your visit!');
-        $pdf->MultiCell(0, $lineHeight-1, $footerMessage, 0, $alignCenter, false, 1);
+        $pdf->MultiCell(0, $lineHeight - 1, $footerMessage, 0, $alignCenter, false, 1);
         $pdf->Ln(3); // Extra space at the end for cutting
 
         // --- Output PDF ---
@@ -871,13 +960,15 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         $alignStart = $isRTL ? 'R' : 'L';
         $alignEnd = $isRTL ? 'L' : 'R';
 
-        if ($isBoldValue) $pdf->SetFont($fontName, 'B', $currentFontSizePt + 0.5);
+        if ($isBoldValue)
+            $pdf->SetFont($fontName, 'B', $currentFontSizePt + 0.5);
         // Could add color logic based on valueCssClass if TCPDF supported it easily here
-        
-        $pdf->Cell($labelWidth, $lineHeight, $label, 0, 0, $alignStart);  
+
+        $pdf->Cell($labelWidth, $lineHeight, $label, 0, 0, $alignStart);
         $pdf->Cell($valueWidth, $lineHeight, number_format($value, 2), 0, 1, $alignEnd);
-        
-        if ($isBoldValue) $pdf->SetFont($fontName, $currentFontStyle, $currentFontSizePt);
+
+        if ($isBoldValue)
+            $pdf->SetFont($fontName, $currentFontStyle, $currentFontSizePt);
     }
 
     /**
@@ -935,7 +1026,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
     /**
      * Update specific flags or comments of a LabRequest.
      */
-   /**
+    /**
      * Update specific flags or comments of a LabRequest.
      */
     public function update(Request $request, LabRequest $labrequest)
@@ -946,7 +1037,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             'valid' => 'sometimes|boolean',
             'no_sample' => 'sometimes|boolean',
             'comment' => 'nullable|string|max:1000',
-            'sample_id' => ['nullable','string','max:255', Rule::unique('labrequests')->ignore($labrequest->id)],
+            'sample_id' => ['nullable', 'string', 'max:255', Rule::unique('labrequests')->ignore($labrequest->id)],
             'approve' => 'sometimes|boolean', // For insurance/admin approval of the request itself
             'discount_per' => 'sometimes|integer|min:0|max:100',
             'endurance' => 'sometimes|numeric|min:0',
@@ -997,8 +1088,8 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
 
         $validated = $request->validate([
             'is_bankak' => 'required|boolean', // Or 'is_bank' if that's your field name
-            
-            
+
+
             // 'payment_datetime' => 'nullable|date_format:Y-m-d H:i:s', // Optional: if payment time can be backdated
         ]);
 
@@ -1011,9 +1102,9 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             $discountAmount = ($itemSubTotal * ((int) ($labrequest->discount_per ?? 0) / 100));
             // Add fixed discount if applicable: + (float)($labrequest->fixed_discount_amount ?? 0);
             $enduranceAmount = (float) ($labrequest->endurance ?? 0);
-            
+
             $netPayableByPatient = $itemSubTotal - $discountAmount - $enduranceAmount;
-            
+
             // Amount being effectively "paid" now is the remaining balance to reach netPayableByPatient
             $amountBeingPaidNow = $netPayableByPatient - (float) $labrequest->amount_paid;
 
@@ -1026,7 +1117,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                 DB::commit();
                 return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser']));
             }
-            
+
             if ($amountBeingPaidNow <= 0.009) { // No balance due
                 DB::rollBack(); // No actual payment to make
                 return response()->json(['message' => 'لا يوجد مبلغ مستحق لهذا الطلب.'], 400);
@@ -1040,7 +1131,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             $labrequest->user_deposited = Auth::id();       // User who processed this payment
             // $labrequest->payment_at = $request->input('payment_datetime', Carbon::now()); // If you add a payment_at timestamp
             // $labrequest->payment_shift_id = $validated['shift_id']; // If you want to store the specific shift of payment
-            
+
             $labrequest->save();
 
             // NO RequestedServiceDeposit::create(...) here for labrequest payments
@@ -1054,7 +1145,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
             return response()->json(['message' => 'فشل تسجيل الدفعة.', 'error' => 'خطأ داخلي.'], 500);
         }
     }
-    
+
 
     /**
      * Authorize all results for a lab request.
@@ -1070,13 +1161,13 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
         $doctorvisit = Doctorvisit::find($request->get('doctor_visit_id_for_sysmex'));
         $patient = $doctorvisit->patient;
         $main_test_id = $request->get('main_test_id');
-            $sysmex = SysmexResult::where('doctorvisit_id', $doctorvisit->id)
+        $sysmex = SysmexResult::where('doctorvisit_id', $doctorvisit->id)
             ->orderBy('id', 'desc')
             ->first();
         if ($sysmex == null) {
-            return  ['status' => false, 'message' => 'no data found'];
+            return ['status' => false, 'message' => 'no data found'];
         }
-        $bindings =   CbcBinding::all();
+        $bindings = CbcBinding::all();
         $object = null;
 
         // return ['patient'=>$patient->id,'main_test_id'=>$main_test_id];
@@ -1085,7 +1176,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
                 'child_id' => [$binding->child_id_array],
                 'result' => $sysmex[$binding->name_in_sysmex_table]
             ];
-            $child_array =  explode(',', $binding->child_id_array);
+            $child_array = explode(',', $binding->child_id_array);
             foreach ($child_array as $child_id) {
                 $requested_result = RequestedResult::where('child_test_id', $child_id)->where('main_test_id', '=', $main_test_id)->where('patient_id', '=', $patient->id)->first();
                 if ($requested_result != null) {
@@ -1098,7 +1189,7 @@ public function batchPayLabRequests(Request $request, DoctorVisit $visit)
 
         return response()->json([
             'status' => true,
-            'message' =>  'CBC results populated successfully.' ,
+            'message' => 'CBC results populated successfully.',
             'data' => new LabRequestResource($labrequest), // Assuming loadDefaultRelations loads what UI needs
             'cbcObj' => $object // Your debug object
         ]);

@@ -536,6 +536,7 @@ Route::middleware('auth:sanctum')->group(function () {
       // Add more routes for reports later
       // Route::get('/reports/monthly', [AttendanceController::class, 'getMonthlyReport'])->name('reports.monthly');
   });
+  Route::post('/visits/{visit}/send-whatsapp-report', [ReportController::class, 'sendVisitReportViaWhatsApp'])->name('visits.sendWhatsappReport');
 
 
         

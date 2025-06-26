@@ -29,6 +29,82 @@ class UserController extends Controller
         // $this->middleware('can:delete users')->only('destroy');
     }
 
+    public function store(Request $request)
+    {
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users,username',
+            'password' => ['required', 'confirmed', Password::defaults()],
+            'roles' => 'nullable|array',
+            'roles.*' => 'exists:roles,name,guard_name,web', // Ensure guard_name is web
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'is_nurse' => 'sometimes|boolean',
+            'is_supervisor' => 'sometimes|boolean', // ADDED
+            'is_active' => 'sometimes|boolean',     // ADDED
+            'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
+        ]);
+
+        $createData = collect($validatedData)->except(['password_confirmation', 'roles'])->toArray();
+        $createData['password'] = Hash::make($validatedData['password']);
+        
+        // Set defaults if not provided
+        $createData['is_nurse'] = $validatedData['is_nurse'] ?? false;
+        $createData['is_supervisor'] = $validatedData['is_supervisor'] ?? false;
+        $createData['is_active'] = $validatedData['is_active'] ?? true; // Default to active
+        $createData['user_money_collector_type'] = $validatedData['user_money_collector_type'] ?? 'all';
+
+
+        $user = User::create($createData);
+
+        if (!empty($validatedData['roles']) && Auth::user()->can('assign roles')) { // Assuming 'assign roles' permission
+            $user->syncRoles($validatedData['roles']);
+        } else {
+            // Assign a default role if no roles are provided and you have a default role strategy
+            // For example: $user->assignRole('Default User');
+        }
+
+        return new UserResource($user->load('roles', 'doctor'));
+    }
+
+    public function update(Request $request, User $user)
+    {
+        $validatedData = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'username' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
+            // Password validation is removed here; use updatePassword for that.
+            // If you want to allow password change here, add it back with 'nullable'
+            // 'password' => ['nullable', 'confirmed', Password::defaults()],
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'is_nurse' => 'sometimes|boolean',
+            'is_supervisor' => 'sometimes|boolean', // ADDED
+            'is_active' => 'sometimes|boolean',     // ADDED
+            'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
+            'roles' => 'nullable|array',
+            'roles.*' => 'exists:roles,name,guard_name,web', // Ensure guard_name is web
+        ]);
+
+        // Prepare data for update, excluding password fields (handled by dedicated endpoint)
+        $updateData = collect($validatedData)->except(['roles'])->toArray();
+
+        // Handle boolean flags explicitly if they are not present in the request but field exists
+        if ($request->has('is_nurse')) $updateData['is_nurse'] = $request->boolean('is_nurse');
+        if ($request->has('is_supervisor')) $updateData['is_supervisor'] = $request->boolean('is_supervisor');
+        if ($request->has('is_active')) $updateData['is_active'] = $request->boolean('is_active');
+        
+        $user->update($updateData);
+
+        if ($request->has('roles') && Auth::user()->can('assign roles')) { // Assuming 'assign roles' permission
+            $user->syncRoles($validatedData['roles'] ?? []);
+        }
+
+        return new UserResource($user->load('roles', 'doctor'));
+    }
+
+
+    public function show(User $user)
+    {
+        return new UserResource($user->load('roles', 'permissions'));
+    }
     public function index(Request $request)
     {
         // Validate per_page if you want to restrict its range
@@ -64,66 +140,7 @@ class UserController extends Controller
 
         return UserResource::collection($users);
     }
-    public function store(Request $request)
-    {
-        $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
-            'username' => 'required|string|max:255|unique:users,username',
-            // 'email' => 'required|string|email|max:255|unique:users,email', // If using email
-            'password' => ['required', 'confirmed', Password::defaults()],
-            'roles' => 'nullable|array',
-            'roles.*' => 'exists:roles,name', // Validate that roles exist by name
-        ]);
-
-        $user = User::create([
-            'name' => $validatedData['name'],
-            'username' => $validatedData['username'],
-            // 'email' => $validatedData['email'],
-            'password' => Hash::make($validatedData['password']),
-            'doctor_id' => $validatedData['doctor_id'] ?? null,
-            'is_nurse' => $validatedData['is_nurse'] ?? false,
-            'user_money_collector_type' => $validatedData['user_money_collector_type'] ?? 'all',
-        ]);
-
-        if (!empty($validatedData['roles']) && $request->user()->can('assign roles')) {
-            $user->syncRoles($validatedData['roles']);
-        }
-
-        return new UserResource($user->load('roles'));
-    }
-
-    public function show(User $user)
-    {
-        return new UserResource($user->load('roles', 'permissions'));
-    }
-
-    public function update(Request $request, User $user)
-    {
-        $validatedData = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'username' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
-            // 'email' => ['sometimes','required','string','email','max:255', Rule::unique('users')->ignore($user->id)],
-            'password' => ['nullable', 'confirmed', Password::defaults()], // Password is optional on update
-            'doctor_id' => 'nullable|exists:doctors,id',
-            'is_nurse' => 'sometimes|required|boolean',
-            'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
-            'roles' => 'nullable|array',
-            'roles.*' => 'exists:roles,name',
-        ]);
-
-        $updateData = $request->except(['password', 'password_confirmation', 'roles']);
-        if (!empty($validatedData['password'])) {
-            $updateData['password'] = Hash::make($validatedData['password']);
-        }
-
-        $user->update($updateData);
-
-        if ($request->has('roles') && $request->user()->can('assign roles')) {
-            $user->syncRoles($validatedData['roles'] ?? []);
-        }
-
-        return new UserResource($user->load('roles'));
-    }
+  
 
     public function destroy(User $user)
     {

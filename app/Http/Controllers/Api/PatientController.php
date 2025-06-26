@@ -38,7 +38,7 @@ class PatientController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Patient::with(['company', 'primaryDoctor:id,name', 'doctor']); // Eager load common relations
+        $query = Patient::with(['company', 'primaryDoctor:id,name', 'doctor','doctorVisit']); // Eager load common relations
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
@@ -158,17 +158,51 @@ class PatientController extends Controller
         }
     }
 
+    /**
+     * Toggle the result lock status for a patient.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Patient  $patient
+     * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
+     */
     public function toggleResultLock(Request $request, Patient $patient)
     {
-        // Add permission check: e.g., can('manage patient_result_lock', $patient)
-        // if (!Auth::user()->can('manage_patient_result_lock')) {
-        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // Add permission check: e.g., can('lock lab_results', $patient)
+        // if (!Auth::user()->can('manage_result_lock', $patient)) { // Example permission
+        //     return response()->json(['message' => 'Unauthorized to change result lock status.'], 403);
         // }
 
-        $patient->result_is_locked = !$patient->result_is_locked;
+        $request->validate([
+            'lock' => 'required|boolean', // Expecting true to lock, false to unlock
+        ]);
+
+        if ($patient->result_is_locked === $request->boolean('lock')) {
+            $status = $request->boolean('lock') ? 'locked' : 'unlocked';
+            return response()->json([
+                'message' => "Results are already {$status}.",
+                'data' => new PatientResource($patient->fresh()) // Return current state
+            ], 200); // Or 409 Conflict if preferred
+        }
+
+        $patient->result_is_locked = $request->boolean('lock');
+        
+        // If locking, you might want to log who locked it and when,
+        // potentially in an audit trail or separate fields on the patient model.
+        // if ($request->boolean('lock')) {
+        //     $patient->result_locked_by = Auth::id();
+        //     $patient->result_locked_at = now();
+        // } else {
+        //     $patient->result_locked_by = null;
+        //     $patient->result_locked_at = null;
+        // }
+        
         $patient->save();
 
-        return new PatientResource($patient->loadMissing(['company', 'primaryDoctor'])); // Return updated patient
+        $action = $request->boolean('lock') ? 'locked' : 'unlocked';
+        return response()->json([
+            'message' => "Patient results have been successfully {$action}.",
+            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor'])) // Reload relations for consistency
+        ]);
     }
     /**
      * Create a new Patient record by cloning data, and then create a new DoctorVisit.

@@ -64,6 +64,8 @@ class User extends Authenticatable
         'doctor_id',
         'is_nurse',
         'user_money_collector_type',
+        'is_supervisor',
+        'is_active',
     ];
 
     protected $hidden = [
@@ -76,7 +78,7 @@ class User extends Authenticatable
         'password' => 'hashed',
         'is_nurse' => 'boolean',
         'is_supervisor' => 'boolean',
-
+        'is_active' => 'boolean',
     ];
     
     public function defaultShifts(): BelongsToMany
@@ -90,7 +92,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Attendance::class);
     }
-
+    public function doctor()
+    {
+        return $this->belongsTo(Doctor::class);
+    }
     public function supervisedAttendances(): HasMany // Attendances this user supervised
     {
         return $this->hasMany(Attendance::class, 'supervisor_id');
