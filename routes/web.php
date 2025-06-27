@@ -4,6 +4,7 @@
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\LabResultController;
 use App\Models\DoctorShift;
+use App\Models\Patient;
 use App\Models\Shift;
 use Illuminate\Support\Facades\Route;
 
@@ -50,3 +51,7 @@ Route::get('/phpinfo', function () {
 });
 
 
+Route::get('ttt',function(){
+    $patient = Patient::find(13863);
+    return $patient->labRequests;
+});

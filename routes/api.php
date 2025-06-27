@@ -537,13 +537,17 @@ Route::middleware('auth:sanctum')->group(function () {
       // Route::get('/reports/monthly', [AttendanceController::class, 'getMonthlyReport'])->name('reports.monthly');
   });
   Route::post('/visits/{visit}/send-whatsapp-report', [ReportController::class, 'sendVisitReportViaWhatsApp'])->name('visits.sendWhatsappReport');
+  Route::get('/search/patient-visits', [PatientController::class, 'searchPatientVisitsForAutocomplete']);
+  Route::post('/patients/{patient}/create-lab-visit', [PatientController::class, 'createLabVisitForExistingPatient'])->name('patients.createLabVisit');
 
 
-        
+  Route::post('/patients/store-from-lab', [PatientController::class, 'storeFromLab'])->name('patients.storeFromLab');
+
     // Devices
     Route::get('/devices-list', [DeviceController::class, 'indexList']);
     Route::post('/devices', [DeviceController::class, 'store']); // If you add device creation dialog
-
+ // NEW route for lab reception queue
+ Route::get('/lab/reception-queue', [LabRequestController::class, 'getNewlyRegisteredLabPendingQueue']);
     // Device Specific Normal Ranges for Child Tests
     Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
     Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
@@ -553,9 +557,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns
     Route::apiResource('service-groups', ServiceGroupController::class);
     Route::prefix('sample-collection')->name('sample.collection.')->group(function () {
-      Route::get('/queue', [SampleCollectionController::class, 'getQueue'])->name('queue');
-      Route::patch('/labrequests/{labrequest}/mark-collected', [SampleCollectionController::class, 'markSampleCollected'])->name('markCollected');
-      Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit'])->name('markAllCollected');
+    Route::get('/queue', [SampleCollectionController::class, 'getQueue'])->name('queue');
+    Route::patch('/labrequests/{labrequest}/mark-collected', [SampleCollectionController::class, 'markSampleCollected'])->name('markCollected');
+    Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit'])->name('markAllCollected');
       Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest'])->name('generateSampleId');
   });
 });

@@ -13,6 +13,7 @@ use App\Http\Resources\PatientResource;
 use App\Http\Resources\PatientSearchResultResource;
 use App\Http\Resources\PatientStrippedResource;
 use App\Http\Resources\RecentDoctorVisitSearchResource;
+use App\Models\Doctor;
 // use App\Http\Resources\PatientCollection; // If you have custom pagination
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -377,6 +378,216 @@ class PatientController extends Controller
             ->get();
 
         return DoctorVisitResource::collection($patients);
+    }
+     /**
+     * Store a new patient and create a lab-centric visit from the Lab Reception page.
+     * This method does not require an active doctor shift but links to a general clinic shift.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
+     */
+    public function storeFromLab(Request $request)
+    {
+        // Add a specific permission check for this action
+        // if (!Auth::user()->can('register lab_patient')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
+        // Validation tailored for lab registration
+        $validatedData = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'gender' => 'required|in:male,female',
+            'age_year' => 'nullable|integer|min:0|max:120',
+            'age_month' => 'nullable|integer|min:0|max:11',
+            'age_day' => 'nullable|integer|min:0|max:30',
+            'address' => 'nullable|string|max:1000',
+            'doctor_id' => 'required|integer|exists:doctors,id', // Referring doctor is required
+            // No company/insurance fields needed if lab is always cash, otherwise add them here.
+        ]);
+
+        $currentGeneralShift = Shift::open()->latest('created_at')->first();
+        if (!$currentGeneralShift) {
+            return response()->json(['message' => 'No open clinic shift available to create a visit.'], 400);
+        }
+        //the visit number is the number of  the in the general shift
+        $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1;
+
+
+        // Find the latest active shift for the selected referring doctor.
+        // This is important for correctly assigning any doctor-related credit later.
+        $activeDoctorShift = DoctorShift::where('doctor_id', $validatedData['doctor_id'])
+                                        ->latest('id')
+                                        ->first();
+
+                                        if($activeDoctorShift){
+                                           
+                                        }else{
+                                            //create a new shift
+                                            $activeDoctorShift = DoctorShift::create([
+                                                'doctor_id' => $validatedData['doctor_id'],
+                                                'start_time' => Carbon::now(),
+                                                'end_time' => Carbon::now()->addHours(1),
+                                                'status' => true,
+                                            ]);
+                                        }
+
+        DB::beginTransaction();
+        try {
+            // Your logic for finding an existing patient file can be reused here
+            // For simplicity, we'll create a new file for each new lab visit encounter
+            $file = File::create();
+
+            // Create the new Patient record for this encounter
+            // A new patient record is created for each visit to capture their state at that time.
+            $patient = Patient::create([
+                'name' => $validatedData['name'],
+                'phone' => $validatedData['phone'],
+                'gender' => $validatedData['gender'] ?? 'male',
+                'age_year' => $validatedData['age_year'] ?? 0   ,
+                'age_month' => $validatedData['age_month'] ?? 0,
+                'age_day' => $validatedData['age_day'] ?? 0,
+                'address' => $validatedData['address'] ?? '',
+                'doctor_id' => $validatedData['doctor_id'], // Store the referring doctor
+                'user_id' => Auth::id(),
+                'shift_id' => $currentGeneralShift->id,
+                'auth_date' => null,
+                'result_auth' => false,
+                'result_is_locked' => false,
+                'sample_collected' => false,
+                'is_lab_paid' => false,
+                'lab_paid' => 0,
+                'referred' => Doctor::find($validatedData['doctor_id'])->name,
+                'discount_comment' => '',
+                'visit_number' => $visitLabNumber,
+                
+
+            ]);
+
+            // Create the DoctorVisit record linked to this new Patient record
+            $doctorVisit = $patient->doctorVisit()->create([
+                'doctor_id' => $validatedData['doctor_id'], // Referring doctor
+                'user_id' => Auth::id(),
+                'shift_id' => $currentGeneralShift->id,
+                'doctor_shift_id' => $activeDoctorShift?->id, // Can be null if doctor isn't on shift
+                'file_id' => $file->id,
+                'visit_date' => Carbon::today(),
+                'visit_time' => Carbon::now()->format('H:i:s'),
+                'status' => 'lab_pending', // A specific status for lab reception visits
+                'is_new' => true,
+                'only_lab' => true, // CRUCIAL FLAG for this workflow
+            ]);
+
+            DB::commit();
+            
+            // Return the patient resource, ensuring it includes the new doctorVisit relation
+            // The PatientResource should be configured to conditionally include this.
+            $patient->load('doctorVisit');
+            
+            return new PatientResource($patient);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Lab patient registration failed: " . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['message' => 'Failed to register patient for lab.', 'error_details' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Search for patients and return their recent visits for an Autocomplete component.
+     */
+    public function searchPatientVisitsForAutocomplete(Request $request)
+    {
+        $request->validate([
+            'term' => 'required|string|min:2',
+        ]);
+
+        $searchTerm = $request->term;
+
+        // Find recent visits for patients matching the search term
+        $visits = DoctorVisit::with('patient:id,name,phone')
+            ->whereHas('patient', function ($query) use ($searchTerm) {
+                $query->where('name', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                      ->orWhere('id', $searchTerm);
+            })
+            ->select('id', 'patient_id', 'visit_date') // Select only what's needed
+            ->latest('visit_date') // Order by most recent visits first
+            ->limit(15) // Limit the number of results for performance
+            ->get();
+
+        // Transform the data into the format the frontend Autocomplete expects
+        $formattedResults = $visits->map(function ($visit) {
+            return [
+                'visit_id' => $visit->id,
+                'patient_id' => $visit->patient_id,
+                // Create a user-friendly label for the dropdown
+                'autocomplete_label' => "{$visit->patient->name} (#{$visit->patient->id}) - Visit on {$visit->visit_date->format('d-M-Y')}",
+            ];
+        });
+
+        return response()->json(['data' => $formattedResults]);
+    }
+     /**
+     * Create a new lab-only visit for an existing patient.
+     */
+    public function createLabVisitForExistingPatient(Request $request, Patient $patient)
+    {
+        // Add permission check, e.g., can('create lab_visit')
+        $validated = $request->validate([
+            'doctor_id' => 'required|integer|exists:doctors,id', // Referring doctor
+            'reason_for_visit' => 'nullable|string|max:1000',
+        ]);
+
+        $currentGeneralShift = Shift::open()->latest('created_at')->first();
+        if (!$currentGeneralShift) {
+            return response()->json(['message' => 'No open clinic shift is available to create a visit.'], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Re-use file_id from the patient's most recent visit to keep records linked
+            $latestVisit = $patient->doctorVisits()->latest('visit_date')->first();
+            $fileToUseId = $latestVisit?->file_id;
+            
+            // If for some reason no previous visit had a file, create a new one
+            if (!$fileToUseId) {
+                $file = File::create();
+                $fileToUseId = $file->id;
+            }
+
+            $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1;
+
+            $doctorVisit = $patient->doctorVisits()->create([
+                'doctor_id' => $validated['doctor_id'],
+                'user_id' => Auth::id(),
+                'shift_id' => $currentGeneralShift->id,
+                'doctor_shift_id' => null, // Not tied to a doctor's active shift session in the clinic
+                'file_id' => $fileToUseId,
+                'visit_date' => Carbon::today(),
+                'visit_time' => Carbon::now()->format('H:i:s'),
+                'status' => 'lab_pending', // A status indicating it's waiting for lab work
+                'reason_for_visit' => $validated['reason_for_visit'] ?? 'Lab Request',
+                'is_new' => false, // It's a visit for an existing patient
+                'number' => $visitLabNumber,
+                'only_lab' => true, // CRUCIAL: This marks it as a direct lab visit
+            ]);
+            
+            DB::commit();
+
+            // Load patient data into the visit before returning, as onPatientActivated expects it
+            $doctorVisit->load('patient');
+            // The Patient model needs a doctorVisit relationship for this to work
+            $patient->setRelation('doctorVisit', $doctorVisit);
+
+
+            return new \App\Http\Resources\PatientResource($patient);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to create lab visit for existing patient {$patient->id}: " . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['message' => 'Failed to create lab visit.', 'error' => $e->getMessage()], 500);
+        }
     }
     public function getRecentLabActivityPatients(Request $request)
     {

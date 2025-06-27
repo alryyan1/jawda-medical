@@ -297,6 +297,59 @@ class LabRequestController extends Controller
 
         return PatientLabQueueItemResource::collection($pendingVisits);
     }
+
+ /**
+     * Get the queue of patients registered through the lab for a specific shift or day.
+     * This method shows ALL lab-specific visits, even those without tests added yet.
+     */
+    public function getNewlyRegisteredLabPendingQueue(Request $request)
+    {
+        // if (!Auth::user()->can('view lab_reception_queue')) { /* ... */ }
+
+        $request->validate([
+            'shift_id' => 'nullable|integer|exists:shifts,id',
+            'search' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
+        ]);
+
+        // This query fetches DoctorVisits marked as 'only_lab'
+        $query = DoctorVisit::query()
+            ->select(
+                'doctorvisits.id as visit_id',
+                'doctorvisits.created_at as visit_creation_time',
+                'patients.id as patient_id',
+                'patients.name as patient_name'
+            )
+            ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id');
+            // ->where('doctorvisits.only_lab', true); // ** THE KEY FILTER **
+
+        // Prioritize shift_id if provided
+        if ($request->filled('shift_id')) {
+            $query->where('doctorvisits.shift_id', $request->shift_id);
+        } 
+
+        // Apply search filter
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q_search) use ($searchTerm) {
+                $q_search->where('patients.name', 'LIKE', "%{$searchTerm}%")
+                         ->orWhere('patients.id', $searchTerm)
+                         ->orWhere('doctorvisits.id', $searchTerm);
+            });
+        }
+        
+        // Eager load details needed for the PatientLabQueueItemResource
+        $query->withCount(['patientLabRequests as test_count']) // Count all lab requests
+            ->withMin(['patientLabRequests as oldest_request_time'], 'labrequests.created_at') // Get time of first request
+            ->with(['patientLabRequests:labrequests.id,doctor_visit_id,sample_id,is_paid']); // Eager load for status check
+
+        $pendingVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
+    
+        return PatientLabQueueItemResource::collection($pendingVisits);
+    }
+
+
     /**
      * List lab requests for a specific visit. (For TestSelectionPanel)
      */

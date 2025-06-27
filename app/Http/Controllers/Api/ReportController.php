@@ -3851,7 +3851,9 @@ class ReportController extends Controller
 
             $pdf->cell($table_col_widht * 2 + 10, 5, $patient?->doctor?->name, 0, 0, 'R'); // doctor name
             $pdf->cell($table_col_widht / 2 - 10, 5, "د/ ", 0, 1, 'C');
-            $requestedTests = $patient->tests_concatinated();
+            $requestedTests = $doctorvisit->patientLabRequests
+            ->map(fn($lr) => $lr->mainTest?->main_test_name)
+            ->filter()->unique()->implode(' | ');
             if ($pdf->PageNo() == 1) {
                 $pdf->Line(6, 5, 205, 5); //TOP LINE [H]
                 //            $pdf->Line(6, 35, 205, 35); //SECOND [H]

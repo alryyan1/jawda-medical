@@ -209,6 +209,9 @@ class LabRequest extends Model
         $prefix = $visit ? "V{$visit->id}-" : "S-";
         return $prefix . strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 6));
     }
+    public function getNameAttribute(){
+        return $this->mainTest->main_test_name;
+    }
     // In app/Models/LabRequest.php
     public function scopeLoadDefaultRelations($query)
     {
