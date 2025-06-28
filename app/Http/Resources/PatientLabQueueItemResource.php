@@ -2,6 +2,7 @@
 
 use App\Models\LabRequest;
 use App\Models\Patient;
+use App\Models\RequestedResult;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request; use Illuminate\Http\Resources\Json\JsonResource;
 class PatientLabQueueItemResource extends JsonResource {
@@ -18,6 +19,24 @@ class PatientLabQueueItemResource extends JsonResource {
         // $this->resource is a DoctorVisit model instance with aggreg
         $allLabRequests = $this->patientLabRequests()->get(); // Get all lab requests for this visit
         $unpaidCount = $allLabRequests->where('is_paid', false)->count();
+
+         // --- Logic to calculate pending results ---
+         $totalResultsCount = 0;
+         $pendingResultsCount = 0;
+ 
+         // Assuming '$this->resource' is the DoctorVisit model instance from the query
+         $labRequestIds = $this->resource->patientLabRequests->pluck('id');
+         
+         if ($labRequestIds->isNotEmpty()) {
+             $totalResultsCount = RequestedResult::whereIn('lab_request_id', $labRequestIds)->count();
+             
+             $pendingResultsCount = RequestedResult::whereIn('lab_request_id', $labRequestIds)
+                                     ->where(function ($query) {
+                                         $query->whereNull('result')
+                                               ->orWhere('result', '=', '');
+                                     })
+                                     ->count();
+         }
         return [
             'visit_id' => $this->visit_id,
             'patient_id' => $this->patient_id,
@@ -39,6 +58,8 @@ class PatientLabQueueItemResource extends JsonResource {
             // This 'all_requests_paid_for_badge' determines badge color based on overall visit payment status for valid tests
             'all_requests_paid_for_badge' => $areAllValidRequestsPaid,
 
+            // NEW FIELD
+            'is_last_result_pending' => ($totalResultsCount > 0 && $pendingResultsCount === 1),
             // 'status_summary' => ... // Calculate if needed
         ];
     }
