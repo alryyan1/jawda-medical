@@ -171,16 +171,9 @@ class LabRequestController extends Controller
             });
 
         // Context for DoctorVisit itself (shift or date range)
-        if ($request->filled('shift_id')) {
             $query->where('doctorvisits.shift_id', $request->shift_id);
-        } elseif ($request->filled('date_from') && $request->filled('date_to')) {
-            $query->whereBetween('doctorvisits.visit_date', [
-                Carbon::parse($request->date_from)->startOfDay(),
-                Carbon::parse($request->date_to)->endOfDay()
-            ]);
-        } else {
-            $query->whereDate('doctorvisits.visit_date', Carbon::today());
-        }
+        
+      
 
 
         // Filter by Main Test
@@ -212,41 +205,9 @@ class LabRequestController extends Controller
         // Filter by Result Status (this is complex for a visit with multiple lab requests)
 // You might need an aggregated status on the visit or a more complex subquery.
 // Simple example: Show visit if *any* lab request matches the status.
-        if ($request->filled('result_status_filter') && $request->result_status_filter !== 'all') {
-            $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
-                if ($request->result_status_filter === 'finished') {
-                    $q_lr->whereIn('result_status', ['authorized', 'results_complete_pending_auth']);
-                } elseif ($request->result_status_filter === 'pending') {
-                    $q_lr->whereNotIn('result_status', ['authorized', 'results_complete_pending_auth', 'cancelled']);
-                }
-            });
-        }
+       
 
-        // Filter by Print Status (Patient.result_print_date)
-        if ($request->filled('print_status_filter') && $request->print_status_filter !== 'all') {
-            $query->whereHas('patient', function ($q_pat) use ($request) {
-                if ($request->print_status_filter === 'printed') {
-                    $q_pat->whereNotNull('result_print_date');
-                } elseif ($request->print_status_filter === 'not_printed') {
-                    $q_pat->whereNull('result_print_date');
-                }
-            });
-        }
-
-        // Search functionality on DoctorVisit and related Patient/LabRequest attributes
-        if ($request->filled('search')) {
-            $searchTerm = $request->search;
-            $query->where(function ($q_search) use ($searchTerm) {
-                $q_search->where('patients.name', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('patients.id', $searchTerm) // Patient ID
-                    ->orWhere('doctorvisits.id', $searchTerm) // Visit ID
-                    ->orWhereHas('patientLabRequests', function ($lrSearchQuery) use ($searchTerm) {
-                        $lrSearchQuery->where('labrequests.sample_id', 'LIKE', "%{$searchTerm}%")
-                            ->orWhere('labrequests.id', $searchTerm); // LabRequest ID
-                    });
-            });
-        }
-
+       
         // Eager load data needed for PatientLabQueueItemResource after filtering
         // This uses the hypothetical 'patientLabRequests' relation on DoctorVisit model.
         // If it doesn't exist, we have to construct this data manually or adjust the resource.
