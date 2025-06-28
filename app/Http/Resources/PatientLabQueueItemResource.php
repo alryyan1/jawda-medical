@@ -22,6 +22,7 @@ class PatientLabQueueItemResource extends JsonResource {
             'visit_id' => $this->visit_id,
             'patient_id' => $this->patient_id,
             'patient_name' => $this->patient_name,
+             'company'=>$this->patient->company,
             'patient_phone_for_whatsapp' => $patientModel ? WhatsAppService::formatPhoneNumberForWaApi($patientModel->phone) : null,
             'is_result_locked' => $patientModel ? (bool) $patientModel->result_is_locked : false,
             'is_printed'=>$this->patient->result_print_date != null,
