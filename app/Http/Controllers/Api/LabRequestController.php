@@ -235,22 +235,22 @@ class LabRequestController extends Controller
             }
         ]);
 
-        $query->withMin([
-            'patientLabRequests as oldest_request_time_for_patient_in_context' => function ($lrQuery) use ($request) {
+        // $query->withMin([
+        //     'patientLabRequests as oldest_request_time_for_patient_in_context' => function ($lrQuery) use ($request) {
 
-                // Re-apply filters for oldest time context
-                if ($request->filled('package_id')) {
-                    $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
-                }
-                if ($request->boolean('has_unfinished_results')) {
-                    $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));
-                }
-                if ($request->filled('main_test_id')) {
-                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
-                }
-                $lrQuery->whereDate('labrequests.created_at', DB::raw('DATE(doctorvisits.visit_date)'));
-            }
-        ], 'labrequests.created_at');
+        //         // Re-apply filters for oldest time context
+        //         if ($request->filled('package_id')) {
+        //             $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
+        //         }
+        //         if ($request->boolean('has_unfinished_results')) {
+        //             $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));
+        //         }
+        //         if ($request->filled('main_test_id')) {
+        //             $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
+        //         }
+        //         $lrQuery->whereDate('labrequests.created_at', DB::raw('DATE(doctorvisits.visit_date)'));
+        //     }
+        // ], 'labrequests.created_at');
 
         // This will fetch DoctorVisit records. The PatientLabQueueItemResource will need to correctly
         // extract/derive lab_request_ids, sample_id, and all_requests_paid based on the DoctorVisit and its Patient.
