@@ -12,6 +12,7 @@ use App\Models\RequestedService;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class ShiftController extends Controller
@@ -55,16 +56,16 @@ class ShiftController extends Controller
     public function index(Request $request)
     {
         $query = Shift::with(['userOpened:id,name', 'userClosed:id,name']) // Eager load users
-                      ->latest('created_at'); 
+            ->latest('created_at');
 
         if ($request->has('is_closed') && $request->is_closed !== '' && $request->is_closed !== 'all') {
-            $query->where('is_closed', (bool)$request->is_closed);
+            $query->where('is_closed', (bool) $request->is_closed);
         }
-        
+
         // If a single date is provided, treat it as filtering for that day
         if ($request->filled('date')) { // Expecting 'YYYY-MM-DD'
             $query->whereDate('created_at', '=', Carbon::parse($request->date)->toDateString());
-        } 
+        }
         // Keep existing date_from/date_to logic if still needed for other use cases
         elseif ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', $request->date_from);
@@ -79,7 +80,7 @@ class ShiftController extends Controller
             $shifts = $query->get();
             return ShiftResource::collection($shifts); // Return as collection if not paginating
         }
-        
+
         $shifts = $query->paginate($perPage ?: 15);
         return ShiftResource::collection($shifts);
     }
@@ -113,20 +114,17 @@ class ShiftController extends Controller
             return response()->json(['message' => 'ليس لديك صلاحية لفتح وردية عمل.'], 403);
         }
 
-       
+
         $user = Auth::user();
         // Check if there's already an open shift to prevent multiple open shifts if that's your rule
-        $existingOpenShift = Shift::open()->exists();
-        if ($existingOpenShift) {
-            return response()->json(['message' => 'يوجد وردية عمل مفتوحة بالفعل. يرجى إغلاقها أولاً.'], 409); // Conflict
-        }
+      
 
         $validatedData = $request->validate([
             // 'name' => 'nullable|string|max:255', // If you add a name field
             'pharmacy_entry' => 'nullable|boolean',
             // 'user_id_opened' => 'required|exists:users,id', // If tracking who opened
         ]);
-        
+
         $shift = Shift::create([
             'is_closed' => false,
             'touched' => false,
@@ -136,7 +134,7 @@ class ShiftController extends Controller
             'total' => 0, // Initial values
             'bank' => 0,
             'expenses' => 0,
-            'user_id'=> $user->id, // Assuming the user is the one opening the shift
+            'user_id' => $user->id, // Assuming the user is the one opening the shift
         ]);
 
         return new ShiftResource($shift);
@@ -145,13 +143,13 @@ class ShiftController extends Controller
     {
         // Permission check: e.g., can('view shift_financial_summary', $shift)
         if ($shift->is_closed && !$request->user()->can('view closed_shift_summary')) {
-             // Potentially different permission for closed shifts
+            // Potentially different permission for closed shifts
         }
 
         // 1. Calculate Total Net Income (Services + Lab) for this shift
         // This logic needs to be robust and match how you define "income"
         // and how you link services/lab_requests to shifts.
-        
+
         // Service Revenue
         $serviceNetIncome = RequestedService::query()
             ->whereHas('doctorVisit', fn($dvq) => $dvq->where('shift_id', $shift->id))
@@ -182,7 +180,7 @@ class ShiftController extends Controller
                 END
             ) as total_net')
             ->value('total_net') ?? 0;
-        
+
         $totalNetIncome = (float) $serviceNetIncome + (float) $labNetIncome;
 
         // 2. Calculate Total Cash and Bank Payments specifically for this Shift
@@ -200,7 +198,7 @@ class ShiftController extends Controller
             ->where('is_paid', true) // Consider only fully paid or sum all amount_paid
             ->get(['amount_paid', 'bank']); // Assuming 'bank' is boolean for payment method
 
-        foreach($servicePayments as $sp) {
+        foreach ($servicePayments as $sp) {
             if ($sp->bank) {
                 $totalBankCollected += (float) $sp->amount_paid;
             } else {
@@ -214,14 +212,14 @@ class ShiftController extends Controller
             ->where('is_paid', true)
             ->get(['amount_paid', 'is_bankak']); // Assuming 'is_bankak'
 
-        foreach($labPayments as $lp) {
+        foreach ($labPayments as $lp) {
             if ($lp->is_bankak) {
                 $totalBankCollected += (float) $lp->amount_paid;
             } else {
                 $totalCashCollected += (float) $lp->amount_paid;
             }
         }
-        
+
         // Get shift's recorded expenses (already on shift model)
         $totalExpenses = (float) $shift->expenses;
 
@@ -231,7 +229,7 @@ class ShiftController extends Controller
                 'is_closed' => (bool) $shift->is_closed,
                 'closed_at' => $shift->closed_at?->toIso8601String(),
                 'total_net_income' => round($totalNetIncome, 2),
-                'total_discount_applied' => round(($serviceNetIncome + $labNetIncome) - ($totalCashCollected + $totalBankCollected - $totalExpenses),2), //This needs to be calculated based on actual discount fields from services/lab requests if available or make totalIncome be from price before discount
+                'total_discount_applied' => round(($serviceNetIncome + $labNetIncome) - ($totalCashCollected + $totalBankCollected - $totalExpenses), 2), //This needs to be calculated based on actual discount fields from services/lab requests if available or make totalIncome be from price before discount
                 'total_cash_collected' => round($totalCashCollected, 2),
                 'total_bank_collected' => round($totalBankCollected, 2),
                 'total_collected' => round($totalCashCollected + $totalBankCollected, 2),
@@ -253,7 +251,7 @@ class ShiftController extends Controller
     }
 
 
- 
+
     /**
      * Close an open clinic shift.
      * This action will also close any associated active doctor shifts.
@@ -274,7 +272,7 @@ class ShiftController extends Controller
     //         return response()->json(['message' => 'وردية العمل هذه مغلقة بالفعل.'], 400);
     //     }
 
-    
+
     //     DB::beginTransaction();
     //     try {
     //         $closingTime = Carbon::now();
@@ -283,7 +281,7 @@ class ShiftController extends Controller
     //         // 1. Update and close the main clinic shift
     //         $shift->update([
     //             'user_closed' => Auth::id(),
-                 
+
     //             'is_closed' => true,
     //             'closed_at' => $closingTime,
     //             // 'user_id_closed' => $closingUserId, // If you track this
@@ -303,7 +301,7 @@ class ShiftController extends Controller
     //                 // If it does, you might want to update that too.
     //             ]);
     //         }
-            
+
     //         // TODO: Add logic for financial reconciliation here if needed.
     //         // E.g., compare system calculated totals with manually entered totals.
     //         // The 'touched' flag could be set if there's a discrepancy or manual override.
@@ -321,7 +319,7 @@ class ShiftController extends Controller
     //         return response()->json(['message' => 'حدث خطأ أثناء إغلاق الوردية.', 'error' => $e->getMessage()], 500);
     //     }
     // }
-  /**
+    /**
      * Close an open clinic shift.
      * This action will only proceed if all associated doctor shifts for THIS general shift are closed.
      * If doctor shifts (for this general shift) are open, it will return an error.
@@ -339,20 +337,25 @@ class ShiftController extends Controller
 
         // Check for any open DoctorShift records specifically associated with THIS general Shift ($shift)
         $openDoctorShiftsForThisGeneralShift = DoctorShift::where('shift_id', $shift->id)
-                                                          ->where('status', true) // Active
-                                                          ->with('doctor:id,name') // Load doctor names for the message
-                                                          ->get();
+            ->where('status', true) // Active
+            ->with('doctor:id,name') // Load doctor names for the message
+            ->get();
 
-        if ($openDoctorShiftsForThisGeneralShift->isNotEmpty()) {
-            $doctorNames = $openDoctorShiftsForThisGeneralShift->pluck('doctor.name')->filter()->implode(', ');
-            return response()->json([
-                'message' => "$doctorNames \n  لا يمكن إغلاق الوردية العامة. لا تزال هناك ورديات أطباء مفتوحة مرتبطة بهذه الوردية.",
-                'open_doctor_shifts' => 'الأطباء الذين لديهم ورديات مفتوحة حالياً: ' . $doctorNames,
-                // Optionally return the list of open shifts for frontend handling
-                // 'data' => $openDoctorShiftsForThisGeneralShift->map(fn($ds) => ['doctor_id' => $ds->doctor_id, 'doctor_name' => $ds->doctor?->name, 'doctor_shift_id' => $ds->id])
-            ], 409); // 409 Conflict
+        //if current user has role superadmin skip this check
+        if (!Auth::user()->hasRole('Super Admin')) {
+
+
+            if ($openDoctorShiftsForThisGeneralShift->isNotEmpty()) {
+                $doctorNames = $openDoctorShiftsForThisGeneralShift->pluck('doctor.name')->filter()->implode(', ');
+                return response()->json([
+                    'message' => "$doctorNames \n  لا يمكن إغلاق الوردية العامة. لا تزال هناك ورديات أطباء مفتوحة مرتبطة بهذه الوردية.",
+                    'open_doctor_shifts' => 'الأطباء الذين لديهم ورديات مفتوحة حالياً: ' . $doctorNames,
+                    // Optionally return the list of open shifts for frontend handling
+                    // 'data' => $openDoctorShiftsForThisGeneralShift->map(fn($ds) => ['doctor_id' => $ds->doctor_id, 'doctor_name' => $ds->doctor?->name, 'doctor_shift_id' => $ds->id])
+                ], 409); // 409 Conflict
+            }
         }
-        
+
         // Additional consideration: What about doctor shifts that might be open but NOT tied to this specific $shift->id,
         // but perhaps tied to older general shifts that were never properly closed?
         // The original code `DoctorShift::where('status', true)->get()` would close ALL active doctor shifts regardless
@@ -385,7 +388,7 @@ class ShiftController extends Controller
             $shiftDataToUpdate = [
                 'is_closed' => true,
                 'closed_at' => $closingTime,
-                'user_id_closed' => $closingUserId, // Assuming user_id_closed column exists on shifts table
+                'user_closed' => $closingUserId, // Assuming user_id_closed column exists on shifts table
             ];
 
             // Financial reconciliation fields if provided (ensure validation if they are optional or required)
@@ -401,9 +404,9 @@ class ShiftController extends Controller
             if ($request->has('touched')) {
                 $shiftDataToUpdate['touched'] = $request->boolean('touched');
             }
-            
+
             $shift->update($shiftDataToUpdate);
-            
+
             DB::commit();
 
             return new ShiftResource($shift->loadMissing(['userClosed', 'doctorShifts']));
@@ -424,7 +427,7 @@ class ShiftController extends Controller
         // if (!Auth::user()->can('manage shift_financials')) {
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
-        
+
         $validatedData = $request->validate([
             'total' => 'sometimes|required|numeric|min:0',
             'bank' => 'sometimes|required|numeric|min:0',
@@ -435,7 +438,7 @@ class ShiftController extends Controller
         $shift->update($validatedData);
         return new ShiftResource($shift);
     }
-    
+
     // A standard update and destroy might not be typical for shifts.
     // Shifts are usually opened and then closed (which is an update).
     // Deleting a shift might have serious data integrity implications.

@@ -323,11 +323,31 @@ class LabRequestController extends Controller
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id');
             // ->where('doctorvisits.only_lab', true); // ** THE KEY FILTER **
-
+            if ($request->filled('isBankak')) {
+                // $q_lab->where('is_bankak', $request->boolean('is_bankak'));
+                $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
+                    $q_lr->where('is_bankak', $request->boolean('isBankak'));
+                });
+            }
         // Prioritize shift_id if provided
         if ($request->filled('shift_id')) {
             $query->where('doctorvisits.shift_id', $request->shift_id);
         } 
+  
+    // --- APPLY FILTERS ON RELATED TABLES ---
+    if ($request->filled('company_id')) {
+        $query->where('patients.company_id', $request->company_id);
+    }
+
+    if ($request->filled('doctor_id')) {
+        $query->where('doctorvisits.doctor_id', $request->doctor_id);
+    }
+    
+    if ($request->filled('specialist_id')) {
+        $query->whereHas('doctor.specialist', function($q_spec) use ($request) {
+            $q_spec->where('id', $request->specialist_id);
+        });
+    }
 
         // Apply search filter
         if ($request->filled('search')) {
