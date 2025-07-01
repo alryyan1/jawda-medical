@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\LabPaymentUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DoctorVisitResource;
 use App\Models\LabRequest;
@@ -443,6 +444,8 @@ class LabRequestController extends Controller
                 $remainingPaymentToDistribute -= $paymentForThisItem;
             }
             DB::commit();
+            broadcast(new LabPaymentUpdated($visit))->toOthers(); // `toOthers()` prevents broadcasting to the user who triggered the event
+
             // It's better to return the updated visit with all its lab requests
             // so the frontend can update everything at once.
             return new DoctorVisitResource($visit->fresh()->load([
@@ -1171,6 +1174,8 @@ class LabRequestController extends Controller
             // NO RequestedServiceDeposit::create(...) here for labrequest payments
 
             DB::commit();
+            broadcast(new LabPaymentUpdated($labrequest->doctorvisit))->toOthers();
+
             return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser']));
 
         } catch (\Exception $e) {

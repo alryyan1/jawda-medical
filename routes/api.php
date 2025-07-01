@@ -562,4 +562,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit'])->name('markAllCollected');
       Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest'])->name('generateSampleId');
   });
+
+   Route::get('specialists-list', [SpecialistController::class, 'indexList']);
+    Route::apiResource('specialists', SpecialistController::class);
 });
