@@ -565,4 +565,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
    Route::get('specialists-list', [SpecialistController::class, 'indexList']);
     Route::apiResource('specialists', SpecialistController::class);
+    Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel'])->name('reports.services.excel');
+     // NEW route for the services with cost details export
+     Route::get('/reports/services-with-costs/excel', [ExcelController::class, 'exportServicesWithCostsToExcel'])->name('reports.services_with_costs.excel');
+     Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices'])->name('services.batchUpdatePrices');
 });

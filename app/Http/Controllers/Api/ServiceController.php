@@ -5,6 +5,8 @@ use App\Models\Service;
 use Illuminate\Http\Request;
 use App\Http\Resources\ServiceResource;
 use App\Http\Resources\ServiceCollection; // If you create one for pagination
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class ServiceController extends Controller
@@ -62,5 +64,103 @@ class ServiceController extends Controller
     {
         $service->delete();
         return response()->json(null, 204);
+    }
+
+      /**
+     * Preview or execute a batch update on service prices based on dynamic conditions.
+     */
+    public function batchUpdatePrices(Request $request)
+    {
+        // if (!Auth::user()->can('batch_update_service_prices')) { /* ... */ }
+
+        $validated = $request->validate([
+            'update_mode'       => ['required', Rule::in(['increase', 'decrease'])],
+            'update_type'       => ['required', Rule::in(['percentage', 'fixed_amount'])],
+            'update_value'      => 'required|numeric|min:0',
+            'conditions'        => 'present|array',
+            'conditions.*.field' => ['required', Rule::in(['service_group_id', 'price', 'name'])], // Add more valid fields here
+            'conditions.*.operator' => ['required', Rule::in(['=', '!=', '<', '>', '<=', '>=', 'LIKE'])],
+            'conditions.*.value' => 'required',
+            'is_preview'        => 'sometimes|boolean', // If true, just return the count
+        ]);
+
+        $query = Service::query();
+
+        // --- Dynamically apply conditions ---
+        foreach ($validated['conditions'] as $condition) {
+            $field = $condition['field'];
+            $operator = $condition['operator'];
+            $value = $condition['value'];
+
+            // Sanitize and validate operator/field combos to prevent SQL injection-like issues
+            if (!in_array($field, ['service_group_id', 'price', 'name'])) {
+                continue; // Skip invalid fields
+            }
+            if ($operator === 'LIKE' && $field === 'name') {
+                 $query->where($field, 'LIKE', '%' . $value . '%');
+            } elseif (in_array($operator, ['=', '!=', '<', '>', '<=', '>='])) {
+                 $query->where($field, $operator, $value);
+            }
+        }
+        
+        // If it's just a preview, return the count of affected services
+        if ($request->boolean('is_preview')) {
+            $count = $query->count();
+            return response()->json(['message' => "This update will affect {$count} services.", 'affected_count' => $count]);
+        }
+
+        // --- Execute the update ---
+        $updateValue = (float)$validated['update_value'];
+        $updateExpression = '';
+
+        if ($validated['update_type'] === 'percentage') {
+            if ($validated['update_mode'] === 'increase') {
+                $updateExpression = "price * (1 + (? / 100))";
+            } else { // decrease
+                $updateExpression = "price * (1 - (? / 100))";
+            }
+        } else { // fixed_amount
+            if ($validated['update_mode'] === 'increase') {
+                $updateExpression = "price + ?";
+            } else { // decrease
+                $updateExpression = "price - ?";
+            }
+        }
+
+        try {
+            // Get the services to update
+            $servicesToUpdate = $query->get();
+            $affectedRows = 0;
+
+            foreach ($servicesToUpdate as $service) {
+                $newPrice = $service->price;
+                
+                if ($validated['update_type'] === 'percentage') {
+                    if ($validated['update_mode'] === 'increase') {
+                        $newPrice = $service->price * (1 + ($updateValue / 100));
+                    } else { // decrease
+                        $newPrice = $service->price * (1 - ($updateValue / 100));
+                    }
+                } else { // fixed_amount
+                    if ($validated['update_mode'] === 'increase') {
+                        $newPrice = $service->price + $updateValue;
+                    } else { // decrease
+                        $newPrice = $service->price - $updateValue;
+                    }
+                }
+
+                // Ensure price doesn't go below zero
+                $newPrice = max(0, $newPrice);
+                
+                $service->update(['price' => $newPrice]);
+                $affectedRows++;
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Batch service price update failed: ' . $e->getMessage());
+            return response()->json(['message' => 'An error occurred during the update process.', 'error' => $e->getMessage()], 500);
+        }
+
+        return response()->json(['message' => "Successfully updated the price for {$affectedRows} services."]);
     }
 }

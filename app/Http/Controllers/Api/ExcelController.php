@@ -9,6 +9,7 @@ use App\Models\AuditedPatientRecord;
 use App\Models\AuditedRequestedService;
 use App\Models\Cost;
 use App\Models\RequestedServiceDeposit;
+use App\Models\Service;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -231,10 +232,27 @@ class ExcelController extends Controller
             $writer = new Xlsx($spreadsheet);
             $fileName = 'audited_insurance_claim_V2_' . $company->name . '_' . date('Ymd_His') . '.xlsx';
 
-            return response()->streamDownload(function () use ($writer) {
-                $writer->save('php://output');
+            // Clear any output buffers
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            // Create temporary file
+            $tempFile = tempnam(sys_get_temp_dir(), 'excel_');
+            $writer->save($tempFile);
+
+            // Dispose of the spreadsheet to free memory
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+
+            return response()->streamDownload(function () use ($tempFile) {
+                if (file_exists($tempFile)) {
+                    readfile($tempFile);
+                    unlink($tempFile); // Clean up temp file
+                }
             }, $fileName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
             ]);
 
         } catch (\Exception $e) {
@@ -416,10 +434,267 @@ class ExcelController extends Controller
 
         $writer = new Xlsx($spreadsheet);
         $fileName = 'monthly_service_income_' . $reportPeriod['from'] . '_' . $reportPeriod['to'] . '.xlsx';
-        return response()->streamDownload(function () use ($writer) {
-            $writer->save('php://output');
+        
+        // Clear any output buffers
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        // Create temporary file
+        $tempFile = tempnam(sys_get_temp_dir(), 'excel_');
+        $writer->save($tempFile);
+
+        // Dispose of the spreadsheet to free memory
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        return response()->streamDownload(function () use ($tempFile) {
+            if (file_exists($tempFile)) {
+                readfile($tempFile);
+                unlink($tempFile); // Clean up temp file
+            }
         }, $fileName, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
         ]);
+    }
+    /**
+     * Export the list of services to an Excel file.
+     */
+    public function exportServicesListToExcel(Request $request)
+    {
+        // Add permission check if needed:
+        // if (!Auth::user()->can('export services_list')) { /* ... */ }
+
+        // Reuse filtering logic from ServiceController@index if possible
+        $request->validate([
+            'search' => 'nullable|string|max:255',
+            // Add any other filters your frontend list page uses
+        ]);
+
+        $query = Service::with('serviceGroup:id,name')->orderBy('name');
+
+        if ($request->filled('search')) {
+            $query->where('name', 'LIKE', '%' . $request->search . '%');
+        }
+
+
+        $services = $query->get();
+        
+        if ($services->isEmpty()) {
+            // It's better to return an empty Excel sheet with headers than a 404
+            // return response()->json(['message' => 'No services found to export.'], 404);
+        }
+
+        try {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $isRTL = app()->getLocale() === 'ar'; // Check for RTL
+            $sheet->setRightToLeft($isRTL);
+
+            // --- Header & Title ---
+            $sheet->mergeCells('A1:F1');
+            $sheet->setCellValue('A1', 'قائمة الخدمات الطبية');
+            $sheet->getStyle('A1')->getFont()->setSize(16)->setBold(true);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getRowDimension(1)->setRowHeight(25);
+
+            // --- Column Headers ---
+            $headerStyle = [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F46E5']], // Indigo
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E0E0E0']]],
+            ];
+
+            $headers = [
+                'ID',
+                'اسم الخدمة',
+                'مجموعة الخدمة',
+                'السعر',
+                'الحالة',
+                'متغيرة السعر؟'
+            ];
+            
+            $sheet->fromArray($headers, null, 'A3');
+            $sheet->getStyle('A3:F3')->applyFromArray($headerStyle);
+            $sheet->getRowDimension(3)->setRowHeight(18);
+
+            // Set column widths
+            $sheet->getColumnDimension('A')->setWidth(8);
+            $sheet->getColumnDimension('B')->setWidth(40);
+            $sheet->getColumnDimension('C')->setWidth(25);
+            $sheet->getColumnDimension('D')->setWidth(15);
+            $sheet->getColumnDimension('E')->setWidth(15);
+            $sheet->getColumnDimension('F')->setWidth(18);
+            
+            // --- Data Rows ---
+            $dataRowNumber = 4;
+            foreach ($services as $service) {
+                $sheet->setCellValue('A' . $dataRowNumber, $service->id);
+                $sheet->setCellValue('B' . $dataRowNumber, $service->name);
+                $sheet->setCellValue('C' . $dataRowNumber, $service->serviceGroup?->name ?? 'N/A');
+                $sheet->setCellValue('D' . $dataRowNumber, (float)$service->price);
+                $sheet->setCellValue('E' . $dataRowNumber, $service->activate ? 'نشطة' : 'غير نشطة');
+                $sheet->setCellValue('F' . $dataRowNumber, $service->variable ? 'نعم' : 'لا');
+                $dataRowNumber++;
+            }
+            
+            // Apply styles to data rows
+            $lastDataRow = $dataRowNumber - 1;
+            if ($lastDataRow >= 4) {
+                $sheet->getStyle('D4:D'.$lastDataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+                $sheet->getStyle('A4:F'.$lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('B4:C'.$lastDataRow)->getAlignment()->setHorizontal($isRTL ? Alignment::HORIZONTAL_RIGHT : Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle('A4:F'.$lastDataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('E0E0E0'));
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $fileName = 'Services_List_' . date('Y-m-d') . '.xlsx';
+
+            // Clear any output buffers
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            // Create temporary file
+            $tempFile = tempnam(sys_get_temp_dir(), 'excel_');
+            $writer->save($tempFile);
+
+            // Dispose of the spreadsheet to free memory
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+
+            return response()->streamDownload(function () use ($tempFile) {
+                if (file_exists($tempFile)) {
+                    readfile($tempFile);
+                    unlink($tempFile); // Clean up temp file
+                }
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Services List Excel Export Error: " . $e->getMessage());
+            return response()->json(['message' => 'An error occurred while generating the Excel file.'], 500);
+        }
+    }
+    /**
+     * Export a detailed list of services and their associated cost definitions to Excel.
+     */
+    public function exportServicesWithCostsToExcel(Request $request)
+    {
+        // Add permission check if needed:
+        // if (!Auth::user()->can('export_service_costs_report')) { /* ... */ }
+
+        try {
+            // Fetch only services that HAVE associated costs. Eager load for performance.
+            $servicesWithCosts = Service::whereHas('serviceCosts')
+                ->with(['serviceGroup:id,name', 'serviceCosts.subServiceCost:id,name'])
+                ->orderBy('name')
+                ->get();
+
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $isRTL = app()->getLocale() === 'ar';
+            $sheet->setRightToLeft($isRTL);
+
+            // --- Header & Title ---
+            $sheet->mergeCells('A1:G1');
+            $sheet->setCellValue('A1', 'تقرير تفصيل تكاليف الخدمات المعرفة');
+            $sheet->getStyle('A1')->getFont()->setSize(16)->setBold(true);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getRowDimension(1)->setRowHeight(25);
+
+            // --- Column Headers ---
+            $headerStyle = [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E40AF']], // Darker Blue
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E0E0E0']]],
+            ];
+
+            $headers = [
+                'الخدمة الرئيسية',
+                'المجموعة',
+                'اسم تعريف التكلفة',
+                'نوع التكلفة (المكون)',
+                'أساس الحساب',
+                'النسبة المئوية (%)',
+                'المبلغ الثابت',
+            ];
+            
+            $sheet->fromArray($headers, null, 'A3');
+            $sheet->getStyle('A3:G3')->applyFromArray($headerStyle);
+            $sheet->getRowDimension(3)->setRowHeight(18);
+
+            // Set column widths
+            $sheet->getColumnDimension('A')->setWidth(35);
+            $sheet->getColumnDimension('B')->setWidth(20);
+            $sheet->getColumnDimension('C')->setWidth(30);
+            $sheet->getColumnDimension('D')->setWidth(25);
+            $sheet->getColumnDimension('E')->setWidth(20);
+            $sheet->getColumnDimension('F')->setWidth(18);
+            $sheet->getColumnDimension('G')->setWidth(18);
+            
+            // --- Data Rows ---
+            $dataRowNumber = 4;
+            foreach ($servicesWithCosts as $service) {
+                // For the first cost of a service, we print the service name.
+                // For subsequent costs of the same service, we leave the first columns blank.
+                $isFirstCostForRow = true;
+                foreach ($service->serviceCosts as $cost) {
+                    if ($isFirstCostForRow) {
+                        $sheet->setCellValue('A' . $dataRowNumber, $service->name);
+                        $sheet->setCellValue('B' . $dataRowNumber, $service->serviceGroup?->name ?? 'N/A');
+                    } else {
+                        // Merge cells for subsequent rows of the same service for better readability
+                        // This can get complex, so for now we just leave them blank
+                        $sheet->setCellValue('A' . $dataRowNumber, '');
+                        $sheet->setCellValue('B' . $dataRowNumber, '');
+                    }
+
+                    $sheet->setCellValue('C' . $dataRowNumber, $cost->name);
+                    $sheet->setCellValue('D' . $dataRowNumber, $cost->subServiceCost?->name ?? 'N/A');
+                    $sheet->setCellValue('E' . $dataRowNumber, $cost->cost_type === 'total' ? 'من الإجمالي' : 'بعد المصروفات الأخرى');
+                    $sheet->setCellValue('F' . $dataRowNumber, $cost->percentage ? (float)$cost->percentage : '-');
+                    $sheet->setCellValue('G' . $dataRowNumber, $cost->fixed ? (float)$cost->fixed : '-');
+                    
+                    $dataRowNumber++;
+                    $isFirstCostForRow = false;
+                }
+                 // Add a separator row after each service block
+                if($servicesWithCosts->last()->id !== $service->id){
+                    $sheet->mergeCells('A'.$dataRowNumber.':G'.$dataRowNumber);
+                    $sheet->getStyle('A'.$dataRowNumber)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('E5E7EB');
+                    $dataRowNumber++;
+                }
+            }
+            
+            // Apply styles to data rows
+            $lastDataRow = $dataRowNumber - 1;
+            if ($lastDataRow >= 4) {
+                $sheet->getStyle('F4:G'.$lastDataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+                $sheet->getStyle('A4:G'.$lastDataRow)->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                $sheet->getStyle('A4:D'.$lastDataRow)->getAlignment()->setHorizontal($isRTL ? Alignment::HORIZONTAL_RIGHT : Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle('E4:G'.$lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A4:G'.$lastDataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('E0E0E0'));
+            }
+
+            $writer = new Xlsx($spreadsheet);
+            $fileName = 'Services_With_Cost_Details_' . date('Y-m-d') . '.xlsx';
+
+            return response()->streamDownload(function () use ($writer) {
+                if (ob_get_level() > 0) ob_end_clean();
+                $writer->save('php://output');
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Services With Costs Excel Export Error: " . $e->getMessage());
+            return response()->json(['message' => 'An error occurred while generating the Excel file.'], 500);
+        }
     }
 }
