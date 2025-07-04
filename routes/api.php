@@ -569,4 +569,6 @@ Route::middleware('auth:sanctum')->group(function () {
      // NEW route for the services with cost details export
      Route::get('/reports/services-with-costs/excel', [ExcelController::class, 'exportServicesWithCostsToExcel'])->name('reports.services_with_costs.excel');
      Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices'])->name('services.batchUpdatePrices');
+         // NEW route for the PDF services list export
+    Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf'])->name('reports.services.pdf');
 });

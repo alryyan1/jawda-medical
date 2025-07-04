@@ -4895,7 +4895,83 @@ class ReportController extends Controller
         // We can still use LabTestStatisticResource, but it will only populate these fields.
         return \App\Http\Resources\LabTestStatisticResource::collection($statistics); // Ensure resource is imported
     }
-  
+  /**
+     * Export the list of services to a PDF file.
+     */
+    public function exportServicesListToPdf(Request $request)
+    {
+        // Add permission check
+        // if (!Auth::user()->can('export services_list')) { /* ... */ }
+
+        // Reuse filtering logic
+        $request->validate([
+            'search' => 'nullable|string|max:255',
+        ]);
+
+        $query = Service::with('serviceGroup:id,name')->orderBy('name');
+
+        $filterCriteria = [];
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where('name', 'LIKE', '%' . $searchTerm . '%');
+            $filterCriteria[] = "Search: " . $searchTerm;
+        }
+        if ($request->filled('service_group_id') && $request->service_group_id != 'all') {
+            $groupId = $request->service_group_id;
+            $query->where('service_group_id', $groupId);
+            $group = \App\Models\ServiceGroup::find($groupId);
+            if($group) $filterCriteria[] = "Group: " . $group->name;
+        }
+
+        $services = $query->get();
+        $filterCriteriaString = !empty($filterCriteria) ? implode(' | ', $filterCriteria) : "All Services";
+
+        // --- PDF Generation ---
+        $reportTitle = 'Services List';
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4',  true,
+        'UTF-8',
+        false,
+        false,
+        $filterCriteriaString);
+        $pdf->AddPage();
+        
+        // --- Table Headers ---
+        $headers = ['ID', 'Service Name', 'Service Group', 'Price', 'Status', 'Variable Price?'];
+        // A4 Portrait width ~190mm usable
+        $colWidths = [15, 70, 35, 25, 20, 25];
+        $colWidths[count($colWidths)-1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
+        $alignments = ['C', 'L', 'L', 'R', 'C', 'C'];
+        
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+        
+        // --- Table Body ---
+        $fill = false;
+        if($services->isEmpty()){
+            $pdf->Cell(array_sum($colWidths), 10, 'No services found matching the criteria.', 1, 1, 'C');
+        } else {
+            foreach ($services as $service) {
+                $rowData = [
+                    $service->id,
+                    $service->name,
+                    $service->serviceGroup?->name ?? 'N/A',
+                    number_format((float)$service->price, 2),
+                    $service->activate ? 'Active' : 'Inactive',
+                    $service->variable ? 'Yes' : 'No'
+                ];
+                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 6); // Base height 6
+                $fill = !$fill;
+            }
+        }
+        // Draw final line under the table
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+        
+        $pdfFileName = 'Services_List_' . date('Y-m-d') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
+
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
     // Ensure MyCustomTCPDF has drawTextWatermark and drawReportSignatures methods, or define them here
     // ... other helper methods like drawReportSignatures ...
 }
