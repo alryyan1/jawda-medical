@@ -15,123 +15,202 @@ class DoctorVisitResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $totalDiscount = 0;
-        // Calculate discount from services
-        foreach ($this->whenLoaded('requestedServices') as $rs) {
-            $itemPrice = (float) $rs->price;
-            $itemCount = (int) ($rs->count ?? 1);
-            $itemSubTotal = $itemPrice * $itemCount;
-            $discountFromPercentage = ($itemSubTotal * (intval($rs->discount_per) ?? 0)) / 100;
-            $fixedDiscount = intval($rs->discount) ?? 0; // Assuming 'discount' is fixed amount
-            $totalDiscount += ($discountFromPercentage + $fixedDiscount);
-        }
-        // Calculate discount from lab requests (if applicable and tracked similarly)
-        foreach ($this->whenLoaded('patientLabRequests') as $lr) {
-            $labPrice = (float) $lr->price;
-            $labCount = (int) ($lr->count ?? 1); // Assuming lab requests can also have a count
-            $labItemSubTotal = $labPrice * $labCount;
-            $labDiscountFromPercentage = ($labItemSubTotal * (intval($lr->discount_per) ?? 0)) / 100;
-            // If lab requests have a fixed discount field, add it here.
-            // $labFixedDiscount = intval($lr->fixed_discount_field_name ?? 0);
-            // $totalDiscount += ($labDiscountFromPercentage + $labFixedDiscount);
-            $totalDiscount += $labDiscountFromPercentage;
-        }
-
-
-        // Calculate total amount and paid for the summary needed by PatientVisitSummary type
-        $totalAmount = 0;
-        $totalPaid = 0;
-        $balanceDue = 0;
-
-        foreach ($this->whenLoaded('requestedServices') as $rs) {
-            $price = (float)($rs->price ?? 0);
-            $count = (int)($rs->count ?? 1);
-            $itemSubTotal = $price * $count;
-            $discountPercent = (float)($rs->discount_per ?? 0);
-            $discountFixed = (float)($rs->discount ?? 0);
-            $itemDiscount = ($itemSubTotal * $discountPercent / 100) + $discountFixed;
-            $itemEndurance = (float)($rs->endurance ?? 0) * $count; // endurance per item * count
-            $isCompanyPatientForService = !!$this->patient?->company_id;
-
-            $netPayableForItem = $itemSubTotal - $itemDiscount - ($isCompanyPatientForService ? $itemEndurance : 0);
-            $totalAmount += $netPayableForItem; // This is net payable by patient/company combined for this service
-            $totalPaid += (float)($rs->amount_paid ?? 0);
-        }
-
-        foreach ($this->whenLoaded('patientLabRequests') as $lr) {
-            $price = (float)($lr->price ?? 0);
-            $count = (int)($lr->count ?? 1);
-            $itemSubTotal = $price * $count;
-            $discountPercent = (float)($lr->discount_per ?? 0);
-            $itemDiscount = ($itemSubTotal * $discountPercent / 100);
-            $itemEndurance = (float)($lr->endurance ?? 0) * $count;
-            $isCompanyPatientForLab = !!$this->patient?->company_id;
-            
-            $netPayableForItem = $itemSubTotal - $itemDiscount - ($isCompanyPatientForLab ? $itemEndurance : 0);
-            $totalAmount += $netPayableForItem;
-            $totalPaid += (float)($lr->amount_paid ?? 0);
-        }
-        $balanceDue = $totalAmount - $totalPaid;
-
+        // Calculate financial totals once
+        $financialSummary = $this->calculateFinancialSummary();
+        
+        // Cache company status to avoid multiple checks
+        $isCompanyPatient = !empty($this->patient?->company_id);
 
         return [
             'id' => $this->id,
-            'created_at' => $this->created_at->format('Y-m-d'),
-            'visit_time' => $this->visit_time, // Keep as string HH:mm:ss or HH:mm
-            'visit_time_formatted' => $this->visit_time ? Carbon::parse($this->visit_time)->format('h:i A') : null, // Formatted time
+            'created_at' => $this->created_at?->format('Y-m-d'),
+            'visit_time' => $this->visit_time,
+            'visit_time_formatted' => $this->formatVisitTime(),
             'status' => $this->status,
             'visit_type' => $this->visit_type,
             'company' => $this->patient?->company,
             'queue_number' => $this->queue_number,
-            'number' => $this->number, // If this is also queue number or visit specific number
+            'number' => $this->number,
             'reason_for_visit' => $this->reason_for_visit,
             'visit_notes' => $this->visit_notes,
             'is_new' => (bool) $this->is_new,
             'only_lab' => (bool) $this->only_lab,
             'requested_services_count' => $this->requested_services_count,
-            'patient_id' => $this->patient_id,
-            'patient' => new PatientStrippedResource($this->whenLoaded('patient')), // Assuming PatientStrippedResource
             
+            // Patient information
+            'patient_id' => $this->patient_id,
+            'patient' => new PatientResource($this->whenLoaded('patient')),
+            
+            // Doctor information
             'doctor_id' => $this->doctor_id,
-            'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor')), // NEW
-            'doctor_name' => $this->whenLoaded('doctor', $this->doctor?->name), // Direct doctor name
+            'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor')),
+            'doctor_name' => $this->whenLoaded('doctor', $this->doctor?->name),
 
+            // User information
             'user_id' => $this->user_id,
             'created_by_user' => new UserStrippedResource($this->whenLoaded('createdByUser')),
             
+            // Shift information
             'shift_id' => $this->shift_id,
             'general_shift_details' => new ShiftResource($this->whenLoaded('generalShift')),
-            
             'doctor_shift_id' => $this->doctor_shift_id,
-            'doctor_shift_details' => new DoctorShiftResource($this->whenLoaded('doctorShift')), // Assuming DoctorShiftResource
+            'doctor_shift_details' => new DoctorShiftResource($this->whenLoaded('doctorShift')),
 
-            // For PatientVisitSummary type compatibility on frontend
-            'total_amount' => round($totalAmount, 2),
-            'total_paid' => round($totalPaid, 2),
-            'total_discount' => round($totalDiscount, 2), // NEW
-            'balance_due' => round($balanceDue, 2),
+            // Financial summary
+            'total_amount' => $financialSummary['total_amount'],
+            'total_paid' => $financialSummary['total_paid'],
+            'total_discount' => $financialSummary['total_discount'],
+            'balance_due' => $financialSummary['balance_due'],
 
+            // Related resources
             'requested_services' => RequestedServiceResource::collection($this->whenLoaded('requestedServices')),
             'lab_requests' => LabRequestResource::collection($this->whenLoaded('patientLabRequests')),
-            // For the services summary dialog
-            'requested_services_summary' => $this->whenLoaded('requestedServices', function() {
-                return $this->requestedServices->map(function ($rs) {
-                    return [
-                        'id' => $rs->id,
-                        'service_name' => $rs->service?->name,
-                        'price' => (float) $rs->price,
-                        'count' => (int) $rs->count,
-                        'amount_paid' => (float) $rs->amount_paid,
-                        'is_paid' => (bool) $rs->is_paid,
-                        'done' => (bool) $rs->done,
-                    ];
-                });
-            }),
+            'requested_services_summary' => $this->getRequestedServicesSummary(),
             
+            // Timestamps
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-       
-            
         ];
+    }
+
+    /**
+     * Calculate financial summary for the visit
+     *
+     * @return array
+     */
+    private function calculateFinancialSummary(): array
+    {
+        $totalAmount = 0;
+        $totalPaid = 0;
+        $totalDiscount = 0;
+        $isCompanyPatient = !empty($this->patient?->company_id);
+
+        // Calculate from requested services
+        if ($this->relationLoaded('requestedServices')) {
+            foreach ($this->requestedServices as $service) {
+                $serviceCalculation = $this->calculateServiceFinancials($service, $isCompanyPatient);
+                $totalAmount += $serviceCalculation['net_payable'];
+                $totalPaid += $serviceCalculation['amount_paid'];
+                $totalDiscount += $serviceCalculation['discount'];
+            }
+        }
+
+        // Calculate from lab requests
+        if ($this->relationLoaded('patientLabRequests')) {
+            foreach ($this->patientLabRequests as $labRequest) {
+                $labCalculation = $this->calculateLabRequestFinancials($labRequest, $isCompanyPatient);
+                $totalAmount += $labCalculation['net_payable'];
+                $totalPaid += $labCalculation['amount_paid'];
+                $totalDiscount += $labCalculation['discount'];
+            }
+        }
+
+        return [
+            'total_amount' => round($totalAmount, 2),
+            'total_paid' => round($totalPaid, 2),
+            'total_discount' => round($totalDiscount, 2),
+            'balance_due' => round($totalAmount - $totalPaid, 2),
+        ];
+    }
+
+    /**
+     * Calculate financial details for a service
+     *
+     * @param object $service
+     * @param bool $isCompanyPatient
+     * @return array
+     */
+    private function calculateServiceFinancials($service, bool $isCompanyPatient): array
+    {
+        $price = (float) ($service->price ?? 0);
+        $count = (int) ($service->count ?? 1);
+        $subtotal = $price * $count;
+        
+        // Calculate discounts
+        $discountPercent = (float) ($service->discount_per ?? 0);
+        $discountFixed = (float) ($service->discount ?? 0);
+        $totalDiscount = ($subtotal * $discountPercent / 100) + $discountFixed;
+        
+        // Calculate endurance (company coverage)
+        $endurance = $isCompanyPatient ? (float) ($service->endurance ?? 0) * $count : 0;
+        
+        $netPayable = $subtotal - $totalDiscount - $endurance;
+        $amountPaid = (float) ($service->amount_paid ?? 0);
+
+        return [
+            'net_payable' => $netPayable,
+            'amount_paid' => $amountPaid,
+            'discount' => $totalDiscount,
+        ];
+    }
+
+    /**
+     * Calculate financial details for a lab request
+     *
+     * @param object $labRequest
+     * @param bool $isCompanyPatient
+     * @return array
+     */
+    private function calculateLabRequestFinancials($labRequest, bool $isCompanyPatient): array
+    {
+        $price = (float) ($labRequest->price ?? 0);
+        $count = (int) ($labRequest->count ?? 1);
+        $subtotal = $price * $count;
+        
+        // Calculate discount (only percentage for lab requests)
+        $discountPercent = (float) ($labRequest->discount_per ?? 0);
+        $totalDiscount = $subtotal * $discountPercent / 100;
+        
+        // Calculate endurance (company coverage)
+        $endurance = $isCompanyPatient ? (float) ($labRequest->endurance ?? 0) * $count : 0;
+        
+        $netPayable = $subtotal - $totalDiscount - $endurance;
+        $amountPaid = (float) ($labRequest->amount_paid ?? 0);
+
+        return [
+            'net_payable' => $netPayable,
+            'amount_paid' => $amountPaid,
+            'discount' => $totalDiscount,
+        ];
+    }
+
+    /**
+     * Format visit time for display
+     *
+     * @return string|null
+     */
+    private function formatVisitTime(): ?string
+    {
+        if (!$this->visit_time) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($this->visit_time)->format('h:i A');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get requested services summary
+     *
+     * @return \Illuminate\Support\Collection|null
+     */
+    private function getRequestedServicesSummary()
+    {
+        return $this->whenLoaded('requestedServices', function() {
+            return $this->requestedServices->map(function ($service) {
+                return [
+                    'id' => $service->id,
+                    'service_name' => $service->service?->name,
+                    'price' => (float) ($service->price ?? 0),
+                    'count' => (int) ($service->count ?? 1),
+                    'amount_paid' => (float) ($service->amount_paid ?? 0),
+                    'is_paid' => (bool) ($service->is_paid ?? false),
+                    'done' => (bool) ($service->done ?? false),
+                ];
+            });
+        });
     }
 }

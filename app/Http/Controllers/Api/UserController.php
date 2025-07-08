@@ -8,6 +8,7 @@ use App\Http\Resources\ShiftDefinitionResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Resources\UserResource;
+use App\Models\LabRequest;
 use App\Models\RequestedServiceDeposit;
 use App\Models\Shift;
 use Illuminate\Support\Facades\Auth;
@@ -296,5 +297,36 @@ class UserController extends Controller
     {
         // if (!Auth::user()->can('view_user_attendance_settings', $user)) { /* ... */ }
         return ShiftDefinitionResource::collection($user->defaultShifts);
+    }
+    /**
+     * Get a summary of lab payments processed by the current user in a specific shift.
+     */
+    public function getCurrentUserLabIncomeSummary(Request $request)
+    {
+        $request->validate([
+            'shift_id' => 'required|integer|exists:shifts,id',
+        ]);
+
+        $user = Auth::user();
+        $shiftId = $request->input('shift_id');
+
+        // Sum up payments from LabRequest records where this user was the depositor in this shift
+        $query = LabRequest::where('user_deposited', $user->id)
+                           ->where('payment_shift_id', $shiftId);
+
+        $totalIncome = (float) (clone $query)->sum('amount_paid');
+        $totalBank = (float) (clone $query)->where('is_bankak', true)->sum('amount_paid');
+        $totalCash = $totalIncome - $totalBank;
+
+        return response()->json([
+            'data' => [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'shift_id' => (int) $shiftId,
+                'total_lab_income' => $totalIncome,
+                'total_cash' => $totalCash,
+                'total_bank' => $totalBank,
+            ]
+        ]);
     }
 }

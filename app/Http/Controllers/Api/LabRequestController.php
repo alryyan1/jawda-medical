@@ -295,7 +295,10 @@ class LabRequestController extends Controller
         if ($request->filled('shift_id')) {
             $query->where('doctorvisits.shift_id', $request->shift_id);
         } 
-  
+  // NEW Filter for referring doctor
+  if ($request->filled('referring_doctor_id')) {
+    $query->where('doctorvisits.doctor_id', $request->referring_doctor_id);
+}
     // --- APPLY FILTERS ON RELATED TABLES ---
     if ($request->filled('company_id')) {
         $query->where('patients.company_id', $request->company_id);
@@ -408,8 +411,7 @@ class LabRequestController extends Controller
                     break;
 
                 $price = (float) $labrequest->price;
-                $count = (int) ($labrequest->count ?? 1);
-                $itemSubTotal = $price * $count;
+                $itemSubTotal = $price; // Each lab request represents one test
                 $discountAmount = ($itemSubTotal * ((int) ($labrequest->discount_per ?? 0) / 100));
                 $enduranceAmount = (float) ($labrequest->endurance ?? 0);
                 $netPayableByPatient = $itemSubTotal - $discountAmount - ($visit->patient->company_id ? $enduranceAmount : 0);
@@ -444,7 +446,6 @@ class LabRequestController extends Controller
                 $remainingPaymentToDistribute -= $paymentForThisItem;
             }
             DB::commit();
-            broadcast(new LabPaymentUpdated($visit))->toOthers(); // `toOthers()` prevents broadcasting to the user who triggered the event
 
             // It's better to return the updated visit with all its lab requests
             // so the frontend can update everything at once.
@@ -781,20 +782,19 @@ class LabRequestController extends Controller
         // Permission Check: e.g., can('print lab_receipt', $visit)
         // if (!Auth::user()->can('print lab_receipt', $visit)) { /* ... */ }
 
-        $visit->load([
-            'patient:id,name,phone,company_id',
-            'patient.company:id,name',
-            'labRequests' => function ($query) {
-                $query->where('is_paid', true) // Typically only paid items on receipt
-                    ->orWhere('amount_paid', '>', 0); // Or partially paid
-            },
-            'labRequests.mainTest:id,main_test_name',
-            'labRequests.depositUser:id,name', // User who handled deposit if tracked per request
-            'user:id,name', // User who created the visit (receptionist)
-            'doctor:id,name', // Doctor of the visit
-        ]);
+        // $visit->load([
+        //     'patient:id,name,phone,company_id',
+        //     'patient.company:id,name',
+        //     'patientLabRequests' => function ($query) {
+        //         $query->where('is_paid', true) // Typically only paid items on receipt
+        //             ->orWhere('amount_paid', '>', 0); // Or partially paid
+        //     },
+        //     'patientLabRequests.mainTest:id,main_test_name',
+        //     'patientLabRequests.depositUser:id,name', // User who handled deposit if tracked per request
+        //     'user:id,name', // User who created the visit (receptionist)
+        // ]);
 
-        $labRequestsToPrint = $visit->labRequests;
+        $labRequestsToPrint = $visit->patientLabRequests;
 
         if ($labRequestsToPrint->isEmpty()) {
             return response()->json(['message' => 'لا توجد طلبات مختبر مدفوعة لهذه الزيارة لإنشاء إيصال.'], 404);
@@ -806,7 +806,7 @@ class LabRequestController extends Controller
 
 
         // --- PDF Instantiation with Thermal Defaults ---
-        $pdf = new MyCustomTCPDF('إيصال مختبر', "زيارة رقم: {$visit->id}");
+        $pdf = new MyCustomTCPDF('إيصال مختبر', $visit);
         $thermalWidth = (float) ($appSettings?->thermal_printer_width ?? 76); // Get from settings
         $pdf->setThermalDefaults($thermalWidth); // Set narrow width, small margins, basic font
         $pdf->AddPage();
@@ -1079,7 +1079,6 @@ class LabRequestController extends Controller
             'discount_per' => 'sometimes|integer|min:0|max:100',
             'endurance' => 'sometimes|numeric|min:0',
             'is_bankak' => 'sometimes|boolean', // If payment method choice is saved before actual payment
-            'count' => 'sometimes|integer|min:1', // If count is editable for a lab request
         ]);
 
         // Prevent updating financial fields if already paid or processed, unless specific permission
@@ -1099,6 +1098,103 @@ class LabRequestController extends Controller
         // ... (logic for cancellation/deletion with checks) ...
         $labrequest->delete();
         return response()->json(null, 204);
+    }
+
+    /**
+     * Update discount for a lab request.
+     */
+    public function updateDiscount(Request $request, LabRequest $labrequest)
+    {
+        $validated = $request->validate([
+            'discount_per' => 'required|integer|min:0|max:100',
+        ]);
+
+        $labrequest->update([
+            'discount_per' => $validated['discount_per']
+        ]);
+
+        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
+    }
+
+    /**
+     * Pay all lab requests for a visit.
+     */
+    public function payAllLabRequests(Request $request, DoctorVisit $visit)
+    {
+        // Get all unpaid lab requests for this visit
+        $unpaidRequests = $visit->patientLabRequests()
+            ->where('is_paid', false)
+            ->get();
+
+        if ($unpaidRequests->isEmpty()) {
+            return response()->json(['message' => 'جميع طلبات المختبر لهذه الزيارة مدفوعة بالفعل.'], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            foreach ($unpaidRequests as $labrequest) {
+                // Calculate net payable for this item
+                $price = (float) $labrequest->price;
+                $itemSubTotal = $price; // Each lab request represents one test
+                $discountAmount = ($itemSubTotal * ((int) ($labrequest->discount_per ?? 0) / 100));
+                $enduranceAmount = (float) ($labrequest->endurance ?? 0);
+
+                $netPayableByPatient = $itemSubTotal - $discountAmount - $enduranceAmount;
+
+                // Mark as fully paid
+                $labrequest->amount_paid = $netPayableByPatient;
+                $labrequest->is_paid = true;
+                $labrequest->is_bankak = false; // Default to cash payment
+                $labrequest->user_deposited = Auth::id();
+                $labrequest->save();
+            }
+
+            DB::commit();
+
+            return new DoctorVisitResource($visit->fresh()->load([
+                'patientLabRequests.mainTest',
+                'patientLabRequests.requestingUser:id,name',
+                'patientLabRequests.depositUser:id,name'
+            ]));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Pay all lab requests failed for Visit ID {$visit->id}: " . $e->getMessage());
+            return response()->json(['message' => 'فشل دفع جميع طلبات المختبر.', 'error' => 'خطأ داخلي.'], 500);
+        }
+    }
+
+    /**
+     * Cancel payment for a lab request.
+     */
+    public function cancelPayment(Request $request, LabRequest $labrequest)
+    {
+        if (!$labrequest->is_paid) {
+            return response()->json(['message' => 'هذا الطلب غير مدفوع.'], 400);
+        }
+
+        $labrequest->is_paid = false;
+        $labrequest->amount_paid = 0;
+        $labrequest->user_deposited = null;
+        $labrequest->save();
+
+        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser']));
+    }
+
+    /**
+     * Toggle is_bankak field for a lab request.
+     */
+    public function toggleBankak(Request $request, LabRequest $labrequest)
+    {
+        $validated = $request->validate([
+            'is_bankak' => 'required|boolean',
+        ]);
+
+        $labrequest->update([
+            'is_bankak' => $validated['is_bankak']
+        ]);
+
+        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
     }
 
     public function unpay(LabRequest $labrequest)
@@ -1134,8 +1230,7 @@ class LabRequestController extends Controller
         try {
             // Calculate net payable for this item to confirm the amount being settled
             $price = (float) $labrequest->price;
-            $count = (int) ($labrequest->count ?? 1);
-            $itemSubTotal = $price * $count;
+            $itemSubTotal = $price; // Each lab request represents one test
             $discountAmount = ($itemSubTotal * ((int) ($labrequest->discount_per ?? 0) / 100));
             // Add fixed discount if applicable: + (float)($labrequest->fixed_discount_amount ?? 0);
             $enduranceAmount = (float) ($labrequest->endurance ?? 0);
@@ -1174,14 +1269,13 @@ class LabRequestController extends Controller
             // NO RequestedServiceDeposit::create(...) here for labrequest payments
 
             DB::commit();
-            broadcast(new LabPaymentUpdated($labrequest->doctorvisit))->toOthers();
 
             return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser']));
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Lab request payment failed for ID {$labrequest->id}: " . $e->getMessage());
-            return response()->json(['message' => 'فشل تسجيل الدفعة.', 'error' => 'خطأ داخلي.'], 500);
+            return response()->json(['message' => 'فشل تسجيل الدفعة.', 'error' => 'خطأ داخلي.', 'error_message' => $e->getMessage()], 500);
         }
     }
 

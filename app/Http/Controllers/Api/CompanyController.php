@@ -15,11 +15,11 @@ class CompanyController extends Controller
 {
     public function __construct()
     {
-        $this->middleware('can:list companies')->only('index');
-        $this->middleware('can:view companies')->only('show'); // Assuming 'view companies' implies 'show'
-        $this->middleware('can:create companies')->only('store');
-        $this->middleware('can:edit companies')->only('update');
-        $this->middleware('can:delete companies')->only('destroy');
+        // $this->middleware('can:list companies')->only('index');
+        // $this->middleware('can:view companies')->only('show'); // Assuming 'view companies' implies 'show'
+        // $this->middleware('can:create companies')->only('store');
+        // $this->middleware('can:edit companies')->only('update');
+        // $this->middleware('can:delete companies')->only('destroy');
     }
 
     /**

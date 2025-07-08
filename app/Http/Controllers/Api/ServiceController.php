@@ -149,7 +149,7 @@ class ServiceController extends Controller
                     }
                 }
 
-                // Ensure price doesn't go below zero
+            // Ensure price doesn't go below zero
                 $newPrice = max(0, $newPrice);
                 
                 $service->update(['price' => $newPrice]);

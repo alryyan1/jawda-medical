@@ -270,7 +270,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::delete('/visits/{visit}/lab-requests/clear-pending', [LabRequestController::class, 'clearPendingRequests'])->middleware('auth:sanctum');
   Route::post('/labrequests/{labrequest}/unpay', [LabRequestController::class, 'unpay'])->middleware('auth:sanctum');
   Route::post('/costs', [CostController::class, 'store']); // For the dialog
-  // The route api/visits/48/lab-requests/batch-pay could not be foun
+  // The route api/visits/48/lab-requests/batch-pay could not be found
   Route::post('/visits/{visit}/lab-requests/batch-pay', [LabRequestController::class, 'batchPayLabRequests'])->middleware('auth:sanctum');
   // Route::apiResource('costs', CostController::class); // For full CRUD page later
   // The `except(['index', 'store'])` means GET /labrequests/{labrequest} (for show) SHOULD be defined by apiResource.
@@ -299,7 +299,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // The route api/reports/clinic-shift-summary/pdf could not be found.
   Route::get('/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
   // ...
-  Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
+  Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf'])->name('reports.lab.thermalReceipt');
   Route::get('/reports/costs/pdf', [ReportController::class, 'generateCostsReportPdf']);
     // Route for fetching costs for the list page (if not using a full apiResource for costs)
     Route::get('/costs-report-data', [CostController::class, 'index']); // Using CostController@index for data
@@ -551,7 +551,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Device Specific Normal Ranges for Child Tests
     Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
     Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
-    Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [ReportController::class, 'generateLabThermalReceiptPdf'])->name('reports.lab.thermalReceipt');
+    Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf'])->name('reports.lab.thermalReceipt');
     Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf'])->name('reports.lab.sampleLabels');
     Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result'])->name('reports.lab.fullReport'); // For "View Report Preview"
     Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns
@@ -562,7 +562,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit'])->name('markAllCollected');
       Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest'])->name('generateSampleId');
   });
-
+  Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt'])->name('reports.lab.thermalReceipt');
    Route::get('specialists-list', [SpecialistController::class, 'indexList']);
     Route::apiResource('specialists', SpecialistController::class);
     Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel'])->name('reports.services.excel');
@@ -571,4 +571,12 @@ Route::middleware('auth:sanctum')->group(function () {
      Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices'])->name('services.batchUpdatePrices');
          // NEW route for the PDF services list export
     Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf'])->name('reports.services.pdf');
+    Route::get('/user/current-shift-lab-income-summary', [UserController::class, 'getCurrentUserLabIncomeSummary']);
+
 });
+
+// Add missing routes for LabRequestsColumn functionality
+Route::patch('/labrequests/{labrequest}/discount', [LabRequestController::class, 'updateDiscount'])->middleware('auth:sanctum');
+Route::post('/doctor-visits/{visit}/pay-all-lab-requests', [LabRequestController::class, 'payAllLabRequests'])->middleware('auth:sanctum');
+Route::post('/lab-requests/{labrequest}/cancel-payment', [LabRequestController::class, 'cancelPayment'])->middleware('auth:sanctum');
+Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::class, 'toggleBankak'])->middleware('auth:sanctum');
