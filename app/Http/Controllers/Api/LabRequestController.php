@@ -452,7 +452,8 @@ class LabRequestController extends Controller
             return new DoctorVisitResource($visit->fresh()->load([
                 'patientLabRequests.mainTest',
                 'patientLabRequests.requestingUser:id,name',
-                'patientLabRequests.depositUser:id,name'
+                'patientLabRequests.depositUser:id,name',
+                'patient.doctor'
             ]));
 
         } catch (\Exception $e) {
@@ -1129,7 +1130,19 @@ class LabRequestController extends Controller
     public function destroy(LabRequest $labrequest)
     {
         // ... (logic for cancellation/deletion with checks) ...
-        $labrequest->delete();
+        //start transaction
+        DB::beginTransaction(); 
+        try {
+            $deleted = $labrequest->delete();
+            if ($deleted) {
+                $labrequest->results()->delete();
+            }
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to delete lab request: " . $e->getMessage());
+            return response()->json(['message' => 'فشل حذف الطلب.' . $e->getMessage()], 500);
+        }
         return response()->json(null, 204);
     }
 

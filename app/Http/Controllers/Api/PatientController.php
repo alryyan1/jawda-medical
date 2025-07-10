@@ -291,7 +291,7 @@ class PatientController extends Controller
             ]);
             DB::commit();
 
-            return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'doctor', 'file']));
+            return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor', 'file']));
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to store visit from history for original patient {$doctorVisit->patient->id}: " . $e->getMessage(), ['exception' => $e]);
@@ -537,6 +537,7 @@ class PatientController extends Controller
         // Add permission check, e.g., can('create lab_visit')
         $validated = $request->validate([
             'doctor_id' => 'required|integer|exists:doctors,id', // Referring doctor
+            'company_id' => 'nullable|integer|exists:companies,id', // Company for insurance patients
             'reason_for_visit' => 'nullable|string|max:1000',
         ]);
 
@@ -567,7 +568,7 @@ class PatientController extends Controller
                 'age_month' => $patient->age_month,
                 'age_day' => $patient->age_day,
                 'address' => $patient->address,
-                'company_id' => $patient->company_id,
+                'company_id' => $validated['company_id'] ?? $patient->company_id, // Use new company_id if provided, otherwise keep original
                 'subcompany_id' => $patient->subcompany_id,
                 'company_relation_id' => $patient->company_relation_id,
                 'guarantor' => $patient->guarantor,

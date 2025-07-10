@@ -45,9 +45,9 @@ class DoctorVisitResource extends JsonResource
             }),
             
             // Doctor information
-            'doctor_id' => $this->doctor_id,
-            'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor')),
-            'doctor_name' => $this->whenLoaded('doctor', $this->doctor?->name),
+            'doctor_id' => $this->patient?->doctor_id,
+            'doctor' => new DoctorStrippedResource($this->whenLoaded('patient') ? $this->patient->doctor : null),
+            'doctor_name' => $this->whenLoaded('patient', $this->patient?->doctor?->name),
              
             // User information
             'user_id' => $this->user_id,

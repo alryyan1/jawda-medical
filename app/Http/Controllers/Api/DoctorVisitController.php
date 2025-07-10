@@ -169,7 +169,7 @@ class DoctorVisitController extends Controller
             'only_lab' => $validatedData['only_lab'] ?? false,
         ]);
 
-        return new DoctorVisitResource($visit->load(['patient.subcompany', 'doctor', 'createdByUser']));
+        return new DoctorVisitResource($visit->load(['patient.subcompany', 'patient.doctor']));
     }
 
     /**
@@ -179,9 +179,9 @@ class DoctorVisitController extends Controller
     {
         // Load all relevant data for displaying a single visit's details
         // $doctorVisit->load(['patient', 'doctor', 'createdByUser', 'generalShift', 'doctorShift', 'requestedServices.service.serviceGroup', 'doctorShift.doctor', 'patientLabRequests']);
-        $doctorVisit->load(['patient.subcompany', 'doctor','patientLabRequests'
+        $doctorVisit->load(['patient.subcompany', 'patient.doctor','patientLabRequests'
         , 'patientLabRequests','doctor','patientLabRequests.mainTest','createdByUser']);
-        return new DoctorVisitResource($doctorVisit);
+        return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor']));
     }
 
     /**
@@ -201,7 +201,7 @@ class DoctorVisitController extends Controller
         ]);
 
         $doctorVisit->update($validatedData);
-        return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'doctor']));
+        return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor']));
     }
 
     /**
@@ -219,7 +219,7 @@ class DoctorVisitController extends Controller
         // TODO: Trigger events if needed (e.g., VisitStatusUpdated for WebSockets)
         // event(new VisitStatusUpdated($doctorVisit));
 
-        return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'doctor']));
+        return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor']));
     }
 
 
@@ -316,7 +316,7 @@ class DoctorVisitController extends Controller
             // Trigger event if needed, e.g., VisitReassigned
             // event(new VisitReassigned($doctorVisit, $originalDoctorShiftId));
 
-            return new DoctorVisitResource($doctorVisit->fresh()->load(['patient.subcompany', 'doctor', 'doctorShift.doctor']));
+            return new DoctorVisitResource($doctorVisit->fresh()->load(['patient.subcompany', 'patient.doctor', 'doctorShift.doctor']));
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -424,7 +424,7 @@ class DoctorVisitController extends Controller
             DB::commit();
             
             // Return the new DoctorVisit, eager loading what the frontend might need
-            return new DoctorVisitResource($newDoctorVisit->load(['patient.subcompany', 'doctor', 'file']));
+            return new DoctorVisitResource($newDoctorVisit->load(['patient.subcompany', 'patient.doctor', 'file']));
 
         } catch (\Exception $e) {
             DB::rollBack();

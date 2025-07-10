@@ -61,7 +61,7 @@ class CompanyController extends Controller
         $validatedData = $request->validate([
             'name' => 'required|string|max:255|unique:companies,name',
             'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255|unique:companies,email',
+            'email' => 'nullable|max:255',
             'status' => 'required|boolean',
             'lab_endurance' => 'required|numeric|min:0|max:100', // Assuming percentage
             'service_endurance' => 'required|numeric|min:0|max:100', // Assuming percentage
@@ -118,7 +118,7 @@ class CompanyController extends Controller
         $validatedData = $request->validate([
             'name' => ['sometimes','required','string','max:255', Rule::unique('companies')->ignore($company->id)],
             'phone' => 'nullable|string|max:20',
-            'email' => ['nullable','email','max:255', Rule::unique('companies')->ignore($company->id)],
+            'email' => ['nullable','max:255'],
             'status' => 'sometimes|required|boolean',
             'lab_endurance' => 'sometimes|required|numeric|min:0|max:100',
             'service_endurance' => 'sometimes|required|numeric|min:0|max:100',

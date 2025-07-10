@@ -72,7 +72,9 @@ return [
 
     //AFRICA/KHARTOUM
     // 'timezone' => env('APP_TIMEZONE', 'Africa/Khartoum'),
-    'timezone' => 'Africa/Khartoum',
+    // 'timezone' => 'Africa/Khartoum',
+    'timezone' => 'Asia/Muscat',
+
 
     /*
     |--------------------------------------------------------------------------

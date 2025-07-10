@@ -40,6 +40,7 @@ class CostController extends Controller
             'comment' => 'nullable|string|max:255',
             'amount_cash_input' => 'required_without:amount_bank|nullable|numeric|min:0', // Amount from cash
             'amount_bank_input' => 'required_without:amount_cash|nullable|numeric|min:0', // Amount from bank
+            'doctor_shift_id_for_sub_cost' => 'nullable|integer|exists:doctor_shifts,id',
         ]);
     
         // Ensure at least one amount is provided and not both zero if one is required
@@ -56,6 +57,7 @@ class CostController extends Controller
             'comment' => $validated['comment'] ?? null,
             'amount' => $validated['amount_cash_input'] ?? 0,       // Store cash portion
             'amount_bankak' => $validated['amount_bank_input'] ?? 0, // Store bank portion
+            'doctor_shift_id_for_sub_cost' => $validated['doctor_shift_id_for_sub_cost'] ?? null,
         ]);
         return new CostResource($cost->load(['costCategory', 'userCost:id,name']));
     }
