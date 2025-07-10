@@ -236,7 +236,7 @@ class PatientController extends Controller
         // AND if the existingPatient's latest visit also doesn't provide a file_id, create a new file.
         // This logic assumes you want to reuse file_id if available from history.
         if (!$fileToUseId) {
-            $latestVisitOfExistingPatient = $doctorVisit->patient->doctorVisit()->latest('visit_date')->first();
+            $latestVisitOfExistingPatient = $doctorVisit->patient->doctorVisit()->latest('created_at')->first();
             $fileToUseId = $latestVisitOfExistingPatient?->file_id;
         }
 
@@ -291,7 +291,7 @@ class PatientController extends Controller
             ]);
             DB::commit();
 
-            return new DoctorVisitResource($doctorVisit->load(['patient', 'doctor', 'file']));
+            return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'doctor', 'file']));
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to store visit from history for original patient {$doctorVisit->patient->id}: " . $e->getMessage(), ['exception' => $e]);
@@ -531,8 +531,9 @@ class PatientController extends Controller
      /**
      * Create a new lab-only visit for an existing patient.
      */
-    public function createLabVisitForExistingPatient(Request $request, Patient $patient)
+    public function createLabVisitForExistingPatient(Request $request, DoctorVisit $doctorVisit)
     {
+        $patient = $doctorVisit->patient;
         // Add permission check, e.g., can('create lab_visit')
         $validated = $request->validate([
             'doctor_id' => 'required|integer|exists:doctors,id', // Referring doctor
@@ -543,12 +544,10 @@ class PatientController extends Controller
         if (!$currentGeneralShift) {
             return response()->json(['message' => 'No open clinic shift is available to create a visit.'], 400);
         }
-
         DB::beginTransaction();
         try {
-            // Re-use file_id from the patient's most recent visit to keep records linked
-            $latestVisit = $patient->doctorVisits()->latest('visit_date')->first();
-            $fileToUseId = $latestVisit?->file_id;
+            // Get file_id from the patient's current doctorVisit or create a new file
+            $fileToUseId = $patient->doctorVisit?->file_id;
             
             // If for some reason no previous visit had a file, create a new one
             if (!$fileToUseId) {
@@ -558,7 +557,32 @@ class PatientController extends Controller
 
             $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1;
 
-            $doctorVisit = $patient->doctorVisits()->create([
+            // Since Patient has only one doctorVisit, we need to create a new Patient record
+            // and then create the doctorVisit for that new patient record
+            $newPatient = Patient::create([
+                'name' => $patient->name,
+                'phone' => $patient->phone,
+                'gender' => $patient->gender,
+                'age_year' => $patient->age_year,
+                'age_month' => $patient->age_month,
+                'age_day' => $patient->age_day,
+                'address' => $patient->address,
+                'company_id' => $patient->company_id,
+                'subcompany_id' => $patient->subcompany_id,
+                'company_relation_id' => $patient->company_relation_id,
+                'guarantor' => $patient->guarantor,
+                'insurance_no' => $patient->insurance_no,
+                'doctor_id' => $validated['doctor_id'],
+                'user_id' => Auth::id(),
+                'shift_id' => $currentGeneralShift->id,
+                'visit_number' => $visitLabNumber,
+                'result_auth' => false,
+                'referred' => 'no',
+                'discount_comment' => '',
+            ]);
+
+            // Create the DoctorVisit record for the new patient
+            $doctorVisit = $newPatient->doctorVisit()->create([
                 'doctor_id' => $validated['doctor_id'],
                 'user_id' => Auth::id(),
                 'shift_id' => $currentGeneralShift->id,
@@ -575,13 +599,10 @@ class PatientController extends Controller
             
             DB::commit();
 
-            // Load patient data into the visit before returning, as onPatientActivated expects it
-            $doctorVisit->load('patient');
-            // The Patient model needs a doctorVisit relationship for this to work
-            $patient->setRelation('doctorVisit', $doctorVisit);
+            // Load the doctorVisit relationship for the new patient
+            $newPatient->load('doctorVisit');
 
-
-            return new \App\Http\Resources\PatientResource($patient);
+            return new \App\Http\Resources\PatientResource($newPatient);
 
         } catch (\Exception $e) {
             DB::rollBack();

@@ -577,13 +577,36 @@ class LabRequestController extends Controller
                     $contract = $company->contractedMainTests()
                         ->where('main_tests.id', $mainTestId)
                         ->first();
+                        if(!$contract->pivot->status ){
+                            return response()->json(['message' => 'الفحص غير مفعل في العقد الموقع مع الشركة.'], 400);
+                        }
                     if ($contract && $contract->pivot->status) {
                         $price = $contract->pivot->price;
                         $approve = $contract->pivot->approve;
                         if ($contract->pivot->use_static) {
                             $endurance = $contract->pivot->endurance_static;
                         } else {
-                            $endurance = ($price * $contract->pivot->endurance_percentage) / 100;
+                            if($contract->pivot->endurance_percentage > 0 ) {
+                                    //log here
+                                    Log::info('endurance_percentage: ' . $contract->pivot->endurance_percentage);
+                                    //log the contract
+                                    Log::info('contract: ' . $contract);
+                                $endurance = ($price * $contract->pivot->endurance_percentage) / 100;
+                            } else{
+                                 if($patient->relation != null){
+                                $endurance = ($price * $patient->relation->lab_endurance) / 100;
+
+                            }else{
+                                if($patient->subcompany_id != null){
+                                    $endurance = ($price * $patient->subcompany->lab_endurance) / 100;
+                                }else{
+                                    $endurance = ($price * $patient->company->lab_endurance) / 100;
+                                }
+
+                            }
+                            } 
+                              
+                            
                         }
                     }
                 }
@@ -859,6 +882,16 @@ class LabRequestController extends Controller
             $pdf->Cell(0, $lineHeight, ($isRTL ? "الهاتف: " : "Phone: ") . $visit->patient->phone, 0, 1, $alignStart);
         if ($isCompanyPatient && $visit->patient->company)
             $pdf->Cell(0, $lineHeight, ($isRTL ? "الشركة: " : "Company: ") . $visit->patient->company->name, 0, 1, $alignStart);
+        // --- Additions below ---
+        if ($isCompanyPatient && $visit->patient->insurance_no)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "رقم التأمين: " : "Insurance No: ") . $visit->patient->insurance_no, 0, 1, $alignStart);
+        if ($isCompanyPatient && $visit->patient->subcompany)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "الشركة الفرعية: " : "Subcompany: ") . $visit->patient->subcompany->name, 0, 1, $alignStart);
+        if ($isCompanyPatient && $visit->patient->guarantor)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "الضامن: " : "Guarantor: ") . $visit->patient->guarantor, 0, 1, $alignStart);
+        if ($isCompanyPatient && $visit->patient->companyRelation)
+            $pdf->Cell(0, $lineHeight, ($isRTL ? "العلاقة: " : "Relation: ") . $visit->patient->companyRelation->name, 0, 1, $alignStart);
+        // --- End additions ---
         if ($visit->doctor)
             $pdf->Cell(0, $lineHeight, ($isRTL ? "الطبيب: " : "Doctor: ") . $visit->doctor->name, 0, 1, $alignStart);
         $pdf->Cell(0, $lineHeight, ($isRTL ? "الكاشير: " : "Cashier: ") . $cashierName, 0, 1, $alignStart);
@@ -1279,6 +1312,44 @@ class LabRequestController extends Controller
         }
     }
 
+
+    /**
+     * Update all lab requests' is_bankak to 1 for a specific visit.
+     */
+    public function updateAllLabRequestsBankak(Request $request, DoctorVisit $visit)
+    {
+        // Permission check: can user update lab request payment methods?
+        // if (!Auth::user()->can('update lab_request_payment_methods', $visit)) {
+        //     return response()->json(['message' => 'Unauthorized to update payment methods.'], 403);
+        // }
+
+        $validated = $request->validate([
+            'is_bankak' => 'required|boolean',
+        ]);
+
+        $isBankak = (bool) $validated['is_bankak'];
+
+        DB::beginTransaction();
+        try {
+            // Update all lab requests for this visit
+            $updatedCount = $visit->patientLabRequests()
+                ->update(['is_bankak' => $isBankak]);
+
+            DB::commit();
+
+            // Return the updated visit with all its lab requests
+            return new DoctorVisitResource($visit->fresh()->load([
+                'patientLabRequests.mainTest',
+                'patientLabRequests.requestingUser:id,name',
+                'patientLabRequests.depositUser:id,name'
+            ]));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Update all lab requests bankak failed for Visit ID {$visit->id}: " . $e->getMessage());
+            return response()->json(['message' => 'فشل تحديث طريقة الدفع لجميع طلبات المختبر.', 'error' => 'خطأ داخلي.', 'error_details' => $e->getMessage()], 500);
+        }
+    }
 
     /**
      * Authorize all results for a lab request.

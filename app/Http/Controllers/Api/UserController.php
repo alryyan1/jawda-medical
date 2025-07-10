@@ -312,7 +312,9 @@ class UserController extends Controller
 
         // Sum up payments from LabRequest records where this user was the depositor in this shift
         $query = LabRequest::where('user_deposited', $user->id)
-                           ->where('payment_shift_id', $shiftId);
+                           ->whereHas('patient', function ($query) use ($shiftId) {
+                            $query->where('shift_id', $shiftId);
+                           });
 
         $totalIncome = (float) (clone $query)->sum('amount_paid');
         $totalBank = (float) (clone $query)->where('is_bankak', true)->sum('amount_paid');

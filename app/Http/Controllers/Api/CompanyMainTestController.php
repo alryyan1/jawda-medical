@@ -21,7 +21,7 @@ class CompanyMainTestController extends Controller
     public function index(Request $request, Company $company)
     {
         // $this->authorize('view', $company); // Or specific contract view permission
-        $query = $company->contractedMainTests()->with('container')->orderBy('main_test_name');
+        $query = $company->contractedMainTests()->with('container')->orderBy('id','asc');
         
         if($request->filled('search')) {
             $query->where('main_test_name', 'LIKE', '%' . $request->search . '%');

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AttendanceReportController;
 use App\Http\Controllers\Api\AttendanceSettingController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CashDenominationController;
 use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
 use App\Http\Controllers\Api\ChildTestOptionController;
@@ -538,7 +539,7 @@ Route::middleware('auth:sanctum')->group(function () {
   });
   Route::post('/visits/{visit}/send-whatsapp-report', [ReportController::class, 'sendVisitReportViaWhatsApp'])->name('visits.sendWhatsappReport');
   Route::get('/search/patient-visits', [PatientController::class, 'searchPatientVisitsForAutocomplete']);
-  Route::post('/patients/{patient}/create-lab-visit', [PatientController::class, 'createLabVisitForExistingPatient'])->name('patients.createLabVisit');
+  Route::post('/patients/{doctorVisit}/create-lab-visit', [PatientController::class, 'createLabVisitForExistingPatient'])->name('patients.createLabVisit');
 
 
   Route::post('/patients/store-from-lab', [PatientController::class, 'storeFromLab'])->name('patients.storeFromLab');
@@ -572,7 +573,8 @@ Route::middleware('auth:sanctum')->group(function () {
          // NEW route for the PDF services list export
     Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf'])->name('reports.services.pdf');
     Route::get('/user/current-shift-lab-income-summary', [UserController::class, 'getCurrentUserLabIncomeSummary']);
-
+    Route::get('/cash-denominations', [CashDenominationController::class, 'getDenominationsForShift']);
+    Route::post('/cash-denominations', [CashDenominationController::class, 'saveDenominationCounts']);
 });
 
 // Add missing routes for LabRequestsColumn functionality
@@ -580,3 +582,4 @@ Route::patch('/labrequests/{labrequest}/discount', [LabRequestController::class,
 Route::post('/doctor-visits/{visit}/pay-all-lab-requests', [LabRequestController::class, 'payAllLabRequests'])->middleware('auth:sanctum');
 Route::post('/lab-requests/{labrequest}/cancel-payment', [LabRequestController::class, 'cancelPayment'])->middleware('auth:sanctum');
 Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::class, 'toggleBankak'])->middleware('auth:sanctum');
+Route::patch('/doctor-visits/{visit}/update-all-lab-requests-bankak', [LabRequestController::class, 'updateAllLabRequestsBankak'])->middleware('auth:sanctum');

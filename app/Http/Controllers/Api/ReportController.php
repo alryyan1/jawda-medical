@@ -696,7 +696,7 @@ class ReportController extends Controller
         $reportTitle = 'تقرير عقد الفحوصات لشركة: ' . $company->name;
         $filterCriteriaString = $searchTerm ? "بحث: " . $searchTerm : "جميع الفحوصات المتعاقد عليها";
 
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteriaString, 'P', 'mm', 'A4');
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4',true, 'UTF-8', false,false,$filterCriteriaString);
         $pdf->AddPage();
 
         $headers = ['اسم الفحص', 'نوع العينة', 'سعر العقد', 'تحمل الشركة', 'موافقة'];

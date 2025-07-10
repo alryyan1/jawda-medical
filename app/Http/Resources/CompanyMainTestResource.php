@@ -24,7 +24,7 @@ class CompanyMainTestResource extends JsonResource
                     'price' => (float) $this->pivot->price, // Contracted price
                     'approve' => (bool) $this->pivot->approve,
                     'endurance_static' => (int) $this->pivot->endurance_static,
-                    'endurance_percentage' => (float) $this->pivot->percentage_endurance,
+                    'endurance_percentage' => (float) $this->pivot->endurance_percentage,
                     'use_static' => (bool) $this->pivot->use_static,
                 ];
             }),

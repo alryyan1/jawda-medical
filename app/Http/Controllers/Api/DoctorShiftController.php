@@ -512,7 +512,7 @@ class DoctorShiftController extends Controller
         // Option B: Copy (create new visit, mark old as 'transferred' or similar) - More complex
         // ...
 
-        return new DoctorVisitResource($visit->fresh()->load(['patient', 'doctor']));
+        return new DoctorVisitResource($visit->fresh()->load(['patient.subcompany', 'doctor']));
     }
     // app/Http/Controllers/Api/DoctorShiftController.php
     public function updateProofingFlags(Request $request, DoctorShift $doctorShift)
