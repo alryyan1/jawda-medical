@@ -15,7 +15,6 @@ class ClinicWorkspaceController extends Controller
         $request->validate([
             'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
             'search' => 'nullable|string|max:100',
-            'page' => 'nullable|integer|min:1',
         ]);
 
         $query = DoctorVisit::with(['patient.subcompany', 'doctor','patient.company'])
@@ -48,7 +47,7 @@ class ClinicWorkspaceController extends Controller
         $query->orderByRaw("CASE status WHEN 'with_doctor' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END")
               ->orderBy('id', 'desc'); // Or by appointment_time / queue_number
 
-        $activeVisits = $query->paginate($request->get('per_page', 20));
+        $activeVisits = $query->get();
 
         // You might want a specific resource that flattens Patient + Visit info for the list
         // For now, DoctorVisitResource which loads patient and doctor should work.
