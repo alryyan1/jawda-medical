@@ -762,27 +762,40 @@ class PatientController extends Controller
         // if (!Auth::user()->can('search_doctor_visits')) { /* ... */ }
 
         $request->validate([
-            'patient_name_search' => 'required|string|min:2',
+            'patient_name_search' => 'required|string|min:1',
             'limit' => 'nullable|integer|min:1|max:50',
         ]);
 
         $searchTerm = $request->patient_name_search;
         $limit = $request->input('limit', 15); // Default limit for autocomplete
 
-        $visits = DoctorVisit::with([
-                'patient:id,name,phone', // Eager load basic patient info
-                'doctor:id,name'         // Eager load basic doctor info
-            ])
-            ->whereHas('patient', function ($query) use ($searchTerm) {
-                $query->where('name', 'LIKE', "%{$searchTerm}%")
-                      ->orWhere('phone', 'LIKE', "%{$searchTerm}%"); // Optionally search by phone too
-            })
-            // Optionally, filter for visits that actually have lab requests if this is for lab workstation
-            // ->whereHas('labRequests') 
-            ->orderBy('visit_date', 'desc') // Most recent visits first
-            ->orderBy('created_at', 'desc')
-            ->take($limit)
-            ->get();
+        // Check if search term is numeric (visit ID search)
+        if (is_numeric($searchTerm)) {
+            $visits = DoctorVisit::with([
+                    'patient:id,name,phone', // Eager load basic patient info
+                    'doctor:id,name'         // Eager load basic doctor info
+                ])
+                ->where('id', $searchTerm)
+                ->take($limit)
+                ->get();
+        } else {
+            // Search by patient name or phone (minimum 2 characters for text search)
+            if (strlen($searchTerm) < 2) {
+                return RecentDoctorVisitSearchResource::collection(collect());
+            }
+
+            $visits = DoctorVisit::with([
+                    'patient:id,name,phone', // Eager load basic patient info
+                    'doctor:id,name'         // Eager load basic doctor info
+                ])
+                ->whereHas('patient', function ($query) use ($searchTerm) {
+                    $query->where('name', 'LIKE', "%{$searchTerm}%")
+                          ->orWhere('phone', 'LIKE', "%{$searchTerm}%"); // Optionally search by phone too
+                })
+                ->orderBy('id', 'desc')
+                ->take($limit)
+                ->get();
+        }
             
         // Filter out visits that do not have lab requests (if strictly for lab workstation)
         // Or do this in the initial whereHas if more performant for your DB
