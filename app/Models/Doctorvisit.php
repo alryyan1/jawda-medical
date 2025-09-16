@@ -385,6 +385,15 @@ class DoctorVisit extends Model
         }
         return $totalPaid;
     }
+    //discount on services
+    public function discountOnServices()
+    {
+        $totalDiscount = 0;
+        foreach ($this->requestedServices as $rs) {
+            $totalDiscount += (float)$rs->discount;
+        }
+        return $totalDiscount;
+    }
 
     /**
      * Concatenated string of service names for this visit.
@@ -428,9 +437,9 @@ class DoctorVisit extends Model
             $total_paid += $rs->totalDeposits();
         }
        if($this->patient->company_id){
-          return $total_paid - $this->totalEnduranceWillPay();
+          return $total_paid   - $this->totalEnduranceWillPay();
        }
-       return $this->total_services() - $total_paid;
+       return $this->total_services() - $total_paid - $this->discountOnServices();
     }
     public function user(){
         return $this->belongsTo(User::class, 'user_id');

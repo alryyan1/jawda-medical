@@ -580,6 +580,7 @@ Route::middleware('auth:sanctum')->group(function () {
      Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices'])->name('services.batchUpdatePrices');
          // NEW route for the PDF services list export
     Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf'])->name('reports.services.pdf');
+    Route::post('/services/activate-all', [ServiceController::class, 'activateAll']);
     Route::get('/user/current-shift-lab-income-summary', [UserController::class, 'getCurrentUserLabIncomeSummary']);
     Route::get('/cash-denominations', [CashDenominationController::class, 'getDenominationsForShift']);
     Route::post('/cash-denominations', [CashDenominationController::class, 'saveDenominationCounts']);

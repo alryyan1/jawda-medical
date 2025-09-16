@@ -21,6 +21,7 @@ class RecentDoctorVisitSearchResource extends JsonResource
             'patient_name' => $this->whenLoaded('patient', $this->patient?->name),
             'patient_phone' => $this->whenLoaded('patient', $this->patient?->phone),
             'doctor_name' => $this->whenLoaded('doctor', $this->doctor?->name ?? 'N/A'),
+            'doctor_shift_id' => $this->doctor_shift_id,
             'visit_date' => $this->visit_date ? Carbon::parse($this->visit_date)->format('Y-m-d') : null,
             'visit_time' => $this->visit_time, // Already formatted as H:i:s string potentially
             // You can add a label for the autocomplete here if needed

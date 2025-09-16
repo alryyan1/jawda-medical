@@ -163,4 +163,17 @@ class ServiceController extends Controller
 
         return response()->json(['message' => "Successfully updated the price for {$affectedRows} services."]);
     }
+
+    /**
+     * Activate all services (set activate = true)
+     */
+    public function activateAll(Request $request)
+    {
+        // Optionally add authorization here
+        $affected = Service::where('activate', false)->update(['activate' => true]);
+        return response()->json([
+            'message' => 'تم تفعيل جميع الخدمات بنجاح',
+            'affected_count' => $affected,
+        ]);
+    }
 }
