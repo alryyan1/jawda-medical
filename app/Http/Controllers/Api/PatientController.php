@@ -28,6 +28,7 @@ use App\Models\RequestedServiceCost;
 use App\Models\Service;
 use App\Models\Company;
 use Illuminate\Support\Facades\Http as HttpClient;
+use App\Jobs\EmitPatientRegisteredJob;
 
 class PatientController extends Controller
 {
@@ -252,17 +253,10 @@ class PatientController extends Controller
 
             DB::commit();
 
-            // Fire realtime event to Socket.IO server
-            try {
-                $payload = [
-                    'patient' => (new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file'])))->resolve(),
-                ];
-                $url = config('services.realtime.url') . '/emit/patient-registered';
-                HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
-                    ->post($url, $payload);
-            } catch (\Throwable $e) {
-                Log::warning('Failed to emit patient-registered realtime event: ' . $e->getMessage());
-            }
+            // Queue non-blocking realtime emit after successful commit
+            \DB::afterCommit(function () use ($patient) {
+                EmitPatientRegisteredJob::dispatch($patient->id);
+            });
 
             return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file']));
         } catch (\Exception $e) {

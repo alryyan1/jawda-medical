@@ -38,4 +38,9 @@ return [
         'default_country_code' => env('WHATSAPP_DEFAULT_COUNTRY_CODE', '249'), // Example for Sudan
     ],
 
+    'realtime' => [
+        'url' => env('REALTIME_URL', 'http://127.0.0.1:4000'),
+        'token' => env('REALTIME_INTERNAL_TOKEN', ''),
+    ],
+
 ];
