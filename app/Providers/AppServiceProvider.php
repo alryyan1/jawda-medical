@@ -19,6 +19,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        config(['services.realtime' => [
+            'url' => env('REALTIME_EVENTS_URL', 'http://localhost:4001'),
+            'token' => env('REALTIME_EVENTS_TOKEN', 'changeme'),
+        ]]);
     }
 }

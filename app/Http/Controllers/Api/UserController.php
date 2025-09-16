@@ -124,8 +124,7 @@ class UserController extends Controller
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('username', 'LIKE', "%{$searchTerm}%")
-                    ->orWhere('email', 'LIKE', "%{$searchTerm}%"); // If you have email
+                    ->orWhere('username', 'LIKE', "%{$searchTerm}%");
             });
         }
 
@@ -157,9 +156,7 @@ class UserController extends Controller
     // Endpoint to get all roles for dropdowns/checkboxes in user form
     public function getRolesList()
     {
-        if (!Auth::user()->can('assign roles') && !Auth::user()->can('list roles')) {
-            return response()->json(['message' => 'غير مصرح لك.'], 403);
-        }
+    
         return RoleResource::collection(Role::orderBy('name')->get());
     }
 

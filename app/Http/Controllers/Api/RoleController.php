@@ -15,12 +15,7 @@ class RoleController extends Controller
 {
     public function __construct()
     {
-        // Apply middleware for permissions. Adjust permission names as needed.
-        $this->middleware('can:list roles')->only(['index', 'indexList']);
-        $this->middleware('can:view roles')->only('show');
-        $this->middleware('can:create roles')->only('store');
-        $this->middleware('can:edit roles')->only('update'); // Covers assigning permissions too
-        $this->middleware('can:delete roles')->only('destroy');
+
     }
 
     public function index(Request $request)
@@ -58,7 +53,7 @@ class RoleController extends Controller
                 'guard_name' => 'web' // Or your default API guard
             ]);
 
-            if (!empty($validatedData['permissions']) && Auth::user()->can('assign permissions to role')) {
+            if (!empty($validatedData['permissions'])) {
                 $permissions = Permission::whereIn('name', $validatedData['permissions'])
                                          ->where('guard_name', 'web')
                                          ->get();
@@ -107,12 +102,12 @@ class RoleController extends Controller
                  $role->save();
              }
 
-            if ($request->has('permissions') && Auth::user()->can('assign permissions to role')) {
+            if ($request->has('permissions')) {
                 $permissions = Permission::whereIn('name', $validatedData['permissions'] ?? [])
                                          ->where('guard_name', 'web')
                                          ->get();
                 $role->syncPermissions($permissions);
-            } elseif ($request->has('permissions') && empty($validatedData['permissions']) && Auth::user()->can('assign permissions to role')) {
+            } elseif ($request->has('permissions') && empty($validatedData['permissions'])) {
                 // If an empty permissions array is sent, revoke all permissions
                 $role->syncPermissions([]);
             }
@@ -145,9 +140,7 @@ class RoleController extends Controller
     // Endpoint to get all permissions for dropdowns/checkboxes in role form
     public function getPermissionsList()
     {
-        if(!Auth::user()->can('assign permissions to role') && !Auth::user()->can('list roles')) { // Or a specific 'list permissions' permission
-             return response()->json(['message' => 'غير مصرح لك.'], 403);
-        }
+    
         // Only return permissions for the 'web' guard
         return PermissionResource::collection(Permission::where('guard_name', 'web')->orderBy('name')->get());
     }

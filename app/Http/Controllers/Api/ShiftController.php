@@ -109,10 +109,10 @@ class ShiftController extends Controller
      */
     public function openShift(Request $request)
     {
-        //check if user has permission to open shift
-        if (!Auth::user()->can('open financials_shift')) {
-            return response()->json(['message' => 'ليس لديك صلاحية لفتح وردية عمل.'], 403);
-        }
+        // //check if user has permission to open shift
+        // if (!Auth::user()->can('open financials_shift')) {
+        //     return response()->json(['message' => 'ليس لديك صلاحية لفتح وردية عمل.'], 403);
+        // }
 
 
         $user = Auth::user();

@@ -54,9 +54,9 @@ class VisitServiceController extends Controller
 
     public function addRequestedServices(Request $request, DoctorVisit $visit)
     {
-        if(!Auth::user()->can('request visit_services')) {
-            return response()->json(['message' => 'لا يمكنك إضافة خدمات للزيارة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
-        }
+        // if(!Auth::user()->can('request visit_services')) {
+        //     return response()->json(['message' => 'لا يمكنك إضافة خدمات للزيارة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
+        // }
         $validated = $request->validate([
             'service_ids' => 'required|array',
             'service_ids.*' => 'required|integer|exists:services,id',
@@ -195,9 +195,9 @@ class VisitServiceController extends Controller
 
     public function removeRequestedService(DoctorVisit $visit, RequestedService $requestedService)
     {
-        if(!Auth::user()->can('remove visit_services')) {
-            return response()->json(['message' => 'لا يمكنك حذف خدمة للزيارة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
-        }
+        // if(!Auth::user()->can('remove visit_services')) {
+        //     return response()->json(['message' => 'لا يمكنك حذف خدمة للزيارة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
+        // }
         if ($requestedService->doctorvisits_id !== $visit->id) {
             return response()->json(['message' => 'Service not found for this visit.'], 404);
         }

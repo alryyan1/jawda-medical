@@ -1116,7 +1116,7 @@ class ReportController extends Controller
 
 
         $user_id = $request->get('user');
-        $doctor_shift_id = $request->get('doctor_shift_id');
+        $doctor_shift_id = $request->get(key: 'doctor_shift_id');
         $doctorShift = DoctorShift::find($doctor_shift_id);
 
 

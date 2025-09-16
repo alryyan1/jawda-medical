@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\SubcompanyController;
 use App\Http\Controllers\Api\SubServiceCostController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\UserDocSelectionController;
 use App\Http\Controllers\Api\VisitServiceController;
 use App\Http\Controllers\Api\WhatsAppController;
 use Illuminate\Http\Request;
@@ -115,6 +116,13 @@ Route::middleware('auth:sanctum')->group(function () {
   // Doctors
   Route::get('doctors-list', [DoctorController::class, 'indexList']);
   Route::apiResource('doctors', DoctorController::class);
+
+  // Favorite Doctors Management
+  Route::get('/favorite-doctors', [UserDocSelectionController::class, 'index']);
+  Route::get('/doctors-with-favorites', [UserDocSelectionController::class, 'getDoctorsWithFavorites']);
+  Route::post('/favorite-doctors', [UserDocSelectionController::class, 'store']);
+  Route::post('/favorite-doctors/toggle', [UserDocSelectionController::class, 'toggle']);
+  Route::delete('/favorite-doctors/{docId}', [UserDocSelectionController::class, 'destroy']);
 
   // Doctor Schedules
   Route::get('/doctor-schedules', [DoctorScheduleController::class, 'index']);

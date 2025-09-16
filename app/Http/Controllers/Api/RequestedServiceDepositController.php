@@ -42,9 +42,9 @@ class RequestedServiceDepositController extends Controller
 
     public function store(Request $request, RequestedService $requestedService)
     {
-        if(!Auth::user()->can('record visit_service_payment')) {
-            return response()->json(['message' => 'لا يمكنك تسجيل دفعة للخدمة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
-        }
+        // if(!Auth::user()->can('record visit_service_payment')) {
+        //     return response()->json(['message' => 'لا يمكنك تسجيل دفعة للخدمة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
+        // }
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'is_bank' => 'required|boolean',

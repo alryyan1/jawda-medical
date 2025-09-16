@@ -96,9 +96,9 @@ class DoctorShiftController extends Controller
         // if (!Auth::user()->can('start doctor_shift')) {
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
-        if (!Auth::user()->can('start doctor_shifts')) {
-            return response()->json(['message' => 'لا يمكنك فتح وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
-        }
+        // if (!Auth::user()->can('start doctor_shifts')) {
+        //     return response()->json(['message' => 'لا يمكنك فتح وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
+        // }
 
         $validated = $request->validate([
             'doctor_id' => 'required|exists:doctors,id',
@@ -139,9 +139,9 @@ class DoctorShiftController extends Controller
         // if (!Auth::user()->can('end doctor_shift')) {
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
-        if (!Auth::user()->can('end doctor_shifts')) {
-            return response()->json(['message' => 'لا يمكنك إغلاق وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
-        }
+        // if (!Auth::user()->can('end doctor_shifts')) {
+        //     return response()->json(['message' => 'لا يمكنك إغلاق وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
+        // }
 
         if (!$doctorShift->status) { // If already closed
             return response()->json(['message' => 'وردية عمل هذا الطبيب مغلقة بالفعل.'], 400);

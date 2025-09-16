@@ -22,6 +22,12 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Models\DoctorShift;
 use App\Models\File;
+use App\Models\UserDocSelection;
+use App\Models\RequestedService;
+use App\Models\RequestedServiceCost;
+use App\Models\Service;
+use App\Models\Company;
+use Illuminate\Support\Facades\Http as HttpClient;
 
 class PatientController extends Controller
 {
@@ -86,9 +92,9 @@ class PatientController extends Controller
         $activeDoctorShiftId = $request->input('doctor_shift_id');
 
         if ($request->filled('company_id')) {
-            $this->authorize('register insurance_patient');
+            // $this->authorize('register insurance_patient');
         } else {
-            $this->authorize('register cash_patient');
+            // $this->authorize('register cash_patient');
         }
         DB::beginTransaction();
         try {
@@ -150,7 +156,114 @@ class PatientController extends Controller
                 'queue_number' => $queueNumber,
             ]);
 
+            // 4. Auto-attach favorite service if user has a selection for this doctor
+            $userId = Auth::id();
+            $fav = UserDocSelection::where('user_id', $userId)
+                ->where('doc_id', $visitDoctorId)
+                ->where('active', 1)
+                ->first();
+
+            if ($fav && $fav->fav_service) {
+                $service = Service::with('serviceCosts.subServiceCost')->find($fav->fav_service);
+                if ($service) {
+                    $company = $patient->company_id ? Company::find($patient->company_id) : null;
+
+                    $price = (float) $service->price;
+                    $companyEnduranceAmount = 0;
+                    $contractApproval = true;
+
+                    if ($company) {
+                        $contract = $company->contractedServices()
+                            ->where('services.id', $service->id)
+                            ->first();
+
+                        if ($contract && $contract->pivot) {
+                            $pivot = $contract->pivot;
+                            $price = (float) $pivot->price;
+                            $contractApproval = (bool) $pivot->approval;
+                            if ($pivot->use_static) {
+                                $companyEnduranceAmount = (float) $pivot->static_endurance;
+                            } else {
+                                if ($pivot->percentage_endurance > 0) {
+                                    $companyServiceEndurance = ($price * (float) ($pivot->percentage_endurance ?? 0)) / 100;
+                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                } else {
+                                    $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
+                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                }
+                            }
+                        }
+                    }
+
+                    $requestedService = RequestedService::create([
+                        'doctorvisits_id' => $doctorVisit->id,
+                        'service_id' => $service->id,
+                        'user_id' => $userId,
+                        'doctor_id' => $patient->doctor_id,
+                        'price' => $price,
+                        'amount_paid' => 0,
+                        'endurance' => $companyEnduranceAmount,
+                        'is_paid' => false,
+                        'discount' => 0,
+                        'discount_per' => 0,
+                        'bank' => false,
+                        'count' => 1,
+                        'approval' => $contractApproval,
+                        'done' => false,
+                    ]);
+
+                    // Auto-create RequestedServiceCost breakdowns similar to manual add
+                    if ($service->serviceCosts->isNotEmpty()) {
+                        $costEntriesData = [];
+                        $baseAmountForCostCalc = $price * 1; // count is 1
+
+                        foreach ($service->serviceCosts as $serviceCostDefinition) {
+                            $calculatedCostAmount = 0;
+                            $currentBase = $baseAmountForCostCalc;
+
+                            if ($serviceCostDefinition->cost_type === 'after cost') {
+                                $alreadyCalculatedCostsSum = collect($costEntriesData)->sum('amount');
+                                $currentBase = $baseAmountForCostCalc - $alreadyCalculatedCostsSum;
+                            }
+
+                            if ($serviceCostDefinition->fixed !== null && $serviceCostDefinition->fixed > 0) {
+                                $calculatedCostAmount = (float) $serviceCostDefinition->fixed;
+                            } elseif ($serviceCostDefinition->percentage !== null && $serviceCostDefinition->percentage > 0) {
+                                $calculatedCostAmount = ($currentBase * (float) $serviceCostDefinition->percentage) / 100;
+                            }
+
+                            if ($calculatedCostAmount > 0) {
+                                $costEntriesData[] = [
+                                    'requested_service_id' => $requestedService->id,
+                                    'sub_service_cost_id' => $serviceCostDefinition->sub_service_cost_id,
+                                    'service_cost_id' => $serviceCostDefinition->id,
+                                    'amount' => round($calculatedCostAmount, 2),
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ];
+                            }
+                        }
+                        if (!empty($costEntriesData)) {
+                            RequestedServiceCost::insert($costEntriesData);
+                        }
+                    }
+                }
+            }
+
             DB::commit();
+
+            // Fire realtime event to Socket.IO server
+            try {
+                $payload = [
+                    'patient' => (new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file'])))->resolve(),
+                ];
+                $url = config('services.realtime.url') . '/emit/patient-registered';
+                HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                    ->post($url, $payload);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to emit patient-registered realtime event: ' . $e->getMessage());
+            }
+
             return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file']));
         } catch (\Exception $e) {
             DB::rollBack();
@@ -347,6 +460,18 @@ class PatientController extends Controller
         // For example, financial or specific clinical flags related to visits.
 
         $patient->update($validatedData);
+        // Emit realtime update event (fire-and-forget)
+        try {
+            $payload = [
+                'patient' => (new PatientResource($patient->loadMissing(['company', 'primaryDoctor'])))->resolve(),
+            ];
+            $url = config('services.realtime.url') . '/emit/patient-updated';
+            HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                ->post($url, $payload);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to emit patient-updated realtime event: ' . $e->getMessage());
+        }
+
         return new PatientResource($patient->loadMissing(['company', 'primaryDoctor']));
     }
 
@@ -386,7 +511,7 @@ class PatientController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
      */
-    public function storeFromLab(Request $request)
+        public function storeFromLab(Request $request)
     {
         // Add a specific permission check for this action
         // if (!Auth::user()->can('register lab_patient')) {

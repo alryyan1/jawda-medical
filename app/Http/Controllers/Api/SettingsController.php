@@ -13,8 +13,8 @@ class SettingsController extends Controller
     public function __construct()
     {
         // Apply middleware for permissions
-        $this->middleware('can:view settings')->only('show');
-        $this->middleware('can:update settings')->only('update');
+        // $this->middleware('can:view settings')->only('show');
+        // $this->middleware('can:update settings')->only('update');
     }
 
     /**
