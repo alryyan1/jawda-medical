@@ -147,7 +147,7 @@ class DoctorShiftController extends Controller
             return response()->json(['message' => 'وردية عمل هذا الطبيب مغلقة بالفعل.'], 400);
         }
 
-        if ($doctorShift->user_id !== Auth::id()) {
+        if ($doctorShift->user_id !== Auth::id() && !Auth::user()->hasRole('admin')) {
             return response()->json(['message' => 'لا يمكنك إغلاق وردية هذا الطبيب لأنك لست المسؤول عنها.'], 403);
         }
 
