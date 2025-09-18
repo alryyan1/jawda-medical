@@ -50,6 +50,11 @@ class PatientLabQueueItemResource extends JsonResource {
             'is_printed'=>$this->patient->result_print_date != null,
             'print_date'=>$this->patient->result_print_date,
              'phone' => $this->patient->phone,
+            // Added visit meta and doctor
+            'visit_created_at' => $this->visit_creation_time,
+            'doctor_name' => $this?->doctor->name ?? null,
+            // Added age representation (years/months/days if available on patient)
+            'patient_age' => $this->formatPatientAge($this->patient),
             'lab_number' => $this->patient->visit_number,
             'sample_id' => $this->patientLabRequests->first()->sample_id ?? ($this->patientLabRequests->first()->id ?? $this->visit_id), // Example logic for display ID
             'lab_request_ids' => $this->patientLabRequests->pluck('id')->toArray(),
@@ -65,7 +70,21 @@ class PatientLabQueueItemResource extends JsonResource {
             'is_last_result_pending' => ($totalResultsCount > 0 && $pendingResultsCount === 1),
              // NEW FIELD
              'is_ready_for_print' => ($allResultsEntered && !$isPrinted),
+             'sample_collected' => $patientModel?->sample_collect_time != null,
             // 'status_summary' => ... // Calculate if needed
         ];
+    }
+
+    protected function formatPatientAge($patient): ?string
+    {
+        if (!$patient) return null;
+        $y = (int) ($patient->age_year ?? 0);
+        $m = (int) ($patient->age_month ?? 0);
+        $d = (int) ($patient->age_day ?? 0);
+        $parts = [];
+        if ($y > 0) $parts[] = $y . 'Y';
+        if ($m > 0) $parts[] = $m . 'M';
+        if ($d > 0 || empty($parts)) $parts[] = $d . 'D';
+        return implode(' ', $parts);
     }
 }

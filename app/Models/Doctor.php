@@ -76,6 +76,7 @@ class Doctor extends Model
         'finance_account_id',
         'finance_account_id_insurance', // Corrected name from migration
         'calc_insurance',
+        'is_default',
     ];
 
     protected $casts = [
@@ -84,6 +85,7 @@ class Doctor extends Model
         'static_wage' => 'decimal:2',
         'lab_percentage' => 'decimal:2',
         'calc_insurance' => 'boolean',
+        'is_default' => 'boolean',
         // 'start' => 'integer', // If it's just a number
     ];
 

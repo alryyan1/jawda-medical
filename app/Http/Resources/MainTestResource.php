@@ -10,6 +10,8 @@ class MainTestResource extends JsonResource
         return [
             'id' => $this->id,
             'main_test_name' => $this->main_test_name,
+            // Unified field used by frontend (lr.main_test.name)
+            'name' => $this->main_test_name,
             'pack_id' => $this->pack_id,
             // 'pack_name' => $this->whenLoaded('pack', optional($this->pack)->name), // If Pack model exists
             'pageBreak' => (bool) $this->pageBreak,

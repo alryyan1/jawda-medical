@@ -36,6 +36,7 @@ class DoctorResource extends JsonResource
             // Add user details if a doctor is linked to a user
             'user_id' => $this->whenLoaded('user', optional($this->user)->id),
             'username' => $this->whenLoaded('user', optional($this->user)->username),
+            'is_default' => $this->is_default,
         ];
     }
 }

@@ -80,15 +80,13 @@ class PatientController extends Controller
         $validatedPatientData = $request->validated(); // Use validated() directly
 
         $visitDoctorId = $validatedPatientData['doctor_id'];
-        $visitReason = $validatedPatientData['notes'] ?? ($validatedPatientData['present_complains'] ?? 'New Visit');
-
         // Remove fields that are not part of the Patient model directly or handled separately
         $patientSpecificData = collect($validatedPatientData)->except(['doctor_id', 'notes', 'active_doctor_shift_id'])->toArray();
 
 
         $currentGeneralShift = Shift::open()->latest('created_at')->first();
         if (!$currentGeneralShift) {
-            return response()->json(['message' => 'لا توجد وردية عيادة مفتوحة حالياً لبدء زيارة.'], 400);
+            return response()->json(['message' => 'لا توجد وردية  مفتوحة حالياً لبدء .'], 400);
         }
         $activeDoctorShiftId = $request->input('doctor_shift_id');
 
@@ -151,7 +149,7 @@ class PatientController extends Controller
                 'visit_date' => Carbon::today(),
                 'visit_time' => Carbon::now()->format('H:i:s'),
                 'status' => 'waiting',
-                'reason_for_visit' => $visitReason,
+                'reason_for_visit' => '',
                 'is_new' => 1,
                 'number' => $queueNumber,
                 'queue_number' => $queueNumber,

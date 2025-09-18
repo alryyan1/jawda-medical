@@ -253,6 +253,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
   // Lab Requests
   Route::get('/visits/{visit}/lab-requests', [LabRequestController::class, 'indexForVisit']);
+  // Removed: container barcode and print-all-samples endpoints
   Route::get('/visits/{visit}/available-lab-tests', [LabRequestController::class, 'availableTestsForVisit']);
   Route::post('/visits/{visit}/lab-requests-batch', [LabRequestController::class, 'storeBatchForVisit']);
 
@@ -570,6 +571,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/labrequests/{labrequest}/mark-collected', [SampleCollectionController::class, 'markSampleCollected'])->name('markCollected');
     Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit'])->name('markAllCollected');
       Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest'])->name('generateSampleId');
+      Route::post('/visits/{visit}/mark-patient-collected', [SampleCollectionController::class, 'markPatientSampleCollectedForVisit'])->name('markPatientCollected');
   });
   Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt'])->name('reports.lab.thermalReceipt');
    Route::get('specialists-list', [SpecialistController::class, 'indexList']);

@@ -326,7 +326,7 @@ class LabRequestController extends Controller
         
         // Eager load details needed for the PatientLabQueueItemResource
         $query->withCount(['patientLabRequests as test_count']) // Count all lab requests
-            ->withMin(['patientLabRequests as oldest_request_time'], 'labrequests.created_at') // Get time of first request
+            ->withMin('patientLabRequests', 'labrequests.created_at', 'oldest_request_time') // Get time of first request
             ->with(['patientLabRequests:labrequests.id,doctor_visit_id,sample_id,is_paid']); // Eager load for status check
 
         $pendingVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
@@ -341,11 +341,73 @@ class LabRequestController extends Controller
     public function indexForVisit(Request $request, DoctorVisit $visit)
     {
         $labRequests = $visit->patientLabRequests()
-            ->with(['mainTest:id,main_test_name,price', 'requestingUser:id,name'])
+            ->with(['mainTest:id,main_test_name,price,container_id', 'mainTest.container:id,container_name', 'requestingUser:id,name'])
             ->orderBy('created_at', 'asc') // Or by main_test.name
             ->get();
         return LabRequestResource::collection($labRequests);
     }
+
+    /**
+     * Generate and download a barcode PDF for a specific container in a visit.
+     */
+    public function generateContainerBarcode(Request $request, DoctorVisit $visit, $containerId)
+    {
+        try {
+            // Get the patient information
+            $patient = $visit->patient;
+            
+            // Get container information
+            $container = \App\Models\Container::find($containerId);
+            if (!$container) {
+                return response()->json(['message' => 'Container not found'], 404);
+            }
+            
+            // Create barcode data (visit ID + container ID)
+            $barcodeData = $visit->id . '-' . $containerId;
+            
+            // Generate PDF with barcode
+            $pdf = new \App\Mypdf\Pdf();
+            $pdf->AddPage();
+            $pdf->SetFont('Arial', 'B', 16);
+            
+            // Add patient information
+            $pdf->Cell(0, 10, 'Patient: ' . $patient->name, 0, 1, 'C');
+            $pdf->Cell(0, 10, 'Visit ID: ' . $visit->id, 0, 1, 'C');
+            $pdf->Cell(0, 10, 'Container: ' . $container->container_name, 0, 1, 'C');
+            $pdf->Ln(10);
+            
+            // Add barcode
+            $pdf->write1DBarcode($barcodeData, 'C128', 50, 50, 100, 20, 0.4, [
+                'position' => 'C',
+                'border' => true,
+                'padding' => 4,
+                'fgcolor' => [0, 0, 0],
+                'bgcolor' => [255, 255, 255],
+                'text' => true,
+                'font' => 'helvetica',
+                'fontsize' => 8,
+                'stretchtext' => 4
+            ]);
+            
+            // Add barcode text
+            $pdf->SetXY(50, 75);
+            $pdf->SetFont('Arial', '', 10);
+            $pdf->Cell(100, 10, $barcodeData, 0, 0, 'C');
+            
+            $filename = 'container_barcode_' . $visit->id . '_' . $containerId . '.pdf';
+            
+            return response($pdf->Output('S'), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="' . $filename . '"'
+            ]);
+            
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error generating container barcode: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to generate barcode'], 500);
+        }
+    }
+
+    // Removed: printAllSamples method (deprecated feature)
 
     /**
      * List available MainTests for selection (excluding already requested for this visit).

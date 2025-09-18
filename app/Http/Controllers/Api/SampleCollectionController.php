@@ -14,6 +14,8 @@ use App\Http\Resources\PatientLabQueueItemResource; // We can reuse this for the
 use App\Http\Resources\LabRequestResource; // For returning updated lab requests
 use App\Services\WhatsAppService;
 use Illuminate\Support\Facades\Log;
+use App\Models\Shift;
+use App\Models\Patient;
 
 class SampleCollectionController extends Controller
 {
@@ -32,14 +34,12 @@ class SampleCollectionController extends Controller
     {
         $request->validate([
             'shift_id' => 'nullable|integer|exists:shifts,id',
-            'date_from' => 'nullable|date_format:Y-m-d',
-            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            
             'search' => 'nullable|string|max:100',
             'page' => 'nullable|integer|min:1',
-            'per_page' => 'nullable|integer|min:5|max:100',
+           
         ]);
 
-        $perPage = $request->input('per_page', 30);
 
         $query = DoctorVisit::query()
             ->select(
@@ -48,39 +48,21 @@ class SampleCollectionController extends Controller
                 'patients.id as patient_id',
                 'patients.name as patient_name',
                 'patients.phone as patient_phone', // For potential WhatsApp formatting
-                'patients.result_is_locked' // To pass to PatientLabRequestItem
+                'patients.result_is_locked', // To pass to PatientLabRequestItem
+                'patients.age_year',
+                'patients.age_month',
+                'patients.age_day',
+                'doctors.name as doctor_name'
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
-            ->whereHas('patientLabRequests', function ($q_lab) {
-                $q_lab
-                      
-                      ->whereNull('sample_collected_at'); // Sample not yet collected
-            })
+            ->leftJoin('doctors', 'doctorvisits.doctor_id', '=', 'doctors.id')
+           
             // Count of lab requests that need a sample for this visit
-            ->withCount(['patientLabRequests as test_count' => function ($q_lab_count) {
-                $q_lab_count
-                          
-                            ->whereNull('sample_collected_at');
-            }])
-         
-            // Eager load to determine if all requests for the visit are paid (for badge color)
-            ->with(['patientLabRequests' => function($q_lr_details) {
-                $q_lr_details->select(['labrequests.id', 'pid', 'sample_id', 'is_paid', 'no_sample', 'sample_collected_at'])
-                            
-                             ->where('no_sample', false); // Only those needing samples for payment status context
-            }]);
-
-
-        if ($request->filled('shift_id')) {
-            $query->where('doctorvisits.shift_id', $request->shift_id);
-        } elseif ($request->filled('date_from') && $request->filled('date_to')) {
-            $dateFrom = Carbon::parse($request->date_from)->startOfDay();
-            $dateTo = Carbon::parse($request->date_to)->endOfDay();
-            $query->whereBetween('doctorvisits.created_at', [$dateFrom->toDateString(), $dateTo->toDateString()]);
-        } else {
-            $today = Carbon::today();
-            $query->whereDate('doctorvisits.created_at', $today->toDateString());
-        }
+            ->withCount(['patientLabRequests as test_count']);
+       
+                $shift = Shift::max('id');
+            $query->where('doctorvisits.shift_id', $shift);
+        
 
         if ($request->filled('search')) {
             // ... (search logic similar to LabRequestController@getLabPendingQueue) ...
@@ -93,7 +75,7 @@ class SampleCollectionController extends Controller
         
         $query->having('test_count', '>', 0); // Ensure visit still has samples to be collected
 
-        $pendingSampleVisits = $query->get();
+        $pendingSampleVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
         
       
 
@@ -198,5 +180,27 @@ class SampleCollectionController extends Controller
         $labrequest->save();
 
         return new LabRequestResource($labrequest);
+    }
+
+    /**
+     * Mark the visit's patient as sample collected and set collection time.
+     */
+    public function markPatientSampleCollectedForVisit(Request $request, DoctorVisit $visit)
+    {
+        $patient = $visit->patient;
+        if (!$patient) {
+            return response()->json(['message' => 'Patient not found for this visit'], 404);
+        }
+
+        $patient->sample_collected = true;
+        $patient->sample_collect_time = now();
+        $patient->save();
+
+        return response()->json([
+            'message' => 'Patient sample marked as collected successfully',
+            'patient_id' => $patient->id,
+            'sample_collected' => (bool) $patient->sample_collected,
+            'sample_collect_time' => $patient->sample_collect_time,
+        ]);
     }
 }

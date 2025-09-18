@@ -9,6 +9,7 @@ use App\Http\Resources\DoctorResource;
 use App\Http\Resources\DoctorCollection;
 use Illuminate\Support\Facades\Storage; // If handling image uploads
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class DoctorController extends Controller
 {
@@ -38,7 +39,7 @@ class DoctorController extends Controller
         // Eager load specialist to include specialist name if needed for display in dropdown
         $doctors = Doctor::with('specialist:id,name') // Only select id and name from specialist
                          ->orderBy('name')
-                         ->get(['id', 'name', 'specialist_id']);
+                         ->get(['id', 'name', 'specialist_id', 'is_default']);
 
         return DoctorResource::collection($doctors);
         // If DoctorResource is too heavy for just a list, you could return directly:
@@ -63,6 +64,7 @@ class DoctorController extends Controller
             'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // For file upload
             'finance_account_id' => 'nullable|exists:finance_accounts,id',
             'calc_insurance' => 'required|boolean',
+            'is_default' => 'sometimes|boolean',
             // Add validation for linking to a user if applicable
             // 'user_id_to_link' => 'nullable|exists:users,id|unique:doctors,user_id_column_if_doctor_has_user'
         ]);
@@ -73,8 +75,13 @@ class DoctorController extends Controller
         }
         unset($validatedData['image_file']); // remove temp key
 
-
-        $doctor = Doctor::create($validatedData);
+        $doctor = DB::transaction(function () use ($validatedData) {
+            $doc = Doctor::create($validatedData);
+            if (!empty($validatedData['is_default'])) {
+                Doctor::where('id', '!=', $doc->id)->update(['is_default' => false]);
+            }
+            return $doc;
+        });
 
         // If you are creating/linking a User for this doctor:
         // $user = User::find($request->user_id_to_link);
@@ -105,6 +112,7 @@ class DoctorController extends Controller
             'finance_account_id' => 'nullable|exists:finance_accounts,id',
             'finance_account_id_insurance' => 'nullable|exists:finance_accounts,id',
             'calc_insurance' => 'sometimes|required|boolean',
+            'is_default' => 'sometimes|boolean',
         ]);
 
         if ($request->hasFile('image_file')) {
@@ -117,7 +125,12 @@ class DoctorController extends Controller
         }
         unset($validatedData['image_file']);
 
-        $doctor->update($validatedData);
+        DB::transaction(function () use (&$doctor, $validatedData) {
+            $doctor->update($validatedData);
+            if (!empty($validatedData['is_default'])) {
+                Doctor::where('id', '!=', $doctor->id)->update(['is_default' => false]);
+            }
+        });
 
         return new DoctorResource($doctor->load(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user']));
     }
