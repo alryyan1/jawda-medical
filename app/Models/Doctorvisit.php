@@ -187,6 +187,11 @@ class DoctorVisit extends Model
         return $this->hasMany(DrugPrescribed::class, 'doctor_visit_id');
     }
 
+    public function labRequests()
+    {
+        return $this->hasMany(LabRequest::class, 'doctor_visit_id');
+    }
+
     // Scopes
     public function scopeToday($query)
     {

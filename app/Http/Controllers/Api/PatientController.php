@@ -337,28 +337,26 @@ class PatientController extends Controller
         $patient->auth_date = now();
         $patient->save();
 
-        // Generate PDF for Firebase upload
-        $pdfContent = null;
+        // Dispatch job to upload lab result to Firebase
         try {
             $doctorVisit = $patient->doctorVisit;
             if ($doctorVisit) {
-                $labResultReport = new \App\Services\Pdf\LabResultReport();
-                $pdfContent = $labResultReport->generate($doctorVisit);
+                \App\Jobs\UploadLabResultToFirebase::dispatch(
+                    $patient->id,
+                    $doctorVisit->id,
+                    'Jawda Medical' // You can get this from settings
+                );
+                
+                \Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
             }
         } catch (\Exception $e) {
-            \Log::error('Error generating PDF for authentication: ' . $e->getMessage());
+            \Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
         }
 
         $responseData = [
-            'message' => "Patient results have been successfully authenticated.",
+            'message' => "Patient results have been successfully authenticated. Upload to cloud storage has been queued.",
             'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor', 'resultAuthUser']))
         ];
-
-        // Include PDF content if generated successfully
-        if ($pdfContent) {
-            $responseData['pdf_content'] = base64_encode($pdfContent);
-            $responseData['pdf_filename'] = "lab_result_{$patient->doctorVisit->id}_{$patient->name}_" . now()->format('Y-m-d') . ".pdf";
-        }
 
         return response()->json($responseData);
     }
@@ -374,6 +372,60 @@ class PatientController extends Controller
         return response()->json([
             'result_url' => $patient->result_url,
             'has_result_url' => !empty($patient->result_url)
+        ]);
+    }
+
+    /**
+     * Toggle authentication status for a patient (Admin only)
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Patient  $patient
+     * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
+     */
+    public function toggleAuthentication(Request $request, Patient $patient)
+    {
+        // Check if user has admin role
+        if (!Auth::user()->hasRole('admin')) {
+            return response()->json([
+                'message' => 'Unauthorized. Admin role required.',
+            ], 403);
+        }
+
+        // Toggle the authentication status
+        $patient->result_auth = !$patient->result_auth;
+        
+        if ($patient->result_auth) {
+            // If authenticating, set the auth user and date
+            $patient->result_auth_user = Auth::id();
+            $patient->auth_date = now();
+            
+            // Dispatch job to upload to Firebase
+            try {
+                $doctorVisit = $patient->doctorVisit;
+                if ($doctorVisit) {
+                    \App\Jobs\UploadLabResultToFirebase::dispatch(
+                        $patient->id,
+                        $doctorVisit->id,
+                        'Jawda Medical'
+                    );
+                    \Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
+                }
+            } catch (\Exception $e) {
+                \Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
+            }
+        } else {
+            // If de-authenticating, clear the auth user and date
+            $patient->result_auth_user = null;
+            $patient->auth_date = null;
+            // Optionally clear the result_url as well
+            $patient->result_url = null;
+        }
+        
+        $patient->save();
+
+        return response()->json([
+            'message' => $patient->result_auth ? "Patient results have been authenticated." : "Patient results authentication has been revoked.",
+            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor', 'resultAuthUser']))
         ]);
     }
     /**

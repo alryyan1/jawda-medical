@@ -52,7 +52,7 @@ class PatientLabQueueItemResource extends JsonResource {
              'phone' => $this->patient->phone,
             // Added visit meta and doctor
             'visit_created_at' => $this->visit_creation_time,
-            'doctor_name' => $this?->doctor->name ?? null,
+            'doctor_name' => $patientModel?->doctor->name ?? null,
             // Added age representation (years/months/days if available on patient)
             'patient_age' => $this->formatPatientAge($this->patient),
             'lab_number' => $this->patient->visit_number,
@@ -71,6 +71,8 @@ class PatientLabQueueItemResource extends JsonResource {
              // NEW FIELD
              'is_ready_for_print' => ($allResultsEntered && !$isPrinted),
              'sample_collected' => $patientModel?->sample_collect_time != null,
+             'result_url' => $patientModel?->result_url,
+             'registered_by' => $patientModel?->user?->name,
             // 'status_summary' => ... // Calculate if needed
         ];
     }
