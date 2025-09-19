@@ -310,6 +310,72 @@ class PatientController extends Controller
             'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor'])) // Reload relations for consistency
         ]);
     }
+
+    /**
+     * Authenticate patient results
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \App\Models\Patient  $patient
+     * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
+     */
+    public function authenticateResults(Request $request, Patient $patient)
+    {
+        // Add permission check: e.g., can('authenticate lab_results', $patient)
+        // if (!Auth::user()->can('authenticate_results', $patient)) {
+        //     return response()->json(['message' => 'Unauthorized to authenticate results.'], 403);
+        // }
+
+        if ($patient->result_auth) {
+            return response()->json([
+                'message' => "Results are already authenticated.",
+                'data' => new PatientResource($patient->fresh())
+            ], 200);
+        }
+
+        $patient->result_auth = true;
+        $patient->result_auth_user = Auth::id();
+        $patient->auth_date = now();
+        $patient->save();
+
+        // Generate PDF for Firebase upload
+        $pdfContent = null;
+        try {
+            $doctorVisit = $patient->doctorVisit;
+            if ($doctorVisit) {
+                $labResultReport = new \App\Services\Pdf\LabResultReport();
+                $pdfContent = $labResultReport->generate($doctorVisit);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error generating PDF for authentication: ' . $e->getMessage());
+        }
+
+        $responseData = [
+            'message' => "Patient results have been successfully authenticated.",
+            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor', 'resultAuthUser']))
+        ];
+
+        // Include PDF content if generated successfully
+        if ($pdfContent) {
+            $responseData['pdf_content'] = base64_encode($pdfContent);
+            $responseData['pdf_filename'] = "lab_result_{$patient->doctorVisit->id}_{$patient->name}_" . now()->format('Y-m-d') . ".pdf";
+        }
+
+        return response()->json($responseData);
+    }
+
+    /**
+     * Get the result URL for a patient
+     *
+     * @param  \App\Models\Patient  $patient
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getResultUrl(Patient $patient)
+    {
+        return response()->json([
+            'result_url' => $patient->result_url,
+            'has_result_url' => !empty($patient->result_url)
+        ]);
+    }
     /**
      * Create a new Patient record by cloning data, and then create a new DoctorVisit.
      * A new File record is created and linked if no previous_visit_id is provided,

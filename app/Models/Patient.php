@@ -142,9 +142,11 @@ class Patient extends Model
         'sample_collected',
         'sample_collect_time',
         'result_print_date',
+        'result_url',
         'sample_print_date',
         'visit_number',
         'result_auth',
+        'result_auth_user',
         'auth_date',
         'country_id',
         'gov_id',
@@ -221,6 +223,14 @@ class Patient extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Get the user who authorized the results.
+     */
+    public function resultAuthUser()
+    {
+        return $this->belongsTo(User::class, 'result_auth_user');
     }
 
     /**

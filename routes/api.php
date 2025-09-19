@@ -414,6 +414,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/labrequests/{labrequest}/set-default-results', [LabRequestController::class, 'setDefaultResults']);
     Route::post('/labrequests/{labrequest}/populate-cbc-from-sysmex', [LabRequestController::class, 'populateCbcResultsFromSysmex']);
     Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
+    Route::patch('/patients/{patient}/authenticate-results', [PatientController::class, 'authenticateResults']);
+    Route::get('/patients/{patient}/result-url', [PatientController::class, 'getResultUrl']);
 
     /*
     |--------------------------------------------------------------------------
