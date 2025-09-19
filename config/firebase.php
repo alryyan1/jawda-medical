@@ -11,7 +11,7 @@ return [
     */
 
     'project_id' => env('FIREBASE_PROJECT_ID', 'hospitalapp-681f1'),
-    'storage_bucket' => env('FIREBASE_STORAGE_BUCKET', 'hospitalapp-681f1.firebasestorage.app'),
+    'storage_bucket' => env('FIREBASE_STORAGE_BUCKET', 'hospitalapp-681f1.appspot.com'),
     
     /*
     |--------------------------------------------------------------------------
