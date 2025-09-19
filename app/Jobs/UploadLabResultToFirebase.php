@@ -132,7 +132,7 @@ class UploadLabResultToFirebase implements ShouldQueue
             // Initialize Firebase
             $firebase = $this->initializeFirebase();
             $storage = $firebase->createStorage();
-            $bucket = $storage->getBucket();
+            $bucket = $storage->getBucket(); // Use default bucket
             
             // Upload file to Firebase Storage
             $object = $bucket->upload($fileContent, [
