@@ -132,7 +132,12 @@ class UploadLabResultToFirebase implements ShouldQueue
             // Initialize Firebase
             $firebase = $this->initializeFirebase();
             $storage = $firebase->createStorage();
-            $bucket = $storage->getBucket(); // Use default bucket
+            
+            // Debug: Log the bucket name being used
+            $bucketName = config('firebase.storage_bucket');
+            Log::info("Using Firebase bucket: " . $bucketName);
+            
+            $bucket = $storage->getBucket($bucketName); // Use specific bucket
             
             // Upload file to Firebase Storage
             $object = $bucket->upload($fileContent, [
