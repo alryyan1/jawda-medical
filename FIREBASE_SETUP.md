@@ -24,6 +24,16 @@ FIREBASE_SERVICE_ACCOUNT_PATH=storage/app/firebase-service-account.json
 5. Download the JSON file
 6. Save it as `storage/app/firebase-service-account.json` in your Laravel project
 
+**Important:** Make sure the file is named exactly `firebase-service-account.json` (not `.json.example`)
+
+**Example file structure:**
+```
+storage/
+  app/
+    firebase-service-account.json  ← Your actual service account file
+    firebase-service-account.json.example  ← Example file (for reference)
+```
+
 ### 3. Firebase Storage Rules
 Make sure your Firebase Storage rules allow uploads. Example rules:
 
@@ -58,6 +68,17 @@ After successful upload, the `result_url` field in the patients table should con
 https://firebasestorage.googleapis.com/v0/b/hospitalapp-681f1.firebasestorage.app/o/results%2FJawda%20Medical%2F23030%2Flab_result_23030___________2025-09-19.pdf?alt=media&token=83c780b8-ec41-4263-acfa-9e122caec591
 ```
 
+## Fallback Behavior
+
+**Important:** If the Firebase service account file is not found, the system will automatically fall back to local storage. This means:
+
+- Files will be stored in `storage/app/public/lab_results/`
+- URLs will be localhost URLs (like `http://localhost/storage/lab_results/...`)
+- The job will complete successfully but with a warning in the logs
+- You'll see warning messages like: "Firebase service account file not found. Falling back to local storage."
+
+To get proper Firebase URLs, you must set up the service account file as described above.
+
 ## Troubleshooting
 
 ### Common Issues:
@@ -65,6 +86,7 @@ https://firebasestorage.googleapis.com/v0/b/hospitalapp-681f1.firebasestorage.ap
 1. **Service Account File Not Found**
    - Ensure the service account JSON file is placed at `storage/app/firebase-service-account.json`
    - Check file permissions
+   - The system will fall back to local storage if not found
 
 2. **Upload Fails**
    - Check Firebase Storage rules
@@ -72,8 +94,8 @@ https://firebasestorage.googleapis.com/v0/b/hospitalapp-681f1.firebasestorage.ap
    - Check Laravel logs for detailed error messages
 
 3. **Wrong URL Format**
-   - The old implementation was storing files locally
-   - Make sure you're using the updated `UploadLabResultToFirebase` job
+   - If you see localhost URLs, it means Firebase service account is not set up
+   - Set up the service account file to get proper Firebase URLs
    - Clear any cached config: `php artisan config:clear`
 
 ### Logs

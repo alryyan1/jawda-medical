@@ -11,6 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\ServiceAccount;
 
@@ -115,6 +116,19 @@ class UploadLabResultToFirebase implements ShouldQueue
     private function uploadToFirebase(string $fileContent, string $firebasePath): ?string
     {
         try {
+            // Check if Firebase service account file exists
+            $serviceAccountPath = config('firebase.service_account_path');
+            
+            if (!file_exists($serviceAccountPath)) {
+                Log::warning("Firebase service account file not found. Falling back to local storage.", [
+                    'expected_path' => $serviceAccountPath,
+                    'firebase_path' => $firebasePath
+                ]);
+                
+                // Fallback to local storage with a note that Firebase setup is needed
+                return $this->fallbackToLocalStorage($fileContent, $firebasePath);
+            }
+            
             // Initialize Firebase
             $firebase = $this->initializeFirebase();
             $storage = $firebase->createStorage();
@@ -141,8 +155,33 @@ class UploadLabResultToFirebase implements ShouldQueue
             
         } catch (\Exception $e) {
             Log::error("Failed to upload to Firebase: " . $e->getMessage());
-            return null;
+            
+            // Fallback to local storage if Firebase fails
+            Log::info("Falling back to local storage due to Firebase error");
+            return $this->fallbackToLocalStorage($fileContent, $firebasePath);
         }
+    }
+    
+    /**
+     * Fallback method to store file locally when Firebase is not available
+     */
+    private function fallbackToLocalStorage(string $fileContent, string $firebasePath): string
+    {
+        $storagePath = "lab_results/{$this->visitId}/" . basename($firebasePath);
+        
+        // Store file locally
+        Storage::disk('public')->put($storagePath, $fileContent);
+        
+        // Return a URL that can be accessed by the frontend
+        $downloadUrl = url('storage/' . $storagePath);
+        
+        Log::warning("File stored locally as Firebase fallback", [
+            'local_path' => $storagePath,
+            'download_url' => $downloadUrl,
+            'note' => 'Please set up Firebase service account for proper cloud storage'
+        ]);
+        
+        return $downloadUrl;
     }
     
     /**
@@ -151,10 +190,6 @@ class UploadLabResultToFirebase implements ShouldQueue
     private function initializeFirebase()
     {
         $serviceAccountPath = config('firebase.service_account_path');
-        
-        if (!file_exists($serviceAccountPath)) {
-            throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}");
-        }
         
         $factory = (new Factory)
             ->withServiceAccount($serviceAccountPath)
