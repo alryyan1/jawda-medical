@@ -800,7 +800,7 @@ class LabRequestController extends Controller
                     'result_flags' => $existingResult->flags ?? null,
                     'result_comment' => $existingResult->result_comment ?? null,
                     'is_result_authorized' => isset($existingResult->authorized_at),
-                    'entered_at' => $existingResult->entered_at?->toIso8601String(),
+                    'entered_at' => null,
                 ];
             })->all(),
         ];

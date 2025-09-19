@@ -33,8 +33,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $cr
  * @property string $email
  * @property string $address
- * @property string $instance_id
- * @property string $token
  * @property bool $send_result_after_auth
  * @property bool $send_result_after_result
  * @property bool $edit_result_after_auth
@@ -123,7 +121,7 @@ class Setting extends Model
         'currency', 'phone', 'gov', 'country', // These gov/country might be booleans or IDs
         'barcode', 'show_water_mark',
         'vatin', 'cr', 'email', 'address',
-        'instance_id', 'token', // For external services like WhatsApp
+        'ultramsg_instance_id', 'ultramsg_token', 'ultramsg_base_url', 'ultramsg_default_country_code', // For Ultramsg WhatsApp API
         'send_result_after_auth', 'send_result_after_result',
         'edit_result_after_auth',
         'auditor_stamp', 'manager_stamp', // Paths or base64 for stamps
@@ -140,7 +138,6 @@ class Setting extends Model
         'report_header_vatin',
         'report_header_cr',
         'default_lab_report_template',
-        'report_header_logo_base64', // or 'report_header_logo_path'
     ];
 
     protected $casts = [

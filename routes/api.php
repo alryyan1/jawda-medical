@@ -50,7 +50,6 @@ use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
 use App\Http\Controllers\Api\VisitServiceController;
-use App\Http\Controllers\Api\WhatsAppController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -421,15 +420,11 @@ Route::middleware('auth:sanctum')->group(function () {
     | WhatsApp Communication Routes
     |--------------------------------------------------------------------------
     */
-    Route::post('/whatsapp/send-text', [WhatsAppController::class, 'sendText']);
-    Route::post('/whatsapp/send-media', [WhatsAppController::class, 'sendMedia']);
-    // Route::get('/whatsapp/templates', [WhatsAppController::class, 'getMessageTemplates']); // 
     Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
     Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
     Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
 
     Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
-    Route::get('/whatsapp/bulk-message-patients', [WhatsAppController::class, 'getPatientsForBulkMessage']);
 
     Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
     // "The route api/reports/service-cost-breakdown could not be found."
@@ -586,6 +581,20 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/current-shift-lab-income-summary', [UserController::class, 'getCurrentUserLabIncomeSummary']);
     Route::get('/cash-denominations', [CashDenominationController::class, 'getDenominationsForShift']);
     Route::post('/cash-denominations', [CashDenominationController::class, 'saveDenominationCounts']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ultramsg WhatsApp API Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('ultramsg')->group(function () {
+        Route::post('/send-text', [\App\Http\Controllers\UltramsgController::class, 'sendTextMessage']);
+        Route::post('/send-document', [\App\Http\Controllers\UltramsgController::class, 'sendDocument']);
+        Route::post('/send-document-file', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFile']);
+        Route::post('/send-document-url', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromUrl']);
+        Route::get('/instance-status', [\App\Http\Controllers\UltramsgController::class, 'getInstanceStatus']);
+        Route::get('/configured', [\App\Http\Controllers\UltramsgController::class, 'isConfigured']);
+    });
 });
 
 // Add missing routes for LabRequestsColumn functionality

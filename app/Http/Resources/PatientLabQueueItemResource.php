@@ -3,7 +3,7 @@
 use App\Models\LabRequest;
 use App\Models\Patient;
 use App\Models\RequestedResult;
-use App\Services\WhatsAppService;
+use App\Services\UltramsgService;
 use Illuminate\Http\Request; use Illuminate\Http\Resources\Json\JsonResource;
 class PatientLabQueueItemResource extends JsonResource {
     public function toArray(Request $request): array {
@@ -45,7 +45,7 @@ class PatientLabQueueItemResource extends JsonResource {
             'patient_id' => $this->patient_id,
             'patient_name' => $this->patient_name,
              'company'=>$this->patient->company,
-            'patient_phone_for_whatsapp' => $patientModel ? WhatsAppService::formatPhoneNumberForWaApi($patientModel->phone) : null,
+            'patient_phone_for_whatsapp' => $patientModel ? UltramsgService::formatPhoneNumber($patientModel->phone) : null,
             'is_result_locked' => $patientModel ? (bool) $patientModel->result_is_locked : false,
             'is_printed'=>$this->patient->result_print_date != null,
             'print_date'=>$this->patient->result_print_date,

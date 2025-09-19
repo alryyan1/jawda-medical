@@ -35,8 +35,10 @@ class SettingResource extends JsonResource
             'cr' => $this->cr,
             'email' => $this->email,
             'address' => $this->address,
-            'instance_id' => $this->instance_id,
-            'token' => $this->token, // Be careful about exposing sensitive tokens directly
+            'ultramsg_instance_id' => $this->ultramsg_instance_id,
+            'ultramsg_token' => $this->ultramsg_token, // Be careful about exposing sensitive tokens directly
+            'ultramsg_base_url' => $this->ultramsg_base_url,
+            'ultramsg_default_country_code' => $this->ultramsg_default_country_code,
             'send_result_after_auth' => (bool) $this->send_result_after_auth,
             'send_result_after_result' => (bool) $this->send_result_after_result,
             'edit_result_after_auth' => (bool) $this->edit_result_after_auth,
@@ -63,7 +65,6 @@ class SettingResource extends JsonResource
             'report_header_email' => $this->report_header_email,
             'report_header_vatin' => $this->report_header_vatin,
             'report_header_cr' => $this->report_header_cr,
-            'report_header_logo_base64' => $this->report_header_logo_base64, 
 
             // Eager load related finance accounts if needed for display
             // 'default_finance_account_details' => new FinanceAccountResource($this->whenLoaded('defaultFinanceAccount')),

@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Http\Resources\PatientLabQueueItemResource; // We can reuse this for the queue
 use App\Http\Resources\LabRequestResource; // For returning updated lab requests
-use App\Services\WhatsAppService;
+use App\Services\UltramsgService;
 use Illuminate\Support\Facades\Log;
 use App\Models\Shift;
 use App\Models\Patient;
