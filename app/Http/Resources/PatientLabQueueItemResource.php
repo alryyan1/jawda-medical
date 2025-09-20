@@ -41,6 +41,8 @@ class PatientLabQueueItemResource extends JsonResource {
          $allResultsEntered = ($totalResultsCount > 0 && $pendingResultsCount === 0);
          $isPrinted = $this->patient->result_print_date != null; // Assuming 'is_printed' is on the visit model
         return [
+            'total_result_count'=>$totalResultsCount,
+            'pending_result_count'=>$pendingResultsCount,
             'visit_id' => $this->visit_id,
             'patient_id' => $this->patient_id,
             'patient_name' => $this->patient_name,
@@ -69,7 +71,7 @@ class PatientLabQueueItemResource extends JsonResource {
             // NEW FIELD
             'is_last_result_pending' => ($totalResultsCount > 0 && $pendingResultsCount === 1),
              // NEW FIELD
-             'is_ready_for_print' => ($allResultsEntered && !$isPrinted),
+             'is_ready_for_print' => ($pendingResultsCount == 0 && !$isPrinted),
              'sample_collected' => $patientModel?->sample_collect_time != null,
              'result_url' => $patientModel?->result_url,
              'registered_by' => $patientModel?->user?->name,

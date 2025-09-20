@@ -260,6 +260,241 @@ class LabRequestController extends Controller
         return PatientLabQueueItemResource::collection($pendingVisits);
     }
 
+    /**
+     * Get patients ready for print (pending_result_count == 0)
+     */
+    public function getLabReadyForPrintQueue(Request $request)
+    {
+        $request->validate([
+            'shift_id' => 'nullable|integer|exists:shifts,id',
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'search' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'package_id' => 'nullable|integer|exists:packages,package_id',
+            'main_test_id' => 'nullable|integer|exists:main_tests,id',
+            'company_id' => 'nullable|integer|exists:companies,id',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+        ]);
+
+        $perPage = $request->input('per_page', 30);
+
+        // Base query for DoctorVisit
+        $query = DoctorVisit::query()
+            ->select(
+                'doctorvisits.id as visit_id',
+                'doctorvisits.created_at as visit_creation_time',
+                'doctorvisits.visit_date',
+                'patients.id as patient_id',
+                'patients.name as patient_name'
+            )
+            ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
+            ->whereHas('patientLabRequests', function ($lrQuery) use ($request) {
+                // Apply filters to lab requests
+                if ($request->filled('package_id')) {
+                    $lrQuery->whereHas('mainTest', function ($mtQuery) use ($request) {
+                        $mtQuery->where('pack_id', $request->package_id);
+                    });
+                }
+
+                if ($request->filled('main_test_id')) {
+                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
+                }
+            })
+            ->whereHas('patientLabRequests.results', function ($resultsQuery) {
+                // Ensure there are results
+                $resultsQuery->whereNotNull('result')
+                           ->where('result', '!=', '');
+            })
+            ->whereDoesntHave('patientLabRequests.results', function ($resultsQuery) {
+                // Ensure no pending results (empty or null)
+                $resultsQuery->where(function ($q) {
+                    $q->whereNull('result')
+                      ->orWhere('result', '=', '');
+                });
+            });
+
+        // Apply shift filter
+        if ($request->filled('shift_id')) {
+            $query->where('doctorvisits.shift_id', $request->shift_id);
+        }
+
+        // Filter by Company
+        if ($request->filled('company_id')) {
+            $query->whereHas('patient', function ($q_pat) use ($request) {
+                $q_pat->where('company_id', $request->company_id);
+            });
+        }
+
+        // Filter by Doctor
+        if ($request->filled('doctor_id')) {
+            $query->where('doctorvisits.doctor_id', $request->doctor_id);
+        }
+
+        // Filter by Package
+        if ($request->filled('package_id')) {
+            $query->whereHas('patientLabRequests.mainTest', function ($q_mt) use ($request) {
+                $q_mt->where('pack_id', $request->package_id);
+            });
+        }
+
+        // Filter by Main Test
+        if ($request->filled('main_test_id')) {
+            $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
+                $q_lr->where('main_test_id', $request->main_test_id);
+            });
+        }
+
+        // Search filter
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('patients.name', 'like', "%{$searchTerm}%")
+                  ->orWhere('patients.phone', 'like', "%{$searchTerm}%")
+                  ->orWhere('doctorvisits.id', 'like', "%{$searchTerm}%");
+            });
+        }
+
+        // Count lab requests for this visit
+        $query->withCount([
+            'patientLabRequests as test_count' => function ($lrQuery) use ($request) {
+                if ($request->filled('package_id')) {
+                    $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
+                }
+                if ($request->filled('main_test_id')) {
+                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
+                }
+            }
+        ]);
+
+        // Get the oldest request time for this visit
+        $query->withMin('patientLabRequests', 'created_at', 'oldest_request_time');
+
+        // Eager load relations needed by the resource
+        $query->with(['patient', 'patientLabRequests.mainTest', 'patientLabRequests.results']);
+
+        // Order by visit ID descending
+        $readyForPrintVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
+
+        return PatientLabQueueItemResource::collection($readyForPrintVisits);
+    }
+
+    /**
+     * Get patients with unfinished results (pending_result_count > 0)
+     */
+    public function getLabUnfinishedResultsQueue(Request $request)
+    {
+        $request->validate([
+            'shift_id' => 'nullable|integer|exists:shifts,id',
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'search' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
+            'package_id' => 'nullable|integer|exists:packages,package_id',
+            'main_test_id' => 'nullable|integer|exists:main_tests,id',
+            'company_id' => 'nullable|integer|exists:companies,id',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+        ]);
+
+        $perPage = $request->input('per_page', 30);
+
+        // Base query for DoctorVisit
+        $query = DoctorVisit::query()
+            ->select(
+                'doctorvisits.id as visit_id',
+                'doctorvisits.created_at as visit_creation_time',
+                'doctorvisits.visit_date',
+                'patients.id as patient_id',
+                'patients.name as patient_name'
+            )
+            ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
+            ->whereHas('patientLabRequests', function ($lrQuery) use ($request) {
+                // Apply filters to lab requests
+                if ($request->filled('package_id')) {
+                    $lrQuery->whereHas('mainTest', function ($mtQuery) use ($request) {
+                        $mtQuery->where('pack_id', $request->package_id);
+                    });
+                }
+
+                if ($request->filled('main_test_id')) {
+                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
+                }
+            })
+            ->whereHas('patientLabRequests.results', function ($resultsQuery) {
+                // Ensure there are some pending results (empty or null)
+                $resultsQuery->where(function ($q) {
+                    $q->whereNull('result')
+                      ->orWhere('result', '=', '');
+                });
+            });
+
+        // Apply shift filter
+        if ($request->filled('shift_id')) {
+            $query->where('doctorvisits.shift_id', $request->shift_id);
+        }
+
+        // Filter by Company
+        if ($request->filled('company_id')) {
+            $query->whereHas('patient', function ($q_pat) use ($request) {
+                $q_pat->where('company_id', $request->company_id);
+            });
+        }
+
+        // Filter by Doctor
+        if ($request->filled('doctor_id')) {
+            $query->where('doctorvisits.doctor_id', $request->doctor_id);
+        }
+
+        // Filter by Package
+        if ($request->filled('package_id')) {
+            $query->whereHas('patientLabRequests.mainTest', function ($q_mt) use ($request) {
+                $q_mt->where('pack_id', $request->package_id);
+            });
+        }
+
+        // Filter by Main Test
+        if ($request->filled('main_test_id')) {
+            $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
+                $q_lr->where('main_test_id', $request->main_test_id);
+            });
+        }
+
+        // Search filter
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('patients.name', 'like', "%{$searchTerm}%")
+                  ->orWhere('patients.phone', 'like', "%{$searchTerm}%")
+                  ->orWhere('doctorvisits.id', 'like', "%{$searchTerm}%");
+            });
+        }
+
+        // Count lab requests for this visit
+        $query->withCount([
+            'patientLabRequests as test_count' => function ($lrQuery) use ($request) {
+                if ($request->filled('package_id')) {
+                    $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
+                }
+                if ($request->filled('main_test_id')) {
+                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
+                }
+            }
+        ]);
+
+        // Get the oldest request time for this visit
+        $query->withMin('patientLabRequests', 'created_at', 'oldest_request_time');
+
+        // Eager load relations needed by the resource
+        $query->with(['patient', 'patientLabRequests.mainTest', 'patientLabRequests.results']);
+
+        // Order by visit ID descending
+        $unfinishedVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
+
+        return PatientLabQueueItemResource::collection($unfinishedVisits);
+    }
+
  /**
      * Get the queue of patients registered through the lab for a specific shift or day.
      * This method shows ALL lab-specific visits, even those without tests added yet.

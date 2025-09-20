@@ -262,6 +262,8 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/labrequests/{labrequest}/authorize', [LabRequestController::class, 'authorizeResults']);
 
   Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
+  Route::get('/lab/ready-for-print-queue', [LabRequestController::class, 'getLabReadyForPrintQueue']);
+  Route::get('/lab/unfinished-results-queue', [LabRequestController::class, 'getLabUnfinishedResultsQueue']);
 
   // This is the endpoint that ResultEntryPanel uses to get all data for one LabRequest
   Route::get('/labrequests/{labrequest}/for-result-entry', [LabRequestController::class, 'getLabRequestForEntry']);
@@ -394,6 +396,9 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // NEW: Route for patient visit history
     Route::get('/patients/{patient}/visit-history', [PatientController::class, 'visitHistory'])->name('patients.visitHistory');
+    
+    // NEW: Route for patient lab history by phone number
+    Route::get('/patients/{patient}/lab-history', [PatientController::class, 'getLabHistory'])->name('patients.labHistory');
     
     Route::apiResource('patients', PatientController::class); // This should already be there
 

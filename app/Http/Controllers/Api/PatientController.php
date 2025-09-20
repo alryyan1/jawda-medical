@@ -997,4 +997,60 @@ class PatientController extends Controller
 
         return RecentDoctorVisitSearchResource::collection($visitsWithLabs);
     }
+
+    /**
+     * Get lab history for patients with the same phone number
+     * Returns all patients with the same phone number who have lab requests
+     */
+    public function getLabHistory(Request $request, Patient $patient)
+    {
+        $request->validate([
+            'phone' => 'required|string',
+        ]);
+
+        $phone = $request->phone;
+
+        // Find all patients with the same phone number who have lab requests
+        $patientsWithLabHistory = Patient::where('phone', $phone)
+            ->whereHas('doctorVisit.labRequests') // Ensure they have lab requests
+            ->with([
+                'doctorVisit' => function ($query) {
+                    $query->with(['labRequests' => function ($labQuery) {
+                        $labQuery->where('valid', true)
+                            ->with(['mainTest:id,main_test_name']);
+                    }])
+                    ->orderBy('created_at', 'desc');
+                },
+                'company:id,name'
+            ])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Format the data for the frontend autocomplete
+        $formattedResults = $patientsWithLabHistory->map(function ($patient) {
+            $latestVisit = $patient->doctorVisit;
+            $labRequestCount = $latestVisit ? $latestVisit->labRequests->count() : 0;
+            
+            return [
+                'patient_id' => $patient->id,
+                'visit_id' => $latestVisit ? $latestVisit->id : null,
+                'patient_name' => $patient->name,
+                'phone' => $patient->phone,
+                'visit_date' => $latestVisit ? $latestVisit->visit_date : null,
+                'lab_request_count' => $labRequestCount,
+                'company_name' => $patient->company ? $patient->company->name : null,
+                'autocomplete_label' => $patient->name . 
+                    ($latestVisit ? " - " . $latestVisit->visit_date->format('d/M/Y') : '') . 
+                    " (" . $labRequestCount . " tests)",
+            ];
+        });
+
+        return response()->json([
+            'data' => $formattedResults,
+            'meta' => [
+                'total_patients' => $patientsWithLabHistory->count(),
+                'phone_searched' => $phone
+            ]
+        ]);
+    }
 }
