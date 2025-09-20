@@ -54,10 +54,9 @@ class UploadLabResultToFirebase implements ShouldQueue
                 return;
             }
 
-            // Check if patient already has result_url
+            // Log if patient already has result_url (we will overwrite it)
             if ($patient->result_url) {
-                Log::info("Patient {$this->patientId} already has result_url: {$patient->result_url}");
-                return; // Job completed successfully
+                Log::info("Patient {$this->patientId} already has result_url, will overwrite: {$patient->result_url}");
             }
 
             // Get doctor visit
@@ -79,9 +78,11 @@ class UploadLabResultToFirebase implements ShouldQueue
             }
 
             // Generate filename
-            $sanitizedPatientName = preg_replace('/[^A-Za-z0-9-_]/', '_', $patient->name);
-            $filename = "lab_result_{$this->visitId}_{$sanitizedPatientName}_" . now()->format('Y-m-d') . ".pdf";
+            $filename = "result.pdf";
             $firebasePath = "results/{$this->hospitalName}/{$this->visitId}/{$filename}";
+
+            // Delete old file if it exists
+            $this->deleteOldFileFromFirebase($firebasePath);
 
             // Upload to Firebase using HTTP API
             $downloadUrl = $this->uploadToFirebase($pdfContent, $firebasePath);
@@ -107,6 +108,47 @@ class UploadLabResultToFirebase implements ShouldQueue
             
             // Re-throw to trigger retry mechanism
             throw $e;
+        }
+    }
+
+    /**
+     * Delete old file from Firebase Storage if it exists
+     */
+    private function deleteOldFileFromFirebase(string $firebasePath): void
+    {
+        try {
+            // Check if Firebase service account file exists
+            $serviceAccountPath = config('firebase.service_account_path');
+            
+            if (!file_exists($serviceAccountPath)) {
+                Log::info("Firebase service account file not found. Skipping old file deletion.");
+                return;
+            }
+            
+            // Initialize Firebase
+            $firebase = $this->initializeFirebase();
+            $storage = $firebase->createStorage();
+            $bucketName = config('firebase.storage_bucket');
+            $bucket = $storage->getBucket($bucketName);
+            
+            // Check if file exists and delete it
+            $object = $bucket->object($firebasePath);
+            if ($object->exists()) {
+                $object->delete();
+                Log::info("Deleted old file from Firebase Storage", [
+                    'firebase_path' => $firebasePath
+                ]);
+            } else {
+                Log::info("No old file found to delete", [
+                    'firebase_path' => $firebasePath
+                ]);
+            }
+            
+        } catch (\Exception $e) {
+            Log::warning("Failed to delete old file from Firebase: " . $e->getMessage(), [
+                'firebase_path' => $firebasePath
+            ]);
+            // Don't throw exception - continue with upload even if deletion fails
         }
     }
 

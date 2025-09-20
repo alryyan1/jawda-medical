@@ -376,6 +376,69 @@ class PatientController extends Controller
     }
 
     /**
+     * Upload lab result to Firebase for a patient
+     *
+     * @param  \App\Models\Patient  $patient
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function uploadToFirebase(Patient $patient)
+    {
+        try {
+            // Get doctor visit
+            $doctorVisit = $patient->doctorVisit;
+            if (!$doctorVisit) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No doctor visit found for this patient'
+                ], 400);
+            }
+
+            // Check if patient already has result_url (for logging purposes)
+            $hadExistingUrl = !empty($patient->result_url);
+            $oldResultUrl = $patient->result_url;
+
+            // Always run the job to upload/overwrite the result
+            $job = new \App\Jobs\UploadLabResultToFirebase(
+                $patient->id,
+                $doctorVisit->id,
+                'Jawda Medical' // You can get this from settings
+            );
+            
+            $job->handle();
+            
+            // Refresh the patient to get the updated result_url
+            $patient->refresh();
+            
+            \Log::info("Firebase upload completed for patient {$patient->id}, visit {$doctorVisit->id}", [
+                'had_existing_url' => $hadExistingUrl,
+                'old_url' => $oldResultUrl,
+                'new_url' => $patient->result_url
+            ]);
+
+            $message = $hadExistingUrl 
+                ? 'Lab result replaced in Firebase successfully' 
+                : 'Lab result uploaded to Firebase successfully';
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'result_url' => $patient->result_url,
+                'patient_id' => $patient->id,
+                'visit_id' => $doctorVisit->id,
+                'was_updated' => $hadExistingUrl
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error uploading to Firebase: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to upload to Firebase: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Toggle authentication status for a patient (Admin only)
      *
      * @param  \Illuminate\Http\Request  $request

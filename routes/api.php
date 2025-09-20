@@ -413,9 +413,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift'])->name('patients.copyToNewVisit');
     Route::post('/labrequests/{labrequest}/set-default-results', [LabRequestController::class, 'setDefaultResults']);
     Route::post('/labrequests/{labrequest}/populate-cbc-from-sysmex', [LabRequestController::class, 'populateCbcResultsFromSysmex']);
-    Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
+        Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
         Route::patch('/patients/{patient}/authenticate-results', [PatientController::class, 'authenticateResults']);
         Route::get('/patients/{patient}/result-url', [PatientController::class, 'getResultUrl']);
+        Route::post('/patients/{patient}/upload-to-firebase', [PatientController::class, 'uploadToFirebase']);
         Route::patch('/patients/{patient}/toggle-authentication', [PatientController::class, 'toggleAuthentication']);
 
     /*
