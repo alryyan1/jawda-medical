@@ -6,7 +6,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import axios from 'axios';
-import { print } from 'pdf-to-printer';
+import pkg from 'pdf-to-printer';
+const { print } = pkg;
 
 const PORT = process.env.PORT || 4001;
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
