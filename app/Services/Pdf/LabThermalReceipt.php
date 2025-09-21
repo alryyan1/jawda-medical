@@ -36,7 +36,7 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->setThermalDefaults($thermalWidth);
         
         // Set custom margins
-        $this->SetMargins(15, 20, 5); // Left, Top, Right margins
+        $this->SetMargins(5, 20, 5); // Left, Top, Right margins
         
         // Set font and alignment properties
         $this->fontName = 'ae_alhor'; // Use the converted Arabic font
@@ -54,8 +54,8 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->generateHeader();
         $this->generateReceiptInfo();
         $this->generateRequiredTests();
-        $this->generateBarcode();
         $this->generateTotalsSection();
+        $this->generateBarcode();
         // $this->generateWatermark();
         $this->generateFooter();
 
@@ -83,11 +83,11 @@ class LabThermalReceipt extends MyCustomTCPDF
         }
 
         // Hospital/Lab name
-        $this->SetFont($this->fontName, 'B', $logoData ? 8 : 9);
+        $this->SetFont($this->fontName, 'B', 15);
         $this->MultiCell(0, $this->lineHeight, $this->appSettings?->hospital_name ?: ($this->appSettings?->lab_name ?: config('app.name')), 0, $this->alignCenter, false, 1);
 
         // Address and contact info
-        $this->SetFont($this->fontName, '', 6);
+        $this->SetFont($this->fontName, '', 9);
         if ($this->appSettings?->address) {
             $this->MultiCell(0, $this->lineHeight - 0.5, $this->appSettings->address, 0, $this->alignCenter, false, 1);
         }
@@ -132,11 +132,11 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->SetX($this->getMargins()['left'] + $centerX);
         $this->Cell($visitNumberWidth, $this->lineHeight, $visitNumber, 0, 0, 'C');
         
-        $this->Ln(5);
-        $this->SetFont($this->fontName, '', size: 8);
+        $this->Ln(10);
+        $this->SetFont($this->fontName, '', size: 7);
         // Position date on the right
         // $this->SetX($this->getMargins()['left'] + $pageWidth - $dateWidth);
-        $this->Cell($dateWidth, $this->lineHeight, $date, 0, 1, 'L');
+        $this->Cell(0, $this->lineHeight, $date, 0, 1, 'L');
         
         $this->Ln(5);
     }
@@ -162,7 +162,7 @@ class LabThermalReceipt extends MyCustomTCPDF
                 'fontsize' => 10,
                 'stretchtext' => 4
             ];
-            $this->write1DBarcode($barcodeValue, 'C128B', '50', '', '', (float)20, (float)0.3, $style, 'N');
+            $this->write1DBarcode($barcodeValue, 'C128B', '50', '', '', (float)15, (float)0.3, $style, 'N');
             // $this->Ln(5);
         }
 
@@ -196,8 +196,8 @@ class LabThermalReceipt extends MyCustomTCPDF
         $allTestsText = implode('، ', $testNames);
         
         $this->SetFont($this->fontName, '', 7);
-        $pageUsableWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
-        $this->MultiCell($pageUsableWidth, $this->lineHeight, $allTestsText, 0, $this->alignStart, false, 1);
+        $pageUsableWidth = $this->getPageWidth() - $this->getMargins()['right'];
+        $this->MultiCell(0, $this->lineHeight, $allTestsText, 0, 'L', false, 1);
 
         $this->Ln(2);
         $this->Cell(0, 0.1, '', 'T', 1, 'C');

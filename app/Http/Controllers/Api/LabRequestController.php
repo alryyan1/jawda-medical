@@ -1116,7 +1116,7 @@ class LabRequestController extends Controller
 
         // Load necessary relationships
         $visit->load([
-            'patient:id,name,phone,company_id,insurance_no,guarantor',
+            'patient:id,name,phone,company_id,insurance_no,guarantor,visit_number',
             'patient.company:id,name',
             'patient.subcompany:id,name',
             'patient.companyRelation:id,name',
