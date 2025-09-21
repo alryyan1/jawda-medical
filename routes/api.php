@@ -614,3 +614,4 @@ Route::post('/doctor-visits/{visit}/pay-all-lab-requests', [LabRequestController
 Route::post('/lab-requests/{labrequest}/cancel-payment', [LabRequestController::class, 'cancelPayment'])->middleware('auth:sanctum');
 Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::class, 'toggleBankak'])->middleware('auth:sanctum');
 Route::patch('/doctor-visits/{visit}/update-all-lab-requests-bankak', [LabRequestController::class, 'updateAllLabRequestsBankak'])->middleware('auth:sanctum');
+Route::get('/lab-requests/visit/{visit}/thermal-receipt-pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf'])->middleware('auth:sanctum');

@@ -2,10 +2,16 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import { Server as SocketIOServer } from 'socket.io';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import axios from 'axios';
 
 const PORT = process.env.PORT || 4001;
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
 const SERVER_AUTH_TOKEN = process.env.SERVER_AUTH_TOKEN || 'changeme';
+const API_BASE = process.env.API_BASE || 'http://localhost:8000/api';
+const SANCTUM_TOKEN = process.env.SANCTUM_TOKEN || '';
 
 const app = express();
 app.use(express.json());
@@ -55,6 +61,79 @@ app.post('/emit/lab-payment', verifyAuth, (req, res) => {
   io.emit('lab-payment', payload);
   console.log('lab-payment emitted');
   return res.json({ ok: true });
+});
+
+// Print lab thermal receipt
+app.post('/emit/print-lab-receipt', verifyAuth, async (req, res) => {
+  try {
+    const payload = req.body; // Expecting { visit_id, patient_id, lab_request_ids }
+    const { visit_id, patient_id, lab_request_ids } = payload;
+    
+    console.log('print-lab-receipt', payload);
+    
+    if (!visit_id) {
+      return res.status(400).json({ error: 'visit_id is required' });
+    }
+
+    // Generate PDF URL
+    const pdfUrl = `${API_BASE}/lab-requests/visit/${visit_id}/thermal-receipt-pdf`;
+    console.log(`[Print] Generating PDF for visit ${visit_id}: ${pdfUrl}`);
+
+    // Download PDF
+    const tmpFile = path.join(os.tmpdir(), `lab-receipt-${visit_id}-${Date.now()}.pdf`);
+    const response = await axios.get(pdfUrl, {
+      responseType: 'arraybuffer',
+      headers: SANCTUM_TOKEN ? { Authorization: `Bearer ${SANCTUM_TOKEN}` } : {},
+    });
+    
+    fs.writeFileSync(tmpFile, response.data);
+    console.log(`[Print] PDF saved to: ${tmpFile}`);
+
+    // Print the PDF (using system default printer)
+    try {
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      
+      // Use system command to print PDF
+      const printCommand = process.platform === 'win32' 
+        ? `start /wait "" "${tmpFile}"`  // Windows
+        : `lp "${tmpFile}"`;            // Linux/Mac
+      
+      await execAsync(printCommand);
+      console.log(`[Print] Successfully printed lab receipt for visit ${visit_id}`);
+      
+      // Clean up temporary file
+      setTimeout(() => {
+        try {
+          fs.unlinkSync(tmpFile);
+          console.log(`[Print] Cleaned up temporary file: ${tmpFile}`);
+        } catch (err) {
+          console.error(`[Print] Error cleaning up file: ${err.message}`);
+        }
+      }, 5000); // Clean up after 5 seconds
+      
+      return res.json({ 
+        ok: true, 
+        message: `Lab receipt printed successfully for visit ${visit_id}`,
+        temp_file: tmpFile
+      });
+      
+    } catch (printError) {
+      console.error(`[Print] Error printing PDF: ${printError.message}`);
+      return res.status(500).json({ 
+        error: 'Failed to print PDF', 
+        details: printError.message 
+      });
+    }
+
+  } catch (err) {
+    console.error('[Print] Error handling print request:', err?.message || err);
+    return res.status(500).json({ 
+      error: 'Failed to process print request', 
+      details: err?.message || err 
+    });
+  }
 });
 
 server.listen(PORT, () => {
