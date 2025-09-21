@@ -105,19 +105,19 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->SetFont($this->fontName, 'B', 12);
         
         // Patient name (first line, left aligned)
-        $this->Cell(0, $this->lineHeight + 1, 'اسم المريض: '.$this->visit->patient->name, 0, 1, $this->alignStart);
+        $this->Cell(0, $this->lineHeight + 1, 'اسم المريض/ '.$this->visit->patient->name, 0, 1, $this->alignStart);
         
         // Doctor name (second line, left aligned)
         if ($this->visit->doctor) {
             $this->SetFont($this->fontName, '', 12);
-            $this->Cell(0, $this->lineHeight, 'اسم الطبيب: '.$this->visit->doctor->name, 0, 1, $this->alignStart);
+            $this->Cell(0, $this->lineHeight, 'اسم الطبيب/ '.$this->visit->doctor->name, 0, 1, $this->alignStart);
         }
         $this->Ln(5);
         
         // Visit number in the middle and date on the right
         $this->SetFont($this->fontName, 'B', 10);
         $visitNumber = " الكود: " . $this->visit->patient->visit_number;
-        $date = Carbon::now()->format('Y/m/d H:i A');
+        $date = Carbon::now()->format('Y/m/d H:i A') . ' التاريخ ';
         
         // Calculate positions for center and right alignment
         $pageWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
@@ -132,8 +132,8 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->Ln(5);
         $this->SetFont($this->fontName, '', size: 8);
         // Position date on the right
-        $this->SetX($this->getMargins()['left'] + $pageWidth - $dateWidth);
-        $this->Cell($dateWidth, $this->lineHeight, $date, 0, 1, 'L');
+        // $this->SetX($this->getMargins()['left'] + $pageWidth - $dateWidth);
+        $this->Cell($dateWidth, $this->lineHeight, $date, 0, 1, 'R');
         
         $this->Ln(5);
     }
