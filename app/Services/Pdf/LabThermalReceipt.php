@@ -50,7 +50,7 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->generateHeader();
         $this->generateReceiptInfo();
         $this->generateBarcode();
-        $this->generateItemsTable();
+        $this->generateRequiredTests();
         $this->generateTotalsSection();
         $this->generateWatermark();
         $this->generateFooter();
@@ -101,42 +101,37 @@ class LabThermalReceipt extends MyCustomTCPDF
 
     protected function generateReceiptInfo(): void
     {
-        $this->SetFont($this->fontName, '', 6.5);
-        $receiptNumber = "LAB-" . $this->visit->id . "-" . ($this->labRequestsToPrint[0]['id'] ?? '');
-        $this->Cell(0, $this->lineHeight, ($this->isRTL ? "إيصال رقم: " : "Receipt #: ") . $receiptNumber, 0, 1, $this->alignStart);
-        $this->Cell(0, $this->lineHeight, ($this->isRTL ? "زيارة رقم: " : "Visit #: ") . $this->visit->id, 0, 1, $this->alignStart);
-        $this->Cell(0, $this->lineHeight, ($this->isRTL ? "التاريخ: " : "Date: ") . Carbon::now()->format('Y/m/d H:i A'), 0, 1, $this->alignStart);
-        $this->Cell(0, $this->lineHeight, ($this->isRTL ? "المريض: " : "Patient: ") . $this->visit->patient->name, 0, 1, $this->alignStart);
+        $this->SetFont($this->fontName, 'B', 8);
         
-        if ($this->visit->patient->phone) {
-            $this->Cell(0, $this->lineHeight, ($this->isRTL ? "الهاتف: " : "Phone: ") . $this->visit->patient->phone, 0, 1, $this->alignStart);
-        }
+        // Patient name (first line, left aligned)
+        $this->Cell(0, $this->lineHeight + 1, $this->visit->patient->name, 0, 1, $this->alignStart);
         
-        if ($this->isCompanyPatient && $this->visit->patient->company) {
-            $this->Cell(0, $this->lineHeight, ($this->isRTL ? "الشركة: " : "Company: ") . $this->visit->patient->company->name, 0, 1, $this->alignStart);
-        }
-        
-        if ($this->isCompanyPatient && $this->visit->patient->insurance_no) {
-            $this->Cell(0, $this->lineHeight, ($this->isRTL ? "رقم التأمين: " : "Insurance No: ") . $this->visit->patient->insurance_no, 0, 1, $this->alignStart);
-        }
-        
-        if ($this->isCompanyPatient && $this->visit->patient->subcompany) {
-            $this->Cell(0, $this->lineHeight, ($this->isRTL ? "الشركة الفرعية: " : "Subcompany: ") . $this->visit->patient->subcompany->name, 0, 1, $this->alignStart);
-        }
-        
-        if ($this->isCompanyPatient && $this->visit->patient->guarantor) {
-            $this->Cell(0, $this->lineHeight, ($this->isRTL ? "الضامن: " : "Guarantor: ") . $this->visit->patient->guarantor, 0, 1, $this->alignStart);
-        }
-        
-        if ($this->isCompanyPatient && $this->visit->patient->companyRelation) {
-            $this->Cell(0, $this->lineHeight, ($this->isRTL ? "العلاقة: " : "Relation: ") . $this->visit->patient->companyRelation->name, 0, 1, $this->alignStart);
-        }
-        
+        // Doctor name (second line, left aligned)
         if ($this->visit->doctor) {
-            $this->Cell(0, $this->lineHeight, ($this->isRTL ? "الطبيب: " : "Doctor: ") . $this->visit->doctor->name, 0, 1, $this->alignStart);
+            $this->SetFont($this->fontName, '', 7);
+            $this->Cell(0, $this->lineHeight, $this->visit->doctor->name, 0, 1, $this->alignStart);
         }
         
-        $this->Cell(0, $this->lineHeight, ($this->isRTL ? "الكاشير: " : "Cashier: ") . $this->cashierName, 0, 1, $this->alignStart);
+        // Visit number in the middle and date on the right
+        $this->SetFont($this->fontName, 'B', 7);
+        $visitNumber = "زيارة رقم: " . $this->visit->id;
+        $date = Carbon::now()->format('Y/m/d H:i A');
+        
+        // Calculate positions for center and right alignment
+        $pageWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
+        $visitNumberWidth = $this->GetStringWidth($visitNumber);
+        $dateWidth = $this->GetStringWidth($date);
+        
+        // Position visit number in center
+        $centerX = ($pageWidth - $visitNumberWidth) / 2;
+        $this->SetX($this->getMargins()['left'] + $centerX);
+        $this->Cell($visitNumberWidth, $this->lineHeight, $visitNumber, 0, 0, 'C');
+        
+        // Position date on the right
+        $this->SetX($this->getMargins()['left'] + $pageWidth - $dateWidth);
+        $this->Cell($dateWidth, $this->lineHeight, $date, 0, 1, 'R');
+        
+        $this->Ln(2);
     }
 
     protected function generateBarcode(): void
@@ -169,43 +164,37 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->Ln(0.5);
     }
 
-    protected function generateItemsTable(): void
+    protected function generateRequiredTests(): void
     {
-        $pageUsableWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
-        $nameWidth = $pageUsableWidth * 0.50;
-        $qtyWidth = $pageUsableWidth * 0.10;
-        $priceWidth = $pageUsableWidth * 0.20;
-        $totalWidth = $pageUsableWidth * 0.20;
+        // Title: "الفحوصات المطلوبة"
+        $this->SetFont($this->fontName, 'B', 8);
+        $this->Cell(0, $this->lineHeight + 1, 'الفحوصات المطلوبة', 0, 1, $this->alignCenter);
+        $this->Ln(1);
 
-        // Table headers
-        $this->SetFont($this->fontName, 'B', 6.5);
-        $this->Cell($nameWidth, $this->lineHeight, ($this->isRTL ? 'البيان' : 'Item'), 'B', 0, $this->alignStart);
-        $this->Cell($qtyWidth, $this->lineHeight, ($this->isRTL ? 'كمية' : 'Qty'), 'B', 0, $this->alignCenter);
-        $this->Cell($priceWidth, $this->lineHeight, ($this->isRTL ? 'سعر' : 'Price'), 'B', 0, $this->alignCenter);
-        $this->Cell($totalWidth, $this->lineHeight, ($this->isRTL ? 'إجمالي' : 'Total'), 'B', 1, $this->alignCenter);
-        $this->SetFont($this->fontName, '', 6.5);
-
-        // Table data
+        // Collect all test names
+        $testNames = [];
         foreach ($this->labRequestsToPrint as $lr) {
             $testName = $lr['main_test']['main_test_name'] ?? 'فحص غير معروف';
             $quantity = (int) ($lr['count'] ?? 1);
-            $unitPrice = (float) ($lr['price'] ?? 0);
-            $itemGrossTotal = $unitPrice * $quantity;
-
-            $currentYbeforeMultiCell = $this->GetY();
-            $this->MultiCell($nameWidth, $this->lineHeight - 0.5, $testName, 0, $this->alignStart, false, 0, '', '', true, (float)0, false, true, (float)0, 'T');
-            $yAfterMultiCell = $this->GetY();
-            $this->SetXY($this->getMargins()['left'] + $nameWidth, $currentYbeforeMultiCell);
-
-            $this->Cell($qtyWidth, $this->lineHeight - 0.5, $quantity, 0, 0, $this->alignCenter);
-            $this->Cell($priceWidth, $this->lineHeight - 0.5, number_format($unitPrice, 2), 0, 0, $this->alignCenter);
-            $this->Cell($totalWidth, $this->lineHeight - 0.5, number_format($itemGrossTotal, 2), 0, 1, $this->alignCenter);
-            $this->SetY(max($yAfterMultiCell, $currentYbeforeMultiCell + $this->lineHeight - 0.5));
+            
+            // Add quantity if more than 1
+            if ($quantity > 1) {
+                $testName .= " (×{$quantity})";
+            }
+            
+            $testNames[] = $testName;
         }
 
-        $this->Ln(0.5);
+        // Join test names with commas and display in full width
+        $allTestsText = implode('، ', $testNames);
+        
+        $this->SetFont($this->fontName, '', 7);
+        $pageUsableWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
+        $this->MultiCell($pageUsableWidth, $this->lineHeight, $allTestsText, 0, $this->alignStart, false, 1);
+
+        $this->Ln(2);
         $this->Cell(0, 0.1, '', 'T', 1, 'C');
-        $this->Ln(0.5);
+        $this->Ln(1);
     }
 
     protected function generateTotalsSection(): void
@@ -216,7 +205,7 @@ class LabThermalReceipt extends MyCustomTCPDF
         // Calculate totals
         $subTotalLab = 0;
         $totalDiscountOnLab = 0;
-        $totalEnduranceOnLab = 0;
+        $hasDiscount = false;
 
         foreach ($this->labRequestsToPrint as $lr) {
             $quantity = (int) ($lr['count'] ?? 1);
@@ -225,39 +214,24 @@ class LabThermalReceipt extends MyCustomTCPDF
             $subTotalLab += $itemGrossTotal;
 
             $itemDiscountPercent = (float) ($lr['discount_per'] ?? 0);
-            $itemDiscountAmount = ($itemGrossTotal * $itemDiscountPercent) / 100;
-            $totalDiscountOnLab += $itemDiscountAmount;
-
-            if ($this->isCompanyPatient) {
-                $itemEndurance = (float) ($lr['endurance'] ?? 0) * $quantity;
-                $totalEnduranceOnLab += $itemEndurance;
+            if ($itemDiscountPercent > 0) {
+                $hasDiscount = true;
+                $itemDiscountAmount = ($itemGrossTotal * $itemDiscountPercent) / 100;
+                $totalDiscountOnLab += $itemDiscountAmount;
             }
         }
 
-        $netAfterDiscount = $subTotalLab - $totalDiscountOnLab;
-        $netPayableByPatient = $netAfterDiscount - ($this->isCompanyPatient ? $totalEnduranceOnLab : 0);
         $totalActuallyPaidForTheseLabs = array_sum(array_column($this->labRequestsToPrint, 'amount_paid'));
-        $balanceDueForTheseLabs = $netPayableByPatient - $totalActuallyPaidForTheseLabs;
 
-        // Display totals
-        $this->drawThermalTotalRow(($this->isRTL ? 'إجمالي الفحوصات:' : 'Subtotal:'), $subTotalLab, $pageUsableWidth);
+        // Display totals - simplified version
+        $this->drawThermalTotalRow('الإجمالي:', $subTotalLab, $pageUsableWidth);
         
-        if ($totalDiscountOnLab > 0) {
-            $this->drawThermalTotalRow(($this->isRTL ? 'إجمالي الخصم:' : 'Discount:'), -$totalDiscountOnLab, $pageUsableWidth, false, 'text-red-500');
+        // Only show discount if there's actually a discount
+        if ($hasDiscount && $totalDiscountOnLab > 0) {
+            $this->drawThermalTotalRow('الخصم:', -$totalDiscountOnLab, $pageUsableWidth);
         }
 
-        if ($this->isCompanyPatient && $totalEnduranceOnLab > 0) {
-            $this->drawThermalTotalRow(($this->isRTL ? 'تحمل الشركة:' : 'Company Share:'), -$totalEnduranceOnLab, $pageUsableWidth, false, 'text-blue-500');
-        }
-
-        $this->SetFont($this->fontName, 'B', 7.5);
-        $this->drawThermalTotalRow(($this->isRTL ? 'صافي المطلوب من المريض:' : 'Patient Net Payable:'), $netPayableByPatient, $pageUsableWidth, true);
-        $this->SetFont($this->fontName, '', 7);
-
-        $this->drawThermalTotalRow(($this->isRTL ? 'المبلغ المدفوع:' : 'Amount Paid:'), $totalActuallyPaidForTheseLabs, $pageUsableWidth);
-
-        $this->SetFont($this->fontName, 'B', 7.5);
-        $this->drawThermalTotalRow(($this->isRTL ? 'المبلغ المتبقي:' : 'Balance Due:'), $balanceDueForTheseLabs, $pageUsableWidth, true);
+        $this->drawThermalTotalRow('المدفوع:', $totalActuallyPaidForTheseLabs, $pageUsableWidth);
 
         $this->Ln(2);
     }
@@ -284,20 +258,12 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->Ln(3);
     }
 
-    protected function drawThermalTotalRow(string $label, float $amount, float $pageUsableWidth, bool $isBold = false, ?string $colorClass = null): void
+    protected function drawThermalTotalRow(string $label, float $amount, float $pageUsableWidth): void
     {
         $labelWidth = $pageUsableWidth * 0.60;
         $amountWidth = $pageUsableWidth * 0.40;
 
-        if ($isBold) {
-            $this->SetFont($this->fontName, 'B', 7.5);
-        }
-
         $this->Cell($labelWidth, $this->lineHeight, $label, 0, 0, $this->alignStart);
         $this->Cell($amountWidth, $this->lineHeight, number_format($amount, 2), 0, 1, $this->alignEnd);
-
-        if ($isBold) {
-            $this->SetFont($this->fontName, '', 7);
-        }
     }
 }
