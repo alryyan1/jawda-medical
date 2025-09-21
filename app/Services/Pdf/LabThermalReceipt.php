@@ -37,9 +37,10 @@ class LabThermalReceipt extends MyCustomTCPDF
         
         // Set font and alignment properties
         $this->fontName = $this->getDefaultFontFamily();
-        $this->isRTL = $this->getRTL();
-        $this->alignStart = $this->isRTL ? 'R' : 'L';
-        $this->alignEnd = $this->isRTL ? 'L' : 'R';
+        $this->setRTL(true);
+        $this->isRTL = true; // Always RTL for Arabic
+        $this->alignStart = 'R'; // Right alignment for RTL
+        $this->alignEnd = 'L'; // Left alignment for RTL
         $this->alignCenter = 'C';
         $this->lineHeight = 3.5;
     }
@@ -49,10 +50,10 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->AddPage();
         $this->generateHeader();
         $this->generateReceiptInfo();
-        $this->generateBarcode();
         $this->generateRequiredTests();
+        $this->generateBarcode();
         $this->generateTotalsSection();
-        $this->generateWatermark();
+        // $this->generateWatermark();
         $this->generateFooter();
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $this->visit->patient->name);
@@ -88,10 +89,10 @@ class LabThermalReceipt extends MyCustomTCPDF
             $this->MultiCell(0, $this->lineHeight - 0.5, $this->appSettings->address, 0, $this->alignCenter, false, 1);
         }
         if ($this->appSettings?->phone) {
-            $this->MultiCell(0, $this->lineHeight - 0.5, ($this->isRTL ? "هاتف: " : "Tel: ") . $this->appSettings->phone, 0, $this->alignCenter, false, 1);
+            $this->MultiCell(0, $this->lineHeight - 0.5, "هاتف: " . $this->appSettings->phone, 0, $this->alignCenter, false, 1);
         }
         if ($this->appSettings?->vatin) {
-            $this->MultiCell(0, $this->lineHeight - 0.5, ($this->isRTL ? "ر.ض: " : "VAT: ") . $this->appSettings->vatin, 0, $this->alignCenter, false, 1);
+            $this->MultiCell(0, $this->lineHeight - 0.5, "ر.ض: " . $this->appSettings->vatin, 0, $this->alignCenter, false, 1);
         }
 
         $this->Ln(1);
@@ -101,20 +102,21 @@ class LabThermalReceipt extends MyCustomTCPDF
 
     protected function generateReceiptInfo(): void
     {
-        $this->SetFont($this->fontName, 'B', 8);
+        $this->SetFont($this->fontName, 'B', 12);
         
         // Patient name (first line, left aligned)
-        $this->Cell(0, $this->lineHeight + 1, $this->visit->patient->name, 0, 1, $this->alignStart);
+        $this->Cell(0, $this->lineHeight + 1, 'اسم المريض: '.$this->visit->patient->name, 0, 1, $this->alignStart);
         
         // Doctor name (second line, left aligned)
         if ($this->visit->doctor) {
-            $this->SetFont($this->fontName, '', 7);
-            $this->Cell(0, $this->lineHeight, $this->visit->doctor->name, 0, 1, $this->alignStart);
+            $this->SetFont($this->fontName, '', 12);
+            $this->Cell(0, $this->lineHeight, 'اسم الطبيب: '.$this->visit->doctor->name, 0, 1, $this->alignStart);
         }
+        $this->Ln(5);
         
         // Visit number in the middle and date on the right
-        $this->SetFont($this->fontName, 'B', 7);
-        $visitNumber = "زيارة رقم: " . $this->visit->id;
+        $this->SetFont($this->fontName, 'B', 10);
+        $visitNumber = " الكود: " . $this->visit->patient->visit_number;
         $date = Carbon::now()->format('Y/m/d H:i A');
         
         // Calculate positions for center and right alignment
@@ -127,17 +129,19 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->SetX($this->getMargins()['left'] + $centerX);
         $this->Cell($visitNumberWidth, $this->lineHeight, $visitNumber, 0, 0, 'C');
         
+        $this->Ln(5);
+        $this->SetFont($this->fontName, '', size: 8);
         // Position date on the right
         $this->SetX($this->getMargins()['left'] + $pageWidth - $dateWidth);
-        $this->Cell($dateWidth, $this->lineHeight, $date, 0, 1, 'R');
+        $this->Cell($dateWidth, $this->lineHeight, $date, 0, 1, 'L');
         
-        $this->Ln(2);
+        $this->Ln(5);
     }
 
     protected function generateBarcode(): void
     {
         if ($this->appSettings?->barcode && !empty($this->labRequestsToPrint[0]['id'])) {
-            $this->Ln(1);
+            $this->Ln(5);
             $barcodeValue = (string) $this->labRequestsToPrint[0]['id'];
             $style = [
                 'position' => '',
@@ -156,10 +160,10 @@ class LabThermalReceipt extends MyCustomTCPDF
                 'stretchtext' => 4
             ];
             $this->write1DBarcode($barcodeValue, 'C128B', '', '', '', (float)10, (float)0.3, $style, 'N');
-            $this->Ln(1);
+            $this->Ln(5);
         }
 
-        $this->Ln(1);
+        $this->Ln(5);
         $this->Cell(0, 0.1, '', 'T', 1, 'C');
         $this->Ln(0.5);
     }
@@ -167,7 +171,7 @@ class LabThermalReceipt extends MyCustomTCPDF
     protected function generateRequiredTests(): void
     {
         // Title: "الفحوصات المطلوبة"
-        $this->SetFont($this->fontName, 'B', 8);
+        $this->SetFont($this->fontName, 'B', 15);
         $this->Cell(0, $this->lineHeight + 1, 'الفحوصات المطلوبة', 0, 1, $this->alignCenter);
         $this->Ln(1);
 
@@ -194,12 +198,12 @@ class LabThermalReceipt extends MyCustomTCPDF
 
         $this->Ln(2);
         $this->Cell(0, 0.1, '', 'T', 1, 'C');
-        $this->Ln(1);
+        $this->Ln(5);
     }
 
     protected function generateTotalsSection(): void
     {
-        $this->SetFont($this->fontName, '', 7);
+        $this->SetFont($this->fontName, '', 10);
         $pageUsableWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
 
         // Calculate totals
@@ -233,7 +237,7 @@ class LabThermalReceipt extends MyCustomTCPDF
 
         $this->drawThermalTotalRow('المدفوع:', $totalActuallyPaidForTheseLabs, $pageUsableWidth);
 
-        $this->Ln(2);
+        $this->Ln(5);
     }
 
     protected function generateWatermark(): void
@@ -253,7 +257,7 @@ class LabThermalReceipt extends MyCustomTCPDF
     {
         $this->Ln(3);
         $this->SetFont($this->fontName, 'I', 6);
-        $footerMessage = $this->appSettings?->receipt_footer_message ?: ($this->isRTL ? 'شكراً لزيارتكم!' : 'Thank you for your visit!');
+        $footerMessage = $this->appSettings?->receipt_footer_message ?: 'شكراً لزيارتكم!';
         $this->MultiCell(0, $this->lineHeight - 1, $footerMessage, 0, $this->alignCenter, false, 1);
         $this->Ln(3);
     }
