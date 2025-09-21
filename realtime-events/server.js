@@ -6,6 +6,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import axios from 'axios';
+import { print } from 'pdf-to-printer';
 
 const PORT = process.env.PORT || 4001;
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
@@ -89,18 +90,16 @@ app.post('/emit/print-lab-receipt', verifyAuth, async (req, res) => {
     fs.writeFileSync(tmpFile, response.data);
     console.log(`[Print] PDF saved to: ${tmpFile}`);
 
-    // Print the PDF (using system default printer)
+    // Print the PDF using pdf-to-printer library
     try {
-      const { exec } = await import('child_process');
-      const { promisify } = await import('util');
-      const execAsync = promisify(exec);
+      console.log(`[Print] Printing PDF: ${tmpFile}`);
       
-      // Use system command to print PDF
-      const printCommand = process.platform === 'win32' 
-        ? `start /wait "" "${tmpFile}"`  // Windows
-        : `lp "${tmpFile}"`;            // Linux/Mac
+      // Print to default printer
+      await print(tmpFile, { 
+        printer: undefined, // Use default printer
+        unix: ['-o fit-to-page'] // Fit to page for thermal printers
+      });
       
-      await execAsync(printCommand);
       console.log(`[Print] Successfully printed lab receipt for visit ${visit_id}`);
       
       // Clean up temporary file
