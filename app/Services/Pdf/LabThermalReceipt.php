@@ -36,7 +36,7 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->setThermalDefaults($thermalWidth);
         
         // Set font and alignment properties
-        $this->fontName = $this->getDefaultFontFamily();
+        $this->fontName = 'ae_alhor'; // Use the converted Arabic font
         $this->setRTL(true);
         $this->isRTL = true; // Always RTL for Arabic
         $this->alignStart = 'R'; // Right alignment for RTL
