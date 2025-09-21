@@ -315,7 +315,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route for fetching costs for the list page (if not using a full apiResource for costs)
     Route::get('/costs-report-data', [CostController::class, 'index']); // Using CostController@index for data
   // Route::
-  Route::get('/reports/lab-test-statistics', [ReportController::class, 'labTestStatistics'])->name('reports.labTestStatistics');
+  Route::get('/reports/lab-test-statistics', [ReportController::class, 'labTestStatistics']);
+  Route::get('/reports/lab-general', [ReportController::class, 'labGeneral']);
+  Route::get('/reports/lab-general/pdf', [ReportController::class, 'generateLabGeneralReportPdf']);
 
     /*
     |--------------------------------------------------------------------------

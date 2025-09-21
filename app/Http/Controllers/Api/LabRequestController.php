@@ -560,14 +560,14 @@ class LabRequestController extends Controller
         // Eager load details needed for the PatientLabQueueItemResource
         $query->withCount(['patientLabRequests as test_count']) // Count all lab requests
             // ->withMin('patientLabRequests', 'labrequests.created_at', 'oldest_request_time') // Get time of first request
-            ->with(['patientLabRequests:labrequests.id,doctor_visit_id,sample_id,is_paid']); // Eager load for status check
+            ->with(['patientLabRequests:labrequests.id,doctor_visit_id,is_paid']); // Eager load for status check
 
         // Log the raw SQL query
-        \Log::info('Lab Reception Queue SQL Query:', [
-            'sql' => $query->toSql(),
-            'bindings' => $query->getBindings(),
-            'filters' => $request->all()
-        ]);
+        // \Log::info('Lab Reception Queue SQL Query:', [
+        //     'sql' => $query->toSql(),
+        //     'bindings' => $query->getBindings(),
+        //     'filters' => $request->all()
+        // ]);
         
         $pendingVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
     

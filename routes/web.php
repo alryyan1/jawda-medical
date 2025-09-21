@@ -1,5 +1,4 @@
-        
-        <?php
+<?php
 
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\LabResultController;
@@ -36,6 +35,7 @@ Route::get('/', function () {
 });
 Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
 Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
+Route::get('/reports/lab-general/pdf', [ReportController::class, 'generateLabGeneralReportPdf']);
 ///api/visits/10664/lab-report/pdf
 Route::get('/visits/{visit}/lab-report/pdf', [ReportController::class, 'result']);
 // Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf']);
@@ -48,10 +48,4 @@ Route::get('/reports/doctor-shifts/test',function(){
 //phpinfo
 Route::get('/phpinfo', function () {
     phpinfo();
-});
-
-
-Route::get('ttt',function(){
-    $patient = Patient::find(13863);
-    return $patient->labRequests;
 });

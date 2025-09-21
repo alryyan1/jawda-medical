@@ -36,6 +36,7 @@ use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Log;
 use App\Models\CostCategory;
 use App\Models\Holiday;
+use App\Models\Patient;
 use App\Models\RequestedServiceCost;
 use App\Models\RequestedServiceDeposit;
 use App\Models\ShiftDefinition;
@@ -4207,6 +4208,552 @@ class ReportController extends Controller
         // We can still use LabTestStatisticResource, but it will only populate these fields.
         return \App\Http\Resources\LabTestStatisticResource::collection($statistics); // Ensure resource is imported
     }
+
+    /**
+     * Lab General Report - Shows patients with their lab information
+     */
+    public function labGeneral(Request $request)
+    {
+        $request->validate([
+            'shift_id' => 'nullable|integer|exists:shifts,id',
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'patient_name' => 'nullable|string|max:255',
+            'user_id' => 'nullable|integer|exists:users,id',
+            'per_page' => 'nullable|integer|min:5|max:100',
+        ]);
+
+        $query = Patient::query()
+            ->join('doctorvisits', 'patients.id', '=', 'doctorvisits.patient_id')
+            ->join('doctors', 'patients.doctor_id', '=', 'doctors.id')
+            ->join('labrequests', 'patients.id', '=', 'labrequests.pid')
+            ->leftJoin('companies', 'patients.company_id', '=', 'companies.id')
+            ->select([
+                'doctorvisits.id as doctorvisit_id',
+                'patients.id',
+                'patients.name',
+                'doctors.name as doctor_name',
+                DB::raw('SUM(labrequests.price) as total_lab_amount'),
+                DB::raw('SUM(labrequests.amount_paid) as total_paid_for_lab'),
+                DB::raw('SUM(labrequests.price * labrequests.discount_per / 100) as discount'),
+                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_amount_bank'),
+                'companies.name as company_name',
+                DB::raw('GROUP_CONCAT(DISTINCT main_tests.main_test_name SEPARATOR ", ") as main_tests_names')
+            ])
+            ->leftJoin('main_tests', 'labrequests.main_test_id', '=', 'main_tests.id')
+            ->groupBy('doctorvisits.id', 'patients.id', 'patients.name', 'doctors.name', 'companies.name');
+
+        // Apply shift filter
+        if ($request->filled('shift_id')) {
+            $query->where('doctorvisits.shift_id', $request->shift_id);
+        }
+
+        // Apply date filters
+        if ($request->filled('date_from')) {
+            $query->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+
+        // Filter by patient name
+        if ($request->filled('patient_name')) {
+            $query->where('patients.name', 'LIKE', '%' . $request->patient_name . '%');
+        }
+
+        // Filter by user (who requested the lab)
+        if ($request->filled('user_id')) {
+            $query->where('labrequests.user_requested', $request->user_id);
+        }
+
+        // Order by patient name
+        $query->orderBy('doctorvisits.id', 'desc');
+
+        $perPage = $request->input('per_page', 20);
+        $results = $query->paginate($perPage);
+
+        // Get user revenue data
+        $userRevenueQuery = Patient::query()
+            ->join('doctorvisits', 'patients.id', '=', 'doctorvisits.patient_id')
+            ->join('labrequests', 'patients.id', '=', 'labrequests.pid')
+            ->join('users', 'labrequests.user_requested', '=', 'users.id')
+            ->select([
+                'users.id as user_id',
+                'users.name as user_name',
+                DB::raw('SUM(labrequests.amount_paid) as total_paid'),
+                DB::raw('SUM(labrequests.price * labrequests.discount_per / 100) as total_discount'),
+                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 0 THEN labrequests.amount_paid ELSE 0 END) as total_cash'),
+                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_bank')
+            ])
+            ->groupBy('users.id', 'users.name');
+
+        // Apply same filters as main query
+        if ($request->filled('shift_id')) {
+            $userRevenueQuery->where('doctorvisits.shift_id', $request->shift_id);
+        }
+        if ($request->filled('date_from')) {
+            $userRevenueQuery->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $userRevenueQuery->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+        if ($request->filled('patient_name')) {
+            $userRevenueQuery->where('patients.name', 'LIKE', '%' . $request->patient_name . '%');
+        }
+        if ($request->filled('user_id')) {
+            $userRevenueQuery->where('labrequests.user_requested', $request->user_id);
+        }
+
+        $userRevenues = $userRevenueQuery->get();
+
+        // Return combined data
+        return response()->json([
+            'data' => $results->items(),
+            'user_revenues' => $userRevenues,
+            'meta' => [
+                'current_page' => $results->currentPage(),
+                'from' => $results->firstItem(),
+                'last_page' => $results->lastPage(),
+                'links' => $results->linkCollection()->toArray(),
+                'path' => $results->path(),
+                'per_page' => $results->perPage(),
+                'to' => $results->lastItem(),
+                'total' => $results->total(),
+            ]
+        ]);
+    }
+
+    /**
+     * Generate PDF for Lab General Report
+     */
+    public function generateLabGeneralReportPdf(Request $request)
+    {
+        // Start output buffering to prevent any output before PDF
+        ob_start();
+        
+        $request->validate([
+            'shift_id' => 'nullable|integer|exists:shifts,id',
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'patient_name' => 'nullable|string|max:255',
+            'user_id' => 'nullable|integer|exists:users,id',
+            'per_page' => 'nullable|integer|min:5|max:100',
+        ]);
+
+        $query = Patient::query()
+            ->join('doctorvisits', 'patients.id', '=', 'doctorvisits.patient_id')
+            ->join('doctors', 'patients.doctor_id', '=', 'doctors.id')
+            ->join('labrequests', 'patients.id', '=', 'labrequests.pid')
+            ->leftJoin('companies', 'patients.company_id', '=', 'companies.id')
+            ->select([
+                'doctorvisits.id as doctorvisit_id',
+                'patients.id',
+                'patients.name',
+                'doctors.name as doctor_name',
+                DB::raw('SUM(labrequests.price) as total_lab_amount'),
+                DB::raw('SUM(labrequests.amount_paid) as total_paid_for_lab'),
+                DB::raw('SUM(labrequests.price * labrequests.discount_per / 100) as discount'),
+                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_amount_bank'),
+                'companies.name as company_name',
+                DB::raw('GROUP_CONCAT(DISTINCT main_tests.main_test_name SEPARATOR ", ") as main_tests_names')
+            ])
+            ->leftJoin('main_tests', 'labrequests.main_test_id', '=', 'main_tests.id')
+            ->groupBy('doctorvisits.id', 'patients.id', 'patients.name', 'doctors.name', 'companies.name');
+
+        // Apply shift filter
+        if ($request->filled('shift_id')) {
+            $query->where('doctorvisits.shift_id', $request->shift_id);
+        }
+
+        // Apply date filters
+        if ($request->filled('date_from')) {
+            $query->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+
+        // Filter by patient name
+        if ($request->filled('patient_name')) {
+            $query->where('patients.name', 'LIKE', '%' . $request->patient_name . '%');
+        }
+
+        // Filter by user (who requested the lab)
+        if ($request->filled('user_id')) {
+            $query->where('labrequests.user_requested', $request->user_id);
+        }
+
+        // Order by patient name
+        $query->orderBy('doctorvisits.id', 'desc');
+
+        // $perPage = $request->input('per_page', 20);
+        // $results = $query->paginate($perPage);
+
+        // return response()->json($results);
+        $results = $query->get();
+
+        // Generate PDF
+        $pdf = new MyCustomTCPDF('', null, 'L', 'mm', 'A4', true, 'UTF-8', false);
+        $pdf->SetCreator('Jawda Medical System');
+        $pdf->SetAuthor('Jawda Medical System');
+        $pdf->SetTitle('تقرير المختبر العام');
+        $pdf->SetSubject('تقرير المختبر العام');
+        $pdf->isLab = true; // Enable footer with page numbers
+
+        // Set margins (left, top, right)
+        $pdf->SetMargins(15, 20, 15);
+        $pdf->SetAutoPageBreak(true, 20);
+
+        // Add a page
+        $pdf->AddPage();
+
+        // Calculate available width (A4 landscape = 297mm, minus margins = 267mm)
+        $availableWidth = 267; // 297 - 15 (left) - 15 (right)
+
+        // Set default font to Arial
+        $pdf->SetFont('arial', '', 10);
+        $pdf->setAutoPageBreak(true, 40);
+        // Title with better styling
+        $pdf->SetFont('arial', 'B', 18);
+        $pdf->SetTextColor(0, 0, 0);
+        $pdf->Cell(0, 12, 'تقرير المختبر العام', 0, 1, 'C');
+        $pdf->Ln(3);
+        
+        // Add a decorative line under title
+        $pdf->SetDrawColor(70, 130, 180);
+        $pdf->SetLineWidth(0.1);
+        $pdf->Line(15, $pdf->GetY(), 282, $pdf->GetY());
+        $pdf->Ln(8);
+
+        // Report period with better styling
+        $pdf->SetFont('arial', '', 10);
+        $pdf->SetTextColor(60, 60, 60);
+        
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            $pdf->Cell(0, 8, 'فترة التقرير: من ' . $request->date_from . ' إلى ' . $request->date_to, 0, 1, 'R');
+        } elseif ($request->filled('date_from')) {
+            $pdf->Cell(0, 8, 'من تاريخ: ' . $request->date_from, 0, 1, 'R');
+        } elseif ($request->filled('date_to')) {
+            $pdf->Cell(0, 8, 'إلى تاريخ: ' . $request->date_to, 0, 1, 'R');
+        }
+
+        // Shift information
+        if ($request->filled('shift_id')) {
+            $shift = Shift::find($request->shift_id);
+            if ($shift) {
+                $pdf->Cell(0, 8, 'المناوبة: ' . $shift->id . ' - ' . Carbon::parse($shift->created_at)->format('Y-m-d'), 0, 1, 'R');
+            }
+        }
+        
+        // Add generation date and time
+        $pdf->SetFont('arial', 'I', 9);
+        $pdf->SetTextColor(100, 100, 100);
+        $pdf->Cell(0, 6, 'تم إنشاء التقرير في: ' . Carbon::now()->format('Y-m-d H:i:s'), 0, 1, 'R');
+        $pdf->Ln(8);
+
+        // User Revenue Section
+        $pdf->SetFont('arial', 'B', 14);
+        $pdf->SetFillColor(70, 130, 180);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->Cell(0, 10, 'ايراد حسب المستخدم', 1, 1, 'C', true);
+        
+        // Get user revenue data
+        $userRevenueQuery = Patient::query()
+            ->join('doctorvisits', 'patients.id', '=', 'doctorvisits.patient_id')
+            ->join('labrequests', 'patients.id', '=', 'labrequests.pid')
+            ->join('users', 'labrequests.user_requested', '=', 'users.id')
+            ->select([
+                'users.id as user_id',
+                'users.name as user_name',
+                DB::raw('SUM(labrequests.amount_paid) as total_paid'),
+                DB::raw('SUM(labrequests.price * labrequests.discount_per / 100) as total_discount'),
+                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 0 THEN labrequests.amount_paid ELSE 0 END) as total_cash'),
+                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_bank')
+            ])
+            ->groupBy('users.id', 'users.name');
+
+        // Apply same filters as main query
+        if ($request->filled('shift_id')) {
+            $userRevenueQuery->where('doctorvisits.shift_id', $request->shift_id);
+        }
+        if ($request->filled('date_from')) {
+            $userRevenueQuery->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $userRevenueQuery->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+        if ($request->filled('patient_name')) {
+            $userRevenueQuery->where('patients.name', 'LIKE', '%' . $request->patient_name . '%');
+        }
+        if ($request->filled('user_id')) {
+            $userRevenueQuery->where('labrequests.user_requested', $request->user_id);
+        }
+
+        $userRevenues = $userRevenueQuery->get();
+
+        // User revenue table headers
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->SetTextColor(0, 0, 0);
+        
+        $userColWidths = [
+            $availableWidth * 0.25,  // اسم المستخدم (25%)
+            $availableWidth * 0.25,  // إجمالي المدفوع (25%)
+            $availableWidth * 0.20,  // إجمالي التخفيض (20%)
+            $availableWidth * 0.15,  // إجمالي كاش (15%)
+            $availableWidth * 0.15   // إجمالي بنك (15%)
+        ];
+        
+        $userHeaders = ['اسم المستخدم', 'إجمالي المدفوع', 'إجمالي التخفيض', 'إجمالي كاش', 'إجمالي بنك'];
+        
+        for ($i = 0; $i < count($userHeaders); $i++) {
+            $pdf->Cell($userColWidths[$i], 8, $userHeaders[$i], 1, 0, 'C', false);
+        }
+        $pdf->Ln();
+
+        // User revenue data
+        $pdf->SetFont('arial', '', 9);
+        $totalUserPaid = 0;
+        $totalUserDiscount = 0;
+        $totalUserCash = 0;
+        $totalUserBank = 0;
+
+        foreach ($userRevenues as $index => $userRevenue) {
+            $totalUserPaid += $userRevenue->total_paid;
+            $totalUserDiscount += $userRevenue->total_discount;
+            $totalUserCash += $userRevenue->total_cash;
+            $totalUserBank += $userRevenue->total_bank;
+
+            // Alternate row colors
+            if ($index % 2 == 0) {
+                $pdf->SetFillColor(248, 249, 250);
+            } else {
+                $pdf->SetFillColor(255, 255, 255);
+            }
+
+            $pdf->Cell($userColWidths[0], 8, $userRevenue->user_name, 1, 0, 'R', true);
+            $pdf->Cell($userColWidths[1], 8, number_format($userRevenue->total_paid, 2), 1, 0, 'C', true);
+            $pdf->Cell($userColWidths[2], 8, number_format($userRevenue->total_discount, 2), 1, 0, 'C', true);
+            $pdf->Cell($userColWidths[3], 8, number_format($userRevenue->total_cash, 2), 1, 0, 'C', true);
+            $pdf->Cell($userColWidths[4], 8, number_format($userRevenue->total_bank, 2), 1, 0, 'C', true);
+            $pdf->Ln();
+        }
+
+        // User revenue totals row
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->SetFillColor(50, 50, 50);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->Cell($userColWidths[0], 8, 'الإجمالي', 1, 0, 'C', true);
+        $pdf->Cell($userColWidths[1], 8, number_format($totalUserPaid, 2), 1, 0, 'C', true);
+        $pdf->Cell($userColWidths[2], 8, number_format($totalUserDiscount, 2), 1, 0, 'C', true);
+        $pdf->Cell($userColWidths[3], 8, number_format($totalUserCash, 2), 1, 0, 'C', true);
+        $pdf->Cell($userColWidths[4], 8, number_format($totalUserBank, 2), 1, 0, 'C', true);
+        $pdf->Ln();
+
+        $pdf->Ln(10);
+        
+        // Patient Details Section
+        $pdf->SetFont('arial', 'B', 14);
+        $pdf->SetFillColor(70, 130, 180);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->Cell(0, 10, 'تفاصيل المرضى', 1, 1, 'C', true);
+        
+        // Table headers with modern styling
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->SetFillColor(255, 255, 255); // White background
+        $pdf->SetTextColor(0, 0, 0); // Black text
+        
+        $headers = [
+            'رقم الزيارة',
+            'اسم المريض', 
+            'الطبيب',
+            'إجمالي المبلغ',
+            'المدفوع',
+            'الخصم',
+            'المبلغ البنك',
+            'الشركة',
+            'التحاليل'
+        ];
+        
+        // Calculate column widths as percentages of available width
+        $colWidths = [
+            $availableWidth * 0.08,  // رقم الزيارة (8%)
+            $availableWidth * 0.15,  // اسم المريض (15%)
+            $availableWidth * 0.12,  // الطبيب (12%)
+            $availableWidth * 0.10,  // إجمالي المبلغ (10%)
+            $availableWidth * 0.10,  // المدفوع (10%)
+            $availableWidth * 0.08,  // الخصم (8%)
+            $availableWidth * 0.10,  // المبلغ البنك (10%)
+            $availableWidth * 0.12,  // الشركة (12%)
+            $availableWidth * 0.15   // التحاليل (15%)
+        ];
+        
+        // Ensure total column widths equal available width (100%)
+        $totalWidth = array_sum($colWidths);
+        if (abs($totalWidth - $availableWidth) > 1) {
+            // Adjust last column if there's a small difference
+            $colWidths[8] += ($availableWidth - $totalWidth);
+        }
+        
+        for ($i = 0; $i < count($headers); $i++) {
+            $pdf->Cell($colWidths[$i], 10, $headers[$i], 1, 0, 'C', false);
+        }
+        $pdf->Ln();
+
+        // Table data with improved styling
+        $pdf->SetFont('arial', '', 9);
+        $pdf->SetTextColor(0, 0, 0); // Reset text color to black
+        $totalLabAmount = 0;
+        $totalPaid = 0;
+        $totalDiscount = 0;
+        $totalBank = 0;
+
+        foreach ($results as $index => $patient) {
+            $totalLabAmount += $patient->total_lab_amount;
+            $totalPaid += $patient->total_paid_for_lab;
+            $totalDiscount += $patient->discount;
+            $totalBank += $patient->total_amount_bank;
+
+            // Alternate row colors with better contrast
+            if ($index % 2 == 0) {
+                $pdf->SetFillColor(248, 249, 250); // Light gray
+            } else {
+                $pdf->SetFillColor(255, 255, 255); // White
+            }
+
+            // Check if patient has discount for special styling
+            $hasDiscount = $patient->discount > 0;
+            if ($hasDiscount) {
+                $pdf->SetFillColor(255, 248, 220); // Light yellow for discount rows
+            }
+
+            $pdf->Cell($colWidths[0], 8, $patient->doctorvisit_id, 1, 0, 'C', true);
+            $pdf->Cell($colWidths[1], 8, $patient->name, 1, 0, 'R', true);
+            $pdf->Cell($colWidths[2], 8, $patient->doctor_name, 1, 0, 'R', true);
+            $pdf->Cell($colWidths[3], 8, number_format($patient->total_lab_amount, 2), 1, 0, 'C', true);
+            $pdf->Cell($colWidths[4], 8, number_format($patient->total_paid_for_lab, 2), 1, 0, 'C', true);
+            
+            // Highlight discount column
+            if ($hasDiscount) {
+                $pdf->SetTextColor(255, 140, 0); // Orange for discount
+            }
+            $pdf->Cell($colWidths[5], 8, number_format($patient->discount, 2), 1, 0, 'C', true);
+            $pdf->SetTextColor(0, 0, 0); // Reset to black
+            
+            // Highlight bank amount in red
+            if ($patient->total_amount_bank > 0) {
+                $pdf->SetTextColor(220, 20, 60); // Red for bank amount
+            }
+            $pdf->Cell($colWidths[6], 8, number_format($patient->total_amount_bank, 2), 1, 0, 'C', true);
+            $pdf->SetTextColor(0, 0, 0); // Reset to black
+            
+            $pdf->Cell($colWidths[7], 8, $patient->company_name ?: '-', 1, 0, 'R', true);
+            
+            // Use multicell for test names to handle long text
+            $currentY = $pdf->GetY();
+            $pdf->MultiCell($colWidths[8], 8, $patient->main_tests_names, 1, 'R', true);
+            $newY = $pdf->GetY();
+            $pdf->SetXY($pdf->GetX() + $colWidths[8], $currentY);
+            
+            // If multicell created a new line, we need to handle the row height
+            if ($newY > $currentY + 8) {
+                // Adjust other cells in the row to match the height
+                $rowHeight = $newY - $currentY;
+                $pdf->SetXY(15, $currentY);
+                
+                // Redraw all cells with proper height
+                $pdf->Cell($colWidths[0], $rowHeight, $patient->doctorvisit_id, 1, 0, 'C', true);
+                $pdf->Cell($colWidths[1], $rowHeight, $patient->name, 1, 0, 'R', true);
+                $pdf->Cell($colWidths[2], $rowHeight, $patient->doctor_name, 1, 0, 'R', true);
+                $pdf->Cell($colWidths[3], $rowHeight, number_format($patient->total_lab_amount, 2), 1, 0, 'C', true);
+                $pdf->Cell($colWidths[4], $rowHeight, number_format($patient->total_paid_for_lab, 2), 1, 0, 'C', true);
+                
+                // Highlight discount column
+                if ($hasDiscount) {
+                    $pdf->SetTextColor(255, 140, 0);
+                }
+                $pdf->Cell($colWidths[5], $rowHeight, number_format($patient->discount, 2), 1, 0, 'C', true);
+                $pdf->SetTextColor(0, 0, 0);
+                
+                // Highlight bank amount in red
+                if ($patient->total_amount_bank > 0) {
+                    $pdf->SetTextColor(220, 20, 60);
+                }
+                $pdf->Cell($colWidths[6], $rowHeight, number_format($patient->total_amount_bank, 2), 1, 0, 'C', true);
+                $pdf->SetTextColor(0, 0, 0);
+                
+                $pdf->Cell($colWidths[7], $rowHeight, $patient->company_name ?: '-', 1, 0, 'R', true);
+                
+                // Redraw the test names cell
+                $pdf->SetXY(15 + array_sum(array_slice($colWidths, 0, 8)), $currentY);
+                $pdf->MultiCell($colWidths[8], 8, $patient->main_tests_names, 1, 'R', true);
+            }
+            
+            $pdf->Ln();
+        }
+
+        // Totals row with enhanced styling
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->SetFillColor(50, 50, 50); // Dark gray background
+        $pdf->SetTextColor(255, 255, 255); // White text
+        $pdf->Cell($colWidths[0] + $colWidths[1] + $colWidths[2], 10, 'الإجمالي', 1, 0, 'C', true);
+        $pdf->Cell($colWidths[3], 10, number_format($totalLabAmount, 2), 1, 0, 'C', true);
+        $pdf->Cell($colWidths[4], 10, number_format($totalPaid, 2), 1, 0, 'C', true);
+        $pdf->Cell($colWidths[5], 10, number_format($totalDiscount, 2), 1, 0, 'C', true);
+        $pdf->Cell($colWidths[6], 10, number_format($totalBank, 2), 1, 0, 'C', true);
+        $pdf->Cell($colWidths[7] + $colWidths[8], 10, '', 1, 0, 'C', true);
+        $pdf->Ln();
+
+        // Summary section with modern styling
+        $pdf->Ln(12);
+        $pdf->addPage();
+        // Summary title with background
+        $pdf->SetFont('arial', 'B', 14);
+        $pdf->SetFillColor(70, 130, 180);
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->Cell(0, 10, 'ملخص التقرير', 1, 1, 'C', true);
+        
+        // Summary content with alternating colors
+        $pdf->SetFont('arial', '', 11);
+        $pdf->SetTextColor(0, 0, 0);
+        
+        $summaryItems = [
+            'إجمالي المرضى: ' . $results->count(),
+            'إجمالي مبلغ المختبر: ' . number_format($totalLabAmount, 2) . ' ',
+            'إجمالي المدفوع: ' . number_format($totalPaid, 2) . ' ',
+            'إجمالي الخصم: ' . number_format($totalDiscount, 2) . ' ',
+            'إجمالي المبلغ البنك: ' . number_format($totalBank, 2) . ' '
+        ];
+        
+        foreach ($summaryItems as $index => $item) {
+            if ($index % 2 == 0) {
+                $pdf->SetFillColor(248, 249, 250);
+            } else {
+                $pdf->SetFillColor(255, 255, 255);
+            }
+            $pdf->Cell(0, 8, $item, 1, 1, 'R', true);
+        }
+        
+        // Add footer with company info
+        $pdf->Ln(10);
+        $pdf->SetFont('arial', 'I', 9);
+        $pdf->SetTextColor(100, 100, 100);
+        $pdf->Cell(0, 6, 'تم إنشاء هذا التقرير بواسطة نظام جوادة الطبي', 0, 1, 'C');
+
+        // Clean any output buffer
+        ob_end_clean();
+        
+        // Set proper headers
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="lab_general_report_' . date('Y-m-d_H-i-s') . '.pdf"');
+        header('Cache-Control: private, max-age=0, must-revalidate');
+        header('Pragma: public');
+        
+        // Output PDF
+        $filename = 'lab_general_report_' . date('Y-m-d_H-i-s') . '.pdf';
+        $pdf->Output($filename, 'I'); // Use 'I' for inline display instead of 'D' for download
+    }
+
   /**
      * Export the list of services to a PDF file.
      */

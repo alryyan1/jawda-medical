@@ -318,7 +318,7 @@ class MyCustomTCPDF extends TCPDF
         // Example simplified signature lines
         $this->Ln(6);
         $sigBlockWidth = ($this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right']) / 2 - 5;
-        $this->Cell($sigBlockWidth, 5, ($isRTL ? 'فني المختبر:' : 'Lab Technician:'), 'T', 0, 'C');
+        $this->Cell($sigBlockWidth, 5, ($isRTL ? ' :' : 'Lab Technician:'), 'T', 0, 'C');
         $this->Cell(10,5,'',0,0); // Spacer
         $this->Cell($sigBlockWidth, 5, ($isRTL ? 'مدير المختبر/المراجع:' : 'Lab Director/Auditor:'), 'T', 1, 'C');
 
