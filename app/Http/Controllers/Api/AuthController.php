@@ -48,7 +48,11 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('username', $request->username)->first();
-
+        if ($user->is_active == false) {
+            throw ValidationException::withMessages([
+                'message'=> 'الحساب غير مفعل',
+            ]);
+        }
         if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'username' // or 'email'

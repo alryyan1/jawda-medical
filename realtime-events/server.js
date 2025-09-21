@@ -48,6 +48,15 @@ app.post('/emit/patient-updated', verifyAuth, (req, res) => {
   return res.json({ ok: true });
 });
 
+// Emit lab-payment
+app.post('/emit/lab-payment', verifyAuth, (req, res) => {
+  const payload = req.body; // Expecting { visit, patient, labRequests }
+  console.log('lab-payment', payload);
+  io.emit('lab-payment', payload);
+  console.log('lab-payment emitted');
+  return res.json({ ok: true });
+});
+
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);
 });
