@@ -12,9 +12,9 @@ const { print } = pkg;
 const PORT = process.env.PORT || 4001;
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
 const SERVER_AUTH_TOKEN = process.env.SERVER_AUTH_TOKEN || 'changeme';
-const API_BASE = process.env.API_BASE || 'http://localhost:8000/api';
+const API_BASE = process.env.VITE_API_BASE_URL || 'http://192.168.100.12/jawda-medical/public/api';
 const SANCTUM_TOKEN = process.env.SANCTUM_TOKEN || '';
-
+console.log(API_BASE,'API_BASE')
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: (origin, cb) => cb(null, true), credentials: true }));

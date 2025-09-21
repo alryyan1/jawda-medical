@@ -822,8 +822,8 @@ class LabRequestController extends Controller
                 // If resetting to default implies un-authorizing the main request
                 if ($labrequest->approve) {
                     $labrequest->approve = false;
-                    $labrequest->authorized_at = null;
-                    $labrequest->authorized_by_user_id = null;
+                    // $labrequest->authorized_at = null;
+                    // $labrequest->authorized_by_user_id = null;
                 }
                 $labrequest->saveQuietly();
             }
@@ -1039,7 +1039,6 @@ class LabRequestController extends Controller
                     'result_value' => $existingResult->result ?? null,
                     'result_flags' => $existingResult->flags ?? null,
                     'result_comment' => $existingResult->result_comment ?? null,
-                    'is_result_authorized' => isset($existingResult->authorized_at),
                     'entered_at' => null,
                 ];
             })->all(),

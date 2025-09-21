@@ -75,6 +75,7 @@ class PatientLabQueueItemResource extends JsonResource {
              'sample_collected' => $patientModel?->sample_collect_time != null,
              'result_url' => $patientModel?->result_url,
              'registered_by' => $patientModel?->user?->name,
+             'auth_date' => $patientModel?->auth_date,
             // 'status_summary' => ... // Calculate if needed
         ];
     }
