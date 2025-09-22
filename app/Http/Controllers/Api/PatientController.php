@@ -1016,32 +1016,55 @@ class PatientController extends Controller
      */
     public function getLabHistory(Request $request, Patient $patient)
     {
-        $request->validate([
+        $validated = $request->validate([
             'phone' => 'required|string',
+            'limit' => 'nullable|integer|min:1|max:100',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date',
         ]);
 
-        $phone = $request->phone;
+        $phone = $validated['phone'];
+        $limit = $validated['limit'] ?? null;
+        $dateFrom = $validated['date_from'] ?? null;
+        $dateTo = $validated['date_to'] ?? null;
 
         // Find all patients with the same phone number who have lab requests
-        $patientsWithLabHistory = Patient::where('phone', $phone)
-            ->whereHas('doctorVisit.labRequests') // Ensure they have lab requests
+        // PERFORMANCE: avoid loading every LabRequest and MainTest; we only need the count
+        $patientsQuery = Patient::query()
+            ->where('phone', $phone)
+            ->whereHas('doctorVisit.labRequests')
             ->with([
-                'doctorVisit' => function ($query) {
-                    $query->with(['labRequests' => function ($labQuery) {
-                        $labQuery->where('valid', true)
-                            ->with(['mainTest:id,main_test_name']);
-                    }])
-                    ->orderBy('created_at', 'desc');
+                'doctorVisit' => function ($query) use ($dateFrom, $dateTo) {
+                    $query
+                        ->select(['id', 'patient_id', 'visit_date', 'created_at'])
+                        ->when($dateFrom, function ($q) use ($dateFrom) {
+                            $q->whereDate('visit_date', '>=', $dateFrom);
+                        })
+                        ->when($dateTo, function ($q) use ($dateTo) {
+                            $q->whereDate('visit_date', '<=', $dateTo);
+                        })
+                        ->withCount([
+                            'labRequests as lab_request_count' => function ($labQuery) {
+                                $labQuery->where('valid', true);
+                            }
+                        ])
+                        ->orderBy('created_at', 'desc');
                 },
-                'company:id,name'
+                'company:id,name',
             ])
-            ->orderBy('created_at', 'desc')
-            ->get();
+            ->select(['id', 'name', 'phone', 'company_id', 'created_at'])
+            ->orderBy('created_at', 'desc');
+
+        if ($limit) {
+            $patientsQuery->limit($limit);
+        }
+
+        $patientsWithLabHistory = $patientsQuery->get();
 
         // Format the data for the frontend autocomplete
         $formattedResults = $patientsWithLabHistory->map(function ($patient) {
             $latestVisit = $patient->doctorVisit;
-            $labRequestCount = $latestVisit ? $latestVisit->labRequests->count() : 0;
+            $labRequestCount = $latestVisit ? ($latestVisit->lab_request_count ?? 0) : 0;
             
             return [
                 'patient_id' => $patient->id,
@@ -1052,7 +1075,7 @@ class PatientController extends Controller
                 'lab_request_count' => $labRequestCount,
                 'company_name' => $patient->company ? $patient->company->name : null,
                 'autocomplete_label' => $patient->name . 
-                    ($latestVisit ? " - " . $latestVisit->visit_date->format('d/M/Y') : '') . 
+                    ($latestVisit && $latestVisit->visit_date ? " - " . $latestVisit->visit_date->format('d/M/Y') : '') . 
                     " (" . $labRequestCount . " tests)",
             ];
         });

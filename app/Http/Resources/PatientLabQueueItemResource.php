@@ -45,7 +45,7 @@ class PatientLabQueueItemResource extends JsonResource {
             'pending_result_count'=>$pendingResultsCount,
             'visit_id' => $this->visit_id,
             'patient_id' => $this->patient_id,
-            'patient_name' => $this->patient_name,
+            'patient_name' => $patientModel?->name,
              'company'=>$this->patient->company,
             'patient_phone_for_whatsapp' => $patientModel ? UltramsgService::formatPhoneNumber($patientModel->phone) : null,
             'is_result_locked' => $patientModel ? (bool) $patientModel->result_is_locked : false,
@@ -53,8 +53,9 @@ class PatientLabQueueItemResource extends JsonResource {
             'print_date'=>$this->patient->result_print_date,
              'phone' => $this->patient->phone,
             // Added visit meta and doctor
-            'visit_created_at' => $this->visit_creation_time,
+            'visit_created_at' => $this->created_at,
             'doctor_name' => $patientModel?->doctor->name ?? null,
+            'name'=>$this->patient->name,
             // Added age representation (years/months/days if available on patient)
             'patient_age' => $this->formatPatientAge($this->patient),
             'lab_number' => $this->patient->visit_number,

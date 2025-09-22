@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
 use App\Http\Controllers\Api\VisitServiceController;
+use App\Http\Controllers\Api\CompanyReportController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SmsController;
@@ -159,8 +160,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
     
     // New route for searching visits by patient name for autocomplete:
-      Route::get('/doctor-visits/search-by-patient', [PatientController::class, 'searchRecentDoctorVisitsByPatientName'])
-      ->name('doctor-visits.searchByPatientName');
+      Route::get('/doctor-visits/search-by-patient', [PatientController::class, 'searchRecentDoctorVisitsByPatientName']);
     Route::get('/patients/recent-lab-activity', [PatientController::class, 'getRecentLabActivityPatients']);
 
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
@@ -189,6 +189,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Companies
   Route::get('companies-list', [CompanyController::class, 'indexList']);
   Route::apiResource('companies', CompanyController::class);
+  Route::post('companies/activate-all', [CompanyController::class, 'activateAll']);
 
   // Company Services
   Route::get('companies/{company}/contracted-services', [CompanyServiceController::class, 'index']);
@@ -201,7 +202,6 @@ Route::middleware('auth:sanctum')->group(function () {
   // Services & Service Groups
   Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']);
   Route::get('/service-groups-with-services', [ServiceGroupController::class, 'getGroupsWithServices']);
-  Route::post('service-groups', [ServiceGroupController::class, 'store']);
   Route::apiResource('services', ServiceController::class);
 
   /*
@@ -240,13 +240,13 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::apiResource('packages', PackageController::class);
 
   // Routes for managing main test contracts of a specific company
-  Route::get('companies/{company}/contracted-main-tests', [CompanyMainTestController::class, 'index'])->name('companies.main_test_contracts.index');
-  Route::get('companies/{company}/available-main-tests', [CompanyMainTestController::class, 'availableMainTests'])->name('companies.main_test_contracts.available');
-  Route::post('companies/{company}/contracted-main-tests', [CompanyMainTestController::class, 'store'])->name('companies.main_test_contracts.store');
-  Route::post('companies/{company}/contracted-main-tests/import-all', [CompanyMainTestController::class, 'importAllMainTests'])->name('companies.main_test_contracts.importAll');
+  Route::get('companies/{company}/contracted-main-tests', [CompanyMainTestController::class, 'index']);
+  Route::get('companies/{company}/available-main-tests', [CompanyMainTestController::class, 'availableMainTests']);
+  Route::post('companies/{company}/contracted-main-tests', [CompanyMainTestController::class, 'store']);
+  Route::post('companies/{company}/contracted-main-tests/import-all', [CompanyMainTestController::class, 'importAllMainTests']);
   // Note: For update and destroy, Laravel's route model binding will bind {main_test} to a MainTest instance
-  Route::put('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'update'])->name('companies.main_test_contracts.update');
-  Route::delete('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'destroy'])->name('companies.main_test_contracts.destroy');
+  Route::put('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'update']);
+  Route::delete('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'destroy']);
   // Example for a dedicated route to assign tests if needed, though update handles it
   // Route::post('packages/{package}/assign-tests', [PackageController::class, 'assignTests']);
 
@@ -306,14 +306,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
   // "The route api/reports/monthly-lab-income could not be found."
   Route::get('/reports/monthly-lab-income', [ReportController::class, 'monthlyLabIncome']);
-  Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
-
   //api/reports/clinic-report/1/financial-summary/pdf
   Route::get('/reports/doctor-shifts/{doctorShift}/financial-summary/pdf', [ReportController::class, 'clinicReport']);
   // The route api/reports/clinic-shift-summary/pdf could not be found.
   Route::get('/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
   // ...
-  Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf'])->name('reports.lab.thermalReceipt');
+  Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
   Route::get('/reports/costs/pdf', [ReportController::class, 'generateCostsReportPdf']);
     // Route for fetching costs for the list page (if not using a full apiResource for costs)
     Route::get('/costs-report-data', [CostController::class, 'index']); // Using CostController@index for data
@@ -400,10 +398,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/patients/{patient}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
     
     // NEW: Route for patient visit history
-    Route::get('/patients/{patient}/visit-history', [PatientController::class, 'visitHistory'])->name('patients.visitHistory');
+    Route::get('/patients/{patient}/visit-history', [PatientController::class, 'visitHistory']);
     
     // NEW: Route for patient lab history by phone number
-    Route::get('/patients/{patient}/lab-history', [PatientController::class, 'getLabHistory'])->name('patients.labHistory');
+    Route::get('/patients/{patient}/lab-history', [PatientController::class, 'getLabHistory']);
     
     Route::apiResource('patients', PatientController::class); // This should already be there
 
@@ -417,10 +415,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('doctor-visits', DoctorVisitController::class);
 
     // NEW: Route for reassigning a doctor visit to a different shift
-    Route::post('/doctor-visits/{doctorVisit}/reassign-shift', [DoctorVisitController::class, 'reassignToShift'])->name('doctorVisits.reassignShift');
+    Route::post('/doctor-visits/{doctorVisit}/reassign-shift', [DoctorVisitController::class, 'reassignToShift']);
     
     // NEW: Route for creating a new visit for a patient by copying their data to a new shift
-    Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift'])->name('patients.copyToNewVisit');
+    Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift']);
     Route::post('/labrequests/{labrequest}/set-default-results', [LabRequestController::class, 'setDefaultResults']);
     Route::post('/labrequests/{labrequest}/populate-cbc-from-sysmex', [LabRequestController::class, 'populateCbcResultsFromSysmex']);
         Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
@@ -451,6 +449,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/company-performance/pdf', [ReportController::class, 'exportCompanyPerformancePdf']);
     Route::get('/reports/doctor-company-entitlement', [ReportController::class, 'doctorCompanyEntitlementReport']);
     Route::get('/reports/doctor-company-entitlement/pdf', [ReportController::class, 'exportDoctorCompanyEntitlementPdf']);
+  // Companies PDF
+  Route::get('/reports/companies/pdf', [CompanyReportController::class, 'exportAllCompaniesPdf']);
     Route::get('/reports/yearly-income-comparison', [ReportController::class, 'yearlyIncomeComparisonByMonth']);
     Route::get('/reports/yearly-patient-frequency', [ReportController::class, 'yearlyPatientFrequencyByMonth']);
     // Route::get('/reports/yearly-patient-frequency/pdf', [ReportController::class, 'exportYearlyPatientFrequencyPdf']); // For future PDF
@@ -463,34 +463,34 @@ Route::middleware('auth:sanctum')->group(function () {
     // 1. Global Attendance Settings
     // Fetches the single global attendance settings record
     Route::get('/attendance-settings', [AttendanceSettingController::class, 'show'])
-        ->name('attendanceSettings.show');
+        ;
     // Updates the single global attendance settings record
     Route::put('/attendance-settings', [AttendanceSettingController::class, 'update'])
-        ->name('attendanceSettings.update');
+        ;
 
     // 2. Shift Definitions (e.g., Morning, Evening Shift timings)
     // Provides a simplified list, often for dropdowns (e.g., only active shifts)
     Route::get('/shifts-definitions/list', [ShiftDefinitionController::class, 'indexList'])
-        ->name('shiftDefinitions.list');
+        ;
     // Standard CRUD for shift definitions
-    Route::apiResource('shifts-definitions', ShiftDefinitionController::class);
+    
 
     // 3. Holiday Management
     // Provides a simplified list, often for calendar highlighting or dropdowns
     Route::get('/holidays/list', [HolidayController::class, 'indexList'])
-        ->name('holidays.list');
+        ;
     // Standard CRUD for holidays
-    Route::apiResource('holidays', HolidayController::class);
+    
 
     // 4. User-Specific Attendance Settings
     // (Integrated into existing UserController or a dedicated UserAttendanceSettingController)
 
     // Endpoint to update a user's supervisor status and their default shift assignments
     Route::put('/users/{user}/attendance-settings', [UserController::class, 'updateAttendanceSettings'])
-        ->name('users.updateAttendanceSettings');
+        ;
     // Endpoint to get a user's currently assigned default shifts
     Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts'])
-        ->name('users.getDefaultShifts');
+        ;
 
 
     /*
@@ -499,11 +499,11 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::get('/attendances/monthly-sheet', [AttendanceController::class, 'getMonthlySheet'])
-        ->name('attendances.monthlySheet');
+        ;
     Route::post('/attendances/record', [AttendanceController::class, 'recordOrUpdateAttendance'])
-        ->name('attendances.recordOrUpdate');
+        ;
     Route::delete('/attendances/{attendance}', [AttendanceController::class, 'destroyAttendance'])
-        ->name('attendances.destroy');
+        ;
 
 
     /*
@@ -512,35 +512,35 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::get('/attendance/reports/monthly-employee-summary', [AttendanceReportController::class, 'monthlyEmployeeSummary'])
-        ->name('attendanceReports.monthlyEmployeeSummary');
+        ;
     Route::get('/attendance/reports/daily-detail', [AttendanceReportController::class, 'dailyAttendanceDetail'])
-        ->name('attendanceReports.dailyDetail');
+        ;
     Route::get('/attendance/reports/payroll', [AttendanceReportController::class, 'payrollAttendanceReport'])
-        ->name('attendanceReports.payroll');
-        Route::prefix('attendance/reports')->name('attendance.reports.')->group(function () {
-          Route::get('/monthly-summary', [ReportController::class, 'getMonthlyAttendanceSummary'])->name('monthlySummary.show');
-          Route::get('/monthly-summary/pdf', [ReportController::class, 'generateMonthlyAttendancePdf'])->name('monthlySummary.pdf');
+        ;
+        Route::prefix('attendance/reports')->group(function () {
+          Route::get('/monthly-summary', [ReportController::class, 'getMonthlyAttendanceSummary']);
+          Route::get('/monthly-summary/pdf', [ReportController::class, 'generateMonthlyAttendancePdf']);
       });
          /*
     |--------------------------------------------------------------------------
     | Attendance Configuration Routes
     |--------------------------------------------------------------------------
     */
-    Route::prefix('attendance-config')->name('attendance.config.')->group(function () {
+    Route::prefix('attendance-config')->group(function () {
       // Attendance Global Settings
-      Route::get('/settings', [AttendanceSettingController::class, 'show'])->name('settings.show');
-      Route::post('/settings', [AttendanceSettingController::class, 'storeOrUpdate'])->name('settings.update'); // Use POST for create or update
+      Route::get('/settings', [AttendanceSettingController::class, 'show']);
+      Route::post('/settings', [AttendanceSettingController::class, 'storeOrUpdate']); // Use POST for create or update
 
       // Shift Definitions
-      Route::get('/shift-definitions/list', [ShiftDefinitionController::class, 'indexList'])->name('shift_definitions.list'); // For dropdowns
+      Route::get('/shift-definitions/list', [ShiftDefinitionController::class, 'indexList']); // For dropdowns
       Route::apiResource('/shift-definitions', ShiftDefinitionController::class);
 
       // Holidays
       Route::apiResource('/holidays', HolidayController::class);
 
       // User Default Shift Assignments (assuming these are part of UserController)
-      Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts'])->name('users.default_shifts.show');
-      Route::put('/users/{user}/default-shifts', [UserController::class, 'updateUserDefaultShifts'])->name('users.default_shifts.update');
+      Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts']);
+      Route::put('/users/{user}/default-shifts', [UserController::class, 'updateUserDefaultShifts']);
   });
 
   /*
@@ -548,19 +548,19 @@ Route::middleware('auth:sanctum')->group(function () {
   | Attendance Recording & Reporting Routes (To be created)
   |--------------------------------------------------------------------------
   */
-  Route::prefix('attendance')->name('attendance.')->group(function () {
-      Route::get('/daily-sheet', [AttendanceController::class, 'getDailySheet'])->name('daily_sheet');
-      Route::post('/record', [AttendanceController::class, 'recordAttendance'])->name('record');
-      Route::put('/record/{attendance}', [AttendanceController::class, 'updateAttendanceStatus'])->name('update_status'); // For changing status later
+  Route::prefix('attendance')->group(function () {
+      Route::get('/daily-sheet', [AttendanceController::class, 'getDailySheet']);
+      Route::post('/record', [AttendanceController::class, 'recordAttendance']);
+      Route::put('/record/{attendance}', [AttendanceController::class, 'updateAttendanceStatus']); // For changing status later
       // Add more routes for reports later
-      // Route::get('/reports/monthly', [AttendanceController::class, 'getMonthlyReport'])->name('reports.monthly');
+      // Route::get('/reports/monthly', [AttendanceController::class, 'getMonthlyReport']);
   });
-  Route::post('/visits/{visit}/send-whatsapp-report', [ReportController::class, 'sendVisitReportViaWhatsApp'])->name('visits.sendWhatsappReport');
+  Route::post('/visits/{visit}/send-whatsapp-report', [ReportController::class, 'sendVisitReportViaWhatsApp']);
   Route::get('/search/patient-visits', [PatientController::class, 'searchPatientVisitsForAutocomplete']);
-  Route::post('/patients/{doctorVisit}/create-lab-visit', [PatientController::class, 'createLabVisitForExistingPatient'])->name('patients.createLabVisit');
+  Route::post('/patients/{doctorVisit}/create-lab-visit', [PatientController::class, 'createLabVisitForExistingPatient']);
 
 
-  Route::post('/patients/store-from-lab', [PatientController::class, 'storeFromLab'])->name('patients.storeFromLab');
+  Route::post('/patients/store-from-lab', [PatientController::class, 'storeFromLab']);
 
     // Devices
     Route::get('/devices-list', [DeviceController::class, 'indexList']);
@@ -570,27 +570,27 @@ Route::middleware('auth:sanctum')->group(function () {
     // Device Specific Normal Ranges for Child Tests
     Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
     Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
-    Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf'])->name('reports.lab.thermalReceipt');
-    Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf'])->name('reports.lab.sampleLabels');
-    Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result'])->name('reports.lab.fullReport'); // For "View Report Preview"
+    Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
+    Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf']);
+    Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result']); // For "View Report Preview"
     Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns
     Route::apiResource('service-groups', ServiceGroupController::class);
-    Route::prefix('sample-collection')->name('sample.collection.')->group(function () {
-    Route::get('/queue', [SampleCollectionController::class, 'getQueue'])->name('queue');
-    Route::patch('/labrequests/{labrequest}/mark-collected', [SampleCollectionController::class, 'markSampleCollected'])->name('markCollected');
-    Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit'])->name('markAllCollected');
-      Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest'])->name('generateSampleId');
-      Route::post('/visits/{visit}/mark-patient-collected', [SampleCollectionController::class, 'markPatientSampleCollectedForVisit'])->name('markPatientCollected');
+    Route::prefix('sample-collection')->group(function () {
+    Route::get('/queue', [SampleCollectionController::class, 'getQueue']);
+    Route::patch('/labrequests/{labrequest}/mark-collected', [SampleCollectionController::class, 'markSampleCollected']);
+    Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit']);
+      Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest']);
+      Route::post('/visits/{visit}/mark-patient-collected', [SampleCollectionController::class, 'markPatientSampleCollectedForVisit']);
   });
-  Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt'])->name('reports.lab.thermalReceipt');
+  Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
    Route::get('specialists-list', [SpecialistController::class, 'indexList']);
     Route::apiResource('specialists', SpecialistController::class);
-    Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel'])->name('reports.services.excel');
+    Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel']);
      // NEW route for the services with cost details export
-     Route::get('/reports/services-with-costs/excel', [ExcelController::class, 'exportServicesWithCostsToExcel'])->name('reports.services_with_costs.excel');
-     Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices'])->name('services.batchUpdatePrices');
+     Route::get('/reports/services-with-costs/excel', [ExcelController::class, 'exportServicesWithCostsToExcel']);
+     Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices']);
          // NEW route for the PDF services list export
-    Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf'])->name('reports.services.pdf');
+    Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf']);
     Route::post('/services/activate-all', [ServiceController::class, 'activateAll']);
     Route::get('/user/current-shift-lab-income-summary', [UserController::class, 'getCurrentUserLabIncomeSummary']);
     Route::get('/cash-denominations', [CashDenominationController::class, 'getDenominationsForShift']);

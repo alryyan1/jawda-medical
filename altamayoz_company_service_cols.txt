@@ -1,0 +1,10 @@
+﻿id	bigint(20) unsigned	NO	NULL
+service_id	bigint(20) unsigned	NO	NULL
+company_id	bigint(20) unsigned	NO	NULL
+price	double(8,2)	NO	NULL
+static_endurance	double(8,2)	NO	NULL
+percentage_endurance	double(8,2)	NO	NULL
+static_wage	double(8,2)	NO	NULL
+percentage_wage	double(8,2)	NO	NULL
+use_static	tinyint(1)	NO	0
+approval	tinyint(1)	NO	0

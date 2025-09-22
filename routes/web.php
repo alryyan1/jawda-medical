@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\LabResultController;
 use App\Models\DoctorShift;
@@ -45,6 +46,7 @@ Route::get('/reports/doctor-shifts/test',function(){
     $doctorShifts = DoctorShift::whereRaw('Date(created_at) between ? and ?', ['2025-06-24','2025-06-24'])->get();
     return $doctorShifts;
 });
+Route::get('/reports/companies/pdf', [CompanyReportController::class, 'exportAllCompaniesPdf']);
 //phpinfo
 Route::get('/phpinfo', function () {
     phpinfo();

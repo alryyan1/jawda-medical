@@ -170,4 +170,16 @@ class CompanyController extends Controller
         // Using CompanyResource for consistency, but could return raw array for performance
         return CompanyResource::collection($companies);
     }
+
+    /**
+     * Activate all companies (set status = 1 for all rows)
+     */
+    public function activateAll()
+    {
+        $updated = Company::query()->update(['status' => 1]);
+        return response()->json([
+            'message' => 'تم تفعيل جميع الشركات',
+            'updated_count' => $updated,
+        ]);
+    }
 }
