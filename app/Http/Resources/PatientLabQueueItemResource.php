@@ -76,6 +76,7 @@ class PatientLabQueueItemResource extends JsonResource {
              'result_url' => $patientModel?->result_url,
              'registered_by' => $patientModel?->user?->name,
              'auth_date' => $patientModel?->auth_date,
+             'result_auth' => $patientModel?->result_auth,
             // 'status_summary' => ... // Calculate if needed
         ];
     }

@@ -9,6 +9,7 @@ use App\Models\Shift; // To get current shift for visit
 use App\Http\Requests\StorePatientRequest;
 use App\Http\Requests\UpdatePatientRequest;
 use App\Http\Resources\DoctorVisitResource;
+use App\Http\Resources\PatientLabQueueItemResource;
 use App\Http\Resources\PatientResource;
 use App\Http\Resources\PatientSearchResultResource;
 use App\Http\Resources\PatientStrippedResource;
@@ -29,6 +30,7 @@ use App\Models\Service;
 use App\Models\Company;
 use Illuminate\Support\Facades\Http as HttpClient;
 use App\Jobs\EmitPatientRegisteredJob;
+use App\Jobs\SendWelcomeSmsJob;
 
 class PatientController extends Controller
 {
@@ -251,9 +253,12 @@ class PatientController extends Controller
 
             DB::commit();
 
-            // Queue non-blocking realtime emit after successful commit
+            // Queue non-blocking actions after successful commit
             \DB::afterCommit(function () use ($patient) {
                 EmitPatientRegisteredJob::dispatch($patient->id);
+                if (!empty($patient->phone)) {
+                    SendWelcomeSmsJob::dispatch($patient->id, $patient->phone, $patient->name);
+                }
             });
 
             return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file']));
@@ -355,7 +360,7 @@ class PatientController extends Controller
 
         $responseData = [
             'message' => "Patient results have been successfully authenticated. Upload to cloud storage has been queued.",
-            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor', 'resultAuthUser']))
+            'data' => new  PatientLabQueueItemResource($patient->doctorVisit)
         ];
 
         return response()->json($responseData);
@@ -777,7 +782,14 @@ class PatientController extends Controller
             ]);
 
             DB::commit();
-            
+
+            // Queue welcome SMS after commit
+            \DB::afterCommit(function () use ($patient) {
+                if (!empty($patient->phone)) {
+                    SendWelcomeSmsJob::dispatch($patient->id, $patient->phone, $patient->name);
+                }
+            });
+
             // Return the patient resource, ensuring it includes the new doctorVisit relation
             // The PatientResource should be configured to conditionally include this.
             $patient->load('doctorVisit');

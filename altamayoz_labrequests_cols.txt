@@ -1,0 +1,20 @@
+﻿id	bigint(20) unsigned	NO	NULL
+doctor_visit_id	bigint(20) unsigned	YES	NULL
+main_test_id	bigint(20) unsigned	NO	NULL
+pid	bigint(20) unsigned	NO	NULL
+hidden	int(11)	NO	1
+is_lab2lab	int(11)	NO	0
+valid	int(11)	NO	1
+no_sample	int(11)	NO	0
+price	double(10,1)	NO	0.0
+amount_paid	double(10,1)	NO	0.0
+discount_per	int(11)	NO	0
+is_bankak	int(11)	NO	0
+comment	text	YES	NULL
+user_requested	bigint(20) unsigned	YES	NULL
+user_deposited	bigint(20) unsigned	YES	NULL
+approve	tinyint(1)	NO	0
+endurance	double	NO	NULL
+created_at	timestamp	YES	NULL
+updated_at	timestamp	YES	NULL
+is_paid	tinyint(1)	NO	0

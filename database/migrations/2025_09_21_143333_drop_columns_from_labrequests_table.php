@@ -11,21 +11,41 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('labrequests', function (Blueprint $table) {
-            // Drop foreign key constraints first
-            $table->dropForeign(['sample_collected_by_user_id']);
-            $table->dropForeign(['authorized_by_user_id']);
-            $table->dropForeign(['payment_shift_id']);
-            
-            // Then drop the columns
-            $table->dropColumn([
+        if (Schema::hasTable('labrequests')) {
+            // Drop foreign key constraints only if their columns exist
+            if (Schema::hasColumn('labrequests', 'sample_collected_by_user_id')) {
+                Schema::table('labrequests', function (Blueprint $table) {
+                    try { $table->dropForeign(['sample_collected_by_user_id']); } catch (\Throwable $e) {}
+                });
+            }
+            if (Schema::hasColumn('labrequests', 'authorized_by_user_id')) {
+                Schema::table('labrequests', function (Blueprint $table) {
+                    try { $table->dropForeign(['authorized_by_user_id']); } catch (\Throwable $e) {}
+                });
+            }
+            if (Schema::hasColumn('labrequests', 'payment_shift_id')) {
+                Schema::table('labrequests', function (Blueprint $table) {
+                    try { $table->dropForeign(['payment_shift_id']); } catch (\Throwable $e) {}
+                });
+            }
+
+            // Drop columns individually if they exist
+            $columnsToDrop = [
                 'sample_collected_at',
                 'sample_collected_by_user_id',
                 'sample_id',
                 'authorized_by_user_id',
-                'payment_shift_id'
-            ]);
-        });
+                'payment_shift_id',
+            ];
+
+            foreach ($columnsToDrop as $column) {
+                if (Schema::hasColumn('labrequests', $column)) {
+                    Schema::table('labrequests', function (Blueprint $table) use ($column) {
+                        $table->dropColumn($column);
+                    });
+                }
+            }
+        }
     }
 
     /**

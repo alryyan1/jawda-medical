@@ -1,3 +1,37 @@
+## Airtel SMS Integration
+
+Environment variables (add to `.env`):
+
+```
+AIRTEL_SMS_BASE_URL=https://www.airtel.sd
+AIRTEL_SMS_ENDPOINT=/api/rest_send_sms/
+AIRTEL_SMS_API_KEY=683e2c68-a020-4423-bc7f-2d9c53e873c6
+AIRTEL_SMS_SENDER=Jawda
+# Optional extras if Airtel requires in future
+AIRTEL_SMS_USER_ID=24
+AIRTEL_SMS_API_ID=8d6bcf54-d558-4a2b-a20a-a6d9aca075cd
+AIRTEL_SMS_USER_IDENTIFIER=72985408111943
+AIRTEL_SMS_PASSWORD=Ik#%#MHGgH04YPIV
+```
+
+API endpoint:
+
+`POST /api/sms/send` (requires `auth:sanctum`)
+
+Example body:
+
+```
+{
+  "sender": "Jawda",
+  "messages": [
+    { "to": "249912345678", "message": "Your OTP is 123456", "is_otp": true },
+    { "to": "249912300000", "message": "Hello from MyApp!" }
+  ]
+}
+```
+
+Response: returns provider-normalized result with `success`, optional `provider_id`, and `results` for bulk.
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

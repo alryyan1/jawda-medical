@@ -1,0 +1,85 @@
+﻿id	bigint(20) unsigned	NO	NULL
+name	varchar(255)	NO	NULL
+shift_id	bigint(20) unsigned	NO	NULL
+user_id	bigint(20) unsigned	NO	NULL
+doctor_id	bigint(20) unsigned	YES	NULL
+phone	varchar(10)	YES	NULL
+gender	varchar(255)	NO	NULL
+age_day	int(11)	YES	NULL
+age_month	int(11)	YES	NULL
+age_year	int(11)	YES	NULL
+company_id	bigint(20) unsigned	YES	NULL
+subcompany_id	bigint(20) unsigned	YES	NULL
+company_relation_id	bigint(20) unsigned	YES	NULL
+paper_fees	int(11)	YES	NULL
+guarantor	varchar(255)	YES	NULL
+expire_date	date	YES	NULL
+insurance_no	varchar(255)	YES	NULL
+is_lab_paid	tinyint(1)	NO	0
+lab_paid	int(11)	NO	0
+result_is_locked	tinyint(1)	NO	0
+sample_collected	tinyint(1)	NO	0
+result_print_date	datetime	YES	NULL
+result_url	text	YES	NULL
+sample_print_date	datetime	YES	NULL
+visit_number	int(11)	NO	NULL
+created_at	timestamp	YES	NULL
+updated_at	timestamp	YES	NULL
+present_complains	text	NO	NULL
+history_of_present_illness	text	NO	NULL
+procedures	varchar(255)	NO	NULL
+provisional_diagnosis	varchar(255)	NO	NULL
+bp	varchar(255)	NO	NULL
+temp	double(8,2)	NO	NULL
+weight	double(8,2)	NO	NULL
+height	double(8,2)	NO	NULL
+juandice	tinyint(1)	YES	NULL
+pallor	tinyint(1)	YES	NULL
+clubbing	tinyint(1)	YES	NULL
+cyanosis	tinyint(1)	YES	NULL
+edema_feet	tinyint(1)	YES	NULL
+dehydration	tinyint(1)	YES	NULL
+lymphadenopathy	tinyint(1)	YES	NULL
+peripheral_pulses	tinyint(1)	YES	NULL
+feet_ulcer	tinyint(1)	YES	NULL
+country_id	bigint(20) unsigned	YES	NULL
+gov_id	varchar(255)	YES	NULL
+prescription_notes	varchar(255)	YES	NULL
+address	text	YES	NULL
+heart_rate	varchar(255)	YES	NULL
+spo2	varchar(255)	YES	NULL
+discount	double	NO	0
+drug_history	text	NO	''
+family_history	text	NO	''
+rbs	varchar(255)	NO	''
+doctor_finish	tinyint(1)	NO	0
+care_plan	text	NO	''
+doctor_lab_request_confirm	tinyint(1)	NO	0
+doctor_lab_urgent_confirm	tinyint(1)	NO	0
+general_examination_notes	varchar(255)	NO	NULL
+patient_medical_history	varchar(255)	NO	NULL
+social_history	varchar(255)	NO	NULL
+allergies	varchar(255)	NO	NULL
+general	varchar(255)	NO	NULL
+skin	varchar(255)	NO	NULL
+head	varchar(255)	NO	NULL
+eyes	varchar(255)	NO	NULL
+ear	varchar(255)	NO	NULL
+nose	varchar(255)	NO	NULL
+mouth	varchar(255)	NO	NULL
+throat	varchar(255)	NO	NULL
+neck	varchar(255)	NO	NULL
+respiratory_system	varchar(255)	NO	NULL
+cardio_system	varchar(255)	NO	NULL
+git_system	varchar(255)	NO	NULL
+genitourinary_system	varchar(255)	NO	NULL
+nervous_system	varchar(255)	NO	NULL
+musculoskeletal_system	varchar(255)	NO	NULL
+neuropsychiatric_system	varchar(255)	NO	NULL
+endocrine_system	varchar(255)	NO	NULL
+peripheral_vascular_system	varchar(255)	NO	NULL
+result_auth	tinyint(1)	NO	0
+result_auth_user	bigint(20) unsigned	YES	NULL
+auth_date	timestamp	YES	NULL
+referred	varchar(255)	NO	NULL
+discount_comment	varchar(255)	NO	NULL

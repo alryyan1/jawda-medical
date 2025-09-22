@@ -123,11 +123,13 @@ class Handler extends ExceptionHandler
                 $status = $exception->status; // Use validation exception status (usually 422)
             }
 
+            // Always include file and line per requirement
+            $response['file'] = $exception->getFile();
+            $response['line'] = $exception->getLine();
+
             // Add detailed debug information ONLY in local/development environment
             if (config('app.debug') && app()->environment(['local', 'development'])) {
                 $response['exception'] = get_class($exception);
-                $response['file'] = $exception->getFile();
-                $response['line'] = $exception->getLine();
                 $response['trace'] = collect($exception->getTrace())->map(function ($trace) {
                     return Arr::except($trace, ['args']);
                 })->all();

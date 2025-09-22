@@ -1,0 +1,16 @@
+﻿id	bigint(20) unsigned	NO	NULL
+lab_request_id	bigint(20) unsigned	NO	NULL
+patient_id	bigint(20) unsigned	NO	NULL
+main_test_id	bigint(20) unsigned	NO	NULL
+child_test_id	bigint(20) unsigned	NO	NULL
+result	text	NO	''
+normal_range	text	NO	NULL
+created_at	timestamp	YES	NULL
+updated_at	timestamp	YES	NULL
+unit_id	bigint(20) unsigned	YES	NULL
+flags	varchar(50)	YES	NULL
+result_comment	text	YES	NULL
+entered_by_user_id	bigint(20) unsigned	YES	NULL
+entered_at	timestamp	YES	NULL
+authorized_by_user_id	bigint(20) unsigned	YES	NULL
+authorized_at	timestamp	YES	NULL

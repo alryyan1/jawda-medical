@@ -52,6 +52,7 @@ use App\Http\Controllers\Api\UserDocSelectionController;
 use App\Http\Controllers\Api\VisitServiceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\SmsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -83,6 +84,8 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
+  // SMS
+  Route::post('/sms/send', [SmsController::class, 'send']);
   /*
     |--------------------------------------------------------------------------
     | User Authentication & Profile Routes
