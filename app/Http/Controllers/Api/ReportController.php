@@ -1562,12 +1562,15 @@ class ReportController extends Controller
             return response()->json(['message' => 'لا توجد خدمات لإنشاء إيصال لها في هذه الزيارة.'], 404);
         }
     
-        $report = new \App\Services\Pdf\ThermalServiceReceiptReport();
-        $result = $report->generate($visit);
+        $report = new \App\Services\Pdf\ThermalServiceReceiptReport($visit);
+        $pdfContent = $report->generate();
+        
+        $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
+        $filename = 'ServiceReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
     
-        return response($result['content'], 200)
+        return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', "inline; filename=\"{$result['filename']}\"");
+            ->header('Content-Disposition', "inline; filename=\"{$filename}\"");
     }
 
     protected function drawThermalTotalRow(MyCustomTCPDF $pdf, string $label, float $value, float $pageUsableWidth, bool $isBoldValue = false, string $valueClass = '')
