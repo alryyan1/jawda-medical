@@ -77,6 +77,7 @@ class DoctorShift extends Model
         'is_company_revenue_prooved' => 'boolean',
         'is_company_reclaim_prooved' => 'boolean',
     ];
+  
 
 
     public function additionalCosts()

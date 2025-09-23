@@ -39,7 +39,9 @@ class DoctorVisitResource extends JsonResource
             
             // Patient information
             'patient_id' => $this->patient_id,
-            'patient' => new PatientResource($this->whenLoaded('patient')),
+            'patient' => new PatientResource($this->whenLoaded('patient',function() {
+                return $this->patient->load('user');
+            })),
             'patient_subcompany' => $this->whenLoaded('patient', function() {
                 return $this->patient->subcompany;
             }),

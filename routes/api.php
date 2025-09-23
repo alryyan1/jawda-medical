@@ -571,6 +571,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
     Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
     Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
+    Route::get('/visits/{visit}/lab-invoice/pdf', [ReportController::class, 'generateLabInvoicePdf']);
     Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf']);
     Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result']); // For "View Report Preview"
     Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns

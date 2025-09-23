@@ -139,6 +139,38 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->Cell(0, $this->lineHeight, $date, 0, 1, 'L');
         
         $this->Ln(5);
+
+        // Company details (if present) - shown after date
+        if ($this->isCompanyPatient && $this->visit->patient) {
+            $this->SetFont($this->fontName, 'B', 10);
+            $this->MultiCell(0, $this->lineHeight, 'معلومات شركة المريض', 0, $this->alignStart, false, 1);
+            $this->SetFont($this->fontName, '', 9);
+
+            // Company name
+            if (!empty($this->visit->patient->company?->name)) {
+                $this->MultiCell(0, $this->lineHeight, 'اسم الشركة: ' . $this->visit->patient->company->name, 0, $this->alignStart, false, 1);
+            }
+            // Subcompany name
+            if (!empty($this->visit->patient->subcompany?->name)) {
+                $this->MultiCell(0, $this->lineHeight, 'اسم الشركة الفرعية: ' . $this->visit->patient->subcompany->name, 0, $this->alignStart, false, 1);
+            }
+            // Insurance number
+            if (!empty($this->visit->patient->insurance_no)) {
+                $this->MultiCell(0, $this->lineHeight, 'رقم التأمين: ' . $this->visit->patient->insurance_no, 0, $this->alignStart, false, 1);
+            }
+            // Guarantor
+            if (!empty($this->visit->patient->guarantor)) {
+                $this->MultiCell(0, $this->lineHeight, 'الضامن: ' . $this->visit->patient->guarantor, 0, $this->alignStart, false, 1);
+            }
+            // Company relation
+            if (!empty($this->visit->patient->company_relation?->name)) {
+                $this->MultiCell(0, $this->lineHeight, 'اسم العلاقة: ' . $this->visit->patient->company_relation->name, 0, $this->alignStart, false, 1);
+            }
+
+            $this->Ln(2);
+            $this->Cell(0, 0.1, '', 'T', 1, 'C');
+            $this->Ln(3);
+        }
     }
 
     protected function generateBarcode(): void

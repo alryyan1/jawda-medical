@@ -75,7 +75,8 @@ class DoctorVisitController extends Controller
             'doctor:id,name',          // EAGER LOAD DOCTOR
             'createdByUser:id,name',
             'requestedServices.service', // For calculating totals
-            'patientLabRequests.mainTest'       // For calculating totals
+            'patientLabRequests.mainTest' ,
+            'patient.user:id,username'        // For calculating totals
         ])
         ->latest('created_at'); // Or created_at if visit_time is not reliable
 

@@ -35,6 +35,7 @@ class UpdatePatientRequest extends FormRequest
             'insurance_no' => 'nullable|string|max:255',
             'address' => 'nullable|string|max:1000',
             'result_url' => 'nullable|string|url',
+            'discount_comment' => 'nullable|string|max:1000',
             // These fields are usually managed by specific actions, not general update
             // 'is_lab_paid' => 'sometimes|boolean',
             // 'lab_paid' => 'sometimes|numeric|min:0',
