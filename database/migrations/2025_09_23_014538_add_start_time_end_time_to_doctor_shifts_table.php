@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('doctor_shifts', function (Blueprint $table) {
-            $table->timestamp('start_time')->nullable()->after('status');
-            $table->timestamp('end_time')->nullable()->after('start_time');
+            if (!Schema::hasColumn('doctor_shifts', 'start_time')) {
+                $table->timestamp('start_time')->nullable()->after('status');
+            }
+            if (!Schema::hasColumn('doctor_shifts', 'end_time')) {
+                $table->timestamp('end_time')->nullable()->after('start_time');
+            }
         });
     }
 
@@ -23,7 +27,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('doctor_shifts', function (Blueprint $table) {
-            $table->dropColumn(['start_time', 'end_time']);
+            if (Schema::hasColumn('doctor_shifts', 'start_time')) {
+                $table->dropColumn('start_time');
+            }
+            if (Schema::hasColumn('doctor_shifts', 'end_time')) {
+                $table->dropColumn('end_time');
+            }
         });
     }
 };

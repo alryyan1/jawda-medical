@@ -247,6 +247,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('companies/{company}/available-main-tests', [CompanyMainTestController::class, 'availableMainTests']);
   Route::post('companies/{company}/contracted-main-tests', [CompanyMainTestController::class, 'store']);
   Route::post('companies/{company}/contracted-main-tests/import-all', [CompanyMainTestController::class, 'importAllMainTests']);
+  Route::post('companies/{targetCompany}/copy-main-test-contracts-from/{sourceCompany}', [CompanyMainTestController::class, 'copyContractsFrom']);
   // Note: For update and destroy, Laravel's route model binding will bind {main_test} to a MainTest instance
   Route::put('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'update']);
   Route::delete('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'destroy']);

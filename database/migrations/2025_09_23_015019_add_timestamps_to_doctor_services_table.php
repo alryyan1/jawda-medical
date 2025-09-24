@@ -12,7 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('doctor_services', function (Blueprint $table) {
-            $table->timestamp('created_at')->nullable()->after('fixed');
+            if (!Schema::hasColumn('doctor_services', 'created_at')) {
+                $table->timestamp('created_at')->nullable()->after('fixed');
+            }
+            if (!Schema::hasColumn('doctor_services', 'updated_at')) {
+                $table->timestamp('updated_at')->nullable()->after('created_at');
+            }
             $table->timestamp('updated_at')->nullable()->after('created_at');
         });
     }
@@ -23,7 +28,12 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('doctor_services', function (Blueprint $table) {
-            $table->dropColumn(['created_at', 'updated_at']);
+            if (Schema::hasColumn('doctor_services', 'created_at')) {
+                $table->dropColumn('created_at');
+            }
+            if (Schema::hasColumn('doctor_services', 'updated_at')) {
+                $table->dropColumn('updated_at');
+            }
         });
     }
 };

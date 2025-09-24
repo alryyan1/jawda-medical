@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('costs', function (Blueprint $table) {
-            $table->unsignedBigInteger('user_cost')->nullable()->after('shift_id');
-            $table->foreign('user_cost')->references('id')->on('users')->onDelete('set null');
+            if (!Schema::hasColumn('costs', 'user_cost')) {
+                $table->unsignedBigInteger('user_cost')->nullable()->after('shift_id');
+            }
+            if (!Schema::hasForeignKey('costs', 'user_cost')) {
+                $table->foreign('user_cost')->references('id')->on('users')->onDelete('set null');
+            }
         });
     }
 
@@ -23,8 +27,13 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('costs', function (Blueprint $table) {
-            $table->dropForeign(['user_cost']);
-            $table->dropColumn('user_cost');
+            if (Schema::hasColumn('costs', 'user_cost')) {
+                $table->dropForeign(['user_cost']);
+                $table->dropColumn('user_cost');
+            }
+            if (Schema::hasColumn('costs', 'user_cost')) {
+                $table->dropColumn('user_cost');
+            }
         });
     }
 };

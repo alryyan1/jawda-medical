@@ -10,6 +10,7 @@ use App\Http\Resources\CompanyMainTestResource;
 use App\Http\Resources\MainTestStrippedResource; // For available tests
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CompanyMainTestController extends Controller
 {
@@ -147,6 +148,66 @@ class CompanyMainTestController extends Controller
         return response()->json([
             'message' => "تم استيراد " . count($attachData) . " فحص بنجاح.",
             'imported_count' => count($attachData),
+        ]);
+    }
+
+    // Copy main test contracts from one company to another
+    public function copyContractsFrom(Request $request, Company $targetCompany, Company $sourceCompany)
+    {
+        // Authorization: User should be able to manage contracts for the targetCompany
+        // if (!Auth::user()->can('manage company_contracts', $targetCompany)) { // Example policy check
+        //     return response()->json(['message' => 'Unauthorized to modify target company contracts.'], 403);
+        // }
+        // if (!Auth::user()->can('view company_contracts', $sourceCompany)) { // Example policy check
+        //     return response()->json(['message' => 'Unauthorized to view source company contracts.'], 403);
+        // }
+
+        if ($targetCompany->id === $sourceCompany->id) {
+            return response()->json(['message' => 'لا يمكن نسخ العقود من نفس الشركة إلى نفسها.'], 422);
+        }
+
+        // Crucial Check: Target company must not have existing main test contracts
+        if ($targetCompany->contractedMainTests()->exists()) {
+            return response()->json(['message' => 'لا يمكن نسخ العقود. الشركة المستهدفة لديها عقود فحوصات موجودة بالفعل.'], 409); // 409 Conflict
+        }
+
+        $sourceContracts = $sourceCompany->contractedMainTests()->get();
+
+        if ($sourceContracts->isEmpty()) {
+            return response()->json(['message' => 'الشركة المصدر لا تحتوي على عقود فحوصات لنسخها.', 'copied_count' => 0], 404);
+        }
+
+        $attachData = [];
+        foreach ($sourceContracts as $sourceContractPivotedTest) {
+            // $sourceContractPivotedTest is a MainTest model with ->pivot populated
+            $pivotData = $sourceContractPivotedTest->pivot;
+            $attachData[$sourceContractPivotedTest->id] = [
+                'status' => $pivotData->status,
+                'price' => $pivotData->price,
+                'approve' => $pivotData->approve,
+                'endurance_static' => $pivotData->endurance_static,
+                'endurance_percentage' => $pivotData->endurance_percentage,
+                'use_static' => $pivotData->use_static,
+                'created_at' => now(), // New timestamps for the new contract
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::beginTransaction();
+        try {
+            if (!empty($attachData)) {
+                $targetCompany->contractedMainTests()->attach($attachData);
+            }
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to copy main test contracts from company {$sourceCompany->id} to {$targetCompany->id}: " . $e->getMessage());
+            return response()->json(['message' => 'فشل نسخ عقود الفحوصات.', 'error' => $e->getMessage()], 500);
+        }
+
+        return response()->json([
+            'message' => "تم نسخ " . count($attachData) . " عقد فحص بنجاح من {$sourceCompany->name} إلى {$targetCompany->name}.",
+            'copied_count' => count($attachData),
         ]);
     }
 }
