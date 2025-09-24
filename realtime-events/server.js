@@ -136,6 +136,32 @@ app.post('/emit/print-lab-receipt', verifyAuth, async (req, res) => {
   }
 });
 
+// Emit close-general-shift
+app.post('/emit/close-general-shift', verifyAuth, (req, res) => {
+  try {
+    const payload = req.body || {};
+    console.log('close-general-shift', payload);
+    io.emit('close-general-shift', payload);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error emitting close-general-shift:', err?.message || err);
+    return res.status(500).json({ error: 'Failed to emit close-general-shift' });
+  }
+});
+
+// Emit open-general-shift
+app.post('/emit/open-general-shift', verifyAuth, (req, res) => {
+  try {
+    const payload = req.body || {};
+    console.log('open-general-shift', payload);
+    io.emit('open-general-shift', payload);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error emitting open-general-shift:', err?.message || err);
+    return res.status(500).json({ error: 'Failed to emit open-general-shift' });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);
 });

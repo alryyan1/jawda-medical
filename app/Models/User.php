@@ -68,6 +68,9 @@ class User extends Authenticatable
         'is_active',
     ];
 
+    // No guarded attributes on User for this change
+    protected $guarded = [];
+
     protected $hidden = [
         'password',
         'remember_token',

@@ -21,6 +21,7 @@ class MainTestResource extends JsonResource
             'price' => (float) $this->price,
             'divided' => (bool) $this->divided,
             'available' => (bool) $this->available,
+            'is_special_test' => (bool) ($this->is_special_test ?? false),
                         'child_tests' => ChildTestResource::collection($this->whenLoaded('childTests')),
 
             // Include timestamps if your model has them

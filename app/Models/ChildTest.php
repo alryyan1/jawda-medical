@@ -55,6 +55,7 @@ class ChildTest extends Model
         'lowest',
         'test_order',
         'child_group_id',
+        'json_params',
     ];
 
     protected $casts = [
@@ -63,6 +64,7 @@ class ChildTest extends Model
         'max' => 'decimal:2',
         'lowest' => 'decimal:2',
         'test_order' => 'integer',
+        'json_params' => 'array',
     ];
     
     public $timestamps = false; // As per your child_tests migration (no timestamps)

@@ -25,10 +25,8 @@ class DoctorShiftsReport
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'doctor_id' => 'nullable|integer|exists:doctors,id',
-            'status' => 'nullable|in:0,1,all', // 0 for closed, 1 for open
             'shift_id' => 'nullable|integer|exists:shifts,id', // General Shift ID
             'user_id_opened' => 'nullable|integer|exists:users,id',
-            'doctor_name_search' => 'nullable|string|max:255',
         ]);
 
         // Build query with relationships

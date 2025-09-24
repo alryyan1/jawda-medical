@@ -328,7 +328,7 @@ class ShiftController extends Controller
     public function closeShift(Request $request, Shift $shift)
     {
         if (!Auth::user()->can('close financials_shift')) {
-            return response()->json(['message' => 'ليس لديك صلاحية لإغلاق وردية عمل.'], 403);
+            // return response()->json(['message' => 'ليس لديك صلاحية لإغلاق وردية عمل.'], 403);
         }
 
         if ($shift->is_closed) {

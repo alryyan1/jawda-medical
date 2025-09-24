@@ -49,6 +49,7 @@ class MainTest extends Model
         'price',
         'divided', // Is the test result divided into sub-components/calculations?
         'available', // Is the test currently offered?
+        'is_special_test',
     ];
 
     protected $casts = [
@@ -56,6 +57,7 @@ class MainTest extends Model
         // 'price' => 'decimal:1', // As per schema double(10,1)
         'divided' => 'boolean',
         'available' => 'boolean',
+        'is_special_test' => 'boolean',
     ];
 
     // Timestamps are NOT in your main_tests schema by default. If you added them:

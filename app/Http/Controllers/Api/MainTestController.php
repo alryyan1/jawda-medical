@@ -99,7 +99,11 @@ class MainTestController extends Controller
             'price' => 'nullable|numeric|min:0',
             'divided' => 'required|boolean',
             'available' => 'required|boolean',
+            'is_special_test' => 'sometimes|boolean',
         ]);
+        if ($request->has('is_special_test')) {
+            $validatedData['is_special_test'] = (bool) $request->boolean('is_special_test');
+        }
         $mainTest = MainTest::create($validatedData);
         return new MainTestResource($mainTest->load('container'));
     }
@@ -119,7 +123,11 @@ class MainTestController extends Controller
             'price' => 'nullable|numeric|min:0',
             'divided' => 'sometimes|required|boolean',
             'available' => 'sometimes|required|boolean',
+            'is_special_test' => 'sometimes|boolean',
         ]);
+        if ($request->has('is_special_test')) {
+            $validatedData['is_special_test'] = (bool) $request->boolean('is_special_test');
+        }
         $mainTest->update($validatedData);
         return new MainTestResource($mainTest->load('container'));
     }

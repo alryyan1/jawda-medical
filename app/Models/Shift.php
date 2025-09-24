@@ -66,13 +66,16 @@ class Shift extends Model
         'closed_at',
         'is_closed',
         'pharamacy_entry',
-        'user_closed',
         'user_id', // If you add this
         // 'user_id_opened', // If you add this
         // 'user_id_closed', // If you add this
         // 'name', // If you add a name field
         // 'start_datetime', // If you add explicit start/end
         // 'end_datetime',
+    ];
+
+    protected $guarded = [
+        'user_closed',
     ];
 
 
@@ -262,9 +265,6 @@ class Shift extends Model
         } else {
             return RequestedServiceDeposit::where('shift_id', $this->id)->where('is_bank', 1)->sum('amount');
         }
-
-
-        return $total;
     }
 
     public function totalCost($user = null)

@@ -24,6 +24,8 @@ class ChildTestResource extends JsonResource
             'child_group_id' => $this->child_group_id,
             'child_group_name' => $this->whenLoaded('childGroup', optional($this->childGroup)->name),
             'child_group' => new ChildGroupResource($this->whenLoaded('childGroup')),
+            'json_params' => $this->json_params,
+            'json_parameter' => $this->json_params, // alias for clients expecting this name
             'options' => ChildTestOptionResource::collection($this->whenLoaded('options')), // For later
         ];
     }

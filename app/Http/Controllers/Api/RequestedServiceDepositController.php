@@ -73,6 +73,7 @@ class RequestedServiceDepositController extends Controller
             $netPayable = $subTotal - $totalDiscount;
         }
 
+        log::info('netPayable   ',['netPayable' => $netPayable]);
         // If company patient, subtract endurance that company covers
         $patient = $requestedService->doctorVisit->patient; // Need to load this relationship if not always available
         // if ($patient->company_id) {
@@ -81,7 +82,7 @@ class RequestedServiceDepositController extends Controller
 
         $currentBalance = $netPayable - (float) $requestedService->amount_paid;
         $paymentAmount = (float) $validated['amount'];
-
+        log::info('currentBalance   ',['currentBalance' => $currentBalance,'paymentAmount' => $paymentAmount]);
         if ($paymentAmount > ($currentBalance + 0.009)) { // Allow for small float inaccuracies
             return response()->json(['message' => 'مبلغ الدفعة يتجاوز الرصيد المستحق للخدمة.', 'balance' => round($currentBalance, 2)], 422);
         }

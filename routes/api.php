@@ -232,6 +232,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
   // Nested resource for child tests under a main test
   Route::apiResource('main-tests.child-tests', ChildTestController::class)->shallow();
+  // JSON params dedicated endpoints for child tests
+  Route::get('/child-tests/{child_test}/json-params', [\App\Http\Controllers\Api\ChildTestController::class, 'getJsonParams']);
+  Route::put('/child-tests/{child_test}/json-params', [\App\Http\Controllers\Api\ChildTestController::class, 'updateJsonParams']);
   Route::put('/batch-update-prices', [MainTestController::class, 'batchUpdatePrices']);
   Route::post('/main-tests/batch-delete', [MainTestController::class, 'batchDeleteTests']); // Using POST for body with IDs
   Route::get('/reports/lab-price-list/pdf', [ReportController::class, 'generatePriceListPdf']);

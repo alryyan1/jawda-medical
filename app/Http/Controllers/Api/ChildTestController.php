@@ -75,7 +75,12 @@ class ChildTestController extends Controller
             'lowest' => 'nullable|numeric|lte:max', // Less than or equal to max if both present
             'test_order' => 'nullable|integer',
             'child_group_id' => 'nullable|exists:child_groups,id',
+            'json_params' => 'nullable|array',
+            'json_parameter' => 'nullable|array', // backward compat alias
         ]);
+        if ($request->has('json_parameter')) {
+            $validatedData['json_params'] = $request->input('json_parameter');
+        }
 
         $childTest = $mainTest->childTests()->create($validatedData);
         return new ChildTestResource($childTest->load(['unit', 'childGroup']));
@@ -110,7 +115,12 @@ class ChildTestController extends Controller
             'lowest' => 'nullable|numeric|lte:max',
             'test_order' => 'nullable|integer',
             'child_group_id' => 'nullable|exists:child_groups,id',
+            'json_params' => 'nullable|array',
+            'json_parameter' => 'nullable|array', // backward compat alias
         ]);
+        if ($request->has('json_parameter')) {
+            $validatedData['json_params'] = $request->input('json_parameter');
+        }
 
         $childTest->update($validatedData);
         return new ChildTestResource($childTest->load(['unit', 'childGroup']));
@@ -129,5 +139,42 @@ class ChildTestController extends Controller
 
         $childTest->delete();
         return response()->json(null, 204);
+    }
+
+    /**
+     * Get only the JSON params for a child test.
+     */
+    public function getJsonParams(ChildTest $childTest)
+    {
+        return response()->json([
+            'data' => [
+                'id' => $childTest->id,
+                'json_params' => $childTest->json_params,
+                'json_parameter' => $childTest->json_params,
+            ]
+        ]);
+    }
+
+    /**
+     * Update only the JSON params for a child test.
+     */
+    public function updateJsonParams(Request $request, ChildTest $childTest)
+    {
+        $validated = $request->validate([
+            'json_params' => 'nullable|array',
+            'json_parameter' => 'nullable|array',
+        ]);
+        if ($request->has('json_parameter')) {
+            $validated['json_params'] = $request->input('json_parameter');
+        }
+        $childTest->update(['json_params' => $validated['json_params'] ?? null]);
+        return response()->json([
+            'message' => 'JSON parameters updated',
+            'data' => [
+                'id' => $childTest->id,
+                'json_params' => $childTest->json_params,
+                'json_parameter' => $childTest->json_params,
+            ]
+        ]);
     }
 }
