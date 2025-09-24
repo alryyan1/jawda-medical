@@ -57,7 +57,6 @@ class CostController extends Controller
             'comment' => $validated['comment'] ?? null,
             'amount' => $validated['amount_cash_input'] ?? 0,       // Store cash portion
             'amount_bankak' => $validated['amount_bank_input'] ?? 0, // Store bank portion
-            'doctor_shift_id_for_sub_cost' => $validated['doctor_shift_id_for_sub_cost'] ?? null,
         ]);
         return new CostResource($cost->load(['costCategory', 'userCost:id,name']));
     }

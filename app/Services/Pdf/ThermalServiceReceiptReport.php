@@ -278,9 +278,9 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
         }
 
         // Show company endurance if applicable
-        if ($this->isCompanyPatient && $totalEnduranceOnServices > 0) {
-            $this->drawThermalTotalRow('تحمل الشركة:', -$totalEnduranceOnServices, $pageUsableWidth);
-        }
+        // if ($this->isCompanyPatient && $totalEnduranceOnServices > 0) {
+        //     $this->drawThermalTotalRow('تحمل الشركة:', -$totalEnduranceOnServices, $pageUsableWidth);
+        // }
 
         $this->drawThermalTotalRow('المدفوع:', $this->visit->total_paid_services(), $pageUsableWidth);
 
