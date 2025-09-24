@@ -121,7 +121,6 @@ class DoctorVisitController extends Controller
         $validatedData = $request->validate([
             'patient_id' => 'required|exists:patients,id',
             'doctor_id' => 'required|exists:doctors,id',
-            'shift_id' => 'required|exists:shifts,id', // Current general clinic shift
             'doctor_shift_id' => 'nullable|exists:doctor_shifts,id',
             // 'appointment_id' => 'nullable|exists:appointments,id|unique:doctor_visits,appointment_id',
             'file_id' => 'nullable|exists:files,id',
@@ -150,11 +149,16 @@ class DoctorVisitController extends Controller
             : 1
         );
 
+        if(isset($validatedData['shift_id'])){
+            $shift_id = $validatedData['shift_id'];
+        }else{
+            $shift_id = Shift::open()->latest()->first()->id;
+        }
         $visit = DoctorVisit::create([
             'patient_id' => $validatedData['patient_id'],
             'doctor_id' => $validatedData['doctor_id'],
             'user_id' => Auth::id(),
-            'shift_id' => $validatedData['shift_id'], //?? $currentClinicShift->id,
+            'shift_id' => $shift_id, 
             'doctor_shift_id' => $validatedData['doctor_shift_id'] ?? null,
             // 'appointment_id' => $validatedData['appointment_id'] ?? null,
             'file_id' => $validatedData['file_id'] ?? null,

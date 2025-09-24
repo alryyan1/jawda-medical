@@ -1012,6 +1012,207 @@ class PatientController extends Controller
     }
 
     /**
+     * Create a new clinic visit for an existing patient from history table.
+     * This method creates a new patient record and doctor visit for clinic workflow.
+     */
+    public function createClinicVisitFromHistory(Request $request, DoctorVisit $doctorVisit)
+    {
+        // Add permission check, e.g., can('create clinic_visit')
+        $validated = $request->validate([
+            'doctor_id' => 'required|integer|exists:doctors,id',
+            'doctor_shift_id' => 'required|integer|exists:doctor_shifts,id',
+            'company_id' => 'nullable|integer|exists:companies,id',
+            'reason_for_visit' => 'nullable|string|max:1000',
+        ]);
+
+        $currentGeneralShift = Shift::open()->latest('created_at')->first();
+        if (!$currentGeneralShift) {
+            return response()->json(['message' => 'لا توجد وردية عيادة مفتوحة حالياً.'], 400);
+        }
+
+        // Verify the doctor shift is active and belongs to the specified doctor
+        $doctorShift = DoctorShift::where('id', $validated['doctor_shift_id'])
+            ->where('doctor_id', $validated['doctor_id'])
+            ->where('status', true)
+            ->first();
+
+        if (!$doctorShift) {
+            return response()->json(['message' => 'وردية الطبيب غير صحيحة أو غير نشطة.'], 400);
+        }
+
+        $patient = $doctorVisit->patient;
+        
+        DB::beginTransaction();
+        try {
+            // Get file_id from the current doctorVisit or create a new file
+            $fileToUseId = $doctorVisit->file_id;
+            
+            // If for some reason no previous visit had a file, create a new one
+            if (!$fileToUseId) {
+                $file = File::create();
+                $fileToUseId = $file->id;
+            }
+
+            $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1;
+            $queueNumber = DoctorVisit::where('doctor_shift_id', $validated['doctor_shift_id'])->count() + 1;
+
+            // Create a new Patient record for this clinic visit
+            $newPatient = Patient::create([
+                'name' => $patient->name,
+                'phone' => $patient->phone,
+                'gender' => $patient->gender,
+                'age_year' => $patient->age_year,
+                'age_month' => $patient->age_month,
+                'age_day' => $patient->age_day,
+                'address' => $patient->address,
+                'company_id' => $validated['company_id'] ?? $patient->company_id,
+                'subcompany_id' => $patient->subcompany_id,
+                'company_relation_id' => $patient->company_relation_id,
+                'guarantor' => $patient->guarantor,
+                'insurance_no' => $patient->insurance_no,
+                'doctor_id' => $validated['doctor_id'],
+                'user_id' => Auth::id(),
+                'shift_id' => $currentGeneralShift->id,
+                'visit_number' => $visitLabNumber,
+                'result_auth' => false,
+                'referred' => 'no',
+                'discount_comment' => '',
+            ]);
+
+            // Create the DoctorVisit record for the new patient
+            $doctorVisit = $newPatient->doctorVisit()->create([
+                'doctor_id' => $validated['doctor_id'],
+                'user_id' => Auth::id(),
+                'shift_id' => $currentGeneralShift->id,
+                'doctor_shift_id' => $validated['doctor_shift_id'],
+                'file_id' => $fileToUseId,
+                'visit_date' => Carbon::today(),
+                'visit_time' => Carbon::now()->format('H:i:s'),
+                'status' => 'waiting',
+                'reason_for_visit' => $validated['reason_for_visit'] ?? 'متابعة',
+                'is_new' => false,
+                'number' => $queueNumber,
+                'queue_number' => $queueNumber,
+                'only_lab' => false, // This is a clinic visit, not lab-only
+            ]);
+
+            // Auto-attach favorite service if user has a selection for this doctor
+            $userId = Auth::id();
+            $fav = UserDocSelection::where('user_id', $userId)
+                ->where('doc_id', $validated['doctor_id'])
+                ->where('active', 1)
+                ->first();
+
+            if ($fav && $fav->fav_service) {
+                $service = Service::with('serviceCosts.subServiceCost')->find($fav->fav_service);
+                if ($service) {
+                    $company = $newPatient->company_id ? Company::find($newPatient->company_id) : null;
+
+                    $price = (float) $service->price;
+                    $companyEnduranceAmount = 0;
+                    $contractApproval = true;
+
+                    if ($company) {
+                        $contract = $company->contractedServices()
+                            ->where('services.id', $service->id)
+                            ->first();
+
+                        if ($contract && $contract->pivot) {
+                            $pivot = $contract->pivot;
+                            $price = (float) $pivot->price;
+                            $contractApproval = (bool) $pivot->approval;
+                            if ($pivot->use_static) {
+                                $companyEnduranceAmount = (float) $pivot->static_endurance;
+                            } else {
+                                if ($pivot->percentage_endurance > 0) {
+                                    $companyServiceEndurance = ($price * (float) ($pivot->percentage_endurance ?? 0)) / 100;
+                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                } else {
+                                    $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
+                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                }
+                            }
+                        }
+                    }
+
+                    $requestedService = RequestedService::create([
+                        'doctorvisits_id' => $doctorVisit->id,
+                        'service_id' => $service->id,
+                        'user_id' => $userId,
+                        'doctor_id' => $newPatient->doctor_id,
+                        'price' => $price,
+                        'amount_paid' => 0,
+                        'endurance' => $companyEnduranceAmount,
+                        'is_paid' => false,
+                        'discount' => 0,
+                        'discount_per' => 0,
+                        'bank' => false,
+                        'count' => 1,
+                        'approval' => $contractApproval,
+                        'done' => false,
+                    ]);
+
+                    // Auto-create RequestedServiceCost breakdowns
+                    if ($service->serviceCosts->isNotEmpty()) {
+                        $costEntriesData = [];
+                        $baseAmountForCostCalc = $price * 1; // count is 1
+
+                        foreach ($service->serviceCosts as $serviceCostDefinition) {
+                            $calculatedCostAmount = 0;
+                            $currentBase = $baseAmountForCostCalc;
+
+                            if ($serviceCostDefinition->cost_type === 'after cost') {
+                                $alreadyCalculatedCostsSum = collect($costEntriesData)->sum('amount');
+                                $currentBase = $baseAmountForCostCalc - $alreadyCalculatedCostsSum;
+                            }
+
+                            if ($serviceCostDefinition->fixed !== null && $serviceCostDefinition->fixed > 0) {
+                                $calculatedCostAmount = (float) $serviceCostDefinition->fixed;
+                            } elseif ($serviceCostDefinition->percentage !== null && $serviceCostDefinition->percentage > 0) {
+                                $calculatedCostAmount = ($currentBase * (float) $serviceCostDefinition->percentage) / 100;
+                            }
+
+                            if ($calculatedCostAmount > 0) {
+                                $costEntriesData[] = [
+                                    'requested_service_id' => $requestedService->id,
+                                    'sub_service_cost_id' => $serviceCostDefinition->sub_service_cost_id,
+                                    'service_cost_id' => $serviceCostDefinition->id,
+                                    'amount' => round($calculatedCostAmount, 2),
+                                    'created_at' => now(),
+                                    'updated_at' => now(),
+                                ];
+                            }
+                        }
+                        if (!empty($costEntriesData)) {
+                            RequestedServiceCost::insert($costEntriesData);
+                        }
+                    }
+                }
+            }
+            
+            DB::commit();
+
+            // Queue non-blocking actions after successful commit
+            \DB::afterCommit(function () use ($newPatient) {
+                EmitPatientRegisteredJob::dispatch($newPatient->id);
+                if (!empty($newPatient->phone)) {
+                    SendWelcomeSmsJob::dispatch($newPatient->id, $newPatient->phone, $newPatient->name);
+                }
+            });
+
+            // Load the doctorVisit relationship for the new patient
+            $newPatient->load(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file']);
+
+            return new PatientResource($newPatient);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to create clinic visit from history for doctor visit {$doctorVisit->id}: " . $e->getMessage(), ['exception' => $e]);
+            return response()->json(['message' => 'فشل إنشاء زيارة العيادة من السجل.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Get lab history for patients with the same phone number
      * Returns all patients with the same phone number who have lab requests
      */

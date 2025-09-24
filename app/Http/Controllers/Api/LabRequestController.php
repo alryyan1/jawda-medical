@@ -1027,7 +1027,8 @@ class LabRequestController extends Controller
                     'unit_id' => $childTest->unit_id,
                     'unit_name' => $childTest->unit->name ?? null,
                     'unit' => $childTest->unit ? ['id' => $childTest->unit->id, 'name' => $childTest->unit->name] : null,
-                    'normalRange' => $childTest->normalRange,
+                    'normalRange' => $existingResult ? $existingResult->normal_range : null,
+                    'normal_range' => $existingResult ? $existingResult->normal_range : null,
                     'max' => $childTest->max,
                     'lowest' => $childTest->lowest,
                     'test_order' => $childTest->test_order,
@@ -1079,7 +1080,6 @@ class LabRequestController extends Controller
                 'patient_id' => $labrequest->pid,
                 'main_test_id' => $labrequest->main_test_id,
                 'result' => $validated['result_value'] ?? '',
-                'normal_range' => $normalRangeToSave,
                 'unit_id' => $unitIdToSave,
                 // 'entered_by_user_id' => Auth::id(), // Add if re-introducing these fields
                 // 'entered_at' => now(),             // Add if re-introducing these fields
@@ -1102,6 +1102,44 @@ class LabRequestController extends Controller
 
         return new RequestedResultResource($requestedResult->load(['childTest.unit', /* 'enteredBy' */]));
     }
+
+    /**
+     * Update only the normal range for a specific child test result
+     */
+    public function updateNormalRange(Request $request, LabRequest $labrequest, ChildTest $childTest)
+    {
+        // Authorization checks
+        if ($labrequest->main_test_id !== $childTest->main_test_id) {
+            return response()->json(['message' => 'Child test does not belong to this lab request.'], 422);
+        }
+
+        $validated = $request->validate([
+            'normal_range' => 'required|string|max:1000',
+        ]);
+
+        // Find or create the requested result
+        $requestedResult = RequestedResult::updateOrCreate(
+            [
+                'lab_request_id' => $labrequest->id,
+                'child_test_id' => $childTest->id,
+            ],
+            [
+                'patient_id' => $labrequest->pid,
+                'main_test_id' => $labrequest->main_test_id,
+                'result' => '', // Default empty result
+                'normal_range' => $validated['normal_range'],
+                'unit_id' => $childTest->unit_id,
+            ]
+        );
+
+        // Update only the normal_range field
+        $requestedResult->update([
+            'normal_range' => $validated['normal_range']
+        ]);
+
+        return new RequestedResultResource($requestedResult->load(['childTest.unit']));
+    }
+
     public function generateLabThermalReceiptPdf(Request $request, DoctorVisit $visit)
     {
         // Permission Check: e.g., can('print lab_receipt', $visit)
@@ -1549,5 +1587,21 @@ class LabRequestController extends Controller
             'data' => new LabRequestResource($labrequest), // Assuming loadDefaultRelations loads what UI needs
             'cbcObj' => $object // Your debug object
         ]);
+    }
+
+    /**
+     * Update the comment for a lab request
+     */
+    public function updateComment(Request $request, LabRequest $labrequest)
+    {
+        $validated = $request->validate([
+            'comment' => 'required|string|max:1000',
+        ]);
+
+        $labrequest->update([
+            'comment' => $validated['comment']
+        ]);
+
+        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
     }
 }

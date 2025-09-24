@@ -112,7 +112,7 @@ class MainTestController extends Controller
     public function update(Request $request, MainTest $mainTest)
     {
         $validatedData = $request->validate([
-            'main_test_name' => ['sometimes', 'required', 'string', 'max:70', Rule::unique('main_tests')->ignore($mainTest->id)],
+            'main_test_name' => ['sometimes', 'required', 'string'],
             'pack_id' => 'nullable|integer',
             'pageBreak' => 'sometimes|required|boolean',
             'container_id' => 'sometimes|required|exists:containers,id',

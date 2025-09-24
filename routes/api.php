@@ -273,6 +273,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
   Route::post('/labrequests/{labrequest}/results', [LabRequestController::class, 'saveResults']);
   Route::patch('/labrequests/{labrequest}/childtests/{child_test}/result', [LabRequestController::class, 'saveSingleResult']);
+  Route::patch('/labrequests/{labrequest}/childtests/{child_test}/normal-range', [LabRequestController::class, 'updateNormalRange']);
+  Route::patch('/labrequests/{labrequest}/comment', [LabRequestController::class, 'updateComment']);
 
   // Generic LabRequest CRUD (if needed separately from visit context for some actions)
   Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']);
@@ -402,6 +404,9 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // NEW: Route for patient lab history by phone number
     Route::get('/patients/{patient}/lab-history', [PatientController::class, 'getLabHistory']);
+    
+    // NEW: Route for creating clinic visit from history
+    Route::post('/doctor-visits/{doctorVisit}/create-clinic-visit-from-history', [PatientController::class, 'createClinicVisitFromHistory']);
     
     Route::apiResource('patients', PatientController::class); // This should already be there
 

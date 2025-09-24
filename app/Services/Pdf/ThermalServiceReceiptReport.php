@@ -282,7 +282,7 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
             $this->drawThermalTotalRow('تحمل الشركة:', -$totalEnduranceOnServices, $pageUsableWidth);
         }
 
-        $this->drawThermalTotalRow('المدفوع:', $totalActuallyPaidForTheseServices, $pageUsableWidth);
+        $this->drawThermalTotalRow('المدفوع:', $this->visit->total_paid_services(), $pageUsableWidth);
 
         $this->Ln(5);
     }
