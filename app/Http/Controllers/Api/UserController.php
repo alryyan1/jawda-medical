@@ -43,6 +43,7 @@ class UserController extends Controller
             'is_supervisor' => 'sometimes|boolean', // ADDED
             'is_active' => 'sometimes|boolean',     // ADDED
             'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
+            'user_type' => 'nullable|string|max:255',
         ]);
 
         $createData = collect($validatedData)->except(['password_confirmation', 'roles'])->toArray();
@@ -82,6 +83,7 @@ class UserController extends Controller
             'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,name,guard_name,web', // Ensure guard_name is web
+            'user_type' => 'nullable|string|max:255',
         ]);
 
         // Prepare data for update, excluding password fields (handled by dedicated endpoint)
@@ -91,7 +93,7 @@ class UserController extends Controller
         if ($request->has('is_nurse')) $updateData['is_nurse'] = $request->boolean('is_nurse');
         if ($request->has('is_supervisor')) $updateData['is_supervisor'] = $request->boolean('is_supervisor');
         if ($request->has('is_active')) $updateData['is_active'] = $request->boolean('is_active');
-        
+        if ($request->has('user_type')) $updateData['user_type'] = (string) $request->input('user_type');
         $user->update($updateData);
 
         if ($request->has('roles') && Auth::user()->can('assign roles')) { // Assuming 'assign roles' permission

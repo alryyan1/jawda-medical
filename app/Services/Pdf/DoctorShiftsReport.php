@@ -22,8 +22,6 @@ class DoctorShiftsReport
     {
         // Validate request parameters
         $request->validate([
-            'date_from' => 'nullable|date_format:Y-m-d',
-            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'doctor_id' => 'nullable|integer|exists:doctors,id',
             'shift_id' => 'nullable|integer|exists:shifts,id', // General Shift ID
             'user_id_opened' => 'nullable|integer|exists:users,id',
@@ -42,8 +40,7 @@ class DoctorShiftsReport
 
         $filterCriteria = [];
        
-        // Apply date filter
-        $query->whereRaw('Date(doctor_shifts.created_at) between ? and ?', [$request->date_from, $request->date_to]);
+   
         
         // Apply filters
         if ($request->filled('doctor_id')) {
@@ -51,9 +48,9 @@ class DoctorShiftsReport
             if($doc = Doctor::find($request->doctor_id)) $filterCriteria[] = "Doctor: ".$doc->name;
         }
         
-        if ($request->filled('user_id_opened')) {
-            $query->where('user_id', $request->user_id_opened);
-             if($u = User::find($request->user_id_opened)) $filterCriteria[] = "Opened By: ".$u->name;
+        if ($request->filled('user_opened')) {
+            $query->where('user_id', $request->user_opened);
+             if($u = User::find($request->user_opened)) $filterCriteria[] = "Opened By: ".$u->name;
         }
         
         if ($request->filled('doctor_name_search')) {
@@ -70,6 +67,12 @@ class DoctorShiftsReport
         if ($request->filled('shift_id')) {
             $query->where('shift_id', $request->shift_id);
             if($gs = Shift::find($request->shift_id)) $filterCriteria[] = "Gen. Shift: #".($gs->name ?? $gs->id);
+        }
+        if($request->filled('date_from')){
+            $query->where('doctor_shifts.created_at', $request->date_from);
+        }
+        if($request->filled('date_to')){
+            $query->where('doctor_shifts.created_at', $request->date_to);
         }
 
         // Execute query with sorting

@@ -51,6 +51,10 @@ class RequestedServiceDepositController extends Controller
             // 'shift_id' might be taken from AuthContext on frontend and passed, or determined here
             // For now, assuming frontend might pass it or we take current open shift
         ]);
+        if($requestedService->doctorVisit->shift_id != Shift::max('id')) {
+            Log::error("Requested service {$requestedService->id} is in a previous shift.",);
+            return response()->json(['message' => 'لا يمكن تسجيل دفعة لخدمة في ورديه سابقه  .'], 403);
+        }
 
         $currentClinicShift = Shift::open()->latest('created_at')->first();
         if (!$currentClinicShift) {

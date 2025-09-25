@@ -11,6 +11,7 @@ use App\Models\ServiceCost; // For accessing predefined costs
 use App\Models\RequestedServiceCost; // For creating cost breakdown entries
 use App\Http\Resources\ServiceResource;
 use App\Http\Resources\RequestedServiceResource;
+use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,30 @@ class VisitServiceController extends Controller
         // Example permissions
         // $this->middleware('can:view requested_services')->only(['getAvailableServices', 'getRequestedServices']);
         // $this->middleware('can:manage requested_services')->only(['addRequestedServices', 'updateRequestedService', 'removeRequestedService']);
+    }
+
+    /**
+     * Central guard to prevent add/delete/update on requested services when conditions are met.
+     * Returns a JSON response on failure, or null if operation is allowed.
+     */
+    private function guardRequestedServiceMutation(DoctorVisit $visit, ?RequestedService $requestedService = null)
+    {
+        // Block any mutation on visits that are not in the latest shift
+        if ($visit->shift_id != Shift::max('id')) {
+            return response()->json(['message' => 'لا يمكن إجراء تعديلات على خدمات زيارة في وردية سابقة.'], 403);
+        }
+
+        // If a specific requested service is provided, ensure it belongs to the visit
+        if ($requestedService && $requestedService->doctorvisits_id !== $visit->id) {
+            return response()->json(['message' => 'Service not found for this visit.'], 404);
+        }
+
+        // If a specific requested service is provided, ensure it's not paid or done
+        if ($requestedService && ($requestedService->is_paid || $requestedService->done)) {
+            return response()->json(['message' => 'لا يمكن تعديل/حذف خدمة مدفوعة أو مكتملة.'], 403);
+        }
+
+        return null;
     }
 
     public function getAvailableServices(DoctorVisit $visit)
@@ -54,6 +79,9 @@ class VisitServiceController extends Controller
 
     public function addRequestedServices(Request $request, DoctorVisit $visit)
     {
+        if ($resp = $this->guardRequestedServiceMutation($visit)) {
+            return $resp;
+        }
         // if(!Auth::user()->can('request visit_services')) {
         //     return response()->json(['message' => 'لا يمكنك إضافة خدمات للزيارة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
         // }
@@ -198,12 +226,9 @@ class VisitServiceController extends Controller
         // if(!Auth::user()->can('remove visit_services')) {
         //     return response()->json(['message' => 'لا يمكنك حذف خدمة للزيارة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
         // }
-        if ($requestedService->doctorvisits_id !== $visit->id) {
-            return response()->json(['message' => 'Service not found for this visit.'], 404);
+        if ($resp = $this->guardRequestedServiceMutation($visit, $requestedService)) {
+            return $resp;
         }
-        // if ($requestedService->is_paid || $requestedService->done) {
-        //     return response()->json(['message' => 'لا يمكن حذف خدمة مدفوعة أو مكتملة.'], 403);
-        // }
 
         DB::beginTransaction();
         try {
@@ -230,8 +255,8 @@ class VisitServiceController extends Controller
 
         // $this->authorize('update', $requestedService); // Policy for RequestedService
 
-        if ($requestedService->is_paid || $requestedService->done) {
-            return response()->json(['message' => 'لا يمكن تعديل خدمة مدفوعة أو مكتملة.'], 403);
+        if ($resp = $this->guardRequestedServiceMutation($visit, $requestedService)) {
+            return $resp;
         }
 
         $validated = $request->validate([

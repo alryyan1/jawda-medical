@@ -12,6 +12,7 @@ class UserResource extends JsonResource {
             'user_money_collector_type' => $this->user_money_collector_type,
             'is_supervisor' => (bool) $this->is_supervisor,
             'is_active' => (bool) $this->is_active,
+            'user_type' => $this->user_type,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
             'roles' => RoleResource::collection($this->whenLoaded('roles')),

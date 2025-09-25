@@ -66,6 +66,7 @@ class User extends Authenticatable
         'user_money_collector_type',
         'is_supervisor',
         'is_active',
+        'user_type',
     ];
 
     // No guarded attributes on User for this change
