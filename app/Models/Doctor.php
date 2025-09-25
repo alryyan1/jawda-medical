@@ -65,6 +65,7 @@ class Doctor extends Model
 
     protected $fillable = [
         'name',
+        'firebase_id',
         'phone',
         'cash_percentage',
         'company_percentage',

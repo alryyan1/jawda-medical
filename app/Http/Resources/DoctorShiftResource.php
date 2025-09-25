@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class DoctorShiftResource extends JsonResource
 {
@@ -23,7 +24,7 @@ class DoctorShiftResource extends JsonResource
         $insuranceEntitlement = $this->doctor_credit_company(); // Assumes this method exists
         $staticWageApplied = ($this->status == false && $this->doctor) ? (float)$this->doctor->static_wage : 0; // Apply static wage only if shift is closed and doctor exists
         $totalDoctorEntitlement = $cashEntitlement + $insuranceEntitlement + $staticWageApplied;
-
+    //    Log::info($this->doctor?->name,['doctor'=>$this->doctor]);
         return [
             'id' => $this->id,
             'doctor_id' => $this->doctor_id,
@@ -34,7 +35,8 @@ class DoctorShiftResource extends JsonResource
             'patients_count' => $this->patients_count,
             'shift_id' => $this->shift_id, // General clinic shift_id
             'general_shift_name' => $this->whenLoaded('generalShift', $this->generalShift?->name ?? ('Shift #'.$this->generalShift?->id)),
-            
+            'firebase_id' => $this->doctor?->firebase_id,
+            'specialist_firestore_id' => $this->doctor?->specialist?->firestore_id,
             'status' => (bool) $this->status,
             'status_text' => $this->status ? 'Open' : 'Closed',
             'start_time' => $this->start_time?->toIso8601String(),

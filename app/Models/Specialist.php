@@ -28,7 +28,7 @@ class Specialist extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'firestore_id'];
 
     // No timestamps defined in the specialists migration, so:
     public $timestamps = false;

@@ -75,7 +75,8 @@ class SpecialistController extends Controller
     public function update(Request $request, Specialist $specialist)
     {
         $validated = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('specialists')->ignore($specialist->id)],
+            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('specialists')->ignore($specialist->id),],
+            'firestore_id' => ['sometimes', 'required', 'string', 'max:255'],
         ]);
         $specialist->update($validated);
         return new SpecialistResource($specialist);

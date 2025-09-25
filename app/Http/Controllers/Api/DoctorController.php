@@ -113,6 +113,7 @@ class DoctorController extends Controller
             'finance_account_id_insurance' => 'nullable|exists:finance_accounts,id',
             'calc_insurance' => 'sometimes|required|boolean',
             'is_default' => 'sometimes|boolean',
+            'firebase_id' => 'sometimes|required|string',
         ]);
 
         if ($request->hasFile('image_file')) {
