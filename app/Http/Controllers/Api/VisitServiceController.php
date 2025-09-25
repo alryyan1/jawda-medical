@@ -208,6 +208,7 @@ class VisitServiceController extends Controller
         DB::beginTransaction();
         try {
             $requestedService->costBreakdown()->delete(); // Delete associated cost breakdown entries
+            $requestedService->deposits()->delete(); // Delete associated deposits entries
             $requestedService->delete();
             DB::commit();
         } catch (\Exception $e) {
