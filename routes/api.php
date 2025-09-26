@@ -51,6 +51,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
 use App\Http\Controllers\Api\VisitServiceController;
 use App\Http\Controllers\Api\CompanyReportController;
+use App\Http\Controllers\Api\SettingUploadController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SmsController;
@@ -213,6 +214,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('finance-accounts-list', [FinanceAccountController::class, 'indexList']);
   Route::get('/user/current-shift-income-summary', [UserController::class, 'getCurrentUserShiftIncomeSummary']);
 
+  Route::post('/settings/upload', [SettingUploadController::class, 'upload']);
   // Settings
   Route::get('/settings', [SettingsController::class, 'show']);
   Route::post('/settings', [SettingsController::class, 'update']);

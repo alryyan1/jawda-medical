@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        // Drop existing table to ensure idempotent re-runs
+        Schema::dropIfExists('denos_users');
+
         Schema::create('denos_users', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();

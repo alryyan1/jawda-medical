@@ -8,7 +8,7 @@ use Illuminate\Http\Request; use Illuminate\Http\Resources\Json\JsonResource;
 class PatientLabQueueItemResource extends JsonResource {
     public function toArray(Request $request): array {
             // $this->resource is the DoctorVisit model instance or a similar object from the query
-            $patientModel = Patient::find($this->patient_id); // Fetch full patient for lock status
+            // $patientModel = Patient::find($this->patient_id); // Fetch full patient for lock status
 
             // For all_requests_paid_for_badge, we need to know if all *valid* requests for the visit are paid
             // This can be intensive if done for every item. Consider optimizing if performance is an issue.
@@ -45,16 +45,16 @@ class PatientLabQueueItemResource extends JsonResource {
             'pending_result_count'=>$pendingResultsCount,
             'visit_id' => $this->visit_id,
             'patient_id' => $this->patient_id,
-            'patient_name' => $patientModel?->name,
+            'patient_name' => $this->patient->name,
              'company'=>$this->patient->company,
-            'patient_phone_for_whatsapp' => $patientModel ? UltramsgService::formatPhoneNumber($patientModel->phone) : null,
-            'is_result_locked' => $patientModel ? (bool) $patientModel->result_is_locked : false,
+            'patient_phone_for_whatsapp' => $this->patient ? UltramsgService::formatPhoneNumber($this->patient->phone) : null,
+            'is_result_locked' => $this->patient ? (bool) $this->patient->result_is_locked : false,
             'is_printed'=>$this->patient->result_print_date != null,
             'print_date'=>$this->patient->result_print_date,
              'phone' => $this->patient->phone,
             // Added visit meta and doctor
             'visit_created_at' => $this->created_at,
-            'doctor_name' => $patientModel?->doctor->name ?? null,
+            'doctor_name' => $this->patient?->doctor->name ?? null,
             'name'=>$this->patient->name,
             // Added age representation (years/months/days if available on patient)
             'patient_age' => $this->formatPatientAge($this->patient),
@@ -73,11 +73,11 @@ class PatientLabQueueItemResource extends JsonResource {
             'is_last_result_pending' => ($totalResultsCount > 0 && $pendingResultsCount === 1),
              // NEW FIELD
              'is_ready_for_print' => ($pendingResultsCount == 0 && !$isPrinted),
-             'sample_collected' => $patientModel?->sample_collect_time != null,
-             'result_url' => $patientModel?->result_url,
-             'registered_by' => $patientModel?->user?->name,
-             'auth_date' => $patientModel?->auth_date,
-             'result_auth' => $patientModel?->result_auth,
+             'sample_collected' => $this->patient?->sample_collect_time != null,
+             'result_url' => $this->patient?->result_url,
+             'registered_by' => $this->patient?->user?->name,
+             'auth_date' => $this->patient?->auth_date,
+             'result_auth' => $this->patient?->result_auth,
             // 'status_summary' => ... // Calculate if needed
         ];
     }

@@ -7,9 +7,18 @@ use App\Models\Package;
 use App\Models\Setting;
 use App\Mypdf\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class LabResultReport
 {
+    // Sizing and spacing constants for consistent UI/UX
+    private float $baseLineHeight = 5.0;         // Default line height used for table rows
+    private float $sectionSpacing = 8.0;         // Spacing between major sections
+    private float $headerSpacing = 6.0;          // Spacing after headers
+    private float $smallSpacing = 3.0;           // Minor spacing between related elements
+    private array $themeHeaderFill = [245, 247, 250]; // light header fill
+    private array $themeBorderColor = [200, 205, 210];
+
     /**
      * Generate lab result PDF content for a doctor visit.
      *
@@ -87,8 +96,10 @@ class LabResultReport
     {
         $pdf->SetFont('arial', '', 18, '', true);
 
+        Log::info('$settings->lab_name',['settigns'=>$settings]);
+
         $pdf->Ln(20);
-        $pdf->Cell($page_width, 5, $settings->is_logo ? $settings->lab_name : '', 0, 1, 'C');
+        $pdf->Cell($page_width, 5, $settings->lab_name , 0, 1, 'C');
 
         $pdf->Ln(20);
 
@@ -139,15 +150,15 @@ class LabResultReport
      */
     private function renderFooter($pdf, $patient, $page_width, $settings, $footer_name, $logo_path): void
     {
-        $pdf->SetFont('arial', '', 13, '', true);
+        $pdf->SetFont('arial', '', 10, '', true);
         $col = $page_width / 6;
-
+        $user = auth()->user();
         $pdf->cell(20, 5, "Sign: ", 0, 1, 'L');
-        $pdf->cell($col, 5, "", 0, 0, 'L');
+        $pdf->cell($col, 5, $user->name, 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
-        $pdf->cell($col, 5, "Visit No ", 0, 0, 'R');
+        $pdf->cell($col, 5, "No ", 0, 0, 'R');
         $pdf->cell($col, 5, $patient->visit_number, 0, 1, 'C');
 
         if ($settings->footer_content != null) {
@@ -252,13 +263,9 @@ class LabResultReport
             if ($count >= 1) {
                 $add = 20;
             }
-            $requared_height = ($children_count * 5) + $number_of_lines_in_normal_range + $add;
-            $y = $pdf->GetY();
-            $remaing_height = $page_height - $y - 15;
-
-            if ($remaing_height <= $requared_height) {
-                $pdf->addpage();
-            }
+            $requared_height = ($children_count * $this->baseLineHeight) + $number_of_lines_in_normal_range + $add;
+            // Ensure enough space before starting the block of this test
+            $this->ensureSpaceFor($pdf, $requared_height + $this->sectionSpacing);
             
             $is_columns = false;
             if ($m_test->requestedOrganisms()->count() > 0) {
@@ -286,10 +293,7 @@ class LabResultReport
             
             if ($has_more_than1_child == false) {
                 if ($show_headers) {
-                    $pdf->cell($table_col_widht, 5, "Test", 'TB', 0, 'C', 1);
-                    $pdf->cell($table_col_widht * 1.5, 5, "Result", 'TB', 0, 'C', 1);
-                    $pdf->cell($table_col_widht / 2, 5, "Unit", 'TB', 0, 'C', 1);
-                    $pdf->cell($table_col_widht, 5, "R.Values", 'TB', 1, 'C', 1);
+                    $this->renderResultTableHeader($pdf, $table_col_widht, $m_test->mainTest->divided == 1);
                 }
                 $show_headers = false;
             }
@@ -302,9 +306,10 @@ class LabResultReport
             $pdf->resetColumns();
 
             $this->renderComments($pdf, $m_test, $page_width);
-            $pdf->cell(0, 5, "", 0, 1, 'C', 0);
+            // $this->addVerticalSpacing($pdf, $this->smallSpacing);
             
             $this->renderOrganisms($pdf, $m_test, $col_number, $column_width ?? 0);
+            $this->addVerticalSpacing($pdf, $this->sectionSpacing);
         }
     }
 
@@ -321,16 +326,13 @@ class LabResultReport
             $pdf->Ln(5);
             $pdf->Ln(5);
         }
-        $pdf->cell(40, 5, $m_test->mainTest->main_test_name, 0, 1, 'L'); // main
+        if ($m_test->mainTest->divided != 1) {
+            // $pdf->Ln(5);
+            $pdf->cell(40, 5, $m_test->mainTest->main_test_name, 0, 1, 'L'); // main
+        }
         $pdf->Ln();
         $y_position_for_divided_section = $pdf->getY();
-
-        $pdf->SetFont('arial', '', 11, '', true);
-        $pdf->cell($table_col_widht, 5, "Test", 'TB', 0, 'C', 1);
-        $pdf->cell($table_col_widht * 1.5, 5, "Result", 'TB', 0, 'C', 1);
-        $pdf->cell($table_col_widht / 2, 5, "Unit", 'TB', 0, 'C', 1);
-        $pdf->cell($table_col_widht, 5, "R.Values", 'TB', 1, 'C', 1);
-        $pdf->Ln();
+        $this->renderResultTableHeader($pdf, $table_col_widht, $m_test->mainTest->divided == 1);
     }
 
     /**
@@ -357,11 +359,8 @@ class LabResultReport
                 if ($m_test->mainTest->divided == 1) {
                     $pdf->selectColumn(col: 1);
                     $y_position_for_divided_section = $pdf->getY();
-                    $pdf->cell($table_col_widht, 5, "Test", 'TB', 0, 'C', 1);
-                    $pdf->cell($table_col_widht * 1.5, 5, "Result", 'TB', 0, 'C', 1);
-                    $pdf->cell($table_col_widht / 2, 5, "Unit", 'TB', 0, 'C', 1);
-                    $pdf->cell($table_col_widht, 5, "R.Values", 'TB', 1, 'C', 1);
-                    $pdf->Ln(5);
+                    $this->renderResultTableHeader($pdf, $table_col_widht, true);
+                    $this->addVerticalSpacing($pdf, $this->smallSpacing);
                 }
             }
             
@@ -386,26 +385,35 @@ class LabResultReport
                 $table_col_widht = ($page_width) / 4;
             }
             
-            $resultCellHeight = 5;
+            $resultCellHeight = $this->baseLineHeight;
 
+            $pdf->SetFont('arial', '', 9, '', true);
             if ($is_columns) {
                 $pdf->cell($column_width, 5, $child_test->child_test_name, 1, 0, 'C'); // test name
             } else {
                 $pdf->cell($table_col_widht, 5, $child_test->child_test_name, 0, 0, 'C'); // test name
             }
-            
+            $pdf->SetFont('arial', '', 11, '', true);
+
             $report_result = $result->result;
+
+            // Pre-measure row height using actual column widths to decide on page break
+            [$testW, $resultColWidth, $unitColWidth, $normalColWidth] = $this->computeColumnWidths($pdf, $table_col_widht, $m_test->mainTest->divided == 1);
+            $estimatedResultHeight = $this->measureTextHeight($pdf, $resultColWidth, (string)$report_result, $this->baseLineHeight);
+            $estimatedNormalHeight = $this->measureTextHeight($pdf, $normalColWidth, (string)$normal_range, $this->baseLineHeight);
+            $estimatedRowHeight = max($this->baseLineHeight, $estimatedResultHeight, $estimatedNormalHeight);
+            $this->ensureSpaceFor($pdf, $estimatedRowHeight + $this->smallSpacing);
 
             if (($child_id == 46 || $child_id == 70 || $child_id == 213) && $report_result != '' && is_numeric($report_result)) {
                 $percent = ($report_result / 15) * 100;
                 $percent = ceil($percent);
                 $resultCellHeight = $pdf->MultiCell($table_col_widht * 1.5, 5, "$report_result         $percent % ", 0, 'C', 0, 0, '', '', true);
             } else {
-                $lines_in_result = $pdf->getNumLines($report_result);
+                $lines_in_result = $pdf->getNumLines($report_result, $resultColWidth);
                 if ($lines_in_result > 0) {
-                    $resultCellHeight = $pdf->MultiCell($table_col_widht * 1.5, 5, "$report_result", 0, 'C', 0, 0, '', '', true);
+                $resultCellHeight = $pdf->MultiCell($resultColWidth, 5, "$report_result", 0, 'C', 0, 0, '', '', true);
                 } else {
-                    $resultCellHeight = $pdf->MultiCell($table_col_widht * 1.5, 5, "$report_result", 0, 'C', 0, 0, '', '', true);
+                $resultCellHeight = $pdf->MultiCell($resultColWidth, 5, "$report_result", 0, 'C', 0, 0, '', '', true);
                 }
             }
 
@@ -413,8 +421,10 @@ class LabResultReport
                 $pdf->SetFont('arial', '', 7, '', true);
             }
             
-            $pdf->MultiCell($table_col_widht / 2, 5, "$unit", 0, 'C', 0, 0, '', '', true);
-            $normalRangeCellHeight = $pdf->MultiCell($table_col_widht, 5, "$normal_range", 0, 'C', 0, 1, '', '', true);
+            $pdf->MultiCell($unitColWidth, 5, "$unit", 0, 'C', 0, 0, '', '', true);
+            $pdf->SetFont('arial', '', 9, '', true);
+
+            $normalRangeCellHeight = $pdf->MultiCell($normalColWidth, 5, "$normal_range", 0, 'C', 0, 1, '', '', true);
             $pdf->SetFont('arial', '', 11, '', true);
 
             $y = $pdf->GetY();
@@ -448,7 +458,12 @@ class LabResultReport
     private function renderComments($pdf, $m_test, $page_width): void
     {
         if (str_word_count($m_test->comment) > 0) {
+            // Ensure there is room for the comment label and content
+            $estimated = $this->measureTextHeight($pdf, $page_width, (string)$m_test->comment, $this->baseLineHeight) + $this->headerSpacing + $this->smallSpacing;
+            $this->ensureSpaceFor($pdf, $estimated);
             $pdf->SetFont('arial', 'u', 14, '', true);
+            $pdf->resetColumns();
+            $pdf->Ln(5);
             $pdf->cell(20, 5, "Comment", 0, 1, 'C'); // bcforh
             $y = $pdf->GetY();
             $pdf->SetFont('arial', 'b', 12, '', true);
@@ -463,16 +478,87 @@ class LabResultReport
     private function renderOrganisms($pdf, $m_test, $col_number, $column_width): void
     {
         foreach ($m_test->requestedOrganisms as $organism) {
+            // Estimate organism block height: title + headers + max(text heights)
+            $sensHeight = $this->measureTextHeight($pdf, $column_width, (string)$organism->sensitive, $this->baseLineHeight);
+            $resHeight = $this->measureTextHeight($pdf, $column_width, (string)$organism->resistant, $this->baseLineHeight);
+            $blockHeight = 10 + 5 + max($sensHeight, $resHeight) + $this->smallSpacing;
+            $this->ensureSpaceFor($pdf, $blockHeight);
             $pdf->selectColumn($col_number);
             $pdf->SetFont('arial', 'b', 15, '', true);
+            $pdf->SetFillColor(...$this->themeHeaderFill);
+            $pdf->SetDrawColor(...$this->themeBorderColor);
             $pdf->cell($column_width * 2, 10, $organism->organism, 1, 1, 'C', 1);
             $pdf->SetFont('arial', '', 11, '', true);
             $pdf->SetFont('arial', '', 12, '', true);
             $pdf->cell($column_width, 5, 'Sensitive', 1, 0, 'C', 0);
             $pdf->cell($column_width, 5, 'Resistant', 1, 1, 'C', 0);
-            $pdf->MultiCell($column_width, 5, $organism->sensitive, 1, 'C', ln: 0);
-            $pdf->MultiCell($column_width, 5, $organism->resistant, 1, 'C', ln: 1);
+            $pdf->MultiCell($column_width, 5, $organism->sensitive, 1, 'L', ln: 0);
+            $pdf->MultiCell($column_width, 5, $organism->resistant, 1, 'L', ln: 1);
             $col_number++;
         }
+    }
+
+    /**
+     * Draw a standardized result table header for both single and divided layouts
+     */
+    private function renderResultTableHeader($pdf, $table_col_widht, bool $isDivided): void
+    {
+        $pdf->SetFont('arial', 'b', 11, '', true);
+        [$colW, $resultW, $unitW, $rangeW] = $this->computeColumnWidths($pdf, $table_col_widht, $isDivided);
+        $pdf->SetFillColor(...$this->themeHeaderFill);
+        $pdf->SetDrawColor(...$this->themeBorderColor);
+        $pdf->cell($colW, 6, "Test", 1, 0, 'C', 1);
+        $pdf->cell($resultW, 6, "Result", 1, 0, 'C', 1);
+        $pdf->cell($unitW, 6, "Unit", 1, 0, 'C', 1);
+        $pdf->cell($rangeW, 6, "R.Values", 1, 1, 'C', 1);
+        $this->addVerticalSpacing($pdf, $this->smallSpacing);
+    }
+
+    /**
+     * Compute column widths (test, result, unit, range) depending on layout
+     */
+    private function computeColumnWidths($pdf, float $table_col_widht, bool $isDivided): array
+    {
+        $base = $isDivided ? (($pdf->getPageWidth() - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT) / 8) : $table_col_widht;
+        $testW = $base;
+        $resultW = $base * 1.5;
+        $unitW = $base / 2;
+        $rangeW = $base;
+        return [$testW, $resultW, $unitW, $rangeW];
+    }
+
+    /**
+     * Add vertical spacing with auto page-break awareness
+     */
+    private function addVerticalSpacing($pdf, float $space): void
+    {
+        $this->ensureSpaceFor($pdf, $space);
+        $pdf->Ln($space);
+    }
+
+    // ----- Layout helpers -----
+
+    private function getBottomPrintableY($pdf): float
+    {
+        // Bottom printable Y considering the automatic page break margin
+        return $pdf->getPageHeight() - $pdf->getBreakMargin();
+    }
+
+    private function getRemainingSpace($pdf): float
+    {
+        return $this->getBottomPrintableY($pdf) - $pdf->GetY();
+    }
+
+    private function ensureSpaceFor($pdf, float $requiredHeight): void
+    {
+        if ($this->getRemainingSpace($pdf) <= $requiredHeight) {
+            $pdf->AddPage();
+        }
+    }
+
+    private function measureTextHeight($pdf, float $width, string $text, float $lineHeight): float
+    {
+        $lines = max(1, (int)$pdf->getNumLines($text, $width));
+        return $lines * $lineHeight;
     }
 }

@@ -18,7 +18,6 @@ return new class extends Migration
             if (!Schema::hasColumn('doctor_services', 'updated_at')) {
                 $table->timestamp('updated_at')->nullable()->after('created_at');
             }
-            $table->timestamp('updated_at')->nullable()->after('created_at');
         });
     }
 

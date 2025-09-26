@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
+        // Drop existing table to ensure idempotent re-runs
+        Schema::dropIfExists('denos');
+
         Schema::create('denos', function (Blueprint $table) {
             $table->id();
             $table->integer('name')->unique();
