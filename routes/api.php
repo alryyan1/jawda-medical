@@ -631,3 +631,7 @@ Route::post('/lab-requests/{labrequest}/cancel-payment', [LabRequestController::
 Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::class, 'toggleBankak'])->middleware('auth:sanctum');
 Route::patch('/doctor-visits/{visit}/update-all-lab-requests-bankak', [LabRequestController::class, 'updateAllLabRequestsBankak'])->middleware('auth:sanctum');
 Route::get('/lab-requests/visit/{visit}/thermal-receipt-pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
+
+// Firestore update endpoints
+Route::post('/firestore/update-document', [App\Http\Controllers\Api\FirestoreController::class, 'updateFirestoreDocument'])->middleware('auth:sanctum');
+Route::post('/firestore/update-patient-pdf', [App\Http\Controllers\Api\FirestoreController::class, 'updatePatientPdf']);

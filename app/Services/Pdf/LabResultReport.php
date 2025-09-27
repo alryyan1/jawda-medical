@@ -50,8 +50,8 @@ class LabResultReport
         
         /** @var Setting $img_base64_encoded */
         $settings = Setting::all()->first();
-        $logo_name = $settings->header_base64;
-        $footer_name = $settings->footer_base64;
+        $logo_name = $settings?->header_base64;
+        $footer_name = $settings?->footer_base64;
         $logo_path = public_path();
 
         // Set up header function
@@ -67,7 +67,7 @@ class LabResultReport
         $pdf->AddPage();
         
         // Add watermark if enabled
-        if ($settings->show_water_mark && $logo_name != '') {
+        if ($settings?->show_water_mark && $logo_name != '') {
             $pdf->SetAlpha(0.2); // Transparency for watermark
             $pdf->Image($logo_path . '/' . $logo_name, 30, 100, 150, 150); // Image watermark
             $pdf->SetAlpha(1); // Reset transparency
@@ -99,7 +99,7 @@ class LabResultReport
         Log::info('$settings->lab_name',['settigns'=>$settings]);
 
         $pdf->Ln(20);
-        $pdf->Cell($page_width, 5, $settings->lab_name , 0, 1, 'C');
+        $pdf->Cell($page_width, 5, $settings?->lab_name ?? 'Lab Name' , 0, 1, 'C');
 
         $pdf->Ln(20);
 
@@ -154,20 +154,20 @@ class LabResultReport
         $col = $page_width / 6;
         $user = auth()->user();
         $pdf->cell(20, 5, "Sign: ", 0, 1, 'L');
-        $pdf->cell($col, 5, $user->name, 0, 0, 'L');
+        $pdf->cell($col, 5, $user?->name ?? 'System', 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
         $pdf->cell($col, 5, "No ", 0, 0, 'R');
         $pdf->cell($col, 5, $patient->visit_number, 0, 1, 'C');
 
-        if ($settings->footer_content != null) {
+        if ($settings?->footer_content != null) {
             $pdf->SetFont('arial', '', 14, '', true);
             $pdf->MultiCell($page_width - 25, 5, $settings->footer_content, 0, 'C', 0, 1, '', '', true);
         }
         
         $y = $pdf->getY();
-        if ($settings->is_footer) {
+        if ($settings?->is_footer) {
             $pdf->Image($logo_path . '/' . $footer_name, 10, $y + 10, $page_width + 10, 10);
         }
     }
@@ -177,20 +177,20 @@ class LabResultReport
      */
     private function addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64): void
     {
-        if ($settings->is_logo) {
+        if ($settings?->is_logo) {
             if ($logo_name != '') {
                 $pdf->Image($logo_path . '/' . $logo_name, 5, 5, 40, 40);
             }
         } else {
             //is_header الترويصه
-            if ($settings->is_header == '1') {
+            if ($settings?->is_header == '1') {
                 $pdf->Image($logo_path . '/' . $logo_name, 10, 10, $page_width + 10, 30);
             }
         }
         
         if (!$base64) {
             //is_header الترويصه
-            if ($settings->is_header == 1) {
+            if ($settings?->is_header == 1) {
                 $pdf->Image($logo_path . '/' . $logo_name, 10, 10, $page_width + 10, 30);
             }
         }

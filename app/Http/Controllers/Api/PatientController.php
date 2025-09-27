@@ -430,6 +430,7 @@ class PatientController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => $message,
+                'lab_to_lab_object_id' => $patient->lab_to_lab_object_id,
                 'result_url' => $patient->result_url,
                 'patient_id' => $patient->id,
                 'visit_id' => $doctorVisit->id,
@@ -788,11 +789,11 @@ class PatientController extends Controller
             DB::commit();
 
             // Queue welcome SMS after commit
-            \DB::afterCommit(function () use ($patient) {
-                if (!empty($patient->phone)) {
-                    SendWelcomeSmsJob::dispatch($patient->id, $patient->phone, $patient->name);
-                }
-            });
+            // \DB::afterCommit(function () use ($patient) {
+            //     if (!empty($patient->phone)) {
+            //         SendWelcomeSmsJob::dispatch($patient->id, $patient->phone, $patient->name);
+            //     }
+            // });
 
             // Return the patient resource, ensuring it includes the new doctorVisit relation
             // The PatientResource should be configured to conditionally include this.
@@ -1328,7 +1329,7 @@ class PatientController extends Controller
             // Create the patient record
             $patient = Patient::create([
                 'name' => $validated['name'],
-                'phone' => 0,
+                'phone' => $validated['phone'],
                 'gender' => 'male', // Default gender, could be made configurable
                 'age_year' => 0, // Default age, could be made configurable
                 'age_month' => 0,

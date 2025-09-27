@@ -95,9 +95,13 @@ class UploadLabResultToFirebase implements ShouldQueue
             // Update patient with result_url
             $patient->update(['result_url' => $downloadUrl]);
 
-            // If this patient came from lab-to-lab system, update the Firestore document
+            // If this patient came from lab-to-lab system, log the information for frontend
             if ($patient->lab_to_lab_object_id) {
-                $this->updateFirestoreDocument($patient->lab_to_lab_object_id, $downloadUrl);
+                Log::info("Lab-to-lab patient detected - frontend should update Firestore", [
+                    'lab_to_lab_object_id' => $patient->lab_to_lab_object_id,
+                    'pdf_url' => $downloadUrl,
+                    'patient_id' => $patient->id
+                ]);
             }
 
             Log::info("Successfully uploaded lab result to Firebase for patient {$this->patientId}", [
@@ -252,61 +256,6 @@ class UploadLabResultToFirebase implements ShouldQueue
         return $factory;
     }
 
-    /**
-     * Update Firestore document with result URL for lab-to-lab patients
-     */
-    private function updateFirestoreDocument(string $labToLabObjectId, string $downloadUrl): void
-    {
-        try {
-            // Check if Firebase service account file exists
-            $serviceAccountPath = config('firebase.service_account_path');
-            
-            if (!file_exists($serviceAccountPath)) {
-                Log::warning("Firebase service account file not found. Cannot update Firestore document.", [
-                    'lab_to_lab_object_id' => $labToLabObjectId
-                ]);
-                return;
-            }
-
-            // Initialize Firebase
-            $firebase = $this->initializeFirebase();
-            $firestore = $firebase->createFirestore();
-            $database = $firestore->database();
-
-            // Reference to the specific document
-            $documentRef = $database->collection('labToLap')
-                ->document('global')
-                ->collection('patients')
-                ->document($labToLabObjectId);
-
-            // Check if document exists
-            $document = $documentRef->snapshot();
-            if (!$document->exists()) {
-                Log::warning("Firestore document not found for lab-to-lab object ID: {$labToLabObjectId}");
-                return;
-            }
-
-            // Update the document with result_url
-            $documentRef->update([
-                ['path' => 'result_url', 'value' => $downloadUrl],
-                ['path' => 'result_updated_at', 'value' => new \DateTime()]
-            ]);
-
-            Log::info("Successfully updated Firestore document with result URL", [
-                'lab_to_lab_object_id' => $labToLabObjectId,
-                'result_url' => $downloadUrl,
-                'firestore_path' => "labToLap/global/patients/{$labToLabObjectId}"
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error("Failed to update Firestore document for lab-to-lab patient: " . $e->getMessage(), [
-                'lab_to_lab_object_id' => $labToLabObjectId,
-                'download_url' => $downloadUrl,
-                'exception' => $e
-            ]);
-            // Don't throw exception - this is not critical for the main upload process
-        }
-    }
     
 
     /**

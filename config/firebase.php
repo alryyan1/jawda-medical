@@ -12,6 +12,7 @@ return [
 
     'project_id' => env('FIREBASE_PROJECT_ID', 'hospitalapp-681f1'),
     'storage_bucket' => env('FIREBASE_STORAGE_BUCKET', 'hospitalapp-681f1.firebasestorage.app'),
+    'api_key' => env('FIREBASE_API_KEY', 'AIzaSyAkjo7wFjRMjyDfssFPVqG-nfoNDfv_jk0'),
     
     /*
     |--------------------------------------------------------------------------
