@@ -28,6 +28,7 @@ use App\Models\File;
 use App\Models\UserDocSelection;
 use App\Models\RequestedService;
 use App\Models\RequestedServiceCost;
+use App\Models\RequestedResult;
 use App\Models\Service;
 use App\Models\Company;
 use Illuminate\Support\Facades\Http as HttpClient;
@@ -1362,19 +1363,10 @@ class PatientController extends Controller
             // Create lab requests for each test
             foreach ($validated['lab_requests'] as $labRequestData) {
                 // Find or create a main test based on the test name
-                $mainTest = MainTest::firstOrCreate(
-                    ['main_test_name' => $labRequestData['name']],
-                    [
-                        'main_test_name' => $labRequestData['name'],
-                        'price' => $labRequestData['price'],
-                        'container_id' => $labRequestData['container_id'] ?? 1,
-                        'available' => true,
-                    ]
-                );
-
+          
                 // Create the lab request
-                LabRequest::create([
-                    'main_test_id' => $mainTest->id,
+              $labRequest = LabRequest::create([
+                    'main_test_id' => $labRequestData['testId'],
                     'pid' => $patient->id,
                     'doctor_visit_id' => $doctorVisit->id,
                     'hidden' => false,
@@ -1385,12 +1377,33 @@ class PatientController extends Controller
                     'amount_paid' => 0,
                     'discount_per' => 0,
                     'is_bankak' => false,
-                    'comment' => 'طلب من مختبر خارجي - معرف الاختبار: ' . $labRequestData['testId'],
+                    'comment' => 'لاب تو' . $labRequestData['testId'],
                     'user_requested' => Auth::id(),
                     'approve' => true,
                     'endurance' => 0,
                     'is_paid' => false,
                 ]);
+                if ($labRequest->mainTest->childTests->isNotEmpty()) {
+                    $requestedResultsData = [];
+                    foreach ($labRequest->mainTest->childTests as $childTest) {
+                        $requestedResultsData[] = [
+                            'lab_request_id' => $labRequest->id,
+                            'patient_id' => $patient->id,
+                            'main_test_id' => $labRequest->main_test_id,
+                            'child_test_id' => $childTest->id,
+                            'result' => '', // Initial empty result
+                            // Capture normal range and unit AT THE TIME OF REQUEST
+                            'normal_range' => $childTest->normalRange ?? ($childTest->low !== null && $childTest->upper !== null ? $childTest->low . ' - ' . $childTest->upper : null),
+                            'unit_id' => $childTest->unit?->id, // From eager loaded unit
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                            // 'entered_by_user_id' => null, // Will be set upon result entry
+                        ];
+                    }
+                    
+                    // Insert the requested results data
+                    RequestedResult::insert($requestedResultsData);
+                }
             }
 
             DB::commit();

@@ -76,12 +76,8 @@ return new class extends Migration
             if (! $this->indexExists('requested_results', 'requested_results_child_main_patient_index')) {
                 $table->index(['child_test_id', 'main_test_id', 'patient_id'], 'requested_results_child_main_patient_index');
             }
-            if (! $this->indexExists('requested_results', 'requested_results_authorized_at_index')) {
-                $table->index('authorized_at', 'requested_results_authorized_at_index');
-            }
-            if (! $this->indexExists('requested_results', 'requested_results_entered_at_index')) {
-                $table->index('entered_at', 'requested_results_entered_at_index');
-            }
+       
+         
         });
     }
 

@@ -1051,54 +1051,15 @@ class LabRequestController extends Controller
     /**
      * Update a single requested result (autosave).
      */
-    public function saveSingleResult(Request $request, LabRequest $labrequest, ChildTest $childTest)
+    public function saveSingleResult(Request $request, RequestedResult $requestedResult)
     {
         // ... (Authorization checks) ...
-        if ($labrequest->main_test_id !== $childTest->main_test_id) {
-            return response()->json(['message' => 'Child test does not belong to this lab request.'], 422);
-        }
+      
 
-        $validated = $request->validate([
-            'result_value' => 'nullable|string|max:65000', // MySQL TEXT can hold more
-            // 'result_flags' => 'nullable|string|max:50', // Not in new schema
-            // 'result_comment' => 'nullable|string|max:500', // Not in new schema
-            'normal_range_text' => 'nullable|string|max:1000', // For the snapshot
-            'unit_id_from_input' => 'nullable|integer|exists:units,id', // If unit can be overridden per result
+        
+        $requestedResult->update([
+            'result' => $request->input('result'),
         ]);
-
-        $unitIdToSave = $validated['unit_id_from_input'] ?? $childTest->unit_id;
-        $normalRangeToSave = $validated['normal_range_text'] ?? $childTest->normalRange ??
-            (($childTest->low !== null && $childTest->upper !== null) ? $childTest->low . ' - ' . $childTest->upper : 'N/A');
-
-
-        $requestedResult = RequestedResult::updateOrCreate(
-            [
-                'lab_request_id' => $labrequest->id,
-                'child_test_id' => $childTest->id,
-            ],
-            [
-                'patient_id' => $labrequest->pid,
-                'main_test_id' => $labrequest->main_test_id,
-                'result' => $validated['result_value'] ?? '',
-                'unit_id' => $unitIdToSave,
-                // 'entered_by_user_id' => Auth::id(), // Add if re-introducing these fields
-                // 'entered_at' => now(),             // Add if re-introducing these fields
-            ]
-        );
-
-        // ... (Update LabRequest status logic as before) ...
-        $expectedChildTestsCount = $labrequest->mainTest->childTests()->count();
-        $enteredResultsCount = $labrequest->results()->where(fn($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
-
-        if ($enteredResultsCount === 0) {
-            $labrequest->result_status = 'pending_entry';
-        } elseif ($enteredResultsCount < $expectedChildTestsCount) {
-            $labrequest->result_status = 'results_partial';
-        } elseif ($enteredResultsCount >= $expectedChildTestsCount) {
-            $labrequest->result_status = 'results_complete_pending_auth'; // Or 'results_complete' if no separate auth step
-        }
-        $labrequest->saveQuietly();
-
 
         return new RequestedResultResource($requestedResult->load(['childTest.unit', /* 'enteredBy' */]));
     }

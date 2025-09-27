@@ -277,7 +277,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // This is the endpoint that ResultEntryPanel uses to get all data for one LabRequest
   Route::get('/labrequests/{labrequest}/for-result-entry', [LabRequestController::class, 'getLabRequestForEntry']);
 
-  Route::post('/labrequests/{labrequest}/results', [LabRequestController::class, 'saveResults']);
+  Route::post('/labrequests/{requestedResult}/results', [LabRequestController::class, 'saveSingleResult']);
   Route::patch('/labrequests/{labrequest}/childtests/{child_test}/result', [LabRequestController::class, 'saveSingleResult']);
   Route::patch('/labrequests/{labrequest}/childtests/{child_test}/normal-range', [LabRequestController::class, 'updateNormalRange']);
   Route::patch('/labrequests/{labrequest}/comment', [LabRequestController::class, 'updateComment']);
