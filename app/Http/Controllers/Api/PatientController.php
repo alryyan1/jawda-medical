@@ -15,6 +15,8 @@ use App\Http\Resources\PatientSearchResultResource;
 use App\Http\Resources\PatientStrippedResource;
 use App\Http\Resources\RecentDoctorVisitSearchResource;
 use App\Models\Doctor;
+use App\Models\MainTest;
+use App\Models\LabRequest;
 // use App\Http\Resources\PatientCollection; // If you have custom pagination
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -1289,5 +1291,125 @@ class PatientController extends Controller
                 'phone_searched' => $phone
             ]
         ]);
+    }
+
+    /**
+     * Save a patient from online lab system to local system
+     */
+    public function saveFromOnlineLab(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'lab_requests' => 'required|array',
+            'lab_requests.*.name' => 'required|string|max:255',
+            'lab_requests.*.price' => 'required|numeric|min:0',
+            'lab_requests.*.testId' => 'required|string',
+            'lab_requests.*.container_id' => 'nullable|integer',
+            'external_lab_id' => 'required|string',
+            'external_patient_id' => 'required|string',
+            'created_at' => 'nullable',
+        ]);
+
+        $currentGeneralShift = Shift::open()->latest('created_at')->first();
+        if (!$currentGeneralShift) {
+            return response()->json(['message' => 'لا توجد وردية مفتوحة حالياً.'], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Create a new file
+            $file = File::create();
+            
+            // Get the next visit number
+            $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1;
+
+            // Create the patient record
+            $patient = Patient::create([
+                'name' => $validated['name'],
+                'phone' => 0,
+                'gender' => 'male', // Default gender, could be made configurable
+                'age_year' => 0, // Default age, could be made configurable
+                'age_month' => 0,
+                'age_day' => 0,
+                'address' => '',
+                'doctor_id' => 1, // Default doctor, should be configurable
+                'user_id' => Auth::id(),
+                'shift_id' => $currentGeneralShift->id,
+                'visit_number' => $visitLabNumber,
+                'result_auth' => false,
+                'referred' => 'من مختبر خارجي',
+                'discount_comment' => 'مختبر خارجي: ' . $validated['external_lab_id'] . ' - مريض: ' . $validated['external_patient_id'],
+                'lab_to_lab_object_id' => $validated['external_patient_id'], // Store the Firestore document ID
+            ]);
+
+            // Create the doctor visit
+            $doctorVisit = $patient->doctorVisit()->create([
+                'doctor_id' => 1, // Default doctor
+                'user_id' => Auth::id(),
+                'shift_id' => $currentGeneralShift->id,
+                'doctor_shift_id' => null,
+                'file_id' => $file->id,
+                'visit_date' => Carbon::today(),
+                'visit_time' => Carbon::now()->format('H:i:s'),
+                'status' => 'lab_pending',
+                'reason_for_visit' => 'طلب من مختبر خارجي',
+                'is_new' => true,
+                'only_lab' => true,
+                'number' => $visitLabNumber, // Add the missing number field
+            ]);
+
+            // Create lab requests for each test
+            foreach ($validated['lab_requests'] as $labRequestData) {
+                // Find or create a main test based on the test name
+                $mainTest = MainTest::firstOrCreate(
+                    ['main_test_name' => $labRequestData['name']],
+                    [
+                        'main_test_name' => $labRequestData['name'],
+                        'price' => $labRequestData['price'],
+                        'container_id' => $labRequestData['container_id'] ?? 1,
+                        'available' => true,
+                    ]
+                );
+
+                // Create the lab request
+                LabRequest::create([
+                    'main_test_id' => $mainTest->id,
+                    'pid' => $patient->id,
+                    'doctor_visit_id' => $doctorVisit->id,
+                    'hidden' => false,
+                    'is_lab2lab' => true, // Mark as lab-to-lab request
+                    'valid' => true,
+                    'no_sample' => false,
+                    'price' => $labRequestData['price'],
+                    'amount_paid' => 0,
+                    'discount_per' => 0,
+                    'is_bankak' => false,
+                    'comment' => 'طلب من مختبر خارجي - معرف الاختبار: ' . $labRequestData['testId'],
+                    'user_requested' => Auth::id(),
+                    'approve' => true,
+                    'endurance' => 0,
+                    'is_paid' => false,
+                ]);
+            }
+
+            DB::commit();
+
+            // Load the patient with relationships
+            $patient->load(['doctorVisit', 'company', 'primaryDoctor']);
+
+            return response()->json([
+                'message' => 'تم حفظ المريض بنجاح',
+                'data' => new PatientResource($patient)
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to save online lab patient: " . $e->getMessage(), ['exception' => $e]);
+            return response()->json([
+                'message' => 'فشل في حفظ بيانات المريض',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

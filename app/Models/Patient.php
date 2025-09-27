@@ -48,6 +48,7 @@ use Carbon\Carbon;
  * @property bool $doctor_lab_urgent_confirm
  * @property string|null $referred
  * @property string|null $discount_comment
+ * @property string|null $lab_to_lab_object_id
  * @property-read \App\Models\Company|null $company
  * @property-read \App\Models\CompanyRelation|null $companyRelation
  * @property-read \App\Models\Country|null $country
@@ -160,6 +161,7 @@ class Patient extends Model
         'doctor_lab_request_confirm', // Likely visit/request specific
         'doctor_lab_urgent_confirm', // Likely visit/request specific
         'discount_comment', // If general patient discount comment
+        'lab_to_lab_object_id',
     ];
 
     /**

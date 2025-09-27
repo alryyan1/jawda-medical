@@ -572,6 +572,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
   Route::post('/patients/store-from-lab', [PatientController::class, 'storeFromLab']);
+  Route::post('/patients/save-from-online-lab', [PatientController::class, 'saveFromOnlineLab']);
 
     // Devices
     Route::get('/devices-list', [DeviceController::class, 'indexList']);

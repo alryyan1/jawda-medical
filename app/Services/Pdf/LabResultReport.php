@@ -306,7 +306,7 @@ class LabResultReport
             $pdf->resetColumns();
 
             $this->renderComments($pdf, $m_test, $page_width);
-            // $this->addVerticalSpacing($pdf, $this->smallSpacing);
+            $this->addVerticalSpacing($pdf, $this->smallSpacing);
             
             $this->renderOrganisms($pdf, $m_test, $col_number, $column_width ?? 0);
             $this->addVerticalSpacing($pdf, $this->sectionSpacing);
@@ -320,17 +320,15 @@ class LabResultReport
     {
         $pdf->SetFont('arial', 'u', 17, '', true);
         if ($m_test->requestedOrganisms()->count() > 0) {
-            $pdf->Ln(5);
+            // $pdf->Ln(5);
             $pdf->resetColumns();
-            $pdf->Ln(5);
-            $pdf->Ln(5);
-            $pdf->Ln(5);
+            // $pdf->Ln(5);
         }
         if ($m_test->mainTest->divided != 1) {
-            // $pdf->Ln(5);
             $pdf->cell(40, 5, $m_test->mainTest->main_test_name, 0, 1, 'L'); // main
         }
-        $pdf->Ln();
+        // $pdf->Ln(5);
+        // $pdf->Ln();
         $y_position_for_divided_section = $pdf->getY();
         $this->renderResultTableHeader($pdf, $table_col_widht, $m_test->mainTest->divided == 1);
     }
@@ -463,7 +461,13 @@ class LabResultReport
             $this->ensureSpaceFor($pdf, $estimated);
             $pdf->SetFont('arial', 'u', 14, '', true);
             $pdf->resetColumns();
-            $pdf->Ln(5);
+            if ($m_test->mainTest->divided == 1) {
+                $pdf->Ln(15);
+
+            }else{
+
+                $pdf->Ln(5);
+            }
             $pdf->cell(20, 5, "Comment", 0, 1, 'C'); // bcforh
             $y = $pdf->GetY();
             $pdf->SetFont('arial', 'b', 12, '', true);
