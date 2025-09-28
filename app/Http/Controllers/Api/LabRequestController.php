@@ -261,6 +261,31 @@ class LabRequestController extends Controller
     }
 
     /**
+     * Get a single PatientLabQueueItem by visit_id
+     */
+    public function getSinglePatientLabQueueItem($visitId)
+    {
+        $visit = DoctorVisit::query()
+            ->select(
+                'doctorvisits.id as visit_id',
+                'doctorvisits.created_at as visit_creation_time',
+                'doctorvisits.visit_date',
+                'patients.id as patient_id',
+                'patients.name as patient_name'
+            )
+            ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
+            ->where('doctorvisits.id', $visitId)
+            ->whereHas('patientLabRequests') // Ensure the visit has lab requests
+            ->first();
+
+        if (!$visit) {
+            return response()->json(['error' => 'Visit not found or has no lab requests'], 404);
+        }
+
+        return new PatientLabQueueItemResource($visit);
+    }
+
+    /**
      * Get patients ready for print (pending_result_count == 0)
      */
     public function getLabReadyForPrintQueue(Request $request)

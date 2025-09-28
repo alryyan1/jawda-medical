@@ -273,6 +273,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
   Route::get('/lab/ready-for-print-queue', [LabRequestController::class, 'getLabReadyForPrintQueue']);
   Route::get('/lab/unfinished-results-queue', [LabRequestController::class, 'getLabUnfinishedResultsQueue']);
+  Route::get('/lab/queue-item/{visitId}', [LabRequestController::class, 'getSinglePatientLabQueueItem']);
 
   // This is the endpoint that ResultEntryPanel uses to get all data for one LabRequest
   Route::get('/labrequests/{labrequest}/for-result-entry', [LabRequestController::class, 'getLabRequestForEntry']);

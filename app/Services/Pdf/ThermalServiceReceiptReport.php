@@ -226,7 +226,7 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
         // Join service names with commas and display in full width
         $allServicesText = implode('، ', $serviceNames);
         
-        $this->SetFont($this->fontName, '', 7);
+        $this->SetFont($this->fontName, '', 10);
         $pageUsableWidth = $this->getPageWidth() - $this->getMargins()['right'];
         $this->MultiCell(0, $this->lineHeight, $allServicesText, 0, 'L', false, 1);
 
