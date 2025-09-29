@@ -96,7 +96,7 @@ class UserController extends Controller
         if ($request->has('user_type')) $updateData['user_type'] = (string) $request->input('user_type');
         $user->update($updateData);
 
-        if ($request->has('roles') && Auth::user()->can('assign roles')) { // Assuming 'assign roles' permission
+        if ($request->has('roles') ) { // Assuming 'assign roles' permission
             $user->syncRoles($validatedData['roles'] ?? []);
         }
 

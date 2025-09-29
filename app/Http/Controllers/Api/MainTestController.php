@@ -10,6 +10,7 @@ use App\Http\Resources\MainTestStrippedResource;
 use App\Models\DoctorVisit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Services\Pdf\PriceList;
 
 class MainTestController extends Controller
 {
@@ -202,6 +203,44 @@ class MainTestController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['message' => 'فشل حذف الفحوصات.', 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function generatePriceListPdf(Request $request)
+    {
+        try {
+            // Get all main tests with their containers
+            $mainTests = MainTest::with('container')
+                ->where('available', true)
+                ->orderBy('id')
+                ->get();
+
+            // Transform data for PDF
+            $testsData = $mainTests->map(function ($test) {
+                return [
+                    'id' => $test->id,
+                    'main_test_name' => $test->main_test_name,
+                    'container_name' => $test->container ? $test->container->container_name : null,
+                    'price' => $test->price ?? 0,
+                ];
+            })->toArray();
+
+            // Get hospital name from config or use default
+            $hospitalName = config('app.name', 'مستشفى جوادة');
+
+            // Generate PDF
+            $pdf = new PriceList($testsData, $hospitalName);
+            $pdfContent = $pdf->generate();
+
+            return response($pdfContent)
+                ->header('Content-Type', 'application/pdf')
+                ->header('Content-Disposition', 'attachment; filename="price-list-' . date('Y-m-d') . '.pdf"');
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'خطأ في إنشاء قائمة الأسعار',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }

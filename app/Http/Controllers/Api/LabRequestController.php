@@ -896,6 +896,9 @@ class LabRequestController extends Controller
                     // Handle or log duplicate, for now skipping
                     continue;
                 }
+                if($mainTest->available == false){
+                    return response()->json(['message' => 'الفحص غير متوفر.'], 400);
+                }
 
                 $price = $mainTest->price;
                 $endurance = 0;

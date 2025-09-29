@@ -10,6 +10,7 @@ use App\Models\AuditedRequestedService;
 use App\Models\Cost;
 use App\Models\RequestedServiceDeposit;
 use App\Models\Service;
+use App\Models\DoctorVisit;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -22,7 +23,186 @@ use Illuminate\Support\Facades\Log;
 
 class ExcelController extends Controller
 {
-    // ... (constructor) ...
+    public function reclaim(Request $request)
+    {
+        $company = Company::find($request->query("company"));
+
+        if (!$company) {
+            return response()->json(['error' => 'Company not found'], 404);
+        }
+
+        // Style headers
+        $headerStyle = [
+            'font' => [
+                'bold' => true,
+                'color' => ['rgb' => 'FFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '1E90FF'],
+            ],
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+            ],
+        ];
+        
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->getActiveSheet()->setRightToLeft(true);
+
+        // Get data
+        $first = $request->query('first');
+        $second = $request->query('second');
+        $startDate = Carbon::parse($first)->startOfDay();
+        $endDate = Carbon::parse($second)->endOfDay();
+
+        $serviceGroups = ServiceGroup::all();
+
+        $patients = DoctorVisit::whereHas('patient', function ($q) use ($company) {
+            $q->where('company_id', '=', $company->id);
+        })->whereBetween('created_at', [$startDate, $endDate])->get();
+        
+        $count = $patients->count() + 6;
+        $letters = ['H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X'];
+        $start_col_name = 'C';
+        $end_col_name = $letters[$serviceGroups->count()];
+        $last_col_name = $letters[$serviceGroups->count() + 1];
+
+        $spreadsheet->getProperties()->setTitle('مطالبه التامين');
+        $spreadsheet->getActiveSheet()->mergeCells('F2:I2');
+        $spreadsheet->getActiveSheet()->getStyle('F2')->getFont()->setSize(18);
+        $spreadsheet->getActiveSheet()->getStyle('F2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+        $spreadsheet->getActiveSheet()->getStyle('F2')->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+        $spreadsheet->getActiveSheet()->setCellValue("F2", $company->name);
+        
+        $spreadsheet->getActiveSheet()->mergeCells('F3:I3');
+        $spreadsheet->getActiveSheet()->getStyle('F3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+        $spreadsheet->getActiveSheet()->getStyle('F3')->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+        $carbon = Carbon::parse($first);
+        $spreadsheet->getActiveSheet()->setCellValue("F3", $carbon->monthName);
+
+        // Add borders
+        $spreadsheet->getActiveSheet()->getStyle("C5:$last_col_name" . $count)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $spreadsheet->getActiveSheet()->getStyle("C5:$last_col_name" . $count)->getBorders()->getAllBorders()->getColor()->setRGB('000000');
+
+        // Center alignment
+        $spreadsheet->getActiveSheet()->getStyle("C1:$last_col_name" . $count)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+        $spreadsheet->getActiveSheet()->getStyle("C1:$last_col_name" . $count)->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+
+        // Apply header style
+        $spreadsheet->getActiveSheet()->getStyle($start_col_name . '5:' . $end_col_name . '5')->applyFromArray($headerStyle);
+
+        // Set column widths
+        $spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(10);
+        $spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(30);
+        $spreadsheet->getActiveSheet()->getColumnDimension('E')->setWidth(15);
+        $spreadsheet->getActiveSheet()->getColumnDimension('F')->setWidth(20);
+        $spreadsheet->getActiveSheet()->getColumnDimension('G')->setWidth(20);
+
+        // Add SUM formulas and styling
+        $spreadsheet->getActiveSheet()->setCellValue('G' . $count + 1, "=SUM(G4:G$count)");
+        $spreadsheet->getActiveSheet()->getStyle('G' . $count + 1)->getFont()->setSize(20);
+
+        $sumCellStyle = [
+            'font' => [
+                'bold' => true,
+                'size' => 14,
+                'color' => ['rgb' => 'FF0000'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'FFFF99'],
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => Border::BORDER_THICK,
+                    'color' => ['rgb' => '000000'],
+                ],
+            ],
+        ];
+        $spreadsheet->getActiveSheet()->getStyle('G' . $count + 1)->applyFromArray($sumCellStyle);
+        $spreadsheet->getActiveSheet()->getStyle($last_col_name . $count + 1)->applyFromArray($sumCellStyle);
+
+        // Set header names
+        $spreadsheet->getActiveSheet()->setCellValue("C5", "الرقم ");
+        $spreadsheet->getActiveSheet()->setCellValue("D5", "الاسم");
+        $spreadsheet->getActiveSheet()->setCellValue("E5", "التاريخ ");
+        $spreadsheet->getActiveSheet()->setCellValue("F5", "رقم البطاقه");
+        $spreadsheet->getActiveSheet()->setCellValue("G5", "المعمل");
+
+        // Add service group headers and formulas
+        $index = 0;
+        foreach ($serviceGroups as $service_group) {
+            $letter = $letters[$index];
+            $spreadsheet->getActiveSheet()->setCellValue($letter . "5", $service_group->name);
+            $spreadsheet->getActiveSheet()->setCellValue($letter . $count + 1, "=SUM($letter" . "6:" . $letter . "$count)");
+            $spreadsheet->getActiveSheet()->getStyle($letter . $count + 1)->getFont()->setSize(20);
+            $index++;
+        }
+
+        // Add totals
+        $spreadsheet->getActiveSheet()->setCellValue($end_col_name . $count + 1, "=SUM($end_col_name" . "6:" . $end_col_name . "$count)");
+        $spreadsheet->getActiveSheet()->setCellValue($end_col_name . "5", "التحمل");
+        $spreadsheet->getActiveSheet()->setCellValue($last_col_name . "5", "اجمالي");
+        $spreadsheet->getActiveSheet()->setCellValue($last_col_name . $count + 1, "=SUM($last_col_name" . "6:" . $last_col_name . "$count)");
+
+        // Add patient data
+        $patientsCells = [];
+        $index = 1;
+        $startRow = 5;
+        
+        foreach ($patients as $patient) {
+            $inner_array = [];
+            $inner_array[] = $index;
+            $inner_array[] = $patient->patient->name;
+            $inner_array[] = $patient->created_at->format('Y-m-d');
+            $inner_array[] = $patient->patient->insurance_no;
+            $inner_array[] = $patient->patient->total_lab_value_unpaid();
+            
+            // Set comment for Lab
+            $comment = $spreadsheet->getActiveSheet()->getComment('G' . $startRow + $index);
+            $comment->getText()->createTextRun($patient->patient->tests_concatinated());
+            $comment->setAuthor('Ryan');
+
+            // Add sum formula for each patient
+            $st = $startRow + $index;
+            $spreadsheet->getActiveSheet()->setCellValue($last_col_name . $st, "=SUM($end_col_name" . "$st:" . 'G' . "$st)");
+
+            $innerIndex = 0;
+            foreach ($serviceGroups as $service_group) {
+                $total = $patient->total_services_according_to_service_group($service_group->id);
+
+                // Set comment for services
+                if ($total > 0) {
+                    $comment = $spreadsheet->getActiveSheet()->getComment($letters[$innerIndex] . $startRow + $index);
+                    $comment->getText()->createTextRun($patient->services_concatinated());
+                    $comment->setAuthor('Ryan');
+                }
+                $inner_array[] = $total;
+                $innerIndex++;
+            }
+
+            $inner_array[] = $patient->total_paid_services_insurance() + $patient->patient->paid_lab();
+            $patientsCells[] = $inner_array;
+            $index++;
+        }
+        
+        $spreadsheet->getActiveSheet()->fromArray($patientsCells, null, 'C6');
+
+        $writer = new Xlsx($spreadsheet);
+        $filename = 'insurance_reclaim_' . $company->name . '_' . date('Y-m-d') . '.xlsx';
+        
+        return response()->streamDownload(function() use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . urlencode($filename) . '"'
+        ]);
+    }
 
     public function exportInsuranceClaim(Request $request)
     {

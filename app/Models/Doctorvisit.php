@@ -426,6 +426,40 @@ class DoctorVisit extends Model
     {
         return $this->hasOne(AuditedPatientRecord::class, 'doctor_visit_id');
     }
+    public function total_services_according_to_service_group($service_group_id)
+    {
+        $total = 0;
+        foreach ($this->requestedServices as $service) {
+            // dd($service_group_id);
+            if ($service->service->service_group_id != $service_group_id) {
+                continue;
+            }
+            $total += $service->price * $service->count;
+        }
+        return $total;
+    }
+    public function total_paid_services_insurance(Doctor|null $doctor  = null, $user = null)
+    {
+        $total = 0;
+        if (!$this->patient->company) return  0;
+        //        dd($this->services);
+        foreach ($this->requestedServices as $service) {
+
+            //            if (!$service->is_paid) continue;
+            if (!is_null($doctor)) {
+                if ($doctor->id != $service->doctor_id) {
+                    continue;
+                }
+            }
+            if ($user != null) {
+                if ($service->user_deposited != $user) continue;
+                $total += $service->amount_paid;
+            } else {
+                $total += $service->amount_paid;
+            }
+        }
+        return $total;
+    }
     public function totalEnduranceWillPay(){
         $total = 0;
         /**@var RequestedService $rs */

@@ -197,7 +197,7 @@ class MyCustomTCPDF extends TCPDF
 
         // --- Report Title ---
         $this->SetFont($this->defaultFont, 'B', 14); // Main report title font
-        $this->Cell(0, 7, $this->reportTitle, 0, 1, 'C'); // Centered report title
+        // $this->Cell(0, 7, $this->reportTitle, 0, 1, 'C'); // Centered report title
         $this->Ln(1);
 
         // --- Patient Info Block ---
@@ -313,14 +313,8 @@ class MyCustomTCPDF extends TCPDF
         $this->SetTextColor(100);
         if($this->isLab){
                 $this->Cell(0, 5, ($isRTL ? 'صفحة ' : 'Page ') . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 'T', 0, 'C');
-        $this->Cell(0, 5, ($isRTL ? 'تاريخ الطباعة: ' : 'Printed: ') . Carbon::now()->format('Y-m-d H:i'), 'T', 0, $isRTL ? 'L' : 'R');
-
-        // Example simplified signature lines
         $this->Ln(6);
         $sigBlockWidth = ($this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right']) / 2 - 5;
-        $this->Cell($sigBlockWidth, 5, ($isRTL ? ' :' : 'Lab Technician:'), 'T', 0, 'C');
-        $this->Cell(10,5,'',0,0); // Spacer
-        $this->Cell($sigBlockWidth, 5, ($isRTL ? 'مدير المختبر/المراجع:' : 'Lab Director/Auditor:'), 'T', 1, 'C');
 
         }
     

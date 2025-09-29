@@ -47,6 +47,11 @@ Route::get('/reports/doctor-shifts/test',function(){
     return $doctorShifts;
 });
 Route::get('/reports/companies/pdf', [CompanyReportController::class, 'exportAllCompaniesPdf']);
+
+
+// Excel reclaim route for web access
+Route::get('/excel/reclaim', [\App\Http\Controllers\Api\ExcelController::class, 'reclaim']);
+
 //phpinfo
 Route::get('/phpinfo', function () {
     phpinfo();

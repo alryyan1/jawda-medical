@@ -17,6 +17,25 @@ use Illuminate\Validation\Rule;
 class DoctorShiftController extends Controller
 {
     /**
+     * Check if the current shift is closed and prevent doctor shift creation if so
+     */
+    private function checkShiftIsOpen()
+    {
+        $currentGeneralShift = Shift::orderBy('id', 'desc')->first();
+        
+        if (!$currentGeneralShift) {
+            return response()->json(['message' => 'لا توجد وردية   لبدء .'], 400);
+        }
+
+        // Check if shift is closed by either is_closed flag or closed_at timestamp
+        if ($currentGeneralShift->is_closed || $currentGeneralShift->closed_at !== null) {
+            return response()->json(['message' => 'لا يمكن فتح وردية طبيب جديد. الوردية مغلقة حالياً.'], 400);
+        }
+
+        return $currentGeneralShift;
+    }
+
+    /**
      * Get a list of currently active doctor shifts.
      * Used by the DoctorsTabs on the ClinicPage.
      */
@@ -99,7 +118,14 @@ class DoctorShiftController extends Controller
         // if (!Auth::user()->can('start doctor_shifts')) {
         //     return response()->json(['message' => 'لا يمكنك فتح وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
         // }
-
+        
+        // Check if shift is open before proceeding
+        $shiftCheck = $this->checkShiftIsOpen();
+        if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
+            return $shiftCheck; // Return error response if shift is closed
+        }
+        $currentGeneralShift = $shiftCheck;
+        
         $validated = $request->validate([
             'doctor_id' => 'required|exists:doctors,id',
             // 'shift_id' => 'required|exists:shifts,id', // If a doctor can only have one session per general shift
@@ -113,15 +139,16 @@ class DoctorShiftController extends Controller
             ->first();
 
         if ($existingActiveShift) {
-            return response()->json(['message' => 'هذا الطبيب لديه وردية عمل مفتوحة بالفعل.'], 409); // 409 Conflict
+            //close all other shifts
+            DoctorShift::where('doctor_id', $validated['doctor_id'])
+                ->where('status', true)
+                ->update(['status' => false]);
+            // return response()->json(['message' => 'هذا الطبيب لديه وردية عمل مفتوحة بالفعل.'], 409); // 409 Conflict
         }
-        $latestShift = Shift::latest('id')->first();
-        if (!$latestShift || !$latestShift->id) {
-            return response()->json(['message' => 'يجب فتح وردية مالية أولاً.'], 400);
-        }
+        
         $doctorShift = DoctorShift::create([
             'doctor_id' => $validated['doctor_id'],
-            'shift_id' => Shift::latest('id')->first()?->id,
+            'shift_id' => $currentGeneralShift->id,
             'user_id' => Auth::id(), // User initiating this action
             'start_time' => $request->input('start_time', Carbon::now()),
             'status' => true, // Mark as active

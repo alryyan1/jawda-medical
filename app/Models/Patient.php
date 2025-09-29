@@ -361,6 +361,12 @@ class Patient extends Model
         }
         return $total;
     }
+    public function total_lab_value_unpaid(){
+
+
+        return $this->labrequests()->sum('labrequests.price');
+  
+      }
     public function lab_bank($user = null){
 
         $total = 0;

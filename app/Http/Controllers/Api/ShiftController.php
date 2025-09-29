@@ -90,7 +90,7 @@ class ShiftController extends Controller
      */
     public function getCurrentOpenShift()
     {
-        $openShift = Shift::open()->latest('created_at')->first();
+        $openShift = Shift::orderBy('id', 'desc')->first();
         if ($openShift) {
             return new ShiftResource($openShift->loadMissing(['userOpened', 'userClosed']));
         }

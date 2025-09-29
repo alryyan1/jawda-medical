@@ -240,6 +240,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('/batch-update-prices', [MainTestController::class, 'batchUpdatePrices']);
   Route::post('/main-tests/batch-delete', [MainTestController::class, 'batchDeleteTests']); // Using POST for body with IDs
   Route::get('/reports/lab-price-list/pdf', [ReportController::class, 'generatePriceListPdf']);
+  Route::get('/reports/price-list-pdf', [MainTestController::class, 'generatePriceListPdf']);
 
   Route::get('packages-list', [PackageController::class, 'indexList']);
   Route::apiResource('packages', PackageController::class);
@@ -396,6 +397,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/insurance-audit/export/pdf', [InsuranceAuditController::class, 'exportPdf']);
     // http://127.0.0.1/jawda-medical/public/api/insurance-audit/export/excel?company_id=1&date_from=2025-05-01&date_to=2025-05-31&service_group_ids[]=9&service_group_ids[]=1&service_group_ids[]=2&service_group_ids[]=3&service_group_ids[]=4&service_group_ids[]=7&service_group_ids[]=5
     Route::get('/insurance-audit/export/excel', [ExcelController::class, 'exportInsuranceClaim']);
+    Route::get('/excel/reclaim', [ExcelController::class, 'reclaim']);
     Route::get('/reports/monthly-service-deposits-income', [ReportController::class, 'monthlyServiceDepositsIncome']);
      /*
     |--------------------------------------------------------------------------

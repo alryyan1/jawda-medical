@@ -80,19 +80,37 @@ class PatientController extends Controller
      * Store a NEW patient record and an initial DoctorVisit.
      * A new File record is created and linked to the DoctorVisit.
      */
+    /**
+     * Check if the current shift is closed and prevent patient creation if so
+     */
+    private function checkShiftIsOpen()
+    {
+        $currentGeneralShift = Shift::orderBy('id', 'desc')->first();
+        
+     
+        // Check if shift is closed by either is_closed flag or closed_at timestamp
+        if ($currentGeneralShift->is_closed || $currentGeneralShift->closed_at !== null) {
+            return response()->json(['message' => 'لا يمكن تسجيل مريض جديد. الوردية مغلقة حالياً.'], 400);
+        }
+
+        return $currentGeneralShift;
+    }
+
     public function store(StorePatientRequest $request)
     {
+        
         $validatedPatientData = $request->validated(); // Use validated() directly
 
         $visitDoctorId = $validatedPatientData['doctor_id'];
         // Remove fields that are not part of the Patient model directly or handled separately
         $patientSpecificData = collect($validatedPatientData)->except(['doctor_id', 'notes', 'active_doctor_shift_id'])->toArray();
 
-
-        $currentGeneralShift = Shift::open()->latest('created_at')->first();
-        if (!$currentGeneralShift) {
-            return response()->json(['message' => 'لا توجد وردية  مفتوحة حالياً لبدء .'], 400);
+        // Check if shift is open before proceeding
+        $shiftCheck = $this->checkShiftIsOpen();
+        if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
+            return $shiftCheck; // Return error response if shift is closed
         }
+        $currentGeneralShift = $shiftCheck;
         $activeDoctorShiftId = $request->input('doctor_shift_id');
 
         if ($request->filled('company_id')) {
@@ -856,10 +874,12 @@ class PatientController extends Controller
             'reason_for_visit' => 'nullable|string|max:1000',
         ]);
 
-        $currentGeneralShift = Shift::open()->latest('created_at')->first();
-        if (!$currentGeneralShift) {
-            return response()->json(['message' => 'No open clinic shift is available to create a visit.'], 400);
+        // Check if shift is open before proceeding
+        $shiftCheck = $this->checkShiftIsOpen();
+        if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
+            return $shiftCheck; // Return error response if shift is closed
         }
+        $currentGeneralShift = $shiftCheck;
         DB::beginTransaction();
         try {
             // Get file_id from the patient's current doctorVisit or create a new file
@@ -1029,10 +1049,12 @@ class PatientController extends Controller
             'reason_for_visit' => 'nullable|string|max:1000',
         ]);
 
-        $currentGeneralShift = Shift::open()->latest('created_at')->first();
-        if (!$currentGeneralShift) {
-            return response()->json(['message' => 'لا توجد وردية عيادة مفتوحة حالياً.'], 400);
+        // Check if shift is open before proceeding
+        $shiftCheck = $this->checkShiftIsOpen();
+        if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
+            return $shiftCheck; // Return error response if shift is closed
         }
+        $currentGeneralShift = $shiftCheck;
 
         // Verify the doctor shift is active and belongs to the specified doctor
         $doctorShift = DoctorShift::where('id', $validated['doctor_shift_id'])
