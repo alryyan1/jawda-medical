@@ -157,6 +157,7 @@ class Setting extends Model
         'financial_year_start' => 'date',
         'financial_year_end' => 'date',
         'default_lab_report_template' => 'string',
+        'welcome_sms' => 'boolean',
     ];
 
     // Helper to always get the first (and only) settings record

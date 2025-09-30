@@ -34,6 +34,7 @@ use App\Models\Company;
 use Illuminate\Support\Facades\Http as HttpClient;
 use App\Jobs\EmitPatientRegisteredJob;
 use App\Jobs\SendWelcomeSmsJob;
+use App\Models\Setting;
 
 class PatientController extends Controller
 {
@@ -276,10 +277,21 @@ class PatientController extends Controller
 
             // Queue non-blocking actions after successful commit
             \DB::afterCommit(function () use ($patient) {
-                EmitPatientRegisteredJob::dispatch($patient->id);
-                if (!empty($patient->phone)) {
-                    SendWelcomeSmsJob::dispatch($patient->id, $patient->phone, $patient->name);
+                $settings = Setting::first();
+            
+                $hasPhone = is_string($patient->phone) ? trim($patient->phone) !== '' : !empty($patient->phone);
+                $welcomeOn = (bool) ($settings?->send_welcome_message ?? false);
+            
+                if ($hasPhone && $welcomeOn) {
+                    SendWelcomeSmsJob::dispatch($patient->id, (string)$patient->phone, (string)$patient->name);
                 }
+                Log::info($settings);
+                Log::info(sprintf(
+                    'Welcome SMS check -> hasPhone: %s, welcomeOn: %s, phone: "%s"',
+                    $hasPhone ? 'true' : 'false',
+                    $welcomeOn ? 'true' : 'false',
+                    (string) $patient->phone
+                ));
             });
 
             return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file']));
