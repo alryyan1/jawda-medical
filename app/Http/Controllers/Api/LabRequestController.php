@@ -714,13 +714,9 @@ class LabRequestController extends Controller
 
         $totalBalanceDueForAll = 0;
         foreach ($unpaidRequests as $lr) {
-            $price = (float) $lr->price;
-            $count = (int) ($lr->count ?? 1);
-            $itemSubTotal = $price;
-            $discountAmount = ($itemSubTotal * ((int) ($lr->discount_per ?? 0) / 100));
-            $enduranceAmount = (float) ($lr->endurance ?? 0);
-            $netPayableByPatient = $itemSubTotal - $discountAmount - ($visit->patient->company_id ? $enduranceAmount : 0);
-            $totalBalanceDueForAll += ($netPayableByPatient - (float) $lr->amount_paid);
+            $doctorvisitResource = new DoctorVisitResource($visit);
+            $labCalculation = $doctorvisitResource->calculateFinancialSummary();
+            $totalBalanceDueForAll += $labCalculation['balance_due'];
         }
 
         // Prevent overpayment for the batch
@@ -737,18 +733,11 @@ class LabRequestController extends Controller
                 if ($remainingPaymentToDistribute <= 0)
                     break;
 
-                $price = (float) $labrequest->price;
-                $itemSubTotal = $price; // Each lab request represents one test
-                $discountAmount = ($itemSubTotal * ((int) ($labrequest->discount_per ?? 0) / 100));
-                $enduranceAmount = (float) ($labrequest->endurance ?? 0);
-                $netPayableByPatient = $itemSubTotal - $discountAmount - ($visit->patient->company_id ? $enduranceAmount : 0);
+                $doctorvisitResource = new DoctorVisitResource($visit);
+                $labCalculation = $doctorvisitResource->calculateLabRequestFinancials($labrequest, $visit->patient->company_id ? true : false);
+                $netPayableByPatient = $labCalculation['net_payable'];
 
-                $balanceForItem = $netPayableByPatient - (float) $labrequest->amount_paid;
 
-                if ($balanceForItem <= 0)
-                    continue; // Already paid or overpaid somehow
-
-                $paymentForThisItem = min($remainingPaymentToDistribute, $balanceForItem);
 
                 // Create a deposit record if you have a lab_request_deposits table
                 // LabRequestDeposit::create([
@@ -760,17 +749,15 @@ class LabRequestController extends Controller
                 //     'notes' => $request->input('payment_notes'), // Overall note for all payments in this batch
                 // ]);
 
-                $labrequest->amount_paid += $paymentForThisItem;
+                $labrequest->amount_paid += 0;
                 $labrequest->is_bankak = $isBankak; // Set payment method for the latest payment part
                 $labrequest->user_deposited = $userId;
+                $labrequest->is_paid = true;
 
-                if ($labrequest->amount_paid >= $netPayableByPatient - 0.009) {
-                    $labrequest->is_paid = true;
-                    $labrequest->amount_paid = $netPayableByPatient; // Ensure exact amount if fully paid
-                }
+            
                 $labrequest->save();
                 $paidRequestsCount++;
-                $remainingPaymentToDistribute -= $paymentForThisItem;
+                $remainingPaymentToDistribute -= $netPayableByPatient;
             }
             DB::commit();
 
@@ -922,16 +909,21 @@ class LabRequestController extends Controller
                                     Log::info('endurance_percentage: ' . $contract->pivot->endurance_percentage);
                                     //log the contract
                                     Log::info('contract: ' . $contract);
-                                $endurance = ($price * $contract->pivot->endurance_percentage) / 100;
+                                $amount_company_will_endure = ($price * $contract->pivot->endurance_percentage) / 100;
+                                $endurance = $price - $amount_company_will_endure;
                             } else{
                                  if($patient->relation != null){
-                                $endurance = ($price * $patient->relation->lab_endurance) / 100;
-
+                                $amount_company_will_endure = ($price * $patient->relation->lab_endurance) / 100;
+                                $endurance = $price - $amount_company_will_endure;
                             }else{
                                 if($patient->subcompany_id != null){
-                                    $endurance = ($price * $patient->subcompany->lab_endurance) / 100;
+                                    $amount_company_will_endure = ($price * $patient->subcompany->lab_endurance) / 100;
+                                    $endurance = $price - $amount_company_will_endure;
                                 }else{
-                                    $endurance = ($price * $patient->company->lab_endurance) / 100;
+                                    Log::info('patient->company: ' . $patient->company);
+                                    Log::info('patient->company->lab_endurance: ' . $patient->company->lab_endurance);
+                                    $amount_company_will_endure = ($price * $patient->company->lab_endurance) / 100;
+                                    $endurance = $price - $amount_company_will_endure;
                                 }
 
                             }
@@ -1346,13 +1338,10 @@ class LabRequestController extends Controller
         try {
             foreach ($unpaidRequests as $labrequest) {
                 // Calculate net payable for this item
-                $price = (float) $labrequest->price;
-                $itemSubTotal = $price; // Each lab request represents one test
-                $discountAmount = ($itemSubTotal * ((int) ($labrequest->discount_per ?? 0) / 100));
-                $enduranceAmount = (float) ($labrequest->endurance ?? 0);
-
-                $netPayableByPatient = $itemSubTotal - $discountAmount - $enduranceAmount;
-
+          
+                $doctorvisitResource = new DoctorVisitResource($visit);
+                $labCalculation = $doctorvisitResource->calculateLabRequestFinancials($labrequest, $visit->patient->company_id ? true : false);
+                $netPayableByPatient = $labCalculation['net_payable'];
                 // Mark as fully paid
                 $labrequest->amount_paid = $netPayableByPatient;
                 $labrequest->is_paid = true;

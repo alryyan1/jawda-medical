@@ -83,12 +83,13 @@ class DoctorVisitResource extends JsonResource
      *
      * @return array
      */
-    private function calculateFinancialSummary(): array
+    public function calculateFinancialSummary(): array
     {
         $totalAmount = 0;
         $totalPaid = 0;
         $totalDiscount = 0;
         $isCompanyPatient = !empty($this->patient?->company_id);
+        $totalEndurance = 0;
 
         // Calculate from requested services
         if ($this->relationLoaded('requestedServices')) {
@@ -104,9 +105,11 @@ class DoctorVisitResource extends JsonResource
         if ($this->relationLoaded('patientLabRequests')) {
             foreach ($this->patientLabRequests as $labRequest) {
                 $labCalculation = $this->calculateLabRequestFinancials($labRequest, $isCompanyPatient);
-                $totalAmount += $labCalculation['net_payable'];
+
+                $totalAmount += $labCalculation['price'];
                 $totalPaid += $labCalculation['amount_paid'];
                 $totalDiscount += $labCalculation['discount'];
+                $totalEndurance += $labCalculation['endurance'];
             }
         }
 
@@ -114,7 +117,7 @@ class DoctorVisitResource extends JsonResource
             'total_amount' => round($totalAmount, 2),
             'total_paid' => round($totalPaid, 2),
             'total_discount' => round($totalDiscount, 2),
-            'balance_due' => round($totalAmount - $totalPaid, 2),
+            'balance_due' => round($isCompanyPatient ? $totalEndurance - $totalPaid : $totalAmount - $totalPaid, 2),
         ];
     }
 
@@ -146,6 +149,7 @@ class DoctorVisitResource extends JsonResource
             'net_payable' => $netPayable,
             'amount_paid' => $amountPaid,
             'discount' => $totalDiscount,
+            'endurance' => $endurance,
         ];
     }
 
@@ -156,26 +160,30 @@ class DoctorVisitResource extends JsonResource
      * @param bool $isCompanyPatient
      * @return array
      */
-    private function calculateLabRequestFinancials($labRequest, bool $isCompanyPatient): array
+    public function calculateLabRequestFinancials($labRequest, bool $isCompanyPatient): array
     {
         $price = (float) ($labRequest->price ?? 0);
-        $count = (int) ($labRequest->count ?? 1);
-        $subtotal = $price * $count;
         
         // Calculate discount (only percentage for lab requests)
         $discountPercent = (float) ($labRequest->discount_per ?? 0);
-        $totalDiscount = $subtotal * $discountPercent / 100;
+        $totalDiscount = $price * $discountPercent / 100;
         
         // Calculate endurance (company coverage)
-        $endurance = $isCompanyPatient ? (float) ($labRequest->endurance ?? 0) * $count : 0;
+        $endurance = $isCompanyPatient ? (float) ($labRequest->endurance ?? 0) : 0;
         
-        $netPayable = $subtotal - $totalDiscount - $endurance;
+        if($isCompanyPatient){
+            $netPayable =  $endurance;
+        }else{
+            $netPayable = $price - $totalDiscount;
+        }
         $amountPaid = (float) ($labRequest->amount_paid ?? 0);
 
         return [
+            'price' => $price,
             'net_payable' => $netPayable,
             'amount_paid' => $amountPaid,
             'discount' => $totalDiscount,
+            'endurance' => $endurance,
         ];
     }
 

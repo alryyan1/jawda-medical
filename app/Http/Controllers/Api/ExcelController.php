@@ -63,7 +63,8 @@ class ExcelController extends Controller
         })->whereBetween('created_at', [$startDate, $endDate])->get();
         
         $count = $patients->count() + 6;
-        $letters = ['H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X'];
+        // Dynamic service-group columns will start after our fixed columns (C..J), so from K onward
+        $letters = ['K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
         $start_col_name = 'C';
         $end_col_name = $letters[$serviceGroups->count()];
         $last_col_name = $letters[$serviceGroups->count() + 1];
@@ -93,11 +94,14 @@ class ExcelController extends Controller
         $spreadsheet->getActiveSheet()->getStyle($start_col_name . '5:' . $end_col_name . '5')->applyFromArray($headerStyle);
 
         // Set column widths
-        $spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(10);
-        $spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(30);
-        $spreadsheet->getActiveSheet()->getColumnDimension('E')->setWidth(15);
-        $spreadsheet->getActiveSheet()->getColumnDimension('F')->setWidth(20);
-        $spreadsheet->getActiveSheet()->getColumnDimension('G')->setWidth(20);
+        $spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(10);  // الرقم
+        $spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(30);  // الاسم
+        $spreadsheet->getActiveSheet()->getColumnDimension('E')->setWidth(15);  // التاريخ
+        $spreadsheet->getActiveSheet()->getColumnDimension('F')->setWidth(20);  // رقم البطاقه
+        $spreadsheet->getActiveSheet()->getColumnDimension('G')->setWidth(20);  // المعمل (lab total)
+        $spreadsheet->getActiveSheet()->getColumnDimension('H')->setWidth(18);  // subcompany_id
+        $spreadsheet->getActiveSheet()->getColumnDimension('I')->setWidth(18);  // company_relation_id
+        $spreadsheet->getActiveSheet()->getColumnDimension('J')->setWidth(24);  // الضامن (guarantor)
 
         // Add SUM formulas and styling
         $spreadsheet->getActiveSheet()->setCellValue('G' . $count + 1, "=SUM(G4:G$count)");
@@ -133,6 +137,9 @@ class ExcelController extends Controller
         $spreadsheet->getActiveSheet()->setCellValue("E5", "التاريخ ");
         $spreadsheet->getActiveSheet()->setCellValue("F5", "رقم البطاقه");
         $spreadsheet->getActiveSheet()->setCellValue("G5", "المعمل");
+        $spreadsheet->getActiveSheet()->setCellValue("H5", "الشركة الفرعية");
+        $spreadsheet->getActiveSheet()->setCellValue("I5", "علاقة الشركة");
+        $spreadsheet->getActiveSheet()->setCellValue("J5", "الضامن");
 
         // Add service group headers and formulas
         $index = 0;
@@ -162,15 +169,20 @@ class ExcelController extends Controller
             $inner_array[] = $patient->created_at->format('Y-m-d');
             $inner_array[] = $patient->patient->insurance_no;
             $inner_array[] = $patient->patient->total_lab_value_unpaid();
+            // New fixed columns (H, I, J)
+            $inner_array[] = $patient->patient->subcompany_id ?? '';
+            $inner_array[] = $patient->patient->company_relation_id ?? '';
+            $inner_array[] = $patient->patient->guarantor ?? '';
             
             // Set comment for Lab
             $comment = $spreadsheet->getActiveSheet()->getComment('G' . $startRow + $index);
             $comment->getText()->createTextRun($patient->patient->tests_concatinated());
             $comment->setAuthor('Ryan');
 
-            // Add sum formula for each patient
+            // Add sum formula for each patient across dynamic group columns (from K..end_col_name)
             $st = $startRow + $index;
-            $spreadsheet->getActiveSheet()->setCellValue($last_col_name . $st, "=SUM($end_col_name" . "$st:" . 'G' . "$st)");
+            $groupStartCol = 'K';
+            $spreadsheet->getActiveSheet()->setCellValue($last_col_name . $st, "=SUM($groupStartCol$st:$end_col_name$st)");
 
             $innerIndex = 0;
             foreach ($serviceGroups as $service_group) {
