@@ -278,17 +278,19 @@ class VisitServiceController extends Controller
             $service = $requestedService->service; // Get the base service
             if ($company && $service) {
                 $contract = $company->contractedServices()->where('services.id', $service->id)->first();
-                if ($contract && $contract->pivot && $contract->pivot->status) {
+                if ($contract && $contract->pivot) {
                     $contractPivot = $contract->pivot;
                     $currentPrice = $contractPivot->price; // Price from contract
                     $newCount = $validated['count'];
+                    // Log::info('contractPivot', ['contractPivot' => $contractPivot, 'currentPrice' => $currentPrice, 'newCount' => $newCount]);
                     if ($contractPivot->use_static) {
                         // Static endurance usually isn't per count, but per service type per visit.
                         // If it should scale with count, adjust here. For now, assume it doesn't.
                         // $validated['endurance'] = (float) $contractPivot->static_endurance;
                     } else {
                         // Percentage endurance IS per item, so it scales with count * price
-                        $validated['endurance'] = (($currentPrice * $newCount) * (float)($contractPivot->percentage_endurance ?? 0)) / 100;
+                        $validated['endurance'] = $validated['endurance'] * $newCount;
+                        // Log::info('contractPivot', ['contractPivot' => $contractPivot, 'currentPrice' => $currentPrice, 'newCount' => $newCount]);
                     }
                 }
             }

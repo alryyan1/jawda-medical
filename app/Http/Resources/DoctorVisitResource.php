@@ -117,7 +117,7 @@ class DoctorVisitResource extends JsonResource
             'total_amount' => round($totalAmount, 2),
             'total_paid' => round($totalPaid, 2),
             'total_discount' => round($totalDiscount, 2),
-            'balance_due' => round($isCompanyPatient ? $totalEndurance - $totalPaid : $totalAmount - $totalPaid, 2),
+            'balance_due' => round($isCompanyPatient ? $totalEndurance - $totalPaid : ($totalAmount- $totalDiscount )- $totalPaid, 2),
         ];
     }
 
