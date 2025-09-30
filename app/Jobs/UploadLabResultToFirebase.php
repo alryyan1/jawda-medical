@@ -12,6 +12,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\Request;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\ServiceAccount;
 use Kreait\Firebase\Firestore;
@@ -102,6 +103,27 @@ class UploadLabResultToFirebase implements ShouldQueue
                     'pdf_url' => $downloadUrl,
                     'patient_id' => $patient->id
                 ]);
+
+                // Trigger Firestore document update via controller method
+                try {
+                    /** @var \App\Http\Controllers\Api\FirestoreController $firestoreController */
+                    $firestoreController = app(\App\Http\Controllers\Api\FirestoreController::class);
+                    $firestoreRequest = new Request([
+                        'lab_to_lab_object_id' => (string) $patient->lab_to_lab_object_id,
+                        'pdf_url' => (string) $downloadUrl,
+                        'patient_id' => (int) $patient->id,
+                    ]);
+                    $firestoreResponse = $firestoreController->updateFirestoreDocument($firestoreRequest);
+                    Log::info('Triggered Firestore update from job', [
+                        'status' => method_exists($firestoreResponse, 'status') ? $firestoreResponse->status() : null,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::error('Failed to trigger Firestore update from job', [
+                        'error' => $e->getMessage(),
+                        'patient_id' => $patient->id,
+                        'lab_to_lab_object_id' => $patient->lab_to_lab_object_id,
+                    ]);
+                }
             }
 
             Log::info("Successfully uploaded lab result to Firebase for patient {$this->patientId}", [
