@@ -7,6 +7,7 @@ import os from 'os';
 import path from 'path';
 import axios from 'axios';
 import pkg from 'pdf-to-printer';
+import net from 'net';
 const { print } = pkg;
 
 const PORT = process.env.PORT || 4001;
@@ -14,6 +15,8 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
 const SERVER_AUTH_TOKEN = process.env.SERVER_AUTH_TOKEN || 'changeme';
 const API_BASE = process.env.VITE_API_BASE_URL || 'http://192.168.100.12/jawda-medical/public/api';
 const SANCTUM_TOKEN = process.env.SANCTUM_TOKEN || '';
+const HL7_SERVER_HOST = process.env.HL7_SERVER_HOST || '127.0.0.1';
+const HL7_SERVER_PORT = process.env.HL7_SERVER_PORT || 6400;
 console.log(API_BASE,'API_BASE')
 const app = express();
 app.use(express.json());
@@ -29,7 +32,86 @@ io.on('connection', (socket) => {
   socket.on('join', (room) => {
     if (room) socket.join(room);
   });
+  console.log('New connection');
+
+  // Handle HL7 test messages
+  socket.on('hl7-test-message', async (data) => {
+    try {
+      console.log('Received HL7 test message:', data.message?.substring(0, 100) + '...');
+      
+      const result = await sendHL7ToServer(data.message);
+      
+      socket.emit('hl7-test-response', {
+        success: result.success,
+        message: result.message,
+        error: result.error,
+        response: result.response
+      });
+    } catch (error) {
+      console.error('Error handling HL7 test message:', error);
+      socket.emit('hl7-test-response', {
+        success: false,
+        error: error.message || 'Unknown error occurred'
+      });
+    }
+  });
 });
+
+// Function to send HL7 message to TCP server
+function sendHL7ToServer(message) {
+  return new Promise((resolve) => {
+    const client = new net.Socket();
+    let responseData = '';
+    let hasResponded = false;
+
+    const timeout = setTimeout(() => {
+      if (!hasResponded) {
+        hasResponded = true;
+        client.destroy();
+        resolve({
+          success: false,
+          error: 'Connection timeout to HL7 server'
+        });
+      }
+    }, 10000); // 10 second timeout
+
+    client.connect(HL7_SERVER_PORT, HL7_SERVER_HOST, () => {
+      console.log(`Connected to HL7 server at ${HL7_SERVER_HOST}:${HL7_SERVER_PORT}`);
+      
+      // Send the HL7 message
+      client.write(message);
+    });
+
+    client.on('data', (data) => {
+      responseData += data.toString();
+      console.log('Received response from HL7 server:', data.toString().substring(0, 100) + '...');
+    });
+
+    client.on('close', () => {
+      clearTimeout(timeout);
+      if (!hasResponded) {
+        hasResponded = true;
+        resolve({
+          success: true,
+          message: 'Message sent successfully',
+          response: responseData || 'No response received'
+        });
+      }
+    });
+
+    client.on('error', (error) => {
+      clearTimeout(timeout);
+      if (!hasResponded) {
+        hasResponded = true;
+        console.error('HL7 server connection error:', error);
+        resolve({
+          success: false,
+          error: `Connection error: ${error.message}`
+        });
+      }
+    });
+  });
+}
 
 // Simple header token check for internal emits
 function verifyAuth(req, res, next) {

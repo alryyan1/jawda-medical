@@ -16,6 +16,29 @@ use Illuminate\Database\Eloquent\Model;
 class SysmexResult extends Model
 {
     use HasFactory;
-    protected $table ='sysmex';
-
+    protected $table = 'sysmex';
+    public $timestamps = false;
+    
+    protected $fillable = [
+        'doctorvisit_id',
+        'wbc',
+        'rbc',
+        'hgb',
+        'hct',
+        'mcv',
+        'mch',
+        'mchc',
+        'plt',
+        'lym_p',
+        'mxd_p',
+        'neut_p',
+        'lym_c',
+        'mxd_c',
+        'neut_c',
+        'rdw_sd',
+        'rdw_cv',
+        'pdw',
+        'mpv',
+        'plcr',
+    ];
 }

@@ -52,6 +52,8 @@ use App\Http\Controllers\Api\UserDocSelectionController;
 use App\Http\Controllers\Api\VisitServiceController;
 use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\SettingUploadController;
+use App\Http\Controllers\Api\HL7MessageController;
+use App\Http\Controllers\Api\HL7MessageInsertController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SmsController;
@@ -611,6 +613,22 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/current-shift-lab-income-summary', [UserController::class, 'getCurrentUserLabIncomeSummary']);
     Route::get('/cash-denominations', [CashDenominationController::class, 'getDenominationsForShift']);
     Route::post('/cash-denominations', [CashDenominationController::class, 'saveDenominationCounts']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | HL7 Messages Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/hl7-messages', [HL7MessageController::class, 'index']);
+    Route::get('/hl7-messages/{id}', [HL7MessageController::class, 'show']);
+    Route::delete('/hl7-messages/{id}', [HL7MessageController::class, 'destroy']);
+    Route::get('/hl7-messages/recent', [HL7MessageController::class, 'recent']);
+    Route::get('/hl7-messages/devices', [HL7MessageController::class, 'devices']);
+    Route::get('/hl7-messages/statistics', [HL7MessageController::class, 'statistics']);
+    
+    // HL7 Message Insert Routes
+    Route::post('/hl7-messages/insert', [HL7MessageInsertController::class, 'store']);
+    Route::post('/hl7-messages/insert-batch', [HL7MessageInsertController::class, 'storeBatch']);
 
     /*
     |--------------------------------------------------------------------------

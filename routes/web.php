@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\LabResultController;
 use App\Models\DoctorShift;
+use App\Models\Hl7Message;
 use App\Models\Patient;
 use App\Models\Shift;
 use Illuminate\Support\Facades\Route;
@@ -55,4 +56,31 @@ Route::get('/excel/reclaim', [\App\Http\Controllers\Api\ExcelController::class, 
 //phpinfo
 Route::get('/phpinfo', function () {
     phpinfo();
+});
+
+
+Route::get('/hl7', function () {
+    //get hl7 message from hl7_messages table
+    $hl7Message = Hl7Message::find(11);
+    // return $hl7Message;
+    $removed_white_space = preg_replace('/\s+/', '', $hl7Message->raw_message);
+    // var_dump($hl7Message->raw_message);
+    //parse hl7 message using aranyasen/hl7
+    $hl7Message = new  Aranyasen\HL7\Message($removed_white_space);
+    // dd($hl7Message);
+    $msh = $hl7Message->getSegmentByIndex(0);
+    // return $msh->getField(33);
+    return $msh->getFields();
+    // return $msh->getField(4);
+
+    // return $hl7Message->getSegmentsByName('MSH');
+
+    //get msh segment
+    // $msh = $hl7Message->getSegments();
+    //get msh fields
+    // $mshFields = $msh->getFields();
+    //get msh fields
+    // return $hl7Message;
+
+    
 });

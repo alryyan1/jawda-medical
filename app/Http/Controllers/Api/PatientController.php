@@ -1404,7 +1404,7 @@ class PatientController extends Controller
                     'main_test_id' => $labRequestData['testId'],
                     'pid' => $patient->id,
                     'doctor_visit_id' => $doctorVisit->id,
-                    'hidden' => false,
+                    'hidden' => true,
                     'is_lab2lab' => true, // Mark as lab-to-lab request
                     'valid' => true,
                     'no_sample' => false,

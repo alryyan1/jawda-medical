@@ -8,8 +8,8 @@ return new class extends Migration {
     public function up(): void
     {
         // Drop existing table to ensure idempotent re-runs
-        Schema::dropIfExists('denos');
 
+        if (!Schema::hasTable('denos')) {
         Schema::create('denos', function (Blueprint $table) {
             $table->id();
             $table->integer('name')->unique();
@@ -24,10 +24,13 @@ return new class extends Migration {
             ['name' => 1000, 'display_order' => 4],
         ];
         DB::table('denos')->insert($seed);
+        }
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('denos');
+        if (Schema::hasTable('denos')) {
+            Schema::dropIfExists('denos');
+        }
     }
 };

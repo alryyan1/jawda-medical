@@ -6,6 +6,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.1",
+        "aranyasen/hl7": "^1.0",
         "guzzlehttp/guzzle": "^7.2",
         "kreait/firebase-php": "^7.21",
         "laravel/framework": "^10.10",
@@ -13,6 +14,7 @@
         "laravel/tinker": "^2.8",
         "phpoffice/phpspreadsheet": "^4.3",
         "predis/predis": "^3.0",
+        "react/socket": "^1.12",
         "spatie/laravel-permission": "^6.18",
         "tecnickcom/tcpdf": "^6.9"
     },
