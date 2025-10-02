@@ -79,9 +79,23 @@ class SysmexCbcInserter
             'LYM#' => 'lym_c',      // lym_c (count)
             'MXD#' => 'mxd_c',      // mxd_c (count)
             'NEUT#' => 'neut_c',    // neut_c (count)
+            'NEU#' => 'neut_c',     // neut_c (count) - Zybio uses NEU#
             'LYM%' => 'lym_p',      // lym_p (percentage)
             'MXD%' => 'mxd_p',      // mxd_p (percentage)
             'NEUT%' => 'neut_p',    // neut_p (percentage)
+            'NEU%' => 'neut_p',     // neut_p (percentage) - Zybio uses NEU%
+
+            // BC6800 specific WBC differential parameters
+            'BAS#' => 'bas_c',      // basophils count
+            'BAS%' => 'bas_p',      // basophils percentage
+            'EOS#' => 'eos_c',      // eosinophils count
+            'EOS%' => 'eos_p',      // eosinophils percentage
+            'MON#' => 'mon_c',      // monocytes count
+            'MON%' => 'mon_p',      // monocytes percentage
+
+            // Zybio specific WBC differential parameters
+            'MID#' => 'mxd_c',      // mid cells count (maps to mxd_c)
+            'MID%' => 'mxd_p',      // mid cells percentage (maps to mxd_p)
 
             // Red Blood Cell Parameters
             'RBC' => 'rbc',
@@ -97,9 +111,23 @@ class SysmexCbcInserter
             'PLT' => 'plt',
             'MPV' => 'mpv',
             'PDW' => 'pdw',
-            'PCT' => 'pct',         // Note: PCT field doesn't exist in table
-            'PLCC' => 'plcc',       // Note: PLCC field doesn't exist in table
+            'PCT' => 'pct',
+            'PLCC' => 'plcc',
             'PLCR' => 'plcr',
+            
+            // Zybio specific platelet parameters
+            'P-LCC' => 'plcc',      // Platelet Large Cell Count
+            'P-LCR' => 'plcr',      // Platelet Large Cell Ratio
+            
+            // Additional BC6800 specific parameters
+            'HFC#' => 'hfc_c',      // High Fluorescence Cell Count
+            'HFC%' => 'hfc_p',      // High Fluorescence Cell Percentage
+            'PLT-I' => 'plt_i',     // Platelet Immature
+            'WBC-D' => 'wbc_d',     // WBC Differential
+            'WBC-B' => 'wbc_b',     // WBC Basophil
+            'PDW-SD' => 'pdw_sd',   // Platelet Distribution Width SD
+            'InR#' => 'inr_c',      // Immature Reticulocyte Count
+            'InR%' => 'inr_p',      // Immature Reticulocyte Percentage
         ];
     }
 

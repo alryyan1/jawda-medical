@@ -40,5 +40,27 @@ class SysmexResult extends Model
         'pdw',
         'mpv',
         'plcr',
+        
+        // BC6800 specific WBC differential parameters
+        'bas_c',
+        'bas_p',
+        'eos_c',
+        'eos_p',
+        'mon_c',
+        'mon_p',
+        
+        // Additional platelet parameters
+        'pct',
+        'plcc',
+        
+        // Additional BC6800 specific parameters
+        'hfc_c',
+        'hfc_p',
+        'plt_i',
+        'wbc_d',
+        'wbc_b',
+        'pdw_sd',
+        'inr_c',
+        'inr_p',
     ];
 }

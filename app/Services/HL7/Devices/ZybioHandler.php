@@ -7,7 +7,7 @@ use Aranyasen\HL7\Segments\MSH;
 use Illuminate\Support\Facades\Log;
 use App\Services\HL7\Devices\SysmexCbcInserter;
 
-class BC6800Handler
+class ZybioHandler
 {
     protected SysmexCbcInserter $sysmexInserter;
 
@@ -19,17 +19,87 @@ class BC6800Handler
     public function processMessage(Message $msg, MSH $msh, $connection): void
     {
         try {
-            Log::info('BC6800: Processing CBC message');
+            Log::info('Zybio: Processing CBC message');
             
-            // Process CBC results from BC-6800
+            // Process CBC results from Zybio Z3 device
             $this->processCbcResults($msg, $msh);
             
-            Log::info('BC6800: CBC results processed successfully');
+            Log::info('Zybio: CBC results processed successfully');
 
         } catch (\Exception $e) {
-            Log::error('BC6800 processing error: ' . $e->getMessage(), [
+            Log::error('Zybio processing error: ' . $e->getMessage(), [
                 'exception' => $e,
                 'message' => $msg->toString()
+            ]);
+        }
+    }
+
+    /**
+     * Correct HL7 message format by fixing field separator issues
+     * Specifically fixes the MSH segment field separator from ^~& to ^~\&
+     */
+    public static function correctHl7MessageFormat(string $rawMessage): string
+    {
+        try {
+            // Remove control characters from the beginning and end
+            $correctedMessage = trim($rawMessage, "\x00-\x1F");
+            
+            // Fix the field separator in MSH segment
+            // Replace ^~& with ^~\& (add missing backslash)
+            $correctedMessage = preg_replace('/MSH\|\^~&/', 'MSH|^~\&', $correctedMessage);
+            
+            // Normalize line endings to \r (HL7 standard) but be more careful
+            // First, normalize \r\n to \n, then \r to \n, then \n to \r
+            $correctedMessage = str_replace("\r\n", "\n", $correctedMessage);
+            $correctedMessage = str_replace("\r", "\n", $correctedMessage);
+            $correctedMessage = str_replace("\n", "\r", $correctedMessage);
+            
+            // Remove extra whitespace but preserve line breaks
+            $correctedMessage = preg_replace('/[ \t]+/', ' ', $correctedMessage);
+            
+            // Remove any remaining control characters except \r (carriage return = \x0D)
+            $correctedMessage = preg_replace('/[\x00-\x0C\x0E-\x1F\x7F]/', '', $correctedMessage);
+            
+            // Trim leading/trailing whitespace
+            $correctedMessage = trim($correctedMessage);
+            
+            Log::info('Zybio: HL7 message format corrected', [
+                'original_length' => strlen($rawMessage),
+                'corrected_length' => strlen($correctedMessage),
+                'field_separator_fixed' => $rawMessage !== $correctedMessage,
+                'control_chars_removed' => strlen($rawMessage) !== strlen($correctedMessage)
+            ]);
+            
+            return $correctedMessage;
+            
+        } catch (\Exception $e) {
+            Log::error('Zybio: Error correcting HL7 message format: ' . $e->getMessage());
+            return $rawMessage; // Return original message if correction fails
+        }
+    }
+
+    /**
+     * Process raw HL7 message string with automatic format correction
+     */
+    public function processRawMessage(string $rawMessage, $connection): void
+    {
+        try {
+            Log::info('Zybio: Processing raw HL7 message');
+            
+            // Correct the message format first
+            $correctedMessage = self::correctHl7MessageFormat($rawMessage);
+            
+            // Parse the corrected message
+            $msg = new Message($correctedMessage);
+            $msh = $msg->getSegmentByIndex(0);
+            
+            // Process the message
+            $this->processMessage($msg, $msh, $connection);
+            
+        } catch (\Exception $e) {
+            Log::error('Zybio: Error processing raw message: ' . $e->getMessage(), [
+                'exception' => $e,
+                'raw_message' => $rawMessage
             ]);
         }
     }
@@ -45,7 +115,7 @@ class BC6800Handler
             }
 
         } catch (\Exception $e) {
-            Log::error('BC6800: Error processing CBC results: ' . $e->getMessage());
+            Log::error('Zybio: Error processing CBC results: ' . $e->getMessage());
         }
     }
 
@@ -59,17 +129,17 @@ class BC6800Handler
                 'results' => []
             ];
 
-            // Extract doctor visit ID from MSH field 25 (BC6800 specific)
+            // Extract doctor visit ID from MSH field 49 (Zybio specific)
             if ($msh) {
-                $cbcData['doctor_visit_id'] = $msh->getField(25);
-                
-                // If MSH field 25 is empty, try OBR field 3 as fallback
-                if (empty($cbcData['doctor_visit_id'])) {
-                    foreach ($msg->getSegments() as $segment) {
-                        if ($segment->getName() === 'OBR') {
-                            $cbcData['doctor_visit_id'] = $segment->getField(3);
-                            break;
-                        }
+                $cbcData['doctor_visit_id'] = $msh->getField(49);
+            }
+            
+            // Fallback: Extract doctor visit ID from OBR field 3 if MSH field 49 is empty
+            if (!$cbcData['doctor_visit_id']) {
+                foreach ($msg->getSegments() as $segment) {
+                    if ($segment->getName() === 'OBR') {
+                        $cbcData['doctor_visit_id'] = $segment->getField(3);
+                        break;
                     }
                 }
             }
@@ -110,7 +180,7 @@ class BC6800Handler
             return $cbcData;
 
         } catch (\Exception $e) {
-            Log::error('BC6800: Error parsing CBC message: ' . $e->getMessage());
+            Log::error('Zybio: Error parsing CBC message: ' . $e->getMessage());
             return null;
         }
     }
@@ -119,12 +189,12 @@ class BC6800Handler
     {
         try {
             if (!$cbcData['patient_id']) {
-                Log::warning('BC6800: No patient ID found in CBC data');
+                Log::warning('Zybio: No patient ID found in CBC data');
                 return;
             }
 
             if (!$cbcData['doctor_visit_id']) {
-                Log::warning('BC6800: No doctor visit ID found in CBC data');
+                Log::warning('Zybio: No doctor visit ID found in CBC data');
                 return;
             }
 
@@ -134,7 +204,7 @@ class BC6800Handler
             // Validate CBC data before insertion
             $validation = $this->sysmexInserter->validateCbcData($cbcResults);
             if (!$validation['valid']) {
-                Log::error('BC6800: CBC data validation failed', [
+                Log::error('Zybio: CBC data validation failed', [
                     'errors' => $validation['errors']
                 ]);
                 return;
@@ -148,14 +218,14 @@ class BC6800Handler
             );
 
             if ($result['success']) {
-                Log::info('BC6800: CBC results saved successfully', [
+                Log::info('Zybio: CBC results saved successfully', [
                     'patient_id' => $cbcData['patient_id'],
                     'doctor_visit_id' => $cbcData['doctor_visit_id'],
                     'sysmex_id' => $result['sysmex_id'],
                     'results_count' => count($cbcResults)
                 ]);
             } else {
-                Log::error('BC6800: Failed to save CBC results', [
+                Log::error('Zybio: Failed to save CBC results', [
                     'error' => $result['message'],
                     'patient_id' => $cbcData['patient_id'],
                     'doctor_visit_id' => $cbcData['doctor_visit_id']
@@ -163,7 +233,7 @@ class BC6800Handler
             }
 
         } catch (\Exception $e) {
-            Log::error('BC6800: Error saving CBC results: ' . $e->getMessage());
+            Log::error('Zybio: Error saving CBC results: ' . $e->getMessage());
         }
     }
 
@@ -183,15 +253,7 @@ class BC6800Handler
             }
             
             // Skip non-clinical parameters
-            if (in_array($testName, ['Take Mode', 'Blood Mode', 'Test Mode', 'Ref Group', 'Shelf No', 'Tube No', 'Lipid Particles?'])) {
-                continue;
-            }
-            
-            // Skip histogram and scattergram data
-            if (strpos($testName, 'Histogram') !== false || 
-                strpos($testName, 'Scattergram') !== false ||
-                strpos($testName, 'Meta') !== false ||
-                strpos($testName, 'dimension') !== false) {
+            if (in_array($testName, ['Take Mode', 'Blood Mode', 'Test Mode', 'Ref Group', 'Age', 'Leucopenia', 'Remark'])) {
                 continue;
             }
             
@@ -212,9 +274,9 @@ class BC6800Handler
     }
 
     /**
-     * Map CBC test codes to internal test identifiers
+     * Map Zybio CBC test codes to internal test identifiers
      */
-    protected function mapCbcTestCodes(): array
+    protected function mapZybioTestCodes(): array
     {
         return [
             'WBC' => 'white_blood_cells',
@@ -225,12 +287,19 @@ class BC6800Handler
             'MCH' => 'mean_cell_hemoglobin',
             'MCHC' => 'mean_cell_hemoglobin_concentration',
             'PLT' => 'platelets',
-            'LYM%' => 'lymphocytes_percent',
-            'MON%' => 'monocytes_percent',
-            'GRA%' => 'granulocytes_percent',
             'LYM#' => 'lymphocytes_absolute',
-            'MON#' => 'monocytes_absolute',
-            'GRA#' => 'granulocytes_absolute',
+            'MID#' => 'mid_cells_absolute',
+            'NEU#' => 'neutrophils_absolute',
+            'LYM%' => 'lymphocytes_percent',
+            'MID%' => 'mid_cells_percent',
+            'NEU%' => 'neutrophils_percent',
+            'MPV' => 'mean_platelet_volume',
+            'PDW' => 'platelet_distribution_width',
+            'PCT' => 'plateletcrit',
+            'P-LCC' => 'platelet_large_cell_count',
+            'P-LCR' => 'platelet_large_cell_ratio',
+            'RDW-CV' => 'red_cell_distribution_width_cv',
+            'RDW-SD' => 'red_cell_distribution_width_sd',
         ];
     }
 }

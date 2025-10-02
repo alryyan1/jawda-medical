@@ -7,6 +7,8 @@ use App\Models\DoctorShift;
 use App\Models\Hl7Message;
 use App\Models\Patient;
 use App\Models\Shift;
+use App\Services\HL7\Devices\SysmexCbcInserter;
+use App\Services\HL7\Devices\ZybioHandler;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -61,17 +63,27 @@ Route::get('/phpinfo', function () {
 
 Route::get('/hl7', function () {
     //get hl7 message from hl7_messages table
-    $hl7Message = Hl7Message::find(11);
+    $hl7Message = Hl7Message::find(21);
+
+    $correctedMessage = ZybioHandler::correctHl7MessageFormat($hl7Message->raw_message);
+
+    $hl7Message = new Aranyasen\Hl7\Message($correctedMessage);
+    $msh = $hl7Message->getSegmentByIndex(0);
+    return $msh->getField(49);
+    return $correctedMessage;
+    
     // return $hl7Message;
-    $removed_white_space = preg_replace('/\s+/', '', $hl7Message->raw_message);
+    // return $hl7Message;
+    // $removed_white_space = preg_replace('/\s+/', '', $hl7Message);
     // var_dump($hl7Message->raw_message);
     //parse hl7 message using aranyasen/hl7
-    $hl7Message = new  Aranyasen\HL7\Message($removed_white_space);
-    // dd($hl7Message);
+    // return $removed_white_space;
+    $hl7Message = new  Aranyasen\HL7\Message($hl7Message);
+    dd($hl7Message);
     $msh = $hl7Message->getSegmentByIndex(0);
-    // return $msh->getField(33);
-    return $msh->getFields();
-    // return $msh->getField(4);
+    // return $msh->getField(33); patient id for akon
+    // return $msh->getFields();
+    // return $msh->getField(25); //patient id for bc6800
 
     // return $hl7Message->getSegmentsByName('MSH');
 

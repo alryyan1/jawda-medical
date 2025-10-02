@@ -10,6 +10,8 @@ use App\Services\HL7\Devices\MaglumiX3Handler;
 use App\Services\HL7\Devices\MindrayCL900Handler;
 use App\Services\HL7\Devices\BC6800Handler;
 use App\Services\HL7\Devices\ACONHandler;
+use App\Services\HL7\Devices\ZybioHandler;
+use App\Services\HL7\Devices\SysmexCbcInserter;
 
 class HL7MessageProcessor
 {
@@ -20,8 +22,9 @@ class HL7MessageProcessor
         $this->deviceHandlers = [
             'MaglumiX3' => new MaglumiX3Handler(),
             'CL-900' => new MindrayCL900Handler(),
-            'BC-6800' => new BC6800Handler(),
+            'BC-6800' => new BC6800Handler(new SysmexCbcInserter()),
             'ACON' => new ACONHandler(),
+            'Z3' => new ZybioHandler(new SysmexCbcInserter()),
         ];
     }
 
@@ -40,17 +43,29 @@ class HL7MessageProcessor
                 return;
             }
 
-            // Clean and parse message - preserve segment separators
+            // // Clean and parse message - preserve segment separators
             $cleanData = preg_replace('/\r\n|\r|\n/', "\r", $rawData); // Normalize line endings
             $cleanData = preg_replace('/[ \t]+/', ' ', $cleanData); // Replace multiple spaces/tabs with single space
             $cleanData = trim($cleanData); // Remove leading/trailing whitespace
-            
-            $msg = new Message($cleanData);
+
+            // Try to parse HL7 message; if it fails, attempt Zybio auto-format then retry
+            try {
+                $msg = new Message($cleanData);
+            } catch (\Throwable $parseError) {
+                Log::warning('HL7: Initial parse failed; applying Zybio format correction', [
+                    'error' => $parseError->getMessage()
+                ]);
+                $formatted = ZybioHandler::correctHl7MessageFormat($rawData);
+                $msg = new Message($formatted);
+            }
             // Log::info((string) $msg->toString());
             $msh = new MSH($msg->getSegmentByIndex(0)->getFields());
             Log::info("HL7: MSH", ['msh' => $msh]);
             // Extract device identifier from MSH field 4 (Sending Facility)
             $device = $msh->getField(4);
+            if (is_array($device)) {
+                $device = implode('^', $device);
+            }
             
       
 
