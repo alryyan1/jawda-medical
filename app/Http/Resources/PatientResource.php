@@ -81,7 +81,7 @@ class PatientResource extends JsonResource
             // This is included because PatientController->store loads it for the response after registration.
             // This visit is the *initial* visit created during patient registration.
             'doctor_visit' => new DoctorVisitResource($this->whenLoaded('doctorVisit')),
-            'has_cbc' => $this->doctorVisit?->hasCbc,
+            'has_cbc' => $this->doctorVisit?->hasCbc(),
             'result_url' => $this->result_url,
         ];
     }

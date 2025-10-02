@@ -5,6 +5,8 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use App\Services\Contracts\SmsClient;
 use App\Services\AirtelSmsClient;
+use App\Models\SysmexResult;
+use App\Observers\SysmexResultObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -27,5 +29,8 @@ class AppServiceProvider extends ServiceProvider
             'url' => env('REALTIME_EVENTS_URL', 'http://localhost:4001'),
             'token' => env('REALTIME_EVENTS_TOKEN', 'changeme'),
         ]]);
+
+        // Register model observers
+        SysmexResult::observe(SysmexResultObserver::class);
     }
 }

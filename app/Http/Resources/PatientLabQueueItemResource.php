@@ -47,6 +47,7 @@ class PatientLabQueueItemResource extends JsonResource {
             'patient_id' => $this->patient_id,
             'patient_name' => $this->patient->name,
              'company'=>$this->patient->company,
+             'has_cbc' => $this->patient->doctorVisit?->hasCbc(),
             'patient_phone_for_whatsapp' => $this->patient ? UltramsgService::formatPhoneNumber($this->patient->phone) : null,
             'is_result_locked' => $this->patient ? (bool) $this->patient->result_is_locked : false,
             'is_printed'=>$this->patient->result_print_date != null,

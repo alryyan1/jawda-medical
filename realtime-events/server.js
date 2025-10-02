@@ -244,6 +244,20 @@ app.post('/emit/open-general-shift', verifyAuth, (req, res) => {
   }
 });
 
+// Emit sysmex-result-inserted
+app.post('/emit/sysmex-result-inserted', verifyAuth, (req, res) => {
+  try {
+    const payload = req.body; // Expecting { sysmexResult, doctorVisit, patient }
+    console.log('sysmex-result-inserted', payload);
+    io.emit('sysmex-result-inserted', payload);
+    console.log('sysmex-result-inserted emitted');
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error emitting sysmex-result-inserted:', err?.message || err);
+    return res.status(500).json({ error: 'Failed to emit sysmex-result-inserted' });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);
 });
