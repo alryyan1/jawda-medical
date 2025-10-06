@@ -162,6 +162,7 @@ class Patient extends Model
         'doctor_lab_urgent_confirm', // Likely visit/request specific
         'discount_comment', // If general patient discount comment
         'lab_to_lab_object_id',
+        'lab_to_lab_id',
     ];
 
     /**
@@ -196,6 +197,7 @@ class Patient extends Model
         'doctor_lab_urgent_confirm' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'lab_to_lab_id' => 'string',
     ];
 
     /**

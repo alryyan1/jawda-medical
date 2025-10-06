@@ -117,6 +117,22 @@ class UploadLabResultToFirebase implements ShouldQueue
                     Log::info('Triggered Firestore update from job', [
                         'status' => method_exists($firestoreResponse, 'status') ? $firestoreResponse->status() : null,
                     ]);
+
+                    // Send completion notification after successful Firestore update
+                    try {
+                        \App\Services\FirebaseService::sendTopicMessage(
+                            $patient->lab_to_lab_id ,
+                            'النتائج مكتملة',
+                             "تم الانتهاء من  ادخال النتائج  
+                             \n 
+                             $patient->name"
+                        );
+                        Log::info('Sent lab results completion notification');
+                    } catch (\Throwable $notificationError) {
+                        Log::warning('Failed to send lab results completion notification', [
+                            'error' => $notificationError->getMessage(),
+                        ]);
+                    }
                 } catch (\Throwable $e) {
                     Log::error('Failed to trigger Firestore update from job', [
                         'error' => $e->getMessage(),

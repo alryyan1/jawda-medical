@@ -1382,6 +1382,7 @@ class PatientController extends Controller
             'external_lab_id' => 'required|string',
             'external_patient_id' => 'required|string',
             'created_at' => 'nullable',
+            'labId' => 'required|string',
         ]);
 
         $currentGeneralShift = Shift::open()->latest('created_at')->first();
@@ -1410,8 +1411,10 @@ class PatientController extends Controller
                 'user_id' => Auth::id(),
                 'shift_id' => $currentGeneralShift->id,
                 'visit_number' => $visitLabNumber,
+                'lab_to_lab_id' => $validated['labId'],
                 'result_auth' => false,
                 'referred' => 'من مختبر خارجي',
+                'labId' => $validated['labId'],
                 'discount_comment' => 'مختبر خارجي: ' . $validated['external_lab_id'] . ' - مريض: ' . $validated['external_patient_id'],
                 'lab_to_lab_object_id' => $validated['external_patient_id'], // Store the Firestore document ID
             ]);
@@ -1483,6 +1486,43 @@ class PatientController extends Controller
             // Load the patient with relationships
             $patient->load(['doctorVisit', 'company', 'primaryDoctor']);
 
+            // Update Firestore document to mark as delivered (non-blocking best-effort)
+            try {
+                $externalPatientId = $validated['external_patient_id'] ?? null;
+                if ($externalPatientId) {
+                    \App\Services\FirebaseService::updateFirestoreDocument(
+                        'labToLap/global/patients',
+                        $externalPatientId,
+                        [
+                            'sample_delivered' => true,
+                            'delivered_at' => now()->toISOString(),
+                            'delivered_by' => 'jawda-medical-system'
+                        ]
+                    );
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to update Firestore document', [
+                    'error' => $e->getMessage(),
+                    'external_patient_id' => $validated['external_patient_id'] ?? null,
+                ]);
+            }
+
+            // Send FCM topic notification to lab on success (non-blocking best-effort)
+            try {
+                $labNameForTopic = (string)($validated['labId'] ?? '');
+                $safeTopic = preg_replace('/[^A-Za-z0-9\-_]/u', '_', trim($labNameForTopic));
+                $testsNames = collect($validated['lab_requests'] ?? [])->pluck('name')->filter()->values()->all();
+                $testsList = implode(' و ', $testsNames);
+                $title = 'تم توصيل العينات الي المختبر';
+                $body = 'تم توصيل العينات للمريض ' . $validated['name'] . ' صاحب التحاليل التاليه ' . $testsList;
+                
+                \App\Services\FirebaseService::sendTopicMessage($safeTopic, $title, $body);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send lab topic notification', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             return response()->json([
                 'message' => 'تم حفظ المريض بنجاح',
                 'data' => new PatientResource($patient)
@@ -1497,4 +1537,5 @@ class PatientController extends Controller
             ], 500);
         }
     }
+
 }
