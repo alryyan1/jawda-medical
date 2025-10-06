@@ -97,6 +97,27 @@ class PatientController extends Controller
         return $currentGeneralShift;
     }
 
+    /**
+     * Ensure the latest clinic shift belongs to today's date.
+     * Returns 400 response if no shift exists or if the latest shift was created on a different day.
+     */
+    private function checkLatestShiftDateIsToday()
+    {
+        $latestShift = Shift::orderBy('id', 'desc')->first();
+        if (!$latestShift) {
+            return response()->json(['message' => 'لا توجد وردية عيادة متاحة اليوم.'], 400);
+        }
+
+        $latestShiftDate = optional($latestShift->created_at)->toDateString();
+        $today = Carbon::today()->toDateString();
+
+        if ($latestShiftDate !== $today) {
+            return response()->json(['message' => 'لا يمكن تسجيل مريض جديد. آخر وردية ليست بتاريخ اليوم.'], 400);
+        }
+
+        return $latestShift;
+    }
+
     public function store(StorePatientRequest $request)
     {
         
@@ -110,6 +131,10 @@ class PatientController extends Controller
         $shiftCheck = $this->checkShiftIsOpen();
         if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
             return $shiftCheck; // Return error response if shift is closed
+        }
+        $dateCheck = $this->checkLatestShiftDateIsToday();
+        if ($dateCheck instanceof \Illuminate\Http\JsonResponse) {
+            return $dateCheck; // Return error response if latest shift is not today
         }
         $currentGeneralShift = $shiftCheck;
         $activeDoctorShiftId = $request->input('doctor_shift_id');
@@ -548,6 +573,10 @@ class PatientController extends Controller
         if (!$currentGeneralShift) {
             return response()->json(['message' => 'لا توجد وردية عيادة مفتوحة حالياً.'], 400);
         }
+        $dateCheck = $this->checkLatestShiftDateIsToday();
+        if ($dateCheck instanceof \Illuminate\Http\JsonResponse) {
+            return $dateCheck; // Ensure latest shift is from today
+        }
 
         $fileToUseId = null;
         $previousVisit = null;
@@ -891,6 +920,10 @@ class PatientController extends Controller
         if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
             return $shiftCheck; // Return error response if shift is closed
         }
+        $dateCheck = $this->checkLatestShiftDateIsToday();
+        if ($dateCheck instanceof \Illuminate\Http\JsonResponse) {
+            return $dateCheck; // Ensure latest shift is from today
+        }
         $currentGeneralShift = $shiftCheck;
         DB::beginTransaction();
         try {
@@ -1065,6 +1098,10 @@ class PatientController extends Controller
         $shiftCheck = $this->checkShiftIsOpen();
         if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
             return $shiftCheck; // Return error response if shift is closed
+        }
+        $dateCheck = $this->checkLatestShiftDateIsToday();
+        if ($dateCheck instanceof \Illuminate\Http\JsonResponse) {
+            return $dateCheck; // Ensure latest shift is from today
         }
         $currentGeneralShift = $shiftCheck;
 

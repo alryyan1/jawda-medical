@@ -60,12 +60,15 @@ class LabGeneralReport extends MyCustomTCPDF
         $this->SetFont('arial', '', 10);
         $this->SetTextColor(60, 60, 60);
         
+        $startTime = $request->get('start_time', '00:00');
+        $endTime = $request->get('end_time', '23:59');
+
         if ($request->filled('date_from') && $request->filled('date_to')) {
-            $this->Cell(0, 8, 'فترة التقرير: من ' . $request->date_from . ' إلى ' . $request->date_to, 0, 1, 'R');
+            $this->Cell(0, 8, 'فترة التقرير: من ' . $request->date_from . ' ' . $startTime . ' إلى ' . $request->date_to . ' ' . $endTime, 0, 1, 'R');
         } elseif ($request->filled('date_from')) {
-            $this->Cell(0, 8, 'من تاريخ: ' . $request->date_from, 0, 1, 'R');
+            $this->Cell(0, 8, 'من تاريخ: ' . $request->date_from . ' ' . $startTime, 0, 1, 'R');
         } elseif ($request->filled('date_to')) {
-            $this->Cell(0, 8, 'إلى تاريخ: ' . $request->date_to, 0, 1, 'R');
+            $this->Cell(0, 8, 'إلى تاريخ: ' . $request->date_to . ' ' . $endTime, 0, 1, 'R');
         }
 
         // Shift information
@@ -102,7 +105,7 @@ class LabGeneralReport extends MyCustomTCPDF
         $this->SetFont('arial', 'B', 14);
         $this->SetFillColor(70, 130, 180);
         $this->SetTextColor(255, 255, 255);
-        $this->Cell(0, 10, 'ايراد حسب المستخدم', 1, 1, 'C', true);
+        $this->Cell(0, 10, 'ايراد حسب المستخدم', 0, 0, 'C', true);
 
         // headers
         $this->SetFont('arial', 'B', 10);
@@ -118,7 +121,7 @@ class LabGeneralReport extends MyCustomTCPDF
         ];
         $userHeaders = ['اسم المستخدم', 'إجمالي المدفوع', 'إجمالي التخفيض', 'إجمالي كاش', 'إجمالي بنك'];
         for ($i = 0; $i < count($userHeaders); $i++) {
-            $this->Cell($userColWidths[$i], 8, $userHeaders[$i], 1, 0, 'C', false);
+            $this->Cell($userColWidths[$i], 8, $userHeaders[$i], 0, 0, 'C', false);
         }
         $this->Ln();
 
@@ -141,11 +144,11 @@ class LabGeneralReport extends MyCustomTCPDF
                 $this->SetFillColor(255, 255, 255);
             }
 
-            $this->Cell($userColWidths[0], 8, $userRevenue->user_name, 1, 0, 'C', true);
-            $this->Cell($userColWidths[1], 8, number_format($userRevenue->total_paid, 2), 1, 0, 'C', true);
-            $this->Cell($userColWidths[2], 8, number_format($userRevenue->total_discount, 2), 1, 0, 'C', true);
-            $this->Cell($userColWidths[3], 8, number_format($userRevenue->total_cash, 2), 1, 0, 'C', true);
-            $this->Cell($userColWidths[4], 8, number_format($userRevenue->total_bank, 2), 1, 0, 'C', true);
+            $this->Cell($userColWidths[0], 8, $userRevenue->user_name, 0, 0, 'C', true);
+            $this->Cell($userColWidths[1], 8, number_format($userRevenue->total_paid, 2), 0, 0, 'C', true);
+            $this->Cell($userColWidths[2], 8, number_format($userRevenue->total_discount, 2), 0, 0, 'C', true);
+            $this->Cell($userColWidths[3], 8, number_format($userRevenue->total_cash, 2), 0, 0, 'C', true);
+            $this->Cell($userColWidths[4], 8, number_format($userRevenue->total_bank, 2), 0, 0, 'C', true);
             $this->Ln();
         }
 
@@ -154,10 +157,10 @@ class LabGeneralReport extends MyCustomTCPDF
         $this->SetFillColor(188, 188, 188);
         // $this->SetTextColor(255, 255, 255);
         $this->Cell($userColWidths[0], 8, 'الإجمالي', 1, 0, 'C', true);
-        $this->Cell($userColWidths[1], 8, number_format($totalUserPaid, 2), 1, 0, 'C', true);
-        $this->Cell($userColWidths[2], 8, number_format($totalUserDiscount, 2), 1, 0, 'C', true);
-        $this->Cell($userColWidths[3], 8, number_format($totalUserCash, 2), 1, 0, 'C', true);
-        $this->Cell($userColWidths[4], 8, number_format($totalUserBank, 2), 1, 0, 'C', true);
+        $this->Cell($userColWidths[1], 8, number_format($totalUserPaid, 2), 0, 0, 'C', true);
+        $this->Cell($userColWidths[2], 8, number_format($totalUserDiscount, 2), 0, 0, 'C', true);
+        $this->Cell($userColWidths[3], 8, number_format($totalUserCash, 2), 0, 0, 'C', true);
+        $this->Cell($userColWidths[4], 8, number_format($totalUserBank, 2), 0, 0, 'C', true);
         $this->Ln();
     }
 
@@ -166,7 +169,7 @@ class LabGeneralReport extends MyCustomTCPDF
         $this->SetFont('arial', 'B', 14);
         $this->SetFillColor(70, 130, 180);
         $this->SetTextColor(255, 255, 255);
-        $this->Cell(0, 10, 'تفاصيل المرضى', 1, 1, 'C', true);
+        $this->Cell(0, 10, 'تفاصيل المرضى', 0, 1, 'C', true);
         
         $this->SetFont('arial', 'B', 10);
         $this->SetFillColor(255, 255, 255);
@@ -193,7 +196,7 @@ class LabGeneralReport extends MyCustomTCPDF
         }
 
         for ($i = 0; $i < count($headers); $i++) {
-            $this->Cell($colWidths[$i], 10, $headers[$i], 1, 0, 'C', false);
+            $this->Cell($colWidths[$i], 10, $headers[$i], 0, 0, 'C', false);
         }
         $this->Ln();
 
@@ -222,36 +225,36 @@ class LabGeneralReport extends MyCustomTCPDF
                 $this->SetFillColor(255, 248, 220);
             }
 
-            $this->Cell($colWidths[0], 8, $patient->doctorvisit_id, 1, 0, 'C', true);
-            $this->Cell($colWidths[1], 8, $patient->name, 1, 0, 'C', true);
-            $this->Cell($colWidths[2], 8, $patient->doctor_name, 1, 0, 'C', true,'',true);
-            $this->Cell($colWidths[3], 8, number_format($patient->total_lab_amount, 2), 1, 0, 'C', true);
-            $this->Cell($colWidths[4], 8, number_format($patient->total_paid_for_lab, 2), 1, 0, 'C', true);
+            $this->Cell($colWidths[0], 8, $patient->doctorvisit_id, 0, 0, 'C', true);
+            $this->Cell($colWidths[1], 8, $patient->name, 0, 0, 'C', true);
+            $this->Cell($colWidths[2], 8, $patient->doctor_name, 0, 0, 'C', true,'',true);
+            $this->Cell($colWidths[3], 8, number_format($patient->total_lab_amount, 2), 0, 0, 'C', true);
+            $this->Cell($colWidths[4], 8, number_format($patient->total_paid_for_lab, 2), 0, 0, 'C', true);
             if ($hasDiscount) {
                 $this->SetTextColor(255, 140, 0);
             }
-            $this->Cell($colWidths[5], 8, number_format($patient->discount, 2), 1, 0, 'C', true);
+            $this->Cell($colWidths[5], 8, number_format($patient->discount, 2), 0, 0, 'C', true);
             $this->SetTextColor(0, 0, 0);
             if ($patient->total_amount_bank > 0) {
                 $this->SetTextColor(220, 20, 60);
             }
-            $this->Cell($colWidths[6], 8, number_format($patient->total_amount_bank, 2), 1, 0, 'C', true);
+            $this->Cell($colWidths[6], 8, number_format($patient->total_amount_bank, 2), 0, 0, 'C', true);
             $this->SetTextColor(0, 0, 0);
-            $this->Cell($colWidths[7], 8, $patient->company_name ?: '-', 1, 0, 'C', true);
+            $this->Cell($colWidths[7], 8, $patient->company_name ?: '-', 0, 0, 'C', true);
             
             $currentY = $this->GetY();
-            $this->MultiCell($colWidths[8], 8, $patient->main_tests_names, 1, 'C', true);
+            $this->MultiCell($colWidths[8], 8, $patient->main_tests_names, 0, 'C', true);
             $newY = $this->GetY();
             $this->SetXY($this->GetX() + $colWidths[8], $currentY);
 
             if ($newY > $currentY + 8) {
                 $rowHeight = $newY - $currentY;
                 $this->SetXY(15, $currentY);
-                $this->Cell($colWidths[0], $rowHeight, $patient->doctorvisit_id, 1, 0, 'C', true);
-                $this->Cell($colWidths[1], $rowHeight, $patient->name, 1, 0, 'C', true);
-                $this->Cell($colWidths[2], $rowHeight, $patient->doctor_name, 1, 0, 'C', true);
-                $this->Cell($colWidths[3], $rowHeight, number_format($patient->total_lab_amount, 2), 1, 0, 'C', true);
-                $this->Cell($colWidths[4], $rowHeight, number_format($patient->total_paid_for_lab, 2), 1, 0, 'C', true);
+                    $this->Cell($colWidths[0], $rowHeight, $patient->doctorvisit_id, 0, 0, 'C', true);
+                $this->Cell($colWidths[1], $rowHeight, $patient->name, 0, 0, 'C', true);
+                $this->Cell($colWidths[2], $rowHeight, $patient->doctor_name, 0, 0, 'C', true);
+                $this->Cell($colWidths[3], $rowHeight, number_format($patient->total_lab_amount, 2), 0, 0, 'C', true);
+                $this->Cell($colWidths[4], $rowHeight, number_format($patient->total_paid_for_lab, 2), 0, 0, 'C', true);
                 if ($hasDiscount) {
                     $this->SetTextColor(255, 140, 0);
                 }
@@ -274,12 +277,12 @@ class LabGeneralReport extends MyCustomTCPDF
         $this->SetFont('arial', 'B', 10);
         $this->SetFillColor(50, 50, 50);
         $this->SetTextColor(255, 255, 255);
-        $this->Cell($colWidths[0] + $colWidths[1] + $colWidths[2], 10, 'الإجمالي', 1, 0, 'C', true);
-        $this->Cell($colWidths[3], 10, number_format($totalLabAmount, 2), 1, 0, 'C', true);
-        $this->Cell($colWidths[4], 10, number_format($totalPaid, 2), 1, 0, 'C', true);
-        $this->Cell($colWidths[5], 10, number_format($totalDiscount, 2), 1, 0, 'C', true);
-        $this->Cell($colWidths[6], 10, number_format($totalBank, 2), 1, 0, 'C', true);
-        $this->Cell($colWidths[7] + $colWidths[8], 10, '', 1, 0, 'C', true);
+        $this->Cell($colWidths[0] + $colWidths[1] + $colWidths[2], 10, 'الإجمالي', 0, 0, 'C', true);
+        $this->Cell($colWidths[3], 10, number_format($totalLabAmount, 2), 0, 0, 'C', true);
+        $this->Cell($colWidths[4], 10, number_format($totalPaid, 2), 0, 0, 'C', true);
+        $this->Cell($colWidths[5], 10, number_format($totalDiscount, 2), 0, 0, 'C', true);
+        $this->Cell($colWidths[6], 10, number_format($totalBank, 2), 0, 0, 'C', true);
+        $this->Cell($colWidths[7] + $colWidths[8], 10, '', 0, 0, 'C', true);
         $this->Ln();
     }
 
@@ -288,7 +291,7 @@ class LabGeneralReport extends MyCustomTCPDF
         $this->SetFont('arial', 'B', 14);
         $this->SetFillColor(70, 130, 180);
         $this->SetTextColor(255, 255, 255);
-        $this->Cell(0, 10, 'ملخص التقرير', 1, 1, 'C', true);
+        $this->Cell(0, 10, 'ملخص التقرير', 0, 1, 'C', true);
         
         $this->SetFont('arial', '', 11);
         $this->SetTextColor(0, 0, 0);
@@ -312,7 +315,7 @@ class LabGeneralReport extends MyCustomTCPDF
             } else {
                 $this->SetFillColor(255, 255, 255);
             }
-            $this->Cell(0, 8, $item, 1, 1, 'R', true);
+            $this->Cell(0, 8, $item, 0, 0, 'R', true);
         }
     }
 }

@@ -4131,6 +4131,8 @@ class ReportController extends Controller
             'patient_name' => 'nullable|string|max:255',
             'user_id' => 'nullable|integer|exists:users,id',
             'per_page' => 'nullable|integer|min:5|max:100',
+            'start_time' => 'nullable|string|max:255',
+            'end_time' => 'nullable|string|max:255',
         ]);
 
         $query = Patient::query()
@@ -4176,6 +4178,14 @@ class ReportController extends Controller
             $query->where('labrequests.user_requested', $request->user_id);
         }
 
+        // Apply time filters
+        if ($request->filled('start_time')) {
+            $query->whereTime('patients.created_at', '>=', $request->start_time);
+        }
+        if ($request->filled('end_time')) {
+            $query->whereTime('patients.created_at', '<=', $request->end_time);
+        }
+
         // Order by patient name
         $query->orderBy('doctorvisits.id', 'desc');
 
@@ -4212,6 +4222,12 @@ class ReportController extends Controller
         }
         if ($request->filled('user_id')) {
             $userRevenueQuery->where('labrequests.user_requested', $request->user_id);
+        }
+        if ($request->filled('start_time')) {
+            $userRevenueQuery->whereTime('patients.created_at', '>=', $request->start_time);
+        }
+        if ($request->filled('end_time')) {
+            $userRevenueQuery->whereTime('patients.created_at', '<=', $request->end_time);
         }
 
         $userRevenues = $userRevenueQuery->get();

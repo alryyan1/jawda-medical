@@ -27,8 +27,12 @@ class SysmexCbcInserter
             // Map ACON CBC parameters to Sysmex table fields
             $sysmexData = $this->mapCbcToSysmexFields($cbcResults, $doctorVisitId, $patientInfo);
 
+            // Filter to existing columns to avoid unknown column issues
+            $existingColumns = $this->getSysmexExistingColumns();
+            $filtered = array_intersect_key($sysmexData, array_flip($existingColumns));
+
             // Insert into Sysmex table
-            $sysmexResult = SysmexResult::create($sysmexData);
+            $sysmexResult = SysmexResult::create($filtered);
 
             return [
                 'success' => true,
@@ -51,8 +55,9 @@ class SysmexCbcInserter
      */
     public function mapCbcToSysmexFields(array $cbcResults, int $doctorVisitId, array $patientInfo): array
     {
-        $sysmexData = [
+            $sysmexData = [
             'doctorvisit_id' => $doctorVisitId,
+            'flag' => 0,
         ];
 
         // Map CBC parameters to Sysmex fields
@@ -62,6 +67,22 @@ class SysmexCbcInserter
             if (isset($fieldMapping[$parameter])) {
                 $sysmexField = $fieldMapping[$parameter];
                 $sysmexData[$sysmexField] = $result['value'];
+            }
+        }
+
+        // Provide defaults for non-null columns without defaults
+        $defaults = [
+            'mono_p' => 0,
+            'eos_p' => 0,
+            'baso_p' => 0,
+            'mono_abs' => 0,
+            'eso_abs' => 0,
+            'baso_abs' => 0,
+            'MICROR' => 0,
+        ];
+        foreach ($defaults as $k => $v) {
+            if (!isset($sysmexData[$k])) {
+                $sysmexData[$k] = $v;
             }
         }
 
@@ -159,7 +180,9 @@ class SysmexCbcInserter
 
             $updateData['updated_at'] = now();
 
-            // Update the record
+            // Filter to existing columns and update
+            $existingColumns = $this->getSysmexExistingColumns();
+            $updateData = array_intersect_key($updateData, array_flip($existingColumns));
             $sysmexResult->update($updateData);
 
             return [
@@ -292,5 +315,18 @@ class SysmexCbcInserter
     public function getCbcParameterNames(): array
     {
         return array_keys($this->getCbcToSysmexFieldMapping());
+    }
+
+    /**
+     * Get actual existing columns in sysmex table
+     */
+    protected function getSysmexExistingColumns(): array
+    {
+        try {
+            $columns = \Illuminate\Support\Facades\DB::select('SHOW COLUMNS FROM sysmex');
+            return array_map(function ($col) { return $col->Field; }, $columns);
+        } catch (\Exception $e) {
+            return $this->getSysmexFieldNames();
+        }
     }
 }

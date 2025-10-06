@@ -12,6 +12,7 @@ use App\Services\HL7\Devices\BC6800Handler;
 use App\Services\HL7\Devices\ACONHandler;
 use App\Services\HL7\Devices\ZybioHandler;
 use App\Services\HL7\Devices\SysmexCbcInserter;
+use App\Services\HL7\Devices\UritHandler;
 
 class HL7MessageProcessor
 {
@@ -25,6 +26,7 @@ class HL7MessageProcessor
             'BC-6800' => new BC6800Handler(new SysmexCbcInserter()),
             'ACON' => new ACONHandler(),
             'Z3' => new ZybioHandler(new SysmexCbcInserter()),
+            'URIT' => new UritHandler(new SysmexCbcInserter()),
         ];
     }
 

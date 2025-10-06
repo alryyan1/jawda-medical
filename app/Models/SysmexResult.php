@@ -40,6 +40,7 @@ class SysmexResult extends Model
         'pdw',
         'mpv',
         'plcr',
+        'flag',
         
         // BC6800 specific WBC differential parameters
         'bas_c',
@@ -48,6 +49,13 @@ class SysmexResult extends Model
         'eos_p',
         'mon_c',
         'mon_p',
+        // Table columns actually present
+        'mono_p',
+        'baso_p',
+        'mono_abs',
+        'eso_abs',
+        'baso_abs',
+        'MICROR',
         
         // Additional platelet parameters
         'pct',
