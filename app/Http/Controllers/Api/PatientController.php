@@ -410,10 +410,10 @@ class PatientController extends Controller
                     'Jawda Medical' // You can get this from settings
                 );
                 
-                \Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
+                Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
             }
         } catch (\Exception $e) {
-            \Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
+            Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
         }
 
         $responseData = [
@@ -464,7 +464,7 @@ class PatientController extends Controller
             $job = new \App\Jobs\UploadLabResultToFirebase(
                 $patient->id,
                 $doctorVisit->id,
-                'Jawda Medical' // You can get this from settings
+                'alshidwan' // You can get this from settings
             );
             
             $job->handle();
