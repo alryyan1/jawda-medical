@@ -407,7 +407,7 @@ class PatientController extends Controller
                 \App\Jobs\UploadLabResultToFirebase::dispatch(
                     $patient->id,
                     $doctorVisit->id,
-                    'Jawda Medical' // You can get this from settings
+                    'alroomy-shaglaban' // You can get this from settings
                 );
                 
                 Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
@@ -464,7 +464,7 @@ class PatientController extends Controller
             $job = new \App\Jobs\UploadLabResultToFirebase(
                 $patient->id,
                 $doctorVisit->id,
-                'alshidwan' // You can get this from settings
+                'alroomy-shaglaban' // You can get this from settings
             );
             
             $job->handle();
@@ -493,11 +493,27 @@ class PatientController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error uploading to Firebase: ' . $e->getMessage());
+            \Log::error('Error uploading to Firebase: ' . $e->getMessage(), [
+                'patient_id' => $patient->id,
+                'exception' => $e
+            ]);
+            
+            // Return detailed error message to help with debugging
+            $errorMessage = 'Failed to upload to Firebase';
+            if (strpos($e->getMessage(), 'service account file not found') !== false) {
+                $errorMessage = 'Firebase service account not configured. Please contact system administrator.';
+            } elseif (strpos($e->getMessage(), 'Unable to determine the Firebase Project ID') !== false) {
+                $errorMessage = 'Firebase project configuration is missing. Please contact system administrator.';
+            } elseif (strpos($e->getMessage(), 'Permission denied') !== false) {
+                $errorMessage = 'Firebase storage permission denied. Please contact system administrator.';
+            } else {
+                $errorMessage = 'Firebase upload failed: ' . $e->getMessage();
+            }
             
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to upload to Firebase: ' . $e->getMessage()
+                'message' => $errorMessage,
+                'error_details' => $e->getMessage()
             ], 500);
         }
     }
@@ -533,7 +549,7 @@ class PatientController extends Controller
                     \App\Jobs\UploadLabResultToFirebase::dispatch(
                         $patient->id,
                         $doctorVisit->id,
-                        'Jawda Medical'
+                        'alroomy-shaglaban'
                     );
                     \Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
                 }
