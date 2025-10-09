@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\LabResultController;
+use App\Http\Controllers\WebHookController;
 use App\Models\DoctorShift;
 use App\Models\Hl7Message;
 use App\Models\Patient;
@@ -50,7 +51,8 @@ Route::get('/reports/doctor-shifts/test',function(){
     return $doctorShifts;
 });
 Route::get('/reports/companies/pdf', [CompanyReportController::class, 'exportAllCompaniesPdf']);
-
+Route::get('/webhook', [WebHookController::class, 'webhook']);
+Route::post('/webhook', [WebHookController::class, 'webhook']);
 
 // Excel reclaim route for web access
 Route::get('/excel/reclaim', [\App\Http\Controllers\Api\ExcelController::class, 'reclaim']);

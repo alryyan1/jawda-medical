@@ -75,15 +75,34 @@ class LabResultReport
 
         $pdf->AddPage();
         
-        // Add watermark if enabled
-        if ( $settings?->watermark_image != '') {
-            $pdf->SetAlpha(0.2); // Transparency for watermark
-            // Use resize=true and lower DPI for faster rendering and lower memory usage
+        // Add watermark: if the visit has semen analysis, use public/sement-bg.jpeg; otherwise use settings watermark if available
+        $hasSemenAnalysis = $doctorvisit->patientLabRequests
+            ->contains(function ($lr) {
+                return strtolower($lr->mainTest?->main_test_name ?? '') === 'semen_analysis';
+            });
+
+        $watermarkPath = null;
+        if ($hasSemenAnalysis) {
+            $candidate = public_path('sement-bg.jpeg');
+            if (file_exists($candidate)) {
+                $watermarkPath = $candidate;
+            }
+        }
+        if ($watermarkPath === null && !empty($settings?->watermark_image)) {
+            $candidate = $logo_path . '/' . $settings->watermark_image;
+            if (file_exists($candidate)) {
+                $watermarkPath = $candidate;
+            }
+        }
+
+        if ($watermarkPath) {
+            $pdf->SetAlpha(0.85); // Slightly lighter watermark
+            // Fit watermark reasonably in center area
             $pdf->Image(
-                $logo_path . '/' . $settings?->watermark_image,
-                30, 100, 150, 150, '', '', '', true, 150, '', false, false, 0, false, false, false
+                $watermarkPath,
+                15, 90, 180, 160, '', '', '', true, 150, '', false, false, 0, false, false, false
             );
-            $pdf->SetAlpha(1); // Reset transparency
+            $pdf->SetAlpha(1);
         }
 
         // Add logo
@@ -593,7 +612,7 @@ class LabResultReport
         
         // Statistics section follows directly on the same page
         if (isset($groupedResults['STATISTICS'])) {
-            $this->renderStatisticsSection($pdf, $groupedResults['STATISTICS'], $page_width);
+            $this->renderStatisticsSection($pdf, $groupedResults['STATISTICS'], $page_width, true);
         }
     }
     
@@ -881,7 +900,7 @@ class LabResultReport
     /**
      * Render Statistics section with WHO 2021 reference ranges
      */
-    private function renderStatisticsSection($pdf, $results, $page_width): void
+    private function renderStatisticsSection($pdf, $results, $page_width, bool $isSemen = false): void
     {
         // Section header with professional styling
         $pdf->SetFont('arial', 'B', 13, '', true);
@@ -891,7 +910,7 @@ class LabResultReport
         
         $headerHeight = 9;
         $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 2, '1111', 'DF');
-        $pdf->Cell($page_width, $headerHeight, "STATISTICS (WHO 2021 REFERENCE)", 0, 1, 'L', 1);
+        $pdf->Cell($page_width, $headerHeight, "STATISTICS ", 0, 1, 'L', 1);
         
         // Reset colors
         $pdf->SetDrawColor(220, 220, 220);
@@ -904,14 +923,35 @@ class LabResultReport
         $pdf->SetFillColor(41, 98, 255);
         $pdf->SetTextColor(255, 255, 255);
         $pdf->SetDrawColor(41, 98, 255);
-        
-        $paramWidth = $page_width * 0.4;
-        $resultWidth = $page_width * 0.3;
-        $refWidth = $page_width * 0.3;
-        
-        $pdf->Cell($paramWidth, 8, "PARAMETER", 1, 0, 'C', 1);
-        $pdf->Cell($resultWidth, 8, "PATIENT RESULTS", 1, 0, 'C', 1);
-        $pdf->Cell($refWidth, 8, "REFERENCE VALUE", 1, 1, 'C', 1);
+
+        if ($isSemen) {
+            // Multi-row header: PARAMETER | PATIENT RESULTS | REFERENCE VALUE (Lower | Mean | Upper)
+            $paramWidth = $page_width * 0.35;
+            $resultWidth = $page_width * 0.20;
+            $refHeaderWidth = $page_width * 0.45;
+            $subRef = $refHeaderWidth / 3;
+
+            // First header row
+            $pdf->Cell($paramWidth, 8, "PARAMETER", 1, 0, 'C', 1);
+            $pdf->Cell($resultWidth, 8, "PATIENT RESULTS", 1, 0, 'C', 1);
+            $pdf->Cell($refHeaderWidth, 8, "REFERENCE VALUE", 1, 1, 'C', 1);
+
+            // Second header row for refs
+            $pdf->SetFont('arial', 'B', 8, '', true);
+            $pdf->Cell($paramWidth, 7, "", 1, 0, 'C', 1);
+            $pdf->Cell($resultWidth, 7, "", 1, 0, 'C', 1);
+            $pdf->Cell($subRef, 7, "LOWER", 1, 0, 'C', 1);
+            $pdf->Cell($subRef, 7, "MEAN", 1, 0, 'C', 1);
+            $pdf->Cell($subRef, 7, "UPPER", 1, 1, 'C', 1);
+        } else {
+            $paramWidth = $page_width * 0.4;
+            $resultWidth = $page_width * 0.3;
+            $refWidth = $page_width * 0.3;
+
+            $pdf->Cell($paramWidth, 8, "PARAMETER", 1, 0, 'C', 1);
+            $pdf->Cell($resultWidth, 8, "PATIENT RESULTS", 1, 0, 'C', 1);
+            $pdf->Cell($refWidth, 8, "REFERENCE VALUE", 1, 1, 'C', 1);
+        }
         
         // Reset for table rows
         $pdf->SetTextColor(0, 0, 0);
@@ -937,11 +977,29 @@ class LabResultReport
                 $displayResult = $result->result . '%';
             }
             
-            $pdf->Cell($paramWidth, 7, $child_test->child_test_name, 1, 0, 'L', 1);
-            $pdf->SetFont('arial', 'B', 9, '', true);
-            $pdf->Cell($resultWidth, 7, $displayResult, 1, 0, 'C', 1);
-            $pdf->SetFont('arial', '', 9, '', true);
-            $pdf->Cell($refWidth, 7, $normal_range, 1, 1, 'C', 1);
+            if ($isSemen) {
+                $pdf->Cell($paramWidth, 7, $child_test->child_test_name, 1, 0, 'L', 1);
+                $pdf->SetFont('arial', 'B', 9, '', true);
+                $pdf->Cell($resultWidth, 7, $displayResult, 1, 0, 'C', 1);
+                $pdf->SetFont('arial', '', 9, '', true);
+                $lower = $child_test->lower_limit ?? '';
+                $mean = $child_test->mean ?? '';
+                $upper = $child_test->upper_limit ?? '';
+                if ($lower !== '' || $mean !== '' || $upper !== '') {
+                    $pdf->Cell($subRef, 7, $lower, 1, 0, 'C', 1);
+                    $pdf->Cell($subRef, 7, $mean, 1, 0, 'C', 1);
+                    $pdf->Cell($subRef, 7, $upper, 1, 1, 'C', 1);
+                } else {
+                    // If no discrete limits, span the whole reference area with normalRange
+                    $pdf->Cell($refHeaderWidth, 7, $normal_range, 1, 1, 'C', 1);
+                }
+            } else {
+                $pdf->Cell($paramWidth, 7, $child_test->child_test_name, 1, 0, 'L', 1);
+                $pdf->SetFont('arial', 'B', 9, '', true);
+                $pdf->Cell($resultWidth, 7, $displayResult, 1, 0, 'C', 1);
+                $pdf->SetFont('arial', '', 9, '', true);
+                $pdf->Cell($refWidth, 7, $normal_range, 1, 1, 'C', 1);
+            }
             
             $isEvenRow = !$isEvenRow;
         }

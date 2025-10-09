@@ -1,9 +1,0 @@
-﻿id	bigint(20) unsigned	NO	NULL
-lab_request_id	bigint(20) unsigned	NO	NULL
-patient_id	bigint(20) unsigned	NO	NULL
-main_test_id	bigint(20) unsigned	NO	NULL
-child_test_id	bigint(20) unsigned	NO	NULL
-result	text	NO	''
-normal_range	text	NO	NULL
-created_at	timestamp	YES	NULL
-updated_at	timestamp	YES	NULL

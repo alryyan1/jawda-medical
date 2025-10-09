@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AnalysisController;
+use App\Http\Controllers\WebHookController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AttendanceReportController;
 use App\Http\Controllers\Api\AttendanceSettingController;
@@ -656,3 +657,7 @@ Route::get('/lab-requests/visit/{visit}/thermal-receipt-pdf', [LabRequestControl
 // Firestore update endpoints
 Route::post('/firestore/update-document', [App\Http\Controllers\Api\FirestoreController::class, 'updateFirestoreDocument'])->middleware('auth:sanctum');
 Route::post('/firestore/update-patient-pdf', [App\Http\Controllers\Api\FirestoreController::class, 'updatePatientPdf']);
+
+// Webhook endpoints (no CSRF protection needed)
+Route::get('/webhook', [WebHookController::class, 'webhook']);
+Route::post('/webhook', [WebHookController::class, 'webhook']);
