@@ -138,6 +138,9 @@ class Setting extends Model
         'report_header_vatin',
         'report_header_cr',
         'default_lab_report_template',
+        'send_sms_after_auth',
+        'send_whatsapp_after_auth',
+        'watermark_image',
     ];
 
     protected $casts = [
@@ -158,6 +161,9 @@ class Setting extends Model
         'financial_year_end' => 'date',
         'default_lab_report_template' => 'string',
         'welcome_sms' => 'boolean',
+        'send_sms_after_auth' => 'boolean',
+        'send_whatsapp_after_auth' => 'boolean',
+        'watermark_image' => 'string',
     ];
 
     // Helper to always get the first (and only) settings record

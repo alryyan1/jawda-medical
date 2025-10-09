@@ -35,6 +35,8 @@ use Illuminate\Support\Facades\Http as HttpClient;
 use App\Jobs\EmitPatientRegisteredJob;
 use App\Jobs\SendWelcomeSmsJob;
 use App\Models\Setting;
+use App\Services\UltramsgService;
+use App\Jobs\SendAuthWhatsappMessage;
 
 class PatientController extends Controller
 {
@@ -420,6 +422,9 @@ class PatientController extends Controller
             'message' => "Patient results have been successfully authenticated. Upload to cloud storage has been queued.",
             'data' => new  PatientLabQueueItemResource($patient->doctorVisit)
         ];
+
+        // Queue WhatsApp message job (respects settings flag internally)
+        SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
 
         return response()->json($responseData);
     }

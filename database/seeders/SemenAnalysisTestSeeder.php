@@ -34,10 +34,10 @@ class SemenAnalysisTestSeeder extends Seeder
         // Create the main test
         $mainTest = MainTest::create([
             'main_test_name' => 'semen_analysis',
-            'pack_id' => null,
+            'pack_id' => 1,
             'pageBreak' => false,
             'container_id' => $container->id,
-            'price' => null,
+            'price' => 0,
             'divided' => true,
             'available' => true,
             'is_special_test' => true,
@@ -61,50 +61,84 @@ class SemenAnalysisTestSeeder extends Seeder
             $this->command->info("Created/found child group: {$groupName} (ID: {$group->id})");
         }
 
-        // Define child tests for each group
+        // Define child tests for each group with reference values
+        // Format: 'test_name' => ['normalRange' => 'text', 'lower_limit' => float, 'mean' => float, 'upper_limit' => float]
         $childTests = [
             'PERSONAL INFORMATION' => [
-                'Ejaculate:',
-                'Collection method:',
-                'Collection site:',
-                'Collection time',
-                'Difficulties in collection:',
-                'Complete sample:',
-                'Abstinence days:'
+                'Ejaculate:' => ['normalRange' => ''],
+                'Collection method:' => ['normalRange' => ''],
+                'Collection site:' => ['normalRange' => ''],
+                'Collection time' => ['normalRange' => ''],
+                'Difficulties in collection:' => ['normalRange' => ''],
+                'Complete sample:' => ['normalRange' => ''],
+                'Abstinence days:' => ['normalRange' => '']
             ],
             'PHYSICO – CHEMICAL PROPERTIES' => [
-                'Volume (ml)',
-                'Appearance',
-                'Viscosity',
-                'Liquefaction',
-                'PH',
-                'Semen fructose',
-                'Post- ejaculatory urine analysis'
+                'Volume (ml)' => ['normalRange' => '1.4'],
+                'Appearance' => ['normalRange' => 'Clear – Gray – Milky'],
+                'Viscosity' => ['normalRange' => '15-30 minutes'],
+                'Liquefaction' => ['normalRange' => 'normal'],
+                'PH' => ['normalRange' => '7.00 – 7.8'],
+                'Semen fructose' => ['normalRange' => 'Present'],
+                'Post- ejaculatory urine analysis' => ['normalRange' => 'NIL']
             ],
             'MORPHOLOGY' => [
-                'Total counted as normal morphology',
-                'Normal morphology %',
-                'Total counted as abnormal sperm',
-                'Abnormal morphology %',
-                'Head',
-                'Midpiece',
-                'Principal piece',
-                'Residual cytoplasm',
-                'Total examined sperms',
-                'TZI (Terato-Zoospermic Index)',
-                'TZI calculation note',
-                'Normal TZI value: > 1.6'
+                'Total counted as normal morphology' => ['normalRange' => ''],
+                'Normal morphology %' => ['normalRange' => ''],
+                'Total counted as abnormal sperm' => ['normalRange' => ''],
+                'Abnormal morphology %' => ['normalRange' => ''],
+                'Head' => ['normalRange' => ''],
+                'Midpiece' => ['normalRange' => ''],
+                'Principal piece' => ['normalRange' => ''],
+                'Residual cytoplasm' => ['normalRange' => ''],
+                'Total examined sperms' => ['normalRange' => ''],
+                'TZI (Terato-Zoospermic Index)' => ['normalRange' => ''],
+                'TZI calculation note' => ['normalRange' => ''],
+                'Normal TZI value: > 1.6' => ['normalRange' => '']
             ],
             'STATISTICS' => [
-                'Total sperm number (x106  / ejaculate )',
-                'Sperm concentration / ml',
-                'Motility / PR+ NP (grades A ,B,C)',
-                'Rapidly progressive PR (grade A)',
-                'Slow progressive PR (grade B)',
-                'NP-Sluggish (grade C)',
-                'Immotile (grade D)',
-                'Vitality',
-                'WBCs'
+                'Total sperm number (x106  / ejaculate )' => [
+                    'normalRange' => '',
+                    'lower_limit' => 39,
+                    'mean' => 66,
+                    'upper_limit' => 208
+                ],
+                'Sperm concentration / ml' => [
+                    'normalRange' => '',
+                    'lower_limit' => 16,
+                    'mean' => 210,
+                    'upper_limit' => 561
+                ],
+                'Motility / PR+ NP (grades A ,B,C)' => [
+                    'normalRange' => '',
+                    'lower_limit' => 42,
+                    'mean' => 64,
+                    'upper_limit' => 90
+                ],
+                'Rapidly progressive PR (grade A)' => [
+                    'normalRange' => '',
+                    'lower_limit' => 30,
+                    'mean' => 55,
+                    'upper_limit' => 77
+                ],
+                'Slow progressive PR (grade B)' => [
+                    'normalRange' => ''
+                ],
+                'NP-Sluggish (grade C)' => [
+                    'normalRange' => '1 (1-1)'
+                ],
+                'Immotile (grade D)' => [
+                    'normalRange' => '20 (19-20)'
+                ],
+                'Vitality' => [
+                    'normalRange' => '',
+                    'lower_limit' => 54,
+                    'mean' => 78,
+                    'upper_limit' => 97
+                ],
+                'WBCs' => [
+                    'normalRange' => '< 1'
+                ]
             ]
         ];
 
@@ -115,7 +149,13 @@ class SemenAnalysisTestSeeder extends Seeder
             $groupId = $groupIds[$groupName];
             $this->command->info("Creating tests for group: {$groupName}");
             
-            foreach ($tests as $testName) {
+            foreach ($tests as $testName => $testData) {
+                // Extract data from the array
+                $normalRange = $testData['normalRange'] ?? '';
+                $lowerLimit = $testData['lower_limit'] ?? null;
+                $mean = $testData['mean'] ?? null;
+                $upperLimit = $testData['upper_limit'] ?? null;
+                
                 // Check if test already exists for this main test
                 $existingTest = ChildTest::where('main_test_id', $mainTest->id)
                     ->where('child_test_name', $testName)
@@ -127,13 +167,43 @@ class SemenAnalysisTestSeeder extends Seeder
                         'child_test_name' => $testName,
                         'child_group_id' => $groupId,
                         'test_order' => $testOrder++,
-                        'normalRange' => '',
+                        'normalRange' => $normalRange,
+                        'lower_limit' => $lowerLimit,
+                        'mean' => $mean,
+                        'upper_limit' => $upperLimit,
                         'defval' => '',
                     ]);
-                    $this->command->info("  Created: {$testName} (ID: {$childTest->id})");
+                    
+                    $limitsInfo = '';
+                    if ($lowerLimit !== null || $mean !== null || $upperLimit !== null) {
+                        $limitsInfo = " [Lower: {$lowerLimit}, Mean: {$mean}, Upper: {$upperLimit}]";
+                    }
+                    
+                    $this->command->info("  Created: {$testName} - Reference: {$normalRange}{$limitsInfo}");
                     $totalTests++;
                 } else {
-                    $this->command->info("  Already exists: {$testName}");
+                    // Update existing test with new values
+                    $updateData = [];
+                    
+                    if (empty($existingTest->normalRange) && !empty($normalRange)) {
+                        $updateData['normalRange'] = $normalRange;
+                    }
+                    if ($lowerLimit !== null) {
+                        $updateData['lower_limit'] = $lowerLimit;
+                    }
+                    if ($mean !== null) {
+                        $updateData['mean'] = $mean;
+                    }
+                    if ($upperLimit !== null) {
+                        $updateData['upper_limit'] = $upperLimit;
+                    }
+                    
+                    if (!empty($updateData)) {
+                        $existingTest->update($updateData);
+                        $this->command->info("  Updated: {$testName}");
+                    } else {
+                        $this->command->info("  Already exists: {$testName}");
+                    }
                 }
             }
         }

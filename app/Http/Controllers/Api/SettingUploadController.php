@@ -14,7 +14,7 @@ class SettingUploadController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:5120',
-            'field' => 'required|string|in:header_base64,footer_base64',
+            'field' => 'required|string|in:header_base64,footer_base64,watermark_image',
         ]);
 
         $file = $request->file('file');

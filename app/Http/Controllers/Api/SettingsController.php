@@ -134,6 +134,9 @@ class SettingsController extends Controller
             'report_header_vatin' => 'nullable|string|max:50',
             'report_header_cr' => 'nullable|string|max:50',
             'report_header_logo_file' => 'nullable|image|mimes:png,jpg,jpeg|max:1024', // For upload
+            'send_sms_after_auth' => 'sometimes|boolean',
+            'send_whatsapp_after_auth' => 'sometimes|boolean',
+            'watermark_image' => 'nullable|string',
         ]);
         
         $updateData = $request->except(['logo_file', 'header_image_file', 'footer_image_file', 'auditor_stamp_file', 'manager_stamp_file',  'report_header_logo_file']);
@@ -145,6 +148,7 @@ class SettingsController extends Controller
             // 'footer_image_file' => 'footer_image_path',
             'auditor_stamp_file' => 'auditor_stamp',
             'manager_stamp_file' => 'manager_stamp',
+            'watermark_image' => 'watermark_image',
         ];
 
         foreach($fileFields as $requestField => $dbField) {

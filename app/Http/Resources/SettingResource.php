@@ -65,6 +65,9 @@ class SettingResource extends JsonResource
             'report_header_email' => $this->report_header_email,
             'report_header_vatin' => $this->report_header_vatin,
             'report_header_cr' => $this->report_header_cr,
+            'send_sms_after_auth' => (bool) $this->send_sms_after_auth,
+            'send_whatsapp_after_auth' => (bool) $this->send_whatsapp_after_auth,
+            'watermark_image' => $this->watermark_image,
 
             // Eager load related finance accounts if needed for display
             // 'default_finance_account_details' => new FinanceAccountResource($this->whenLoaded('defaultFinanceAccount')),
