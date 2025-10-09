@@ -48,6 +48,9 @@ class ChildTest extends Model
         'child_test_name',
         'low',
         'upper',
+        'lower_limit',
+        'mean',
+        'upper_limit',
         'defval',
         'unit_id',
         'normalRange', // Stored as text
@@ -61,6 +64,9 @@ class ChildTest extends Model
     protected $casts = [
         'low' => 'float', // Or decimal if you used that in migration
         'upper' => 'float',
+        'lower_limit' => 'float',
+        'mean' => 'float',
+        'upper_limit' => 'float',
         'max' => 'decimal:2',
         'lowest' => 'decimal:2',
         'test_order' => 'integer',

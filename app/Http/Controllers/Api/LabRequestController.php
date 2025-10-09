@@ -1030,6 +1030,7 @@ class LabRequestController extends Controller
 
         // Transform into the MainTestWithChildrenResults structure
         $mainTestWithChildrenResults = [
+            'is_special_test' => $labrequest->mainTest->is_special_test,
             'lab_request_id' => $labrequest->id,
             'main_test_id' => $labrequest->mainTest->id,
             'main_test_name' => $labrequest->mainTest->main_test_name,

@@ -201,6 +201,7 @@ class LabResultReport
      */
     private function renderLabResults($pdf, $patient, $settings, $page_width): void
     {
+        // dd($patient->labrequests);
         $pdf->SetFillColor(240, 240, 240);
         $page_height = $pdf->getPageHeight() - PDF_MARGIN_TOP;
         $pdf->SetFont('aealarabiya', '', 10, '', true);
@@ -209,6 +210,7 @@ class LabResultReport
         $pdf->SetFont('arial', '', 10, '', true);
         
         foreach ($mypakages as $package) {
+            // dd($package);
             $this->renderPackageResults($pdf, $patient, $package, $page_width, $page_height);
         }
     }
@@ -219,6 +221,7 @@ class LabResultReport
     private function renderPackageResults($pdf, $patient, $package, $page_width, $page_height): void
     {
         $show_headers = true;
+        // dd($patient->labrequests);
         $main_test_array = $patient->labrequests->filter(function ($item) use ($package) {
             return $item->mainTest->pack_id == $package->package_id;
         });
@@ -226,7 +229,7 @@ class LabResultReport
 
         foreach ($main_test_array as $m_test) {
             $count++;
-
+            // dd($m_test);
             if ($m_test->hidden == 0) continue;
             
             $children_count = count($m_test->results);
@@ -301,6 +304,7 @@ class LabResultReport
             if ($has_more_than1_child) {
                 $this->renderMainTestHeader($pdf, $m_test, $table_col_widht, $page_width);
             }
+            // dd($m_test);
 
             $this->renderTestResults($pdf, $m_test, $table_col_widht, $page_width, $is_columns, $column_width ?? 0);
             $pdf->resetColumns();
@@ -338,6 +342,13 @@ class LabResultReport
      */
     private function renderTestResults($pdf, $m_test, $table_col_widht, $page_width, $is_columns, $column_width): void
     {
+        // Check if this is a special test (like semen analysis)
+        if ($m_test->mainTest->is_special_test) {
+            $this->renderSpecialTestResults($pdf, $m_test, $table_col_widht, $page_width);
+            return;
+        }
+
+        // Original logic for regular tests
         $old = '';
         $index_to_start_new_column = 0;
         $children_count_with_result_empty = 0;
@@ -448,6 +459,558 @@ class LabResultReport
                 }
             }
         }
+    }
+
+    /**
+     * Render special test results with grouped layout (e.g., semen analysis)
+     */
+    private function renderSpecialTestResults($pdf, $m_test, $table_col_widht, $page_width): void
+    {
+        // Check if this is semen analysis for specific formatting
+        $isSemenAnalysis = strtolower($m_test->mainTest->main_test_name) === 'semen_analysis';
+        
+        if ($isSemenAnalysis) {
+            $this->renderSemenAnalysisMultiPage($pdf, $m_test, $page_width);
+        } else {
+            // Original logic for other special tests
+            $this->renderGenericSpecialTest($pdf, $m_test, $page_width);
+        }
+    }
+    
+    /**
+     * Render semen analysis with multi-page layout
+     */
+    private function renderSemenAnalysisMultiPage($pdf, $m_test, $page_width): void
+    {
+        // Group results by child group
+        $groupedResults = [];
+        foreach ($m_test->results as $result) {
+            if ($result->result == '' || $result->result == 'no sample') {
+                continue;
+            }
+            
+            $child_test = $result->childTest;
+            if ($child_test == null) continue;
+            
+            $groupName = $child_test->childGroup?->name ?? 'Other';
+            if (!isset($groupedResults[$groupName])) {
+                $groupedResults[$groupName] = [];
+            }
+            $groupedResults[$groupName][] = $result;
+        }
+        
+        if (empty($groupedResults)) {
+            return;
+        }
+        
+        // PAGE 1: Personal Information + Statistics (no AddPage - starts on current page)
+        $this->renderSemenAnalysisPage1($pdf, $groupedResults, $page_width);
+        
+        // PAGE 2: Physico-Chemical Properties + Morphology
+        $this->renderSemenAnalysisPage2($pdf, $groupedResults, $page_width);
+        
+        // PAGE 3: Image only
+        $this->renderSemenAnalysisPage3($pdf, $groupedResults, $page_width);
+    }
+    
+    /**
+     * Render generic special test (non-semen analysis)
+     */
+    private function renderGenericSpecialTest($pdf, $m_test, $page_width): void
+    {
+        // Group results by child group
+        $groupedResults = [];
+        foreach ($m_test->results as $result) {
+            if ($result->result == '' || $result->result == 'no sample') {
+                continue;
+            }
+            
+            $child_test = $result->childTest;
+            if ($child_test == null) continue;
+            
+            $groupName = $child_test->childGroup?->name ?? 'Other';
+            if (!isset($groupedResults[$groupName])) {
+                $groupedResults[$groupName] = [];
+            }
+            $groupedResults[$groupName][] = $result;
+        }
+        
+        if (empty($groupedResults)) {
+            return;
+        }
+        
+        // Render each group as a separate section
+        foreach ($groupedResults as $groupName => $results) {
+            $this->renderSpecialTestGroup($pdf, $groupName, $results, $page_width, false);
+        }
+    }
+    
+    /**
+     * PAGE 1: Personal Information + Statistics (no AddPage - starts on current page)
+     */
+    private function renderSemenAnalysisPage1($pdf, $groupedResults, $page_width): void
+    {
+        // Main header
+        $pdf->SetFont('arial', 'B', 18, '', true);
+        $pdf->SetFillColor(240, 248, 255);
+        $pdf->SetDrawColor(100, 150, 200);
+        $pdf->SetTextColor(30, 60, 120);
+        
+        $headerHeight = 12;
+        $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 5, '1111');
+        $pdf->Cell($page_width, $headerHeight, "GENERAL SEMEN ANALYSIS", 1, 1, 'C', 1);
+        
+        // Reset colors
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetTextColor(0, 0, 0);
+        
+        $this->addVerticalSpacing($pdf, $this->sectionSpacing);
+        
+        // Personal Information section
+        if (isset($groupedResults['PERSONAL INFORMATION'])) {
+            $this->renderPersonalInformationSection($pdf, $groupedResults['PERSONAL INFORMATION'], $page_width);
+        }
+        
+        // Statistics section follows directly on the same page
+        if (isset($groupedResults['STATISTICS'])) {
+            $this->renderStatisticsSection($pdf, $groupedResults['STATISTICS'], $page_width);
+        }
+    }
+    
+    /**
+     * PAGE 2: Physico-Chemical Properties + Morphology
+     */
+    private function renderSemenAnalysisPage2($pdf, $groupedResults, $page_width): void
+    {
+        $pdf->AddPage();
+        
+        // Physico-Chemical Properties section
+        if (isset($groupedResults['PHYSICO – CHEMICAL PROPERTIES'])) {
+            $this->renderPhysicoChemicalSection($pdf, $groupedResults['PHYSICO – CHEMICAL PROPERTIES'], $page_width);
+        }
+        
+        // Morphology section follows directly on the same page
+        if (isset($groupedResults['MORPHOLOGY'])) {
+            $this->renderMorphologySection($pdf, $groupedResults['MORPHOLOGY'], $page_width);
+        }
+    }
+    
+    /**
+     * PAGE 3: Image only
+     */
+    private function renderSemenAnalysisPage3($pdf, $groupedResults, $page_width): void
+    {
+        $pdf->AddPage();
+        
+        // Add semen.png image at the beginning of the page
+        $imagePath = public_path('semen.png');
+        if (file_exists($imagePath)) {
+            // Get image dimensions
+            $imageInfo = getimagesize($imagePath);
+            $imageWidth = $imageInfo[0];
+            $imageHeight = $imageInfo[1];
+            
+            // Calculate scaling to fit page width
+            $maxWidth = $page_width * 0.8; // 80% of page width
+            $scale = min($maxWidth / $imageWidth, 1);
+            $displayWidth = $imageWidth * $scale;
+            $displayHeight = $imageHeight * $scale;
+            
+            // Position image at the beginning of the page (not centered)
+            $x = PDF_MARGIN_LEFT;
+            $y = $pdf->GetY() + 10;
+            
+            $pdf->Image($imagePath, $x, $y, $displayWidth, $displayHeight);
+        }
+    }
+    
+    
+    
+    /**
+     * Render Personal Information section (like the image layout)
+     */
+    private function renderPersonalInformationSection($pdf, $results, $page_width): void
+    {
+        // Section header - start at beginning of page
+        $pdf->SetFont('arial', 'B', 14, '', true);
+        $pdf->SetFillColor(255, 240, 245); // Light pink
+        $pdf->SetDrawColor(200, 180, 190);
+        $pdf->SetTextColor(60, 40, 50);
+        
+        $headerHeight = 8;
+        $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 3, '1111');
+        $pdf->Cell($page_width, $headerHeight, "PERSONAL INFORMATION", 1, 1, 'C', 1);
+        
+        // Reset colors
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetTextColor(0, 0, 0);
+        
+        $this->addVerticalSpacing($pdf, $this->smallSpacing);
+        
+        // Create a 2-column layout for personal information
+        $colWidth = $page_width / 2;
+        $rowHeight = 6;
+        
+        $pdf->SetFont('arial', '', 10, '', true);
+        
+        // Group results into pairs for 2-column layout
+        $pairs = array_chunk($results, 2);
+        
+        foreach ($pairs as $pair) {
+            $y = $pdf->GetY();
+            
+            // Left column
+            if (isset($pair[0])) {
+                $result = $pair[0];
+                $child_test = $result->childTest;
+                $pdf->Cell($colWidth, $rowHeight, $child_test->child_test_name . ': ' . $result->result, 1, 0, 'L');
+            } else {
+                $pdf->Cell($colWidth, $rowHeight, '', 1, 0, 'L');
+            }
+            
+            // Right column
+            if (isset($pair[1])) {
+                $result = $pair[1];
+                $child_test = $result->childTest;
+                $pdf->Cell($colWidth, $rowHeight, $child_test->child_test_name . ': ' . $result->result, 1, 1, 'L');
+            } else {
+                $pdf->Cell($colWidth, $rowHeight, '', 1, 1, 'L');
+            }
+        }
+        
+        $this->addVerticalSpacing($pdf, $this->sectionSpacing);
+    }
+    
+    /**
+     * Render Physico-Chemical Properties section (like the image layout)
+     */
+    private function renderPhysicoChemicalSection($pdf, $results, $page_width): void
+    {
+        // Section header - start at beginning of page
+        $pdf->SetFont('arial', 'B', 14, '', true);
+        $pdf->SetFillColor(240, 255, 240); // Light green
+        $pdf->SetDrawColor(180, 200, 180);
+        $pdf->SetTextColor(40, 60, 40);
+        
+        $headerHeight = 8;
+        $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 3, '1111');
+        $pdf->Cell($page_width, $headerHeight, "PHYSICO – CHEMICAL PROPERTIES", 1, 1, 'C', 1);
+        
+        // Reset colors
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetTextColor(0, 0, 0);
+        
+        $this->addVerticalSpacing($pdf, $this->smallSpacing);
+        
+        // Table header
+        $pdf->SetFont('arial', 'B', 10, '', true);
+        $pdf->SetFillColor(245, 247, 250);
+        $pdf->SetDrawColor(200, 205, 210);
+        
+        $paramWidth = $page_width * 0.4;
+        $resultWidth = $page_width * 0.3;
+        $refWidth = $page_width * 0.3;
+        
+        $pdf->Cell($paramWidth, 6, "PARAMETER", 1, 0, 'C', 1);
+        $pdf->Cell($resultWidth, 6, "PATIENT RESULTS", 1, 0, 'C', 1);
+        $pdf->Cell($refWidth, 6, "REFERENCE VALUE", 1, 1, 'C', 1);
+        
+        // Table rows
+        $pdf->SetFont('arial', '', 9, '', true);
+        foreach ($results as $result) {
+            $child_test = $result->childTest;
+            $normal_range = $result->normal_range ?? '';
+            
+            $pdf->Cell($paramWidth, 5, $child_test->child_test_name, 1, 0, 'L');
+            $pdf->Cell($resultWidth, 5, $result->result, 1, 0, 'C');
+            $pdf->Cell($refWidth, 5, $normal_range, 1, 1, 'C');
+        }
+        
+        $this->addVerticalSpacing($pdf, $this->sectionSpacing);
+    }
+    
+    /**
+     * Render Morphology section
+     */
+    private function renderMorphologySection($pdf, $results, $page_width): void
+    {
+        // Section header - start at beginning of page
+        $pdf->SetFont('arial', 'B', 14, '', true);
+        $pdf->SetFillColor(255, 248, 220); // Light yellow
+        $pdf->SetDrawColor(200, 190, 150);
+        $pdf->SetTextColor(60, 50, 30);
+        
+        $headerHeight = 8;
+        $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 3, '1111');
+        $pdf->Cell($page_width, $headerHeight, "MORPHOLOGY", 1, 1, 'C', 1);
+        
+        // Reset colors
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetTextColor(0, 0, 0);
+        
+        $this->addVerticalSpacing($pdf, $this->smallSpacing);
+        
+        // Table header
+        $pdf->SetFont('arial', 'B', 10, '', true);
+        $pdf->SetFillColor(245, 247, 250);
+        $pdf->SetDrawColor(200, 205, 210);
+        
+        $paramWidth = $page_width * 0.4;
+        $resultWidth = $page_width * 0.3;
+        $refWidth = $page_width * 0.3;
+        
+        $pdf->Cell($paramWidth, 6, "PARAMETER", 1, 0, 'C', 1);
+        $pdf->Cell($resultWidth, 6, "PATIENT RESULTS", 1, 0, 'C', 1);
+        $pdf->Cell($refWidth, 6, "REFERENCE VALUE", 1, 1, 'C', 1);
+        
+        // Table rows
+        $pdf->SetFont('arial', '', 9, '', true);
+        foreach ($results as $result) {
+            $child_test = $result->childTest;
+            $normal_range = $result->normal_range ?? '';
+            
+            // Special formatting for percentage results
+            $displayResult = $result->result;
+            if ($this->isPercentageResult($child_test->child_test_name)) {
+                $displayResult = $result->result . '%';
+                $pdf->SetFont('arial', 'B', 9, '', true);
+            } else {
+                $pdf->SetFont('arial', '', 9, '', true);
+            }
+            
+            $pdf->Cell($paramWidth, 5, $child_test->child_test_name, 1, 0, 'L');
+            $pdf->Cell($resultWidth, 5, $displayResult, 1, 0, 'C');
+            $pdf->Cell($refWidth, 5, $normal_range, 1, 1, 'C');
+        }
+        
+        $this->addVerticalSpacing($pdf, $this->sectionSpacing);
+    }
+    
+    /**
+     * Render Statistics section
+     */
+    private function renderStatisticsSection($pdf, $results, $page_width): void
+    {
+        // Section header - start at beginning of page
+        $pdf->SetFont('arial', 'B', 14, '', true);
+        $pdf->SetFillColor(240, 248, 255); // Light blue
+        $pdf->SetDrawColor(180, 190, 200);
+        $pdf->SetTextColor(40, 50, 60);
+        
+        $headerHeight = 8;
+        $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 3, '1111');
+        $pdf->Cell($page_width, $headerHeight, "STATISTICS", 1, 1, 'C', 1);
+        
+        // Reset colors
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetTextColor(0, 0, 0);
+        
+        $this->addVerticalSpacing($pdf, $this->smallSpacing);
+        
+        // Table header
+        $pdf->SetFont('arial', 'B', 10, '', true);
+        $pdf->SetFillColor(245, 247, 250);
+        $pdf->SetDrawColor(200, 205, 210);
+        
+        $paramWidth = $page_width * 0.4;
+        $resultWidth = $page_width * 0.3;
+        $refWidth = $page_width * 0.3;
+        
+        $pdf->Cell($paramWidth, 6, "PARAMETER", 1, 0, 'C', 1);
+        $pdf->Cell($resultWidth, 6, "PATIENT RESULTS", 1, 0, 'C', 1);
+        $pdf->Cell($refWidth, 6, "REFERENCE VALUE", 1, 1, 'C', 1);
+        
+        // Table rows
+        $pdf->SetFont('arial', '', 9, '', true);
+        foreach ($results as $result) {
+            $child_test = $result->childTest;
+            $normal_range = $result->normal_range ?? '';
+            
+            // Special formatting for percentage results
+            $displayResult = $result->result;
+            if ($this->isPercentageResult($child_test->child_test_name)) {
+                $displayResult = $result->result . '%';
+                $pdf->SetFont('arial', 'B', 9, '', true);
+            } else {
+                $pdf->SetFont('arial', '', 9, '', true);
+            }
+            
+            $pdf->Cell($paramWidth, 5, $child_test->child_test_name, 1, 0, 'L');
+            $pdf->Cell($resultWidth, 5, $displayResult, 1, 0, 'C');
+            $pdf->Cell($refWidth, 5, $normal_range, 1, 1, 'C');
+        }
+        
+        $this->addVerticalSpacing($pdf, $this->sectionSpacing);
+    }
+
+    /**
+     * Render a single group within a special test
+     */
+    private function renderSpecialTestGroup($pdf, $groupName, $results, $page_width, $isSemenAnalysis = false): void
+    {
+        // Special styling for semen analysis groups
+        if ($isSemenAnalysis) {
+            $this->renderSemenAnalysisGroupHeader($pdf, $groupName, $page_width);
+        } else {
+            // Standard group header styling
+            $pdf->SetFont('arial', 'B', 14, '', true);
+            $pdf->SetFillColor(230, 235, 240); // Light blue background
+            $pdf->SetDrawColor(180, 190, 200); // Border color
+            $pdf->SetTextColor(50, 60, 70); // Dark text
+            
+            $headerHeight = 8;
+            $this->ensureSpaceFor($pdf, $headerHeight + $this->smallSpacing);
+            
+            $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 3, '1111');
+            $pdf->Cell($page_width, $headerHeight, $groupName, 1, 1, 'C', 1);
+            
+            // Reset colors
+            $pdf->SetFillColor(255, 255, 255);
+            $pdf->SetDrawColor(0, 0, 0);
+            $pdf->SetTextColor(0, 0, 0);
+        }
+        
+        $this->addVerticalSpacing($pdf, $this->smallSpacing);
+        
+        // Render table header for this group
+        $this->renderSpecialTestTableHeader($pdf, $page_width);
+        
+        // Render each result in the group
+        foreach ($results as $result) {
+            $this->renderSpecialTestResultRow($pdf, $result, $page_width, $isSemenAnalysis);
+        }
+        
+        // Add spacing after group
+        $this->addVerticalSpacing($pdf, $this->sectionSpacing);
+    }
+    
+    /**
+     * Render semen analysis specific group headers with enhanced styling
+     */
+    private function renderSemenAnalysisGroupHeader($pdf, $groupName, $page_width): void
+    {
+        // Define colors for different groups
+        $groupColors = [
+            'PERSONAL INFORMATION' => [255, 240, 245], // Light pink
+            'PHYSICO – CHEMICAL PROPERTIES' => [240, 255, 240], // Light green
+            'MORPHOLOGY' => [255, 248, 220], // Light yellow
+            'STATISTICS' => [240, 248, 255], // Light blue
+        ];
+        
+        $colors = $groupColors[$groupName] ?? [230, 235, 240]; // Default light gray
+        
+        $pdf->SetFont('arial', 'B', 14, '', true);
+        $pdf->SetFillColor(...$colors);
+        $pdf->SetDrawColor(150, 150, 150);
+        $pdf->SetTextColor(40, 40, 40);
+        
+        $headerHeight = 8;
+        $this->ensureSpaceFor($pdf, $headerHeight + $this->smallSpacing);
+        
+        // Draw group header with rounded rectangle
+        $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 3, '1111');
+        $pdf->Cell($page_width, $headerHeight, $groupName, 1, 1, 'C', 1);
+        
+        // Reset colors
+        $pdf->SetFillColor(255, 255, 255);
+        $pdf->SetDrawColor(0, 0, 0);
+        $pdf->SetTextColor(0, 0, 0);
+    }
+    
+    /**
+     * Render table header for special test groups
+     */
+    private function renderSpecialTestTableHeader($pdf, $page_width): void
+    {
+        $pdf->SetFont('arial', 'B', 10, '', true);
+        $pdf->SetFillColor(245, 247, 250);
+        $pdf->SetDrawColor(200, 205, 210);
+        
+        // Calculate column widths for special test layout
+        $testColWidth = $page_width * 0.4; // 40% for test name
+        $resultColWidth = $page_width * 0.25; // 25% for result
+        $unitColWidth = $page_width * 0.15; // 15% for unit
+        $rangeColWidth = $page_width * 0.2; // 20% for normal range
+        
+        $pdf->Cell($testColWidth, 6, "Test", 1, 0, 'C', 1);
+        $pdf->Cell($resultColWidth, 6, "Result", 1, 0, 'C', 1);
+        $pdf->Cell($unitColWidth, 6, "Unit", 1, 0, 'C', 1);
+        $pdf->Cell($rangeColWidth, 6, "Normal Range", 1, 1, 'C', 1);
+        
+        $this->addVerticalSpacing($pdf, $this->smallSpacing);
+    }
+    
+    /**
+     * Render a single result row for special tests
+     */
+    private function renderSpecialTestResultRow($pdf, $result, $page_width, $isSemenAnalysis = false): void
+    {
+        $child_test = $result->childTest;
+        $unit = $child_test?->unit?->name ?? '';
+        $normal_range = $result->normal_range ?? '';
+        $report_result = $result->result;
+        
+        // Calculate column widths (same as header)
+        $testColWidth = $page_width * 0.4;
+        $resultColWidth = $page_width * 0.25;
+        $unitColWidth = $page_width * 0.15;
+        $rangeColWidth = $page_width * 0.2;
+        
+        // Estimate row height for page break
+        $estimatedResultHeight = $this->measureTextHeight($pdf, $resultColWidth, (string)$report_result, $this->baseLineHeight);
+        $estimatedNormalHeight = $this->measureTextHeight($pdf, $rangeColWidth, (string)$normal_range, $this->baseLineHeight);
+        $estimatedRowHeight = max($this->baseLineHeight, $estimatedResultHeight, $estimatedNormalHeight);
+        $this->ensureSpaceFor($pdf, $estimatedRowHeight + $this->smallSpacing);
+        
+        // Test name
+        $pdf->SetFont('arial', '', 9, '', true);
+        $pdf->Cell($testColWidth, 5, $child_test->child_test_name, 1, 0, 'L');
+        
+        // Result with special formatting for semen analysis
+        $pdf->SetFont('arial', '', 10, '', true);
+        
+        // Special formatting for certain semen analysis results
+        if ($isSemenAnalysis && $this->isPercentageResult($child_test->child_test_name)) {
+            $pdf->SetFont('arial', 'B', 10, '', true);
+            $resultCellHeight = $pdf->MultiCell($resultColWidth, 5, $report_result . '%', 1, 'C', 0, 0, '', '', true);
+        } else {
+            $resultCellHeight = $pdf->MultiCell($resultColWidth, 5, $report_result, 1, 'C', 0, 0, '', '', true);
+        }
+        
+        // Unit
+        $pdf->SetFont('arial', '', 9, '', true);
+        $pdf->MultiCell($unitColWidth, 5, $unit, 1, 'C', 0, 0, '', '', true);
+        
+        // Normal range
+        $pdf->SetFont('arial', '', 9, '', true);
+        $normalRangeCellHeight = $pdf->MultiCell($rangeColWidth, 5, $normal_range, 1, 'C', 0, 1, '', '', true);
+        
+        // Draw horizontal line
+        $y = $pdf->GetY();
+        $pdf->Line(PDF_MARGIN_LEFT, $y, PDF_MARGIN_LEFT + $page_width, $y);
+    }
+    
+    /**
+     * Check if a test result should be displayed as a percentage
+     */
+    private function isPercentageResult($testName): bool
+    {
+        $percentageTests = [
+            'Normal morphology %',
+            'Abnormal morphology %',
+            'Rapidly progressive PR (grade A)',
+            'Slow progressive PR (grade B)',
+            'NP-Sluggish (grade C)',
+            'Immotile (grade D)',
+            'Vitality'
+        ];
+        
+        return in_array($testName, $percentageTests);
     }
 
     /**
