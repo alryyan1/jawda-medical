@@ -43,9 +43,9 @@ class VisitServiceController extends Controller
         }
 
         // If a specific requested service is provided, ensure it's not paid or done
-        if ($requestedService && ($requestedService->is_paid || $requestedService->done)) {
-            return response()->json(['message' => 'لا يمكن تعديل/حذف خدمة مدفوعة أو مكتملة.'], 403);
-        }
+        // if ($requestedService && ($requestedService->is_paid || $requestedService->done)) {
+        //     return response()->json(['message' => 'لا يمكن تعديل/حذف خدمة مدفوعة أو مكتملة.'], 403);
+        // }
 
         return null;
     }

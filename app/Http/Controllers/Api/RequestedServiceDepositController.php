@@ -207,9 +207,7 @@ class RequestedServiceDepositController extends Controller
     public function destroy(RequestedServiceDeposit $requestedServiceDeposit)
     {
         // $this->authorize('delete', $requestedServiceDeposit);
-        if(!Auth::user()->can('manage service_payments_deposits')) {
-            return response()->json(['message' => 'لا يمكنك حذف دفعة للخدمة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
-        }
+        
 
         // IMPORTANT: Adjusting the parent RequestedService's amount_paid is critical.
         $requestedService = $requestedServiceDeposit->requestedService;

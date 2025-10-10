@@ -601,7 +601,6 @@ Route::middleware('auth:sanctum')->group(function () {
       Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest']);
       Route::post('/visits/{visit}/mark-patient-collected', [SampleCollectionController::class, 'markPatientSampleCollectedForVisit']);
   });
-  Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
    Route::get('specialists-list', [SpecialistController::class, 'indexList']);
     Route::apiResource('specialists', SpecialistController::class);
     Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel']);
@@ -653,6 +652,7 @@ Route::post('/lab-requests/{labrequest}/cancel-payment', [LabRequestController::
 Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::class, 'toggleBankak'])->middleware('auth:sanctum');
 Route::patch('/doctor-visits/{visit}/update-all-lab-requests-bankak', [LabRequestController::class, 'updateAllLabRequestsBankak'])->middleware('auth:sanctum');
 Route::get('/lab-requests/visit/{visit}/thermal-receipt-pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
+Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
 
 // Firestore update endpoints
 Route::post('/firestore/update-document', [App\Http\Controllers\Api\FirestoreController::class, 'updateFirestoreDocument'])->middleware('auth:sanctum');
