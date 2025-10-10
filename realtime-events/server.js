@@ -18,6 +18,7 @@ const SANCTUM_TOKEN = process.env.SANCTUM_TOKEN || '';
 const HL7_SERVER_HOST = process.env.HL7_SERVER_HOST || '127.0.0.1';
 const HL7_SERVER_PORT = process.env.HL7_SERVER_PORT || 6400;
 console.log(API_BASE,'API_BASE')
+console.log('SANCTUM_TOKEN:', SANCTUM_TOKEN ? 'Set' : 'Not set')
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: (origin, cb) => cb(null, true), credentials: true }));
@@ -32,7 +33,12 @@ io.on('connection', (socket) => {
   socket.on('join', (room) => {
     if (room) socket.join(room);
   });
-  console.log('New connection');
+  console.log('New connection from:', socket.id);
+
+  // Handle disconnection
+  socket.on('disconnect', (reason) => {
+    console.log('Client disconnected:', socket.id, 'Reason:', reason);
+  });
 
   // Handle HL7 test messages
   socket.on('hl7-test-message', async (data) => {
@@ -214,6 +220,118 @@ app.post('/emit/print-lab-receipt', verifyAuth, async (req, res) => {
     return res.status(500).json({ 
       error: 'Failed to process print request', 
       details: err?.message || err 
+    });
+  }
+});
+
+// Print services thermal receipt
+app.post('/emit/print-services-receipt', verifyAuth, async (req, res) => {
+  console.log('print-services-receipt')
+  try {
+    const payload = req.body; // Expecting { visit_id, patient_id }
+    const { visit_id, patient_id } = payload;
+    
+    console.log('print-services-receipt', payload);
+    console.log('visit_id type:', typeof visit_id, 'value:', visit_id);
+    
+    if (!visit_id) {
+      return res.status(400).json({ error: 'visit_id is required' });
+    }
+    
+    // Ensure visit_id is a number
+    const numericVisitId = parseInt(visit_id);
+    if (isNaN(numericVisitId)) {
+      return res.status(400).json({ error: 'visit_id must be a valid number' });
+    }
+
+    // Skip visit check since the PDF endpoint will handle validation
+
+    // Generate PDF URL for services thermal receipt
+    const pdfUrl = `${API_BASE}/visits/${numericVisitId}/thermal-receipt/pdf`;
+    console.log(`[Print] Generating services PDF for visit ${numericVisitId}: ${pdfUrl}`);
+
+    // Download PDF
+    const tmpFile = path.join(os.tmpdir(), `services-receipt-${visit_id}-${Date.now()}.pdf`);
+    console.log(`[Print] Making request to: ${pdfUrl}`);
+    console.log(`[Print] Using SANCTUM_TOKEN: ${SANCTUM_TOKEN ? 'Yes' : 'No'}`);
+    
+    const response = await axios.get(pdfUrl, {
+      responseType: 'arraybuffer',
+      headers: SANCTUM_TOKEN ? { Authorization: `Bearer ${SANCTUM_TOKEN}` } : {},
+      timeout: 30000, // 30 second timeout
+      validateStatus: function (status) {
+        // Accept any status code as valid to handle 404s properly
+        return status >= 200 && status < 600;
+      }
+    });
+    
+    // Check if the response is an error
+    if (response.status >= 400) {
+      console.error(`[Print] API returned error status: ${response.status}`);
+      console.error(`[Print] Response data:`, response.data.toString());
+      throw new Error(`API returned ${response.status}: ${response.data.toString()}`);
+    }
+    
+    fs.writeFileSync(tmpFile, response.data);
+    console.log(`[Print] Services PDF saved to: ${tmpFile}`);
+
+    // Print the PDF using pdf-to-printer library
+    try {
+      console.log(`[Print] Printing services PDF: ${tmpFile}`);
+      
+      // Print to default printer
+      await print(tmpFile, { 
+        printer: undefined, // Use default printer
+        unix: ['-o fit-to-page'] // Fit to page for thermal printers
+      });
+      
+      console.log(`[Print] Successfully printed services receipt for visit ${visit_id}`);
+      
+      // Clean up temporary file
+      setTimeout(() => {
+        try {
+          fs.unlinkSync(tmpFile);
+          console.log(`[Print] Cleaned up temporary file: ${tmpFile}`);
+        } catch (err) {
+          console.error(`[Print] Error cleaning up file: ${err.message}`);
+        }
+      }, 5000); // Clean up after 5 seconds
+      
+      return res.json({ 
+        ok: true, 
+        message: `Services receipt printed successfully for visit ${visit_id}`,
+        temp_file: tmpFile
+      });
+      
+    } catch (printError) {
+      console.error(`[Print] Error printing services PDF: ${printError.message}`);
+      return res.status(500).json({ 
+        error: 'Failed to print services PDF', 
+        details: printError.message 
+      });
+    }
+
+  } catch (err) {
+    console.error('[Print] Error handling services print request:', err?.message || err);
+    
+    // Log more details about the error
+    if (err.response) {
+      console.error('[Print] API Response Error:', {
+        status: err.response.status,
+        statusText: err.response.statusText,
+        data: err.response.data
+      });
+    } else if (err.request) {
+      console.error('[Print] Request Error:', err.request);
+    } else {
+      console.error('[Print] General Error:', err.message);
+    }
+    
+    return res.status(500).json({ 
+      error: 'Failed to process services print request', 
+      details: err?.message || err,
+      apiError: err.response?.data || null,
+      statusCode: err.response?.status || null
     });
   }
 });
