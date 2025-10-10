@@ -5,6 +5,10 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use App\Services\HL7\HL7MessageProcessor;
+use App\Services\HL7\Devices\Mindray30sHandler;
+use Aranyasen\HL7\Message;
+use Aranyasen\HL7\Segments\MSH;
+use App\Models\HL7Message;
 use React\EventLoop\Loop;
 use React\Socket\Connector;
 use React\Socket\ConnectionInterface;
@@ -16,16 +20,16 @@ class HL7ClientCommand extends Command
                             {--port=5100 : The port to connect to}
                             {--reconnect-delay=5 : Delay in seconds before reconnecting on failure}';
 
-    protected $description = 'Start the HL7 TCP client to connect to laboratory devices and receive messages';
+    protected $description = 'Start the HL7 TCP client to connect to Mindray 30s CBC analyzer and receive messages';
 
-    protected HL7MessageProcessor $messageProcessor;
+    protected Mindray30sHandler $mindrayHandler;
     protected ?ConnectionInterface $connection = null;
     protected bool $shouldReconnect = true;
 
-    public function __construct(HL7MessageProcessor $messageProcessor)
+    public function __construct()
     {
         parent::__construct();
-        $this->messageProcessor = $messageProcessor;
+        $this->mindrayHandler = new Mindray30sHandler();
     }
 
     public function handle(): int
@@ -100,13 +104,91 @@ class HL7ClientCommand extends Command
     protected function setupConnectionHandlers(ConnectionInterface $connection, string $address, int $reconnectDelay, $loop): void
     {
         $connector = new Connector($loop);
+        $messageBuffer = '';
 
-        $connection->on('data', function ($data) use ($connection) {
+        $connection->on('data', function ($data) use ($connection, &$messageBuffer) {
             $this->info('📨 Received data: ' . strlen($data) . ' bytes');
             Log::info('HL7 Client received data', ['bytes' => strlen($data)]);
             
-            // Process the HL7 message using the existing message processor
-            $this->messageProcessor->processMessage($data, $connection);
+            // Add data to buffer
+            $messageBuffer .= $data;
+            
+            // Check if we have a complete HL7 message
+            $messageComplete = false;
+            $cleanData = '';
+            
+            // Check for MLLP framing (starts with \x0B, ends with \x1C)
+            if (strpos($messageBuffer, "\x0B") !== false && strpos($messageBuffer, "\x1C") !== false) {
+                $startPos = strpos($messageBuffer, "\x0B");
+                $endPos = strpos($messageBuffer, "\x1C", $startPos);
+                
+                if ($endPos !== false) {
+                    // Extract the complete MLLP message
+                    $mllpMessage = substr($messageBuffer, $startPos, $endPos - $startPos + 1);
+                    
+                    // Handle MLLP framing - remove start and end characters
+                    $cleanData = $mllpMessage;
+                    if (substr($cleanData, 0, 1) === "\x0B") { // Remove start character
+                        $cleanData = substr($cleanData, 1);
+                    }
+                    if (substr($cleanData, -1) === "\x1C") { // Remove end character
+                        $cleanData = substr($cleanData, 0, -1);
+                    }
+                    if (substr($cleanData, -1) === "\x0D") { // Remove carriage return
+                        $cleanData = substr($cleanData, 0, -1);
+                    }
+                    
+                    $messageComplete = true;
+                    $messageBuffer = substr($messageBuffer, $endPos + 1); // Remove processed message
+                }
+            }
+            // Check for simple MSH-based message (fallback)
+            elseif (str_contains($messageBuffer, 'MSH') && strlen($messageBuffer) > 100) {
+                // Assume we have a complete message if it contains MSH and is reasonably long
+                $cleanData = $messageBuffer;
+                $messageComplete = true;
+                $messageBuffer = ''; // Clear buffer
+            }
+            
+            if ($messageComplete && !empty($cleanData)) {
+                try {
+                    // Find the MSH segment start
+                    $mshStart = strpos($cleanData, 'MSH');
+                    if ($mshStart === false) {
+                        $this->error('❌ MSH segment not found in message');
+                        return;
+                    }
+                    
+                    $row = substr($cleanData, $mshStart);
+                    $msg = new Message($row);
+                    
+                    // Create MSH segment for the handler
+                    $msh = new MSH($msg->getSegmentByIndex(0)->getFields());
+                    
+                    // Log raw message to database
+                    try {
+                        HL7Message::create([
+                            'raw_message' => $cleanData,
+                        ]);
+                        $this->info('✅ HL7 message saved to database');
+                    } catch (\Exception $e) {
+                        $this->error('❌ Error saving to database: ' . $e->getMessage());
+                    }
+                    
+                    // Process using Mindray30sHandler directly
+                    $this->mindrayHandler->processMessage($msg, $msh, $connection);
+                    $this->info('✅ HL7 message processed successfully by Mindray30sHandler');
+                    
+                } catch (\Exception $e) {
+                    $this->error('❌ Processing error: ' . $e->getMessage());
+                    Log::error('HL7: Error processing message: ' . $e->getMessage(), [
+                        'exception' => $e,
+                        'raw_data' => $cleanData
+                    ]);
+                }
+            } else {
+                $this->warn('⏳ Buffering message... (buffer size: ' . strlen($messageBuffer) . ' bytes)');
+            }
         });
 
         $connection->on('close', function () use ($address, $reconnectDelay, $loop, $connector) {

@@ -56,15 +56,17 @@ class HL7MessageProcessor
                 ]);
                 return;
             }
+            $hl  = preg_replace('/\s+/', '', $rawData);
+            $row = substr($hl,strpos($hl,'MSH'));
 
             // Clean and parse message - preserve segment separators
-            $cleanData = preg_replace('/\r\n|\r|\n/', "\r", $rawData); // Normalize line endings
-            $cleanData = preg_replace('/[ \t]+/', ' ', $cleanData); // Replace multiple spaces/tabs with single space
-            $cleanData = trim($cleanData); // Remove leading/trailing whitespace
+            // $cleanData = preg_replace('/\r\n|\r|\n/', "\r", $rawData); // Normalize line endings
+            // $cleanData = preg_replace('/[ \t]+/', ' ', $cleanData); // Replace multiple spaces/tabs with single space
+            // $cleanData = trim($cleanData); // Remove leading/trailing whitespace
 
             // Try to parse HL7 message; if it fails, attempt Zybio auto-format then retry
             try {
-                $msg = new Message($cleanData);
+                $msg = new Message($row);
             } catch (\Throwable $parseError) {
                 Log::warning('HL7: Initial parse failed; applying Zybio format correction', [
                     'error' => $parseError->getMessage()
