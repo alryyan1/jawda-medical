@@ -9,44 +9,142 @@ use Aranyasen\HL7\Segments\OBR;
 use Aranyasen\HL7\Segments\OBX;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use App\Services\HL7\Devices\SysmexCbcInserter;
 
 class Mindray30sHandler
 {
+    protected SysmexCbcInserter $sysmexInserter;
+
+    public function __construct()
+    {
+        $this->sysmexInserter = new SysmexCbcInserter();
+    }
+
     /**
      * Process HL7 message from Mindray 30s CBC analyzer
      */
     public function processMessage(Message $msg, MSH $msh, $connection): void
     {
         try {
-            Log::info('Mindray 30s: Processing CBC message');
+            Log::info('Mindray 30s: Processing CBC message', [
+                'message_segments_count' => count($msg->getSegments()),
+                'message_type' => $msh->getField(9) ?? 'N/A',
+                'sending_facility' => $msh->getField(4) ?? 'N/A'
+            ]);
+            
+            // Log all segment types in the message
+            $segmentTypes = [];
+            foreach ($msg->getSegments() as $segment) {
+                $segmentTypes[] = $segment->getName();
+            }
+            Log::info('Mindray 30s: Message segment types', ['segments' => $segmentTypes]);
             
             // Extract patient information
-            $patientId = $this->extractPatientId($msg);
-            if (!$patientId) {
-                Log::warning('Mindray 30s: No patient ID found in message');
+            $patientInfo = $this->extractPatientInfo($msg);
+            
+            // Extract CBC parameters
+            $cbcResults = $this->extractCBCParameters($msg);
+            if (empty($cbcResults)) {
+                $obxCount = count(array_filter($segmentTypes, fn($type) => $type === 'OBX'));
+                if ($obxCount === 0) {
+                    Log::info('Mindray 30s: Non-CBC message received (no OBX segments)', [
+                        'total_segments' => count($msg->getSegments()),
+                        'segment_types' => $segmentTypes,
+                        'message_type' => $msh->getField(9) ?? 'N/A'
+                    ]);
+                } else {
+                    Log::warning('Mindray 30s: CBC message with OBX segments but no recognized parameters', [
+                        'total_segments' => count($msg->getSegments()),
+                        'segment_types' => $segmentTypes,
+                        'obx_count' => $obxCount
+                    ]);
+                }
                 return;
             }
             
-            // Extract test results
-            $testResults = $this->extractTestResults($msg);
-            if (empty($testResults)) {
-                Log::warning('Mindray 30s: No test results found in message');
-                return;
+            Log::info('Mindray 30s: CBC results extracted', ['results_count' => count($cbcResults)]);
+
+            // Extract doctor visit ID from OBR segment field 3 (Filler Order Number)
+            $doctorVisitId = $this->extractDoctorVisitId($msg);
+            Log::info('Mindray 30s: Doctor visit ID extracted', ['doctorVisitId' => $doctorVisitId]);
+            
+            // Insert into Sysmex table (if doctor visit ID is available)
+            if ($doctorVisitId && is_numeric($doctorVisitId)) {
+                $insertResult = $this->sysmexInserter->insertCbcData(
+                    $cbcResults, 
+                    (int)$doctorVisitId, 
+                    $patientInfo
+                );
+
+                if (!$insertResult['success']) {
+                    Log::error('Mindray 30s: Insertion error', $insertResult);
+                } else {
+                    Log::info('Mindray 30s: Successfully inserted CBC data into sysmex table', ['sysmex_id' => $insertResult['sysmex_id']]);
+                }
+            } else {
+                Log::warning('Mindray 30s: No valid doctor visit ID found', ['doctorVisitId' => $doctorVisitId]);
             }
-            
-            // Store results in database
-            $this->storeResults($patientId, $testResults);
-            
-            Log::info('Mindray 30s: Successfully processed CBC results', [
-                'patient_id' => $patientId,
-                'test_count' => count($testResults)
-            ]);
             
         } catch (\Exception $e) {
             Log::error('Mindray 30s: Error processing message: ' . $e->getMessage(), [
                 'exception' => $e
             ]);
         }
+    }
+
+    /**
+     * Extract patient information from PID segment
+     */
+    private function extractPatientInfo(Message $msg): array
+    {
+        $patientInfo = [];
+        
+        try {
+            // Find PID segment
+            $pidSegment = null;
+            foreach ($msg->getSegments() as $segment) {
+                if ($segment->getName() === 'PID') {
+                    $pidSegment = $segment;
+                    break;
+                }
+            }
+            
+            if ($pidSegment) {
+                $fields = $pidSegment->getFields();
+                $patientInfo = [
+                    'patient_id' => $fields[3] ?? null, // Patient ID
+                    'name' => $fields[5] ?? null, // Patient Name
+                    'dob' => $fields[7] ?? null, // Date of Birth
+                    'gender' => $fields[8] ?? null, // Gender
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error('Mindray 30s: Error extracting patient info: ' . $e->getMessage());
+        }
+        
+        return $patientInfo;
+    }
+
+    /**
+     * Extract doctor visit ID from OBR segment
+     */
+    private function extractDoctorVisitId(Message $msg): ?string
+    {
+        try {
+            // Find OBR segment
+            foreach ($msg->getSegments() as $segment) {
+                if ($segment->getName() === 'OBR') {
+                    // Get field 3 (Filler Order Number) which contains the doctor visit ID
+                    $fields = $segment->getFields();
+                    $doctorVisitId = $fields[3] ?? null;
+                    return $doctorVisitId ?: null;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Mindray 30s: Error extracting doctor visit ID: ' . $e->getMessage());
+        }
+        
+        return null;
     }
     
     /**
@@ -55,14 +153,47 @@ class Mindray30sHandler
     private function extractPatientId(Message $msg): ?string
     {
         try {
-            $pid = new PID($msg->getSegmentByIndex(1)->getFields());
-            $patientId = $pid->getField(4); // Patient ID is in field 4, not field 3
-            
-            if (is_array($patientId)) {
-                return $patientId[0] ?? null;
+            // First try to get patient ID from PID segment
+            $pidSegment = null;
+            foreach ($msg->getSegments() as $segment) {
+                if ($segment->getName() === 'PID') {
+                    $pidSegment = $segment;
+                    break;
+                }
             }
             
-            return $patientId;
+            if ($pidSegment) {
+                $pid = new PID($pidSegment->getFields());
+                $patientId = $pid->getField(3); // Patient ID is in field 3 (Patient Identifier List)
+                
+                if (is_array($patientId)) {
+                    // Extract patient ID from the array format
+                    $patientIdParts = explode('^', $patientId[0] ?? '');
+                    $patientId = $patientIdParts[0] ?? null;
+                }
+                
+                // If we have a valid patient ID, return it
+                if (!empty($patientId) && $patientId !== 'MR') {
+                    return $patientId;
+                }
+            }
+            
+            // If PID doesn't have a valid patient ID, try to get it from OBR segment
+            foreach ($msg->getSegments() as $segment) {
+                if ($segment->getName() === 'OBR') {
+                    $fields = $segment->getFields();
+                    // Get field 3 directly from the segment (OBR constructor shifts indices)
+                    $fillerOrderNumber = $fields[3] ?? '';
+                    
+                    if (!empty($fillerOrderNumber)) {
+                        Log::info('Mindray 30s: Using OBR filler order number as patient ID', ['patient_id' => $fillerOrderNumber]);
+                        return $fillerOrderNumber;
+                    }
+                }
+            }
+            
+            Log::warning('Mindray 30s: No valid patient ID found in PID or OBR segments');
+            return null;
         } catch (\Exception $e) {
             Log::error('Mindray 30s: Error extracting patient ID: ' . $e->getMessage());
             return null;
@@ -70,169 +201,115 @@ class Mindray30sHandler
     }
     
     /**
-     * Extract test results from OBX segments
+     * Extract CBC parameters from OBX segments
      */
-    private function extractTestResults(Message $msg): array
+    private function extractCBCParameters(Message $msg): array
     {
-        $results = [];
+        $cbcResults = [];
         
         try {
-            $segments = $msg->getSegments();
-            foreach ($segments as $segment) {
+            // Define CBC parameter mappings for Mindray 30s
+            $cbcMappings = [
+                // LOINC codes
+                '6690-2' => 'WBC', // White Blood Cell Count
+                '731-0' => 'LYM#', // Lymphocyte Count
+                '8005' => 'MXD#', // Mixed Cell Count
+                '8006' => 'NEUT#', // Neutrophil Count
+                '736-9' => 'LYM%', // Lymphocyte Percentage
+                '8007' => 'MXD%', // Mixed Cell Percentage
+                '8008' => 'NEUT%', // Neutrophil Percentage
+                '789-8' => 'RBC', // Red Blood Cell Count
+                '718-7' => 'HGB', // Hemoglobin
+                '4544-3' => 'HCT', // Hematocrit
+                '787-2' => 'MCV', // Mean Corpuscular Volume
+                '785-6' => 'MCH', // Mean Corpuscular Hemoglobin
+                '786-4' => 'MCHC', // Mean Corpuscular Hemoglobin Concentration
+                '788-0' => 'RDW-CV', // Red Cell Distribution Width CV
+                '21000-5' => 'RDW-SD', // Red Cell Distribution Width SD
+                '777-3' => 'PLT', // Platelet Count
+                '32623-1' => 'MPV', // Mean Platelet Volume
+                '32207-3' => 'PDW', // Platelet Distribution Width
+                '8002' => 'PCT', // Plateletcrit
+                '8003' => 'PLCC', // Platelet Large Cell Count
+                '8004' => 'PLCR', // Platelet Large Cell Ratio
+                
+                // 99MRC codes (ACON device specific)
+                '10027' => 'MID#', // Mid cells count
+                '10029' => 'MID%', // Mid cells percentage
+                '10028' => 'GRAN#', // Granulocytes count
+                '10030' => 'GRAN%', // Granulocytes percentage
+                '10013' => 'PLCC', // Platelet Large Cell Count
+                '10014' => 'PLCR', // Platelet Large Cell Ratio
+                '10002' => 'PCT', // Plateletcrit
+            ];
+            
+            // Process OBX segments
+            foreach ($msg->getSegments() as $segment) {
                 if ($segment->getName() === 'OBX') {
-                    $obx = new OBX($segment->getFields());
+                    $obxData = $this->parseOBXSegment($segment);
                     
-                    $testCode = $obx->getField(3);
-                    $testValue = $obx->getField(5);
-                    $testUnit = $obx->getField(6);
-                    $referenceRange = $obx->getField(7);
-                    $abnormalFlag = $obx->getField(8);
-                    
-                    // Extract test name and code
-                    $testName = '';
-                    $testCodeValue = '';
-                    
-                    if (is_array($testCode)) {
-                        $testCodeValue = $testCode[0] ?? '';
-                        $testName = $testCode[1] ?? $testCodeValue;
-                    } else {
-                        $testCodeValue = $testCode;
-                        $testName = $testCode;
+                    if ($obxData && isset($cbcMappings[$obxData['test_code']])) {
+                        $parameterName = $cbcMappings[$obxData['test_code']];
+                        
+                        $cbcResults[$parameterName] = [
+                            'test_code' => $obxData['test_code'],
+                            'test_name' => $obxData['test_name'],
+                            'value' => $obxData['value'],
+                            'unit' => $obxData['unit'],
+                            'reference_range' => $obxData['reference_range'],
+                            'abnormal_flag' => $obxData['abnormal_flag'],
+                            'status' => $obxData['status'],
+                        ];
                     }
-                    
-                    // Skip non-numeric results and control information
-                    if ($obx->getField(2) !== 'NM' || empty($testValue) || is_array($testValue)) {
-                        continue;
-                    }
-                    
-                    $results[$testName] = [
-                        'code' => $testCodeValue,
-                        'name' => $testName,
-                        'value' => floatval($testValue),
-                        'unit' => is_array($testUnit) ? implode('^', $testUnit) : $testUnit,
-                        'reference_range' => is_array($referenceRange) ? implode('^', $referenceRange) : $referenceRange,
-                        'abnormal_flag' => is_array($abnormalFlag) ? implode('^', $abnormalFlag) : $abnormalFlag,
-                    ];
                 }
             }
+            
         } catch (\Exception $e) {
-            Log::error('Mindray 30s: Error extracting test results: ' . $e->getMessage());
+            Log::error('Mindray 30s: Error extracting CBC parameters: ' . $e->getMessage());
         }
         
-        return $results;
+        return $cbcResults;
     }
-    
+
     /**
-     * Store CBC results in database
+     * Parse OBX segment to extract test data
      */
-    private function storeResults(string $patientId, array $testResults): void
+    private function parseOBXSegment($segment): ?array
     {
         try {
-            DB::beginTransaction();
+            $fields = $segment->getFields();
             
-            // Check if patient exists in sysmex550 table
-            $existingRecord = DB::table('sysmex550')
-                ->where('patient_id', $patientId)
-                ->first();
+            // OBX field structure:
+            // 1: Set ID, 2: Value Type, 3: Observation Identifier, 5: Observation Value,
+            // 6: Units, 7: References Range, 8: Abnormal Flags, 11: Observation Result Status
             
-            if ($existingRecord) {
-                // Update existing record
-                $updateData = [];
-                foreach ($testResults as $testName => $result) {
-                    $columnName = $this->getColumnName($testName);
-                    if ($columnName) {
-                        $updateData[$columnName] = $result['value'];
-                    }
-                }
-                
-                if (!empty($updateData)) {
-                    $updateData['updated_at'] = now();
-                    DB::table('sysmex550')
-                        ->where('patient_id', $patientId)
-                        ->update($updateData);
-                    
-                    Log::info('Mindray 30s: Updated existing CBC record', [
-                        'patient_id' => $patientId,
-                        'updated_fields' => array_keys($updateData)
-                    ]);
-                }
-            } else {
-                // Insert new record
-                $insertData = ['patient_id' => $patientId];
-                foreach ($testResults as $testName => $result) {
-                    $columnName = $this->getColumnName($testName);
-                    if ($columnName) {
-                        $insertData[$columnName] = $result['value'];
-                    }
-                }
-                
-                // Set default values for required fields that might be missing
-                $defaults = [
-                    'WBC' => 0, 'RBC' => 0, 'HGB' => 0, 'HCT' => 0, 'MCV' => 0,
-                    'MCH' => 0, 'MCHC' => 0, 'PLT' => 0, 'NEUTP' => 0, 'LYMPHP' => 0,
-                    'MONOP' => 0, 'EOP' => 0, 'BASOP' => 0, 'NEUTC' => 0, 'LYMPHC' => 0,
-                    'MONOC' => 0, 'EOC' => 0, 'BASOC' => 0, 'IGP' => 0, 'IGC' => 0,
-                    'RDWSD' => 0, 'RDWCV' => 0, 'MICROR' => 0, 'MACROR' => 0,
-                    'PDW' => 0, 'MPV' => 0, 'PLCR' => 0, 'PCT' => 0
-                ];
-                
-                foreach ($defaults as $field => $defaultValue) {
-                    if (!isset($insertData[$field])) {
-                        $insertData[$field] = $defaultValue;
-                    }
-                }
-                
-                DB::table('sysmex550')->insert($insertData);
-                
-                Log::info('Mindray 30s: Created new CBC record', [
-                    'patient_id' => $patientId,
-                    'inserted_fields' => array_keys($insertData)
-                ]);
-            }
+            // Handle array fields properly
+            $observationIdentifier = is_array($fields[3] ?? '') ? implode('^', $fields[3]) : ($fields[3] ?? '');
+            $observationValue = is_array($fields[5] ?? '') ? implode('^', $fields[5]) : ($fields[5] ?? '');
+            $units = is_array($fields[6] ?? '') ? implode('^', $fields[6]) : ($fields[6] ?? '');
+            $referenceRange = is_array($fields[7] ?? '') ? implode('^', $fields[7]) : ($fields[7] ?? '');
+            $abnormalFlag = is_array($fields[8] ?? '') ? implode('^', $fields[8]) : ($fields[8] ?? '');
+            $status = is_array($fields[11] ?? '') ? implode('^', $fields[11]) : ($fields[11] ?? '');
             
-            DB::commit();
+            // Extract test code and name from observation identifier
+            $testParts = explode('^', $observationIdentifier);
+            $testCode = $testParts[0] ?? '';
+            $testName = $testParts[1] ?? $testCode;
+            
+            return [
+                'test_code' => $testCode,
+                'test_name' => $testName,
+                'value' => $observationValue,
+                'unit' => $units,
+                'reference_range' => $referenceRange,
+                'abnormal_flag' => $abnormalFlag,
+                'status' => $status,
+            ];
             
         } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Mindray 30s: Error storing results: ' . $e->getMessage(), [
-                'patient_id' => $patientId,
-                'exception' => $e
-            ]);
-            throw $e;
+            Log::error('Mindray 30s: Error parsing OBX segment: ' . $e->getMessage());
+            return null;
         }
-    }
-    
-    /**
-     * Map test names to database column names
-     */
-    private function getColumnName(string $testName): ?string
-    {
-        // Map to sysmex550 table columns
-        $mapping = [
-            'WBC' => 'WBC',
-            'RBC' => 'RBC',
-            'HGB' => 'HGB',
-            'HCT' => 'HCT',
-            'MCV' => 'MCV',
-            'MCH' => 'MCH',
-            'MCHC' => 'MCHC',
-            'PLT' => 'PLT',
-            'LYM%' => 'LYMPHP',
-            'LYM#' => 'LYMPHC',
-            'GRAN%' => 'NEUTP',
-            'GRAN#' => 'NEUTC',
-            'MID%' => 'MONOP',
-            'MID#' => 'MONOC',
-            'RDW-CV' => 'RDWCV',
-            'RDW-SD' => 'RDWSD',
-            'MPV' => 'MPV',
-            'PDW' => 'PDW',
-            'PCT' => 'PCT',
-            'PLCR' => 'PLCR',
-            // Note: PLCC column doesn't exist in sysmex550 table, so we skip it
-        ];
-        
-        return $mapping[$testName] ?? null;
     }
 }
 
