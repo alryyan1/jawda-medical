@@ -79,6 +79,47 @@ EOD;
                         (new UltramsgService())->sendTextMessage($to, $txt);
                     }
 
+                    // Check if results are ready before generating PDF
+                    $labRequestIds = $patient->patientLabRequests->pluck('id');
+                    $totalResultsCount = 0;
+                    $pendingResultsCount = 0;
+                    
+                    if ($labRequestIds->isNotEmpty()) {
+                        $totalResultsCount = \App\Models\RequestedResult::whereIn('lab_request_id', $labRequestIds)->count();
+                        $pendingResultsCount = \App\Models\RequestedResult::whereIn('lab_request_id', $labRequestIds)
+                            ->where(function ($query) {
+                                $query->whereNull('result')
+                                      ->orWhere('result', '=', '');
+                            })
+                            ->count();
+                    }
+                    
+                    // Check if results are ready
+                    $allResultsReady = ($totalResultsCount > 0 && $pendingResultsCount === 0);
+                    
+                    if (!$allResultsReady) {
+                        Log::info('Results not ready for patient', [
+                            'patient_id' => $id,
+                            'total_results' => $totalResultsCount,
+                            'pending_results' => $pendingResultsCount
+                        ]);
+                        
+                        // Send clarification message
+                        $clarificationMessage = <<<EOD
+عذراً، النتائج غير جاهزة بعد
+{$name}
+عدد النتائج المطلوبة: {$totalResultsCount}
+عدد النتائج المتبقية: {$pendingResultsCount}
+يرجى المحاولة مرة أخرى لاحقاً
+EOD;
+                        
+                        if ($to) {
+                            (new UltramsgService())->sendTextMessage($to, $clarificationMessage);
+                        }
+                        
+                        return response()->json(['ok' => true]);
+                    }
+
                     // Generate PDF using LabResultReport service
                     $pdfContent = (new LabResultReport())->generate($patient, false);
                     

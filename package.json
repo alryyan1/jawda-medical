@@ -1,13 +1,31 @@
 {
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "dev": "vite",
-        "build": "vite build"
-    },
-    "devDependencies": {
-        "axios": "^1.6.4",
-        "laravel-vite-plugin": "^1.0.0",
-        "vite": "^5.0.0"
-    }
+  "name": "jawda-medical-notifications-service",
+  "version": "1.0.0",
+  "description": "Windows service for Jawda Medical notifications queue worker",
+  "main": "notifications-service.js",
+  "scripts": {
+    "start": "node notifications-service.js",
+    "install-service": "node install-service.js",
+    "uninstall-service": "node uninstall-service.js",
+    "test": "node test-service.js",
+    "test-direct": "node notifications-service.js",
+    "test-stay-alive": "node test-service-stay-alive.js",
+    "view-logs": "view-event-logs.bat",
+    "view-logs-ps": "powershell -ExecutionPolicy Bypass -File view-event-logs.ps1"
+  },
+  "dependencies": {
+    "node-windows": "^1.0.0-beta.8"
+  },
+  "keywords": [
+    "windows-service",
+    "laravel",
+    "queue",
+    "notifications",
+    "jawda-medical"
+  ],
+  "author": "Jawda Medical Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
 }
