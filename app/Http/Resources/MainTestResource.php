@@ -22,6 +22,8 @@ class MainTestResource extends JsonResource
             'divided' => (bool) $this->divided,
             'available' => (bool) $this->available,
             'is_special_test' => (bool) $this->is_special_test,
+            'conditions' => $this->conditions,
+            'timer' => $this->timer,
                         'child_tests' => ChildTestResource::collection($this->whenLoaded('childTests')),
 
             // Include timestamps if your model has them
