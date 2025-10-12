@@ -121,7 +121,7 @@ class UltramsgService
                 ->post($endpoint, [
                     'token' => $this->token,
                     'to' => $to,
-                    'filename' => $filename,
+                    'filename' => 'LAB RESULT',
                     'document' => $document,
                     'caption' => $caption,
                 ]);
