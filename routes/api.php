@@ -580,6 +580,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/patients/store-from-lab', [PatientController::class, 'storeFromLab']);
   Route::post('/patients/save-from-online-lab', [PatientController::class, 'saveFromOnlineLab']);
 
+  Route::get('/visits/{doctorvisit}/lab-barcode/pdf', [ReportController::class, 'printBarcodeWithViewer']);
     // Devices
     Route::get('/devices-list', [DeviceController::class, 'indexList']);
     Route::post('/devices', [DeviceController::class, 'store']); // If you add device creation dialog
@@ -591,6 +592,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
     Route::get('/visits/{visit}/lab-invoice/pdf', [ReportController::class, 'generateLabInvoicePdf']);
     Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf']);
+    Route::post('/visits/{doctorvisit}/print-barcode', [PatientController::class, 'printBarcode']); // For Zebra printer barcode printing
     Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result']); // For "View Report Preview"
     Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns
     Route::apiResource('service-groups', ServiceGroupController::class);

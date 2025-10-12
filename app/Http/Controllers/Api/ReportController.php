@@ -3537,6 +3537,169 @@ class ReportController extends Controller
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0');
 
+
+    }
+    /**
+     * Generate PDF barcode labels for lab containers (Ahmed Altamayoz config for printer ZY809)
+     * 
+     * @param Request $request
+     * @param Doctorvisit $doctorvisit
+     * @return mixed
+     */
+    public function printBarcodeWithViewer(Request $request, Doctorvisit $doctorvisit)
+    {
+        try {
+            // Validate doctor visit has patient and lab requests
+            if (!$doctorvisit->patient) {
+                return response()->json(['status' => false, 'message' => 'No patient found for this visit'], 400);
+            }
+
+            /** @var Patient $patient */
+            $patient = $doctorvisit->patient;
+            
+            if (!$patient->labrequests || $patient->labrequests->isEmpty()) {
+                return response()->json(['status' => false, 'message' => 'No lab requests found for this patient'], 400);
+            }
+
+            // PDF configuration
+            $customLayout = [50, 25];
+            $pageWidth = 50;
+            
+            // Initialize PDF
+            $pdf = new Pdf('landscape', PDF_UNIT, $customLayout, true, 'UTF-8', false);
+            
+            // Configure PDF properties
+            $pdf->setCreator(PDF_CREATOR);
+            $pdf->setAuthor('alryyan mahjoob');
+            $pdf->setTitle('ايصال المختبر');
+            $pdf->setSubject('ايصال المختبر');
+            $pdf->setAutoPageBreak(true, 0);
+            $pdf->setMargins(0, 0, 0);
+
+            // Try to add custom font, fallback to helvetica if fails
+            $arialFont = 'helvetica'; // Default fallback
+            try {
+                if (class_exists('TCPDF_FONTS') && file_exists(public_path('arial.ttf'))) {
+                    $arialFont = \TCPDF_FONTS::addTTFfont(public_path('arial.ttf'));
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to load custom font, using helvetica: ' . $e->getMessage());
+            }
+
+            // Get unique containers from lab requests
+            $containers = $patient->labrequests
+                ->map(function (LabRequest $req) {
+                    return $req->mainTest->container;
+                })
+                ->unique('id');
+
+            // Generate labels for each container
+            foreach ($containers as $container) {
+                $this->generatePdfLabelForContainer($pdf, $patient, $doctorvisit, $container, $arialFont, $pageWidth);
+            }
+
+            // Output PDF
+        if ($request->has('base64')) {
+            $resultAsBase64 = $pdf->output('name.pdf', 'E');
+            return $resultAsBase64;
+        } else {
+            // Return PDF as response with proper headers
+            $pdfContent = $pdf->output('barcode_labels.pdf', 'S');
+            return response($pdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="barcode_labels.pdf"',
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+                'Pragma' => 'no-cache',
+                'Expires' => '0'
+            ]);
+        }
+            
+        } catch (\Exception $e) {
+            Log::error('PDF barcode generation failed: ' . $e->getMessage(), [
+                'doctor_visit_id' => $doctorvisit->id,
+                'patient_id' => $doctorvisit->patient?->id,
+                'error' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'status' => false, 
+                'message' => 'Failed to generate PDF barcode labels: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate PDF label for a specific container
+     * 
+     * @param Pdf $pdf
+     * @param Patient $patient
+     * @param Doctorvisit $doctorvisit
+     * @param object $container
+     * @param string $arialFont
+     * @param int $pageWidth
+     * @return void
+     */
+    private function generatePdfLabelForContainer(Pdf $pdf, Patient $patient, Doctorvisit $doctorvisit, $container, string $arialFont, int $pageWidth): void
+    {
+        $pdf->AddPage();
+        
+        // Get tests for this specific container
+        $testsForContainer = $patient->labrequests
+            ->filter(function (LabRequest $labrequest) use ($container) {
+                return $labrequest->mainTest->container->id == $container->id;
+            })
+            ->map(function (LabRequest $labRequest) {
+                return $labRequest->mainTest;
+            });
+
+        // Build test names string with proper formatting
+        $testNames = $testsForContainer
+            ->pluck('main_test_name')
+            ->map(function ($name, $index) {
+                return $index === 0 ? $name : '- ' . $name;
+            })
+            ->implode('');
+
+        // Barcode style configuration
+        $barcodeStyle = [
+            'position' => 'C',
+            'align' => 'C',
+            'stretch' => false,
+            'fitwidth' => false,
+            'cellfitalign' => '',
+            'border' => false,
+            'hpadding' => 0,
+            'vpadding' => 0,
+            'fgcolor' => [0, 0, 0],
+            'bgcolor' => false,
+            'text' => false,
+            'font' => 'helvetica',
+            'fontsize' => 10,
+            'stretchtext' => 4
+        ];
+
+        // Generate label content
+        $pdf->SetFillColor(240, 240, 240);
+        $pdf->SetFont('helvetica', '', 7, '', true);
+        
+        // Header row with PID and date
+        $pdf->Cell(5, 3, '', 0, 0, 'C');
+        $pdf->Cell(15, 3, 'PID ' . $doctorvisit->id, 0, 0, '');
+        $pdf->Cell(0, 3, $patient->created_at->format('Y-m-d H:i A'), 0, 1, 'R');
+
+        // Visit number and patient name row
+        $pdf->Cell(5, 3, '', 0, 0, 'C');
+        $pdf->Cell(10, 3, 'No ' . $patient->visit_number, 1, 0, 'C');
+        $pdf->SetFont($arialFont, '', 9, '', true);
+        $pdf->Cell(5, 3, '', 0, 0, 'C');
+        $pdf->Cell(0, 3, $patient->name, 0, 1, 'C');
+
+        // Generate barcode
+        $pdf->write1DBarcode((string)$doctorvisit->id, 'C128', 30, '', 25, 10, 0.4, $barcodeStyle, 'N');
+
+        // Test names
+        $pdf->SetFont('helvetica', 'u', 7, '', true);
+        $pdf->Cell(0, 3, $testNames, 0, 1, 'C');
     }
 
     public function generateLabVisitReportPdf(Request $request, DoctorVisit $doctorvisit)

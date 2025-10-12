@@ -28,6 +28,7 @@ use App\Models\File;
 use App\Models\UserDocSelection;
 use App\Models\RequestedService;
 use App\Models\RequestedServiceCost;
+use App\Zebra;
 use App\Models\RequestedResult;
 use App\Models\Service;
 use App\Models\Company;
@@ -1099,6 +1100,99 @@ class PatientController extends Controller
 
 
         return RecentDoctorVisitSearchResource::collection($visitsWithLabs);
+    }
+
+    
+    /**
+     * Print barcode labels for lab containers based on doctor visit
+     * 
+     * @param Request $request
+     * @param Doctorvisit $doctorvisit
+     * @return array
+     */
+    public function printBarcode(Request $request, Doctorvisit $doctorvisit)
+    {
+        try {
+            // Validate doctor visit has patient and lab requests
+            if (!$doctorvisit->patient) {
+                return ['status' => false, 'message' => 'No patient found for this visit'];
+            }
+
+            $patient = $doctorvisit->patient;
+            
+            if (!$patient->labrequests || $patient->labrequests->isEmpty()) {
+                return ['status' => false, 'message' => 'No lab requests found for this patient'];
+            }
+
+            // Get printer configuration
+            $ip_address = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+            $hostPrinter = "\\\\$ip_address\\zebra";
+            $speedPrinter = 3;
+            $darknessPrint = 20;
+            $labelSize = [300, 10];
+            $referencePoint = [223, 30];
+
+            // Initialize Zebra printer
+            $zebra = new Zebra($hostPrinter, $speedPrinter, $darknessPrint, $labelSize, $referencePoint);
+
+            // Get unique containers from lab requests
+            $containers = $patient->labrequests
+                ->map(function (LabRequest $req) {
+                    return $req->mainTest->container;
+                })
+                ->unique('id');
+
+            // Generate labels for each container
+            foreach ($containers as $container) {
+                $this->generateLabelForContainer($zebra, $patient, $doctorvisit, $container);
+            }
+
+            // Print all labels
+            $zebra->print2zebra();
+            
+            return ['status' => true, 'message' => 'Barcode labels printed successfully'];
+            
+        } catch (\Exception $e) {
+            Log::error('Barcode printing failed: ' . $e->getMessage(), [
+                'doctor_visit_id' => $doctorvisit->id,
+                'patient_id' => $doctorvisit->patient?->id,
+                'error' => $e->getTraceAsString()
+            ]);
+            
+            return ['status' => false, 'message' => 'Failed to print barcode labels: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Generate label for a specific container
+     * 
+     * @param Zebra $zebra
+     * @param Patient $patient
+     * @param Doctorvisit $doctorvisit
+     * @param object $container
+     * @return void
+     */
+    private function generateLabelForContainer(Zebra $zebra, Patient $patient, Doctorvisit $doctorvisit, $container): void
+    {
+        // Get tests for this specific container
+        $testsForContainer = $patient->labrequests
+            ->filter(function (LabRequest $labrequest) use ($container) {
+                return $labrequest->mainTest->container->id == $container->id;
+            })
+            ->map(function (LabRequest $labRequest) {
+                return $labRequest->mainTest;
+            });
+
+        // Build test names string
+        $testNames = $testsForContainer
+            ->pluck('main_test_name')
+            ->implode(' ');
+
+        // Generate barcode and labels
+        $zebra->setBarcode(1, 270, 110, $doctorvisit->id);
+        $zebra->writeLabelBig($patient->visit_number, 335, 155, 4);
+        $zebra->writeLabel($testNames, 330, 10, 1);
+        $zebra->setLabelCopies(1);
     }
 
     /**
