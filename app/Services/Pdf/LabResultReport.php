@@ -26,7 +26,7 @@ class LabResultReport
      * @param bool $base64
      * @return string PDF content
      */
-    public function generate(DoctorVisit $doctorvisit, bool $base64 = false): string
+    public function generate(DoctorVisit $doctorvisit, bool $base64 = false, bool $isWhatsappContext = false): string
     {
         ob_start();
 
@@ -106,7 +106,7 @@ class LabResultReport
         }
 
         // Add logo
-        $this->addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64);
+        $this->addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64, $isWhatsappContext);
 
         $patient->update(['result_print_date' => now()]);
         
@@ -208,9 +208,20 @@ class LabResultReport
     /**
      * Add logo to the PDF
      */
-    private function addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64): void
+    private function addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64, bool $isWhatsappContext = false): void
     {
-        if ($settings?->is_logo) {
+        // Determine logo visibility using new settings
+        $shouldShowLogo = false;
+        if ($settings?->show_logo_only_whatsapp) {
+            $shouldShowLogo = (bool)$isWhatsappContext; // Only show when sending via WhatsApp
+        } elseif ($settings?->show_logo !== null) {
+            $shouldShowLogo = (bool)$settings->show_logo; // Global on/off
+        } else {
+            // Backward compatibility: fall back to old is_logo flags
+            $shouldShowLogo = (bool)$settings?->is_logo;
+        }
+
+        if ($shouldShowLogo) {
             if ($logo_name != '') {
                 $pdf->Image(
                     $logo_path . '/' . $logo_name,
@@ -219,12 +230,12 @@ class LabResultReport
             }
         } else {
             //is_header الترويصه
-            if ($settings?->is_header == '1') {
+            // if ($settings?->is_header == '1') {
                 $pdf->Image(
                     $logo_path . '/' . $logo_name,
                     10, 10, $page_width + 10, 30, '', '', '', true, 150, '', false, false, 0, false, false, false
                 );
-            }
+            // }
         }
     
     }
@@ -544,10 +555,10 @@ class LabResultReport
         // PAGE 1: Personal Information + Statistics (no AddPage - starts on current page)
         $this->renderSemenAnalysisPage1($pdf, $groupedResults, $page_width);
         
-        // PAGE 2: Physico-Chemical Properties + Morphology
-        $this->renderSemenAnalysisPage2($pdf, $groupedResults, $page_width);
+        // PAGE 2: Physico-Chemical Properties + Morphology (morphology on its own page) + comment after morphology
+        $this->renderSemenAnalysisPage2($pdf, $groupedResults, $page_width, $m_test->comment ?? null);
         
-        // PAGE 3: Image only
+        // PAGE 3: Image only (comment moved to after Morphology on separate page)
         $this->renderSemenAnalysisPage3($pdf, $groupedResults, $page_width);
     }
     
@@ -619,7 +630,7 @@ class LabResultReport
     /**
      * PAGE 2: Physico-Chemical Properties + Morphology
      */
-    private function renderSemenAnalysisPage2($pdf, $groupedResults, $page_width): void
+    private function renderSemenAnalysisPage2($pdf, $groupedResults, $page_width, $comment = null): void
     {
         $pdf->AddPage();
         
@@ -628,16 +639,25 @@ class LabResultReport
             $this->renderPhysicoChemicalSection($pdf, $groupedResults['PHYSICO – CHEMICAL PROPERTIES'], $page_width);
         }
         
-        // Morphology section follows directly on the same page
+        // Morphology on a separate page
         if (isset($groupedResults['MORPHOLOGY'])) {
+            $pdf->AddPage();
             $this->renderMorphologySection($pdf, $groupedResults['MORPHOLOGY'], $page_width);
+            // Immediately after morphology, render the comment if provided
+            if ($comment !== null && trim((string)$comment) !== '') {
+                $this->addVerticalSpacing($pdf, 4);
+                $pdf->SetFont('arial', 'u', 12, '', true);
+                $pdf->Cell($page_width, 6, "Comment", 0, 1, 'L');
+                $pdf->SetFont('arial', '', 11, '', true);
+                $pdf->MultiCell($page_width, 5, (string)$comment, 0, 'L', 0, 1, '', '', true);
+            }
         }
     }
     
     /**
      * PAGE 3: Reference diagram
      */
-    private function renderSemenAnalysisPage3($pdf, $groupedResults, $page_width): void
+    private function renderSemenAnalysisPage3($pdf, $groupedResults, $page_width, $comment = null): void
     {
         $pdf->AddPage();
         
@@ -656,6 +676,8 @@ class LabResultReport
         $pdf->SetTextColor(0, 0, 0);
         
         $this->addVerticalSpacing($pdf, 5);
+
+        // Comment is now rendered after Morphology on its own page, so skip here
         
         // Add semen.png image
         $imagePath = public_path('semen.png');
@@ -980,7 +1002,12 @@ class LabResultReport
             if ($isSemen) {
                 $pdf->Cell($paramWidth, 7, $child_test->child_test_name, 1, 0, 'L', 1);
                 $pdf->SetFont('arial', 'B', 9, '', true);
-                $pdf->Cell($resultWidth, 7, $displayResult, 1, 0, 'C', 1);
+                // Append exponent unit for Total sperm number within semen statistics
+                $displayForCell = $displayResult;
+                if (trim((string)$child_test->child_test_name) === 'Total sperm number (x10⁶  / ejaculate )') {
+                    $displayForCell = rtrim((string)$displayResult) . ' x10⁶';
+                }
+                $pdf->Cell($resultWidth, 7, $displayForCell, 1, 0, 'C', 1);
                 $pdf->SetFont('arial', '', 9, '', true);
                 $lower = $child_test->lower_limit ?? '';
                 $mean = $child_test->mean ?? '';

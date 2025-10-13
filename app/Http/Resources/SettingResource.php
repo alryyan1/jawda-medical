@@ -68,6 +68,8 @@ class SettingResource extends JsonResource
             'send_sms_after_auth' => (bool) $this->send_sms_after_auth,
             'send_whatsapp_after_auth' => (bool) $this->send_whatsapp_after_auth,
             'watermark_image' => $this->watermark_image,
+            'show_logo' => (bool) $this->show_logo,
+            'show_logo_only_whatsapp' => (bool) $this->show_logo_only_whatsapp,
 
             // Eager load related finance accounts if needed for display
             // 'default_finance_account_details' => new FinanceAccountResource($this->whenLoaded('defaultFinanceAccount')),

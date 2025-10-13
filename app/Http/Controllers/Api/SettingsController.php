@@ -137,6 +137,8 @@ class SettingsController extends Controller
             'send_sms_after_auth' => 'sometimes|boolean',
             'send_whatsapp_after_auth' => 'sometimes|boolean',
             'watermark_image' => 'nullable|string',
+            'show_logo' => 'sometimes|boolean',
+            'show_logo_only_whatsapp' => 'sometimes|boolean',
         ]);
         
         $updateData = $request->except(['logo_file', 'header_image_file', 'footer_image_file', 'auditor_stamp_file', 'manager_stamp_file',  'report_header_logo_file']);

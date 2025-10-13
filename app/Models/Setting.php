@@ -141,6 +141,8 @@ class Setting extends Model
         'send_sms_after_auth',
         'send_whatsapp_after_auth',
         'watermark_image',
+        'show_logo',
+        'show_logo_only_whatsapp',
     ];
 
     protected $casts = [
@@ -164,6 +166,8 @@ class Setting extends Model
         'send_sms_after_auth' => 'boolean',
         'send_whatsapp_after_auth' => 'boolean',
         'watermark_image' => 'string',
+        'show_logo' => 'boolean',
+        'show_logo_only_whatsapp' => 'boolean',
     ];
 
     // Helper to always get the first (and only) settings record
