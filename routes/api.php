@@ -330,8 +330,8 @@ Route::middleware('auth:sanctum')->group(function () {
   // ...
   Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
   Route::get('/reports/costs/pdf', [ReportController::class, 'generateCostsReportPdf']);
-    // Route for fetching costs for the list page (if not using a full apiResource for costs)
-    Route::get('/costs-report-data', [CostController::class, 'index']); // Using CostController@index for data
+  // Route for fetching costs for the list page (if not using a full apiResource for costs)
+  Route::get('/costs-report-data', [CostController::class, 'index']); // Using CostController@index for data
   // Route::
   Route::get('/reports/lab-test-statistics', [ReportController::class, 'labTestStatistics']);
   Route::get('/reports/lab-general', [ReportController::class, 'labGeneral']);
@@ -659,6 +659,7 @@ Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::c
 Route::patch('/doctor-visits/{visit}/update-all-lab-requests-bankak', [LabRequestController::class, 'updateAllLabRequestsBankak'])->middleware('auth:sanctum');
 Route::get('/lab-requests/visit/{visit}/thermal-receipt-pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
 Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
+Route::post('/reports/cash-reconciliation/pdf', [ReportController::class, 'generateCashReconciliationPdf'])->middleware('auth:sanctum');
 
 // Firestore update endpoints
 Route::post('/firestore/update-document', [App\Http\Controllers\Api\FirestoreController::class, 'updateFirestoreDocument'])->middleware('auth:sanctum');

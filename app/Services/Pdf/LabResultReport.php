@@ -231,10 +231,12 @@ class LabResultReport
         } else {
             //is_header الترويصه
             // if ($settings?->is_header == '1') {
+                if (!$settings?->show_logo_only_whatsapp) {
                 $pdf->Image(
                     $logo_path . '/' . $logo_name,
                     10, 10, $page_width + 10, 30, '', '', '', true, 150, '', false, false, 0, false, false, false
                 );
+            }
             // }
         }
     
@@ -274,7 +276,7 @@ class LabResultReport
         foreach ($main_test_array as $m_test) {
             $count++;
             // dd($m_test);
-            if ($m_test->hidden == 0) continue;
+            if ($m_test->hidden == 1) continue;
             
             $children_count = count($m_test->results);
             $children_count_empty = $m_test->results->filter(function ($curr) {

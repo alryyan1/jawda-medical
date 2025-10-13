@@ -2,11 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-
 // app/Http/Controllers/Api/ReportController.php
-namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\LabTestStatisticResource;
@@ -41,9 +37,12 @@ use App\Models\RequestedServiceCost;
 use App\Models\RequestedServiceDeposit;
 use App\Models\ShiftDefinition;
 use App\Models\SubServiceCost;
+use App\Models\Deno;
+use App\Models\DenoUser;
 use Illuminate\Support\Facades\Auth;
 use App\Services\UltramsgService;
 use App\Services\Pdf\LabResultReport;
+use App\Services\Pdf\CashReconciliationReport;
 
 class ReportController extends Controller
 {
@@ -354,7 +353,7 @@ class ReportController extends Controller
 
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
         $pdf->AddPage();
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
+        $pdf->SetFont('helvetica', '', 8);
 
         $headers = [ /* ... Your headers ... */
             '#', 'Employee Name', 'Scheduled', 'Present', 'Late', 'Early Leave', 'Absent', 'On Leave', 'Sick Leave', 'Holidays'
@@ -454,8 +453,8 @@ class ReportController extends Controller
         $priceWidth = $itemBlockWidth * 0.30;    // 30% for price
 
         $cellHeight = 6;
-        $headerFont = $pdf->getDefaultFontFamily(); // Or $pdf->defaultFontBold
-        $dataFont = $pdf->getDefaultFontFamily();
+        $headerFont = 'helvetica'; // Or $pdf->defaultFontBold
+        $dataFont = 'helvetica';
 
         $pdf->SetFont($headerFont, 'B', 9);
         $pdf->SetFillColor(230, 230, 230);
@@ -763,7 +762,7 @@ class ReportController extends Controller
 
     //     // Table Body
     //     $fill = false;
-    //     $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
+    //     $pdf->SetFont('helvetica', '', 8);
     //     foreach ($dailyData as $dayData) {
     //         if ($dayData['income'] == 0 && $dayData['cash'] == 0 && $dayData['bank'] == 0 && $dayData['discount'] == 0) {
     //             // Optionally skip days with no activity to make report shorter
@@ -783,10 +782,10 @@ class ReportController extends Controller
     //     $pdf->Ln(5);
 
     //     // Grand Totals Section
-    //     $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 10);
+    //     $pdf->SetFont('helvetica', 'B', 10);
     //     $pdf->Cell(0, 8, 'ملخص إجمالي للشهر', 0, 1, $pdf->getRTL() ? 'R' : 'L');
 
-    //     $pdf->SetFont($pdf->getDefaultFontFamily(), '', 9);
+    //     $pdf->SetFont('helvetica', '', 9);
     //     $totalLabelWidth = 60;
     //     $totalValueWidth = 50;
 
@@ -799,7 +798,7 @@ class ReportController extends Controller
     //     $pdf->Cell($totalLabelWidth, 7, 'إجمالي المحصل بنك/شبكة:', 'LTRB', 0, 'R');
     //     $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['bank'], 2), 'LTRB', 1, 'C');
     //     $pdf->Ln(2);
-    //     $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 9);
+    //     $pdf->SetFont('helvetica', 'B', 9);
     //     $pdf->Cell($totalLabelWidth, 7, 'إجمالي صافي الدخل المحصل:', 'LTRB', 0, 'R');
     //     $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['cash'] + $grandTotals['bank'], 2), 'LTRB', 1, 'C');
 
@@ -860,7 +859,7 @@ class ReportController extends Controller
         // For TCPDF internal fonts like dejavusans, this is not needed.
         // If using a custom TTF font, ensure it's correctly added via TCPDF_FONTS::addTTFfont
         // For now, relying on MyCustomTCPDF's default font (dejavusans)
-        // 'arial' = $pdf->getDefaultFontFamily(); // Use the default from your custom class
+        // 'arial' = 'helvetica'; // Use the default from your custom class
         $fontBold = $pdf->SetFont('arial', 'B'); // Get bold variant if defaultFontBold is set in MyCustomTCPDF
 
         $pdf->AddPage();
@@ -1575,7 +1574,7 @@ class ReportController extends Controller
 
     protected function drawThermalTotalRow(MyCustomTCPDF $pdf, string $label, float $value, float $pageUsableWidth, bool $isBoldValue = false, string $valueClass = '')
     {
-        $fontName = $pdf->getDefaultFontFamily();
+        $fontName = 'helvetica';
         $currentFontSize = $pdf->getFontSizePt();
         $currentStyle = $pdf->getFontStyle();
 
@@ -1730,7 +1729,7 @@ class ReportController extends Controller
         );
         $pdf->AddPage();
         $pdf->SetLineWidth(0.1);
-        $defaultFont = $pdf->getDefaultFontFamily(); // From MyCustomTCPDF
+        $defaultFont = 'helvetica'; // From MyCustomTCPDF
         $isRTL = $pdf->getRTL();
 
         // --- Overall Summary Section at the Top ---
@@ -2169,7 +2168,7 @@ class ReportController extends Controller
         $pdf = new MyCustomTCPDF($reportTitle, null, 'L', 'mm', 'A4', true, 'utf-8', false, false, $filterCriteriaString); // Landscape
         $pdf->AddPage();
         $pdf->SetLineWidth(0.1);
-        $fontname = $pdf->getDefaultFontFamily();
+        $fontname = 'helvetica';
 
         // Table Header
         $headers = ['الطبيب', 'التخصص', 'إجمالي المستحق', 'مستحق نقدي', 'مستحق تأمين', 'بواسطة'];
@@ -2323,7 +2322,7 @@ class ReportController extends Controller
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'P', 'mm', 'A4'); // Portrait
         $pdf->AddPage();
         $pdf->SetLineWidth(0.1);
-        $fontname = $pdf->getDefaultFontFamily();
+        $fontname = 'helvetica';
 
         // Table Header
         $headers = ['نوع التكلفة الفرعية', 'إجمالي المبلغ'];
@@ -2478,7 +2477,7 @@ class ReportController extends Controller
 
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
         $pdf->AddPage();
-        $fontname = $pdf->getDefaultFontFamily();
+        $fontname = 'helvetica';
 
         // Table Header
         $headers = ['الطبيب', 'التخصص', 'عدد المرضى', 'إجمالي الدخل المحقق', 'مستحق نقدي', 'مستحق تأمين', 'إجمالي المستحقات'];
@@ -2672,7 +2671,7 @@ class ReportController extends Controller
 
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4');
         $pdf->AddPage();
-        $fontname = $pdf->getDefaultFontFamily();
+        $fontname = 'helvetica';
 
         $headers = ['الشركة', 'عدد المرضى', 'إجمالي الدخل من مرضى الشركة', 'إجمالي تحمل الشركة', 'صافي الدخل (بعد التحمل)'];
         $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
@@ -2841,7 +2840,7 @@ class ReportController extends Controller
 
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'P', 'mm', 'A4');
         $pdf->AddPage();
-        $fontname = $pdf->getDefaultFontFamily();
+        $fontname = 'helvetica';
 
         $headers = ['شركة التأمين', 'إجمالي المستحقات للطبيب'];
         $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
@@ -3143,7 +3142,7 @@ class ReportController extends Controller
         $pdf->setThermalDefaults($thermalWidth);
         $pdf->AddPage();
 
-        $fontName = $pdf->getDefaultFontFamily();
+        $fontName = 'helvetica';
         $isRTL = $pdf->getRTL();
         $alignStart = $isRTL ? 'R' : 'L';
         $alignCenter = 'C';
@@ -3304,7 +3303,7 @@ class ReportController extends Controller
         $pdf->setThermalDefaults($thermalWidth);
         $pdf->AddPage();
 
-        $fontName = $pdf->getDefaultFontFamily();
+        $fontName = 'helvetica';
         $isRTL = $pdf->getRTL();
         $alignStart = $isRTL ? 'R' : 'L';
         $alignCenter = 'C';
@@ -3462,7 +3461,7 @@ class ReportController extends Controller
         $pdf->setPrintFooter(false);
         $pdf->SetMargins($labelMargin, $labelMargin, $labelMargin);
         $pdf->SetAutoPageBreak(false);
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', $fontSize);
+        $pdf->SetFont('helvetica', '', $fontSize);
 
         foreach ($visit->patientLabRequests as $lr) {
             if (!$lr->sample_id) {
@@ -3479,12 +3478,12 @@ class ReportController extends Controller
             $cellLineHeight = $fontSize * 0.4;
 
             $patientNameShort = mb_substr($visit->patient->name, 0, 15) . (mb_strlen($visit->patient->name) > 15 ? '...' : '');
-            $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', $fontSize);
+            $pdf->SetFont('helvetica', 'B', $fontSize);
             $pdf->MultiCell($labelWidth - (2 * $labelMargin) - 15, $cellLineHeight, $patientNameShort, 0, $alignStart, false, 0, '', $currentY, true, 0, true);
             $pdf->MultiCell(15, $cellLineHeight, "SID:" . $lr->sample_id, 0, ($isRTL ? 'L' : 'R'), false, 1, $pdf->GetX(), $currentY, true, 0, true);
             $currentY = $pdf->GetY();
 
-            $pdf->SetFont($pdf->getDefaultFontFamily(), '', $fontSize - 1);
+            $pdf->SetFont('helvetica', '', $fontSize - 1);
             $ageGender = ($visit->patient->age_year ?? 'NA') . 'Y/' . strtoupper(substr($visit->patient->gender ?? 'U', 0, 1));
             $pdf->MultiCell($labelWidth / 2 - $labelMargin, $cellLineHeight, "PID:" . $visit->patient->id, 0, $alignStart, false, 0, '', $currentY, true, 0, false);
             $pdf->MultiCell(0, $cellLineHeight, $ageGender, 0, ($isRTL ? 'L' : 'R'), false, 1, $labelWidth / 2 + $labelMargin / 2, $currentY, true, 0, false);
@@ -3498,7 +3497,7 @@ class ReportController extends Controller
                 $remainingHeight = $labelHeight - $currentY - $labelMargin;
                 if ($remainingHeight > 5) {
                     $bcHeight = min($barcodeHeight, $remainingHeight - 1);
-                    $style = ['position' => 'S', 'align' => 'C', 'stretch' => false, 'fitwidth' => true, 'border' => false, 'hpadding' => 0, 'vpadding' => 0.5, 'fgcolor' => [0, 0, 0], 'text' => $barcodeText, 'font' => $pdf->getDefaultFontFamily(), 'fontsize' => max(4, $fontSize - 2), 'stretchtext' => 0];
+                    $style = ['position' => 'S', 'align' => 'C', 'stretch' => false, 'fitwidth' => true, 'border' => false, 'hpadding' => 0, 'vpadding' => 0.5, 'fgcolor' => [0, 0, 0], 'text' => $barcodeText, 'font' => 'helvetica', 'fontsize' => max(4, $fontSize - 2), 'stretchtext' => 0];
                     $pdf->write1DBarcode((string) $lr->sample_id, 'C128B', '', $currentY, $labelWidth - (2 * $labelMargin), $bcHeight, 0.25, $style, 'N');
                 }
             }
@@ -3741,7 +3740,7 @@ class ReportController extends Controller
         );
 
         // Font setup is now primarily handled by MyCustomTCPDF's constructor and its defaultFont
-        // $fontMain = $pdf->getDefaultFontFamily(); // e.g., 'aealarabiya' or 'arial'
+        // $fontMain = 'helvetica'; // e.g., 'aealarabiya' or 'arial'
         // $fontEnglish = 'helvetica'; // A fallback or specific English font if needed
 
         $pdf->AddPage(); // This triggers MyCustomTCPDF::Header()
@@ -3784,7 +3783,7 @@ class ReportController extends Controller
 
     protected function estimateMainTestBlockHeightForReport(MyCustomTCPDF $pdf, LabRequest $labRequest): float
     {
-        $fontMain = $pdf->getDefaultFontFamily();
+        $fontMain = 'helvetica';
         $pdf->SetFont($fontMain, '', 8); // Use a typical content font size for estimation
         $lineHeight = 5;
         $height = 10; // For main test name and spacing
@@ -3828,7 +3827,7 @@ class ReportController extends Controller
     protected function drawMainTestContentBlock(MyCustomTCPDF $pdf, LabRequest $labRequest, ?Setting $settings)
     {
         $isRTL = false;
-        $fontMain = $pdf->getDefaultFontFamily(); // Primary font (e.g., aealarabiya)
+        $fontMain = 'helvetica'; // Primary font (e.g., aealarabiya)
         $fontDetail = 'helvetica'; // Fallback for potentially mixed content, or use $fontMain
         $lineHeight = 5;
         $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
@@ -4181,7 +4180,7 @@ class ReportController extends Controller
         $pdf->DrawTableHeader($headers, $colWidths, $alignments);
 
         // Table Body
-        $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
+        $pdf->SetFont('helvetica', '', 8);
         $fill = false;
         if (empty($dailyData)) {
             $pdf->Cell(array_sum($colWidths), 10, ($isRTL ? 'لا توجد بيانات لهذه الفترة.' : 'No data for this period.'), 1, 1, 'C', $fill);
@@ -4200,7 +4199,7 @@ class ReportController extends Controller
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
         // Summary Footer for Table
-        $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 8.5);
+        $pdf->SetFont('helvetica', 'B', 8.5);
         $summaryRow = [
             ($isRTL ? 'الإجمالي الشهري:' : 'Monthly Total:'),
             number_format((float) $summary['total_lab_income_paid'], 2),
@@ -4601,6 +4600,44 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
+    /**
+     * Generate Cash Reconciliation PDF Report
+     */
+    public function generateCashReconciliationPdf(Request $request)
+    {
+        // Permission Check
+        // if (!Auth::user()->can('print cash_reconciliation_report')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
+        $result = CashReconciliationReport::generateFromRequest($request);
+        
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], $result['status']);
+        }
+
+        return response($result['content'], 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "attachment; filename=\"{$result['filename']}\"");
+    }
+
+    /**
+     * Generate Cash Reconciliation PDF Report for Web (opens in new tab)
+     */
+    public function generateCashReconciliationPdfWeb(Request $request)
+    {
+        $result = CashReconciliationReport::generateFromRequest($request);
+        
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], $result['status']);
+        }
+
+        return response($result['content'], 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$result['filename']}\"");
+    }
+
     // Ensure MyCustomTCPDF has drawTextWatermark and drawReportSignatures methods, or define them here
     // ... other helper methods like drawReportSignatures ...
 }
