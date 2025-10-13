@@ -286,6 +286,10 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::patch('/labrequests/{labrequest}/childtests/{child_test}/result', [LabRequestController::class, 'saveSingleResult']);
   Route::patch('/labrequests/{labrequest}/childtests/{child_test}/normal-range', [LabRequestController::class, 'updateNormalRange']);
   Route::patch('/labrequests/{labrequest}/comment', [LabRequestController::class, 'updateComment']);
+  
+  // Comment suggestions endpoints
+  Route::get('/lab/comment-suggestions', [LabRequestController::class, 'getCommentSuggestions']);
+  Route::post('/lab/comment-suggestions', [LabRequestController::class, 'addCommentSuggestion']);
 
   // Generic LabRequest CRUD (if needed separately from visit context for some actions)
   Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']);

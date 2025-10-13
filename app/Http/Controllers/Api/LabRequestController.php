@@ -868,6 +868,7 @@ class LabRequestController extends Controller
         ]);
 
         $patient = $visit->patient()->firstOrFail();
+        if($patient->result_auth) return response()->json(['message' => 'لا يمكن اضافه فحص بعد التحقيق.'], 400);
         $company = $patient->company_id ? Company::find($patient->company_id) : null;
 
         $createdLabRequests = []; // To hold the LabRequest models created
@@ -938,8 +939,8 @@ class LabRequestController extends Controller
                     'main_test_id' => $mainTestId,
                     'pid' => $visit->patient_id,
                     'doctor_visit_id' => $visit->id,
-                    'hidden' => $request->input('hidden', true), // Assuming default is visible
-                    'is_lab2lab' => $request->input('is_lab2lab', false),
+                    'hidden' => 0, // Assuming default is visible
+                    'is_lab2lab' => 0,
                     'valid' => true,
                     'no_sample' => false, // Sample presumably will be collected
                     'price' => $price,
@@ -1582,5 +1583,35 @@ class LabRequestController extends Controller
         ]);
 
         return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
+    }
+
+    /**
+     * Get comment suggestions for autocomplete
+     */
+    public function getCommentSuggestions()
+    {
+        $suggestions = \App\Models\LabCommentSuggestion::getPopularSuggestions(50);
+        
+        return response()->json([
+            'data' => $suggestions
+        ]);
+    }
+
+    /**
+     * Add new comment suggestions (explodes text into words)
+     */
+    public function addCommentSuggestion(Request $request)
+    {
+        $validated = $request->validate([
+            'suggestion' => 'required|string|max:500',
+        ]);
+
+        $suggestions = \App\Models\LabCommentSuggestion::addSuggestion($validated['suggestion']);
+
+        return response()->json([
+            'message' => 'Suggestions processed successfully',
+            'data' => $suggestions,
+            'count' => count($suggestions)
+        ]);
     }
 }
