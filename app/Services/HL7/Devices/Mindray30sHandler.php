@@ -67,6 +67,8 @@ class Mindray30sHandler
             // Extract doctor visit ID from OBR segment field 3 (Filler Order Number)
             $doctorVisitId = $this->extractDoctorVisitId($msg);
             Log::info('Mindray 30s: Doctor visit ID extracted', ['doctorVisitId' => $doctorVisitId]);
+            Log::info('Mindray 30s: CBC results', ['cbcResults' => $cbcResults]);
+            // Log::info('Mindray 30s: Patient info', ['patientInfo' => $patientInfo]);
             
             // Insert into Sysmex table (if doctor visit ID is available)
             if ($doctorVisitId && is_numeric($doctorVisitId)) {
@@ -236,8 +238,8 @@ class Mindray30sHandler
                 // 99MRC codes (ACON device specific)
                 '10027' => 'MID#', // Mid cells count
                 '10029' => 'MID%', // Mid cells percentage
-                '10028' => 'GRAN#', // Granulocytes count
-                '10030' => 'GRAN%', // Granulocytes percentage
+                '10028' => 'NEUT#', // Granulocytes count (mapped to NEUT# for SysmexCbcInserter)
+                '10030' => 'NEUT%', // Granulocytes percentage (mapped to NEUT% for SysmexCbcInserter)
                 '10013' => 'PLCC', // Platelet Large Cell Count
                 '10014' => 'PLCR', // Platelet Large Cell Ratio
                 '10002' => 'PCT', // Plateletcrit

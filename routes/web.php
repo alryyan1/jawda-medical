@@ -72,15 +72,18 @@ Route::get('/phpinfo', function () {
 
 
 Route::get('/hl7', function () {
+    // return 123;
     //get hl7 message from hl7_messages table
-    $hl7Message = Hl7Message::find(21);
+    $hl7Message = Hl7Message::find(1);
+    $hl  = preg_replace('/\s+/', '', $hl7Message->raw_message);
+    $row = substr($hl,strpos($hl,'MSH'));
+    // $correctedMessage = ZybioHandler::correctHl7MessageFormat($hl7Message->raw_message);
 
-    $correctedMessage = ZybioHandler::correctHl7MessageFormat($hl7Message->raw_message);
-
-    $hl7Message = new Aranyasen\Hl7\Message($correctedMessage);
-    $msh = $hl7Message->getSegmentByIndex(0);
-    return $msh->getField(49);
-    return $correctedMessage;
+    // $hl7Message = new Aranyasen\Hl7\Message($correctedMessage);
+    // $msh = $hl7Message->getSegmentByIndex(0);
+    // return $msh->getField(49);
+    $hl7Message = new Aranyasen\HL7\Message($row);
+    dd($hl7Message);
     
     // return $hl7Message;
     // return $hl7Message;
