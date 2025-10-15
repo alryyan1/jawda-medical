@@ -228,8 +228,18 @@ class DoctorShift extends Model
     }
     public function scopeLatestGeneralShift($query)
     {
-        $shift_id = Shift::latest()->first()->id;
-        return $query->where('shift_id', $shift_id)->where('status', true);
+        // Get the latest open (not closed) general shift
+        $latestOpenShift = Shift::where('is_closed', false)
+            ->whereNull('closed_at')
+            ->latest()
+            ->first();
+        
+        if (!$latestOpenShift) {
+            // If no open shift exists, return empty query
+            return $query->whereRaw('1 = 0');
+        }
+        
+        return $query->where('shift_id', $latestOpenShift->id)->where('status', true);
     }
     /**
      * Get all visits associated with this specific doctor's shift session.

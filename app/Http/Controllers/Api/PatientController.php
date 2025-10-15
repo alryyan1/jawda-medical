@@ -719,6 +719,9 @@ class PatientController extends Controller
     public function update(UpdatePatientRequest $request, Patient $patient)
     {
         $validatedData = $request->validated();
+        if($patient->user_id != Auth::id()){
+            return response()->json(['message' => 'لا يمكنك تحديث بيانات هذا المريض.'], 403);
+        }
         Log::info('Updating patient:  ' . $patient->id . ' with data: ' . json_encode($request->all()));
         // Exclude fields that are managed by other processes or shouldn't be mass updated here
         // For example, financial or specific clinical flags related to visits.
