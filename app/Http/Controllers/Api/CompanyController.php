@@ -27,7 +27,7 @@ class CompanyController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Company::withCount('contractedServices') // Get count of service contracts
+        $query = Company::withCount('contractedServices')->where('name', '!=', '') // Get count of service contracts
                           ->with('financeAccount');      // Eager load finance account
 
         // Example Search Filter (optional)

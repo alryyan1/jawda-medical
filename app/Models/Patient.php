@@ -394,6 +394,21 @@ class Patient extends Model
     {
         return $this->belongsTo(File::class);
     }
+    public function total_price($user = null){
+        $total = 0;
+        /** @var LabRequest $labrequest */
+        foreach ($this->labrequests as $labrequest){
+
+            if ($user){
+                if ($labrequest->user_deposited != $user) continue;
+
+            }
+            if(!$labrequest->is_paid) continue;
+
+                $total+=$labrequest->price;
+        }
+        return $total;
+    }
     public function tests_concatinated(){
         return join(',',$this->labRequests->pluck('name')->all());
      }

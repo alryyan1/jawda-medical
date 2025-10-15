@@ -13,6 +13,7 @@ use App\Models\DoctorVisit;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use App\Models\User;
 
 class DoctorShiftController extends Controller
 {
@@ -175,8 +176,11 @@ class DoctorShiftController extends Controller
         }
 
         if ($doctorShift->user_id !== Auth::id() && !Auth::user()->hasRole('admin')) {
-            return response()->json(['message' => 'لا يمكنك إغلاق وردية هذا الطبيب لأنك لست المسؤول عنها.'], 403);
+            $userwhoOpenedShift = User::find($doctorShift->user_id);
+            $name = $userwhoOpenedShift->name;
+            return response()->json(['message' => "فقط الموظف  $name يمكنه إغلاق وردية هذا الطبيب."], 403);
         }
+
 
         $validated = $request->validate([
             // 'end_time' => 'nullable|date_format:Y-m-d H:i:s|after_or_equal:start_time',

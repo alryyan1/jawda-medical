@@ -94,6 +94,9 @@ class UserController extends Controller
         if ($request->has('is_supervisor')) $updateData['is_supervisor'] = $request->boolean('is_supervisor');
         if ($request->has('is_active')) $updateData['is_active'] = $request->boolean('is_active');
         if ($request->has('user_type')) $updateData['user_type'] = (string) $request->input('user_type');
+        if (!$request->has('user_type') || $request->input('user_type') ==  null){
+            $updateData['user_type'] = null;
+        }
         $user->update($updateData);
 
         if ($request->has('roles') ) { // Assuming 'assign roles' permission
@@ -115,6 +118,8 @@ class UserController extends Controller
             'per_page' => 'nullable|integer|min:5|max:200', // Example range
             'search' => 'nullable|string|max:255', // Optional search term
             'role' => 'nullable|string|max:255', // Optional filter by role name
+            'user_type' => 'nullable|string|max:255', // Optional filter by user_type
+            'is_active' => 'nullable|boolean', // Optional filter by active flag
         ]);
 
         $perPage = $request->input('per_page', 15); // Default to 15 items per page
@@ -136,6 +141,16 @@ class UserController extends Controller
             $query->whereHas('roles', function ($q) use ($roleName) {
                 $q->where('name', $roleName);
             });
+        }
+
+        // Optional: Filter by user_type exact match
+        if ($request->filled('user_type')) {
+            $query->where('user_type', $request->input('user_type'));
+        }
+
+        // Optional: Filter by is_active (accepts 0/1, true/false)
+        if ($request->has('is_active') && $request->input('is_active') !== null && $request->input('is_active') !== '') {
+            $query->where('is_active', (bool) $request->boolean('is_active'));
         }
 
         $users = $query->orderBy('id', 'desc')->paginate($perPage);

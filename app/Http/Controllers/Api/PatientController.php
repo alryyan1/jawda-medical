@@ -123,6 +123,7 @@ class PatientController extends Controller
 
     public function store(StorePatientRequest $request)
     {
+
         
         $validatedPatientData = $request->validated(); // Use validated() directly
 
@@ -141,10 +142,12 @@ class PatientController extends Controller
         }
         $currentGeneralShift = $shiftCheck;
         $activeDoctorShiftId = $request->input('doctor_shift_id');
-
+        $user = Auth::user();
         if ($request->filled('company_id')) {
+            if(!$user->user_type == 'تامين') return response()->json(['message' => '   المستخدم ليس من نوع تامين .'], 400);
             // $this->authorize('register insurance_patient');
         } else {
+            if( $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
             // $this->authorize('register cash_patient');
         }
         DB::beginTransaction();
@@ -599,6 +602,10 @@ class PatientController extends Controller
         if ($dateCheck instanceof \Illuminate\Http\JsonResponse) {
             return $dateCheck; // Ensure latest shift is from today
         }
+
+        $user = Auth::user();
+        if($doctorVisit->patient->company_id == null && $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+       
 
         $fileToUseId = null;
         $previousVisit = null;

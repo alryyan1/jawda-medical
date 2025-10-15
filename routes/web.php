@@ -11,6 +11,7 @@ use App\Models\Shift;
 use App\Services\HL7\Devices\SysmexCbcInserter;
 use App\Services\HL7\Devices\ZybioHandler;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\InsuranceReportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,6 +35,8 @@ Route::get('/reports/doctor-shifts/{doctor}/financial-summary/pdf', [ReportContr
     Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
 
 Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
+// Insurance report (web)
+Route::get('/reports/insurance/pdf', [InsuranceReportController::class, 'insuranceReport']);
 Route::get('/', function () {
     $shift = Shift::find(168);
     return $shift->shiftClinicServiceCosts();
