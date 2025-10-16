@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\InsuranceAuditController;
 use App\Http\Controllers\Api\LabRequestController;
 use App\Http\Controllers\Api\MainTestController;
+use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\ReportController;
@@ -56,6 +57,7 @@ use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\SettingUploadController;
 use App\Http\Controllers\Api\HL7MessageController;
 use App\Http\Controllers\Api\HL7MessageInsertController;
+use App\Http\Controllers\Api\ImageProxyController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SmsController;
@@ -231,6 +233,8 @@ Route::middleware('auth:sanctum')->group(function () {
   // Route::apiResource('containers', ContainerController::class); // If full CRUD for containers
 
   Route::apiResource('main-tests', MainTestController::class);
+  Route::apiResource('offers', OfferController::class);
+  Route::get('offers-main-tests', [OfferController::class, 'getMainTests']);
   Route::get('units-list', [UnitController::class, 'indexList']);
   Route::post('units', [UnitController::class, 'store']);
   Route::get('child-groups-list', [ChildGroupController::class, 'indexList']);
@@ -651,6 +655,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/configured', [\App\Http\Controllers\UltramsgController::class, 'isConfigured']);
     });
 });
+
+// Image proxy for cross-origin images -> base64
+Route::get('/image-proxy/base64', [ImageProxyController::class, 'fetchBase64']);
 
 // Add missing routes for LabRequestsColumn functionality
 Route::patch('/labrequests/{labrequest}/discount', [LabRequestController::class, 'updateDiscount'])->middleware('auth:sanctum');

@@ -412,6 +412,19 @@ class Patient extends Model
     public function tests_concatinated(){
         return join(',',$this->labRequests->pluck('name')->all());
      }
+     public function discountAmount($user=null){
+        $total = 0;
+        foreach ($this->labrequests as $labrequest){
+            if ($user){
+                if ($labrequest->user_deposited != $user) continue;
+            }
+            $amount_discounted = $labrequest->price * $labrequest->discount_per / 100;
+            $total += $amount_discounted;
+
+        }
+        return $total;
+
+    }
     /**
      * Calculate age from Date of Birth if you were to store DOB instead of age parts.
      * public function getAgeAttribute() {

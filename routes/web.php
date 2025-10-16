@@ -44,6 +44,8 @@ Route::get('/', function () {
 Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
 Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
 Route::get('/reports/lab-general/pdf', [ReportController::class, 'generateLabGeneralReportPdf']);
+// New: Lab shift PDF report (summary + details)
+Route::get('/reports/lab-shift/pdf', [ReportController::class, 'labShiftReportPdf']);
 Route::get('/reports/cash-reconciliation/pdf', [ReportController::class, 'generateCashReconciliationPdfWeb']);
 Route::get('/reports/cash-reconciliation/test', function() {
     return response()->json(['message' => 'Cash reconciliation route is working', 'timestamp' => now()]);

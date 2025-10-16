@@ -4527,6 +4527,40 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Generate Lab Shift PDF report (summary + details) and stream in browser
+     */
+    public function labShiftReportPdf(Request $request)
+    {
+        ob_start();
+
+        if ($request->has('shift')) {
+            $shift = \App\Models\Shift::find($request->get('shift'));
+            if (!$shift) {
+                ob_end_clean();
+                return response()->json(['error' => 'Shift not found'], 404);
+            }
+        } else {
+            $shift = \App\Models\Shift::orderByDesc('id')->first();
+            if (!$shift) {
+                ob_end_clean();
+                return response()->json(['error' => 'No shifts available'], 404);
+            }
+        }
+
+        $service = new \App\Services\Pdf\LabShiftReport();
+        $pdfContent = $service->generate($shift);
+
+        $fileName = 'LabReport_Shift_' . $shift->id . '_' . now()->format('Ymd_His') . '.pdf';
+        $response = response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+        ]);
+
+        ob_end_clean();
+        return $response;
+    }
+
   /**
      * Export the list of services to a PDF file.
      */

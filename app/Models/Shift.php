@@ -116,6 +116,15 @@ class Shift extends Model
 
  
 
+    public function totalLabDiscount($user = null)
+    {
+        $total = 0;
+        /** @var Doctorvisit $patient */
+        foreach ($this->patients as $patient) {
+            $total += $patient->patient->discountAmount($user);
+        }
+        return $total;
+    }
     /**
      * Get all financial entries associated with this shift.
      */
