@@ -4302,20 +4302,24 @@ class ReportController extends Controller
             ->join('doctors', 'patients.doctor_id', '=', 'doctors.id')
             ->join('labrequests', 'patients.id', '=', 'labrequests.pid')
             ->leftJoin('companies', 'patients.company_id', '=', 'companies.id')
+            ->leftJoin('users', 'patients.user_id', '=', 'users.id')
             ->select([
                 'doctorvisits.id as doctorvisit_id',
                 'patients.id',
                 'patients.name',
                 'doctors.name as doctor_name',
+                'users.name as user_name',
+                // 'patients.user_requested as user_id',
                 DB::raw('SUM(labrequests.price) as total_lab_amount'),
                 DB::raw('SUM(labrequests.amount_paid) as total_paid_for_lab'),
                 DB::raw('SUM(labrequests.price * labrequests.discount_per / 100) as discount'),
                 DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_amount_bank'),
                 'companies.name as company_name',
+                'patients.created_at',
                 DB::raw('GROUP_CONCAT(DISTINCT main_tests.main_test_name SEPARATOR ", ") as main_tests_names')
             ])
             ->leftJoin('main_tests', 'labrequests.main_test_id', '=', 'main_tests.id')
-            ->groupBy('doctorvisits.id', 'patients.id', 'patients.name', 'doctors.name', 'companies.name');
+            ->groupBy('doctorvisits.id', 'patients.id', 'patients.name', 'doctors.name', 'users.name', 'companies.name', 'patients.created_at');
 
         // Apply shift filter
         if ($request->filled('shift_id')) {

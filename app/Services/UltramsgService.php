@@ -332,4 +332,5 @@ class UltramsgService
         // Check if the instance is authenticated and connected
         return $status === 'authenticated' && $substatus === 'connected';
     }
+
 }

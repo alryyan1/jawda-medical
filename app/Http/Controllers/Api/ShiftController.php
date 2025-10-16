@@ -114,10 +114,31 @@ class ShiftController extends Controller
         //     return response()->json(['message' => 'ليس لديك صلاحية لفتح وردية عمل.'], 403);
         // }
 
-
         $user = Auth::user();
-        // Check if there's already an open shift to prevent multiple open shifts if that's your rule
-      
+        
+        // Check if there's already an open shift to prevent multiple open shifts
+        $currentOpenShift = Shift::where('is_closed', false)->first();
+        if ($currentOpenShift) {
+            return response()->json(['message' => 'يوجد وردية عمل مفتوحة بالفعل. يجب إغلاق الوردية الحالية قبل فتح وردية جديدة.'], 409);
+        }
+
+        // Check if at least 6 hours have passed since the last shift was closed
+        $lastClosedShift = Shift::where('is_closed', true)
+            ->whereNotNull('closed_at')
+            ->orderBy('closed_at', 'desc')
+            ->first();
+
+        if ($lastClosedShift) {
+            $hoursSinceLastShift = Carbon::now()->diffInHours($lastClosedShift->closed_at);
+            if ($hoursSinceLastShift < 6) {
+                $remainingHours = 6 - $hoursSinceLastShift;
+                return response()->json([
+                    'message' => "يجب أن تمر 6 ساعات على الأقل بين الورديات. الوقت المتبقي: {$remainingHours} ساعة.",
+                    'hours_remaining' => $remainingHours,
+                    'last_shift_closed_at' => $lastClosedShift->closed_at->toDateTimeString()
+                ], 409);
+            }
+        }
 
         $validatedData = $request->validate([
             // 'name' => 'nullable|string|max:255', // If you add a name field

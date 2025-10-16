@@ -376,6 +376,20 @@ app.post('/emit/sysmex-result-inserted', verifyAuth, (req, res) => {
   }
 });
 
+// Emit bankak-image-inserted
+app.post('/emit/bankak-image-inserted', verifyAuth, (req, res) => {
+  try {
+    const payload = req.body; // Expecting bankak image data
+    console.log('bankak-image-inserted', payload);
+    io.emit('bankak-image-inserted', payload);
+    console.log('bankak-image-inserted emitted');
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error emitting bankak-image-inserted:', err?.message || err);
+    return res.status(500).json({ error: 'Failed to emit bankak-image-inserted' });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);
 });

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Doctorvisit;
+use App\Models\BankakImage;
+use App\Jobs\EmitBankakImageInsertedJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use App\Services\Pdf\LabResultReport;
 use App\Services\UltramsgService;
@@ -41,14 +44,23 @@ class WebHookController extends Controller
 			// UltraMsg structure handling
 			$from = $event['data']['from'] ?? null;
 			$msg  = $event['data']['body'] ?? null;
+			$type = $event['data']['type'] ?? null;
+			$mediaId = $event['data']['mediaId'] ?? $event['data']['media'] ?? null;
+			$mimeType = $event['data']['mimeType'] ?? null;
+			$messageId = $event['data']['id'] ?? null;
 
-			if (!$from || !$msg) {
-				Log::warning('Missing required fields in webhook', ['from' => $from, 'msg' => $msg, 'event' => $event]);
+			if (!$from) {
+				Log::warning('Missing required fields in webhook', ['from' => $from, 'event' => $event]);
 				return response()->json(['ok' => true]);
 			}
 
 			$from_sms = str_replace(['c.us', '@'], '', $from);
-			Log::info('Processing message', ['from' => $from, 'message' => $msg, 'from_sms' => $from_sms]);
+			Log::info('Processing message', ['from' => $from, 'message' => $msg, 'type' => $type, 'from_sms' => $from_sms]);
+
+			// Handle image messages
+			if ($type === 'image' && ($mediaId || $messageId)) {
+				return $this->handleImageMessage($from_sms, $mediaId ?: $messageId, $mimeType, $event);
+			}
 
 			// If the message is numeric, treat it as a Doctorvisit id
 			if (is_numeric($msg)) {
@@ -121,7 +133,7 @@ EOD;
                     }
 
                     // Generate PDF using LabResultReport service
-                    $pdfContent = (new LabResultReport())->generate($patient, false);
+                    $pdfContent = (new LabResultReport())->generate($patient, false, true);
                     
                     if (empty($pdfContent)) {
                         Log::error('PDF generation failed - empty content', ['patient_id' => $id]);
@@ -232,6 +244,264 @@ EOD;
 			
 			return response()->json(['error' => 'An unexpected error occurred. Please check the logs.'], 500);
 		}
+	}
+
+	/**
+	 * Handle incoming image messages and save them to storage
+	 * 
+	 * Note: Ultramsg provides media URLs in webhook data when available.
+	 * Images are downloaded from the provided S3 URL and stored in the bankak folder.
+	 * If no media URL is provided, the user is informed about the limitation.
+	 *
+	 * @param string $from_sms
+	 * @param string $mediaId
+	 * @param string|null $mimeType
+	 * @param array $event
+	 * @return \Illuminate\Http\JsonResponse
+	 */
+	private function handleImageMessage(string $from_sms, string $mediaId, ?string $mimeType, array $event)
+	{
+		try {
+			Log::info('Processing image message', [
+				'from' => $from_sms,
+				'mediaId' => $mediaId,
+				'mimeType' => $mimeType,
+				'event_data' => $event
+			]);
+
+			// Get UltramsgService instance to access configuration
+			$ultramsgService = new UltramsgService();
+			
+			if (!$ultramsgService->isConfigured()) {
+				Log::error('UltramsgService not configured for image download');
+				return response()->json(['ok' => true]);
+			}
+
+			// Try to get media URL from the webhook data first
+			$mediaUrl = $event['data']['media'] ?? null;
+			
+			if (!empty($mediaUrl)) {
+				// If we have a direct media URL, download from it
+				Log::info('Downloading image from direct media URL', ['url' => $mediaUrl]);
+				$imageData = $this->downloadImageFromUrl($mediaUrl);
+			} else {
+				// Ultramsg doesn't provide media download API for webhook messages
+				// This is a known limitation - we can only acknowledge receipt
+				Log::info('Ultramsg webhook received image message but media download is not supported', [
+					'messageId' => $mediaId,
+					'from' => $from_sms,
+					'note' => 'Ultramsg API does not provide media download for webhook messages'
+				]);
+				
+				// Send a message to the user explaining the limitation
+				$to = UltramsgService::formatPhoneNumber($from_sms);
+				if ($to) {
+					$limitationMessage = 'تم استلام الصورة، لكن لا يمكن حفظها حالياً. يرجى إرسال الصورة مرة أخرى أو التواصل معنا مباشرة.';
+					(new UltramsgService())->sendTextMessage($to, $limitationMessage);
+				}
+				
+				return response()->json(['ok' => true]);
+			}
+			
+			if (!$imageData) {
+				Log::error('Failed to download image from URL', ['mediaUrl' => $mediaUrl]);
+				return response()->json(['ok' => true]);
+			}
+
+			// Determine file extension from mime type
+			$extension = $this->getExtensionFromMimeType($mimeType);
+			
+			// Generate unique filename
+			$filename = 'whatsapp_image_' . $from_sms . '_' . time() . '_' . Str::random(8) . '.' . $extension;
+			
+			// Store the image
+			$storagePath = 'bankak/' . date('Y/m/d') . '/' . $filename;
+			$stored = Storage::disk('public')->put($storagePath, $imageData);
+			
+			if (!$stored) {
+				Log::error('Failed to store image to storage', ['filename' => $filename]);
+				return response()->json(['ok' => true]);
+			}
+
+			// Log successful storage
+			Log::info('Image stored successfully', [
+				'from' => $from_sms,
+				'mediaId' => $mediaId,
+				'filename' => $filename,
+				'storage_path' => $storagePath,
+				'file_size' => strlen($imageData)
+			]);
+
+			// Save image record to database
+			try {
+				$bankakImage = BankakImage::create([
+					'image_url' => $storagePath, // Store the relative path to the image
+					'doctorvisit_id' => null, // Set to null for now as requested
+					'phone' => $from_sms,
+				]);
+
+				Log::info('Image record saved to database', [
+					'bankak_image_id' => $bankakImage->id,
+					'phone' => $from_sms,
+					'image_url' => $storagePath
+				]);
+
+				// Emit real-time event for new bankak image
+				EmitBankakImageInsertedJob::dispatch($bankakImage->id);
+			} catch (\Throwable $e) {
+				Log::error('Failed to save image record to database', [
+					'from' => $from_sms,
+					'storage_path' => $storagePath,
+					'error' => $e->getMessage()
+				]);
+			}
+
+			// Send acknowledgment message
+			$to = UltramsgService::formatPhoneNumber($from_sms);
+			if ($to) {
+				$ackMessage = 'تم استلام وحفظ الصورة بنجاح في بنك الصور. شكراً لك!';
+				(new UltramsgService())->sendTextMessage($to, $ackMessage);
+			}
+
+			return response()->json(['ok' => true]);
+
+		} catch (\Throwable $e) {
+			Log::error('Error processing image message', [
+				'from' => $from_sms,
+				'mediaId' => $mediaId,
+				'error' => $e->getMessage(),
+				'trace' => $e->getTraceAsString()
+			]);
+
+			// Try to send error message to user
+			try {
+				$to = UltramsgService::formatPhoneNumber($from_sms);
+				if ($to) {
+					(new UltramsgService())->sendTextMessage($to, 'عذراً، حدث خطأ في معالجة الصورة. يرجى المحاولة مرة أخرى.');
+				}
+			} catch (\Throwable $sendError) {
+				Log::error('Failed to send error message for image processing', [
+					'original_error' => $e->getMessage(),
+					'send_error' => $sendError->getMessage()
+				]);
+			}
+
+			return response()->json(['ok' => true]);
+		}
+	}
+
+
+	/**
+	 * Download image from a direct URL
+	 *
+	 * @param string $url
+	 * @return string|null
+	 */
+	private function downloadImageFromUrl(string $url): ?string
+	{
+		try {
+			// Use cURL directly to handle content encoding issues
+			$ch = curl_init();
+			curl_setopt($ch, CURLOPT_URL, $url);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+			curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+			curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+			
+			// Handle content encoding - don't set CURLOPT_ENCODING for base64
+			curl_setopt($ch, CURLOPT_HTTPHEADER, [
+				'Accept: image/*,*/*;q=0.8',
+				'Accept-Language: en-US,en;q=0.5',
+				'Connection: keep-alive',
+			]);
+			
+			$imageData = curl_exec($ch);
+			$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+			$error = curl_error($ch);
+			curl_close($ch);
+			
+			if ($error) {
+				Log::error('cURL error while downloading image from URL', [
+					'url' => $url,
+					'error' => $error
+				]);
+				return null;
+			}
+			
+			if ($httpCode === 200 && $imageData !== false) {
+				// Check if the content is base64 encoded (common with S3)
+				$decodedData = $imageData;
+				if (base64_encode(base64_decode($imageData, true)) === $imageData) {
+					// Content is base64 encoded, decode it
+					$decodedData = base64_decode($imageData);
+					Log::info('Decoded base64 content from URL', [
+						'url' => $url,
+						'original_size' => strlen($imageData),
+						'decoded_size' => strlen($decodedData)
+					]);
+				}
+				
+				// Check if it's a valid image by looking at file headers
+				if (strlen($decodedData) > 10 && (
+					strpos($decodedData, "\xFF\xD8\xFF") === 0 || // JPEG
+					strpos($decodedData, "\x89PNG") === 0 || // PNG
+					strpos($decodedData, "GIF8") === 0 // GIF
+				)) {
+					Log::info('Image downloaded successfully from URL', [
+						'url' => $url,
+						'size' => strlen($decodedData),
+						'http_code' => $httpCode,
+						'was_base64' => $decodedData !== $imageData
+					]);
+					return $decodedData;
+				} else {
+					Log::warning('Downloaded data from URL is not a valid image', [
+						'url' => $url,
+						'size' => strlen($decodedData),
+						'http_code' => $httpCode,
+						'was_base64' => $decodedData !== $imageData,
+						'first_bytes' => bin2hex(substr($decodedData, 0, 10))
+					]);
+				}
+			} else {
+				Log::error('Failed to download image from URL', [
+					'url' => $url,
+					'http_code' => $httpCode,
+					'response_size' => strlen($imageData)
+				]);
+			}
+			
+			return null;
+			
+		} catch (\Throwable $e) {
+			Log::error('Exception while downloading image from URL', [
+				'url' => $url,
+				'error' => $e->getMessage()
+			]);
+			return null;
+		}
+	}
+
+	/**
+	 * Get file extension from MIME type
+	 *
+	 * @param string|null $mimeType
+	 * @return string
+	 */
+	private function getExtensionFromMimeType(?string $mimeType): string
+	{
+		$mimeToExtension = [
+			'image/jpeg' => 'jpg',
+			'image/jpg' => 'jpg',
+			'image/png' => 'png',
+			'image/gif' => 'gif',
+			'image/webp' => 'webp',
+			'image/bmp' => 'bmp'
+		];
+
+		return $mimeToExtension[$mimeType] ?? 'jpg';
 	}
 }
 

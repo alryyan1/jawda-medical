@@ -222,21 +222,28 @@ class LabResultReport
         }
 
         if ($shouldShowLogo) {
-            if ($logo_name != '') {
-                $pdf->Image(
-                    $logo_path . '/' . $logo_name,
-                    5, 5, 40, 40, '', '', '', true, 150, '', false, false, 0, false, false, false
-                );
-            }
+            // if ($settings->is_logo) {
+            //     $pdf->Image(
+            //         $logo_path . '/' . $logo_name,
+            //         5, 5, 40, 40, '', '', '', true, 150, '', false, false, 0, false, false, false
+            //     );
+            // }else{
+                // if (!$settings?->show_logo_only_whatsapp) {
+                    $pdf->Image(
+                        $logo_path . '/' . $logo_name,
+                        10, 10, $page_width + 10, 30, '', '', '', true, 150, '', false, false, 0, false, false, false
+                    );
+                // }
+            // }
         } else {
             //is_header الترويصه
             // if ($settings?->is_header == '1') {
-                if (!$settings?->show_logo_only_whatsapp) {
-                $pdf->Image(
-                    $logo_path . '/' . $logo_name,
-                    10, 10, $page_width + 10, 30, '', '', '', true, 150, '', false, false, 0, false, false, false
-                );
-            }
+            //     if (!$settings?->show_logo_only_whatsapp) {
+            //     $pdf->Image(
+            //         $logo_path . '/' . $logo_name,
+            //         10, 10, $page_width + 10, 30, '', '', '', true, 150, '', false, false, 0, false, false, false
+            //     );
+            // }
             // }
         }
     

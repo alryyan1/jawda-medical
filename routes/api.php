@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AttendanceReportController;
 use App\Http\Controllers\Api\AttendanceSettingController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BankakImageController;
 use App\Http\Controllers\Api\CashDenominationController;
 use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
@@ -664,6 +665,13 @@ Route::post('/reports/cash-reconciliation/pdf', [ReportController::class, 'gener
 // Firestore update endpoints
 Route::post('/firestore/update-document', [App\Http\Controllers\Api\FirestoreController::class, 'updateFirestoreDocument'])->middleware('auth:sanctum');
 Route::post('/firestore/update-patient-pdf', [App\Http\Controllers\Api\FirestoreController::class, 'updatePatientPdf']);
+
+// Bankak Images endpoints
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/bankak-images', [BankakImageController::class, 'index']);
+    Route::get('/bankak-images/dates', [BankakImageController::class, 'getAvailableDates']);
+    Route::get('/bankak-images/stats', [BankakImageController::class, 'getStats']);
+});
 
 // Webhook endpoints (no CSRF protection needed)
 Route::get('/webhook', [WebHookController::class, 'webhook']);
