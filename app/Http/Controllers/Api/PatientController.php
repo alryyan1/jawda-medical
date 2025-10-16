@@ -144,7 +144,11 @@ class PatientController extends Controller
         $activeDoctorShiftId = $request->input('doctor_shift_id');
         $user = Auth::user();
         if ($request->filled('company_id')) {
-            if(!$user->user_type == 'تامين') return response()->json(['message' => '   المستخدم ليس من نوع تامين .'], 400);
+            if(!$user->user_type == 'تامين') {
+                return response()->json(['message' => '   المستخدم ليس من نوع تامين .'], 400);
+            }else{
+                if(!$user->hasRole('admin')) return response()->json(['message' => '  المستخدم من نوع نقدي لا يمكنه تسجيل مريض من نوع تامين .'], 400);
+            }
             // $this->authorize('register insurance_patient');
         } else {
             if( $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
