@@ -18,6 +18,7 @@ class CompanyResource extends JsonResource {
             'updated_at' => $this->updated_at?->toIso8601String(),
             // Optionally, a count or brief summary of contracted services
             'contracted_services_count' => $this->whenCounted('contractedServices'),
+            'lab2lab_firestore_id' => $this->lab2lab_firestore_id,
             // 'contracted_services' => CompanyServiceEntryResource::collection($this->whenLoaded('companyServiceEntries')), // If you fetch them directly
                     'contracted_main_tests_count' => $this->whenCounted('contractedMainTests'), // NEW
 

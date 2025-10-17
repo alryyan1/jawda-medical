@@ -178,6 +178,87 @@ class UltramsgService
     }
 
     /**
+     * Send an image via Ultramsg WhatsApp API.
+     *
+     * @param string $to Phone number with international format (e.g., +249991961111)
+     * @param string $image HTTP link to image or base64-encoded image
+     * @param string $caption Caption text under the image (max 1024 characters)
+     * @return array{success: bool, data: mixed, error?: string}
+     */
+    public function sendImage(string $to, string $image, string $caption = ''): array
+    {
+        if (!$this->isConfigured()) {
+            Log::error('UltramsgService: Service not configured.');
+            return ['success' => false, 'error' => 'Ultramsg service not configured.', 'data' => null];
+        }
+
+        // Validate caption length
+        if (strlen($caption) > 1024) {
+            Log::error('UltramsgService: Caption too long. Max length is 1024 characters.');
+            return ['success' => false, 'error' => 'Caption too long. Maximum 1024 characters allowed.', 'data' => null];
+        }
+
+        $endpoint = "{$this->baseUrl}/{$this->instanceId}/messages/image";
+
+        try {
+            $response = Http::asForm()
+                ->post($endpoint, [
+                    'token' => $this->token,
+                    'to' => $to,
+                    'image' => $image,
+                    'caption' => $caption,
+                ]);
+
+            return $this->handleResponse($response, 'Image');
+
+        } catch (\Exception $e) {
+            Log::error("UltramsgService sendImage Exception: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
+        }
+    }
+
+    /**
+     * Send an image from a local file path.
+     *
+     * @param string $to Phone number with international format
+     * @param string $filePath Local file path
+     * @param string $caption Caption text under the image
+     * @return array{success: bool, data: mixed, error?: string}
+     */
+    public function sendImageFromFile(string $to, string $filePath, string $caption = ''): array
+    {
+        if (!file_exists($filePath)) {
+            Log::error("UltramsgService: Image file not found: {$filePath}");
+            return ['success' => false, 'error' => 'Image file not found.', 'data' => null];
+        }
+
+        $fileContent = file_get_contents($filePath);
+        
+        if ($fileContent === false) {
+            Log::error("UltramsgService: Could not read image file: {$filePath}");
+            return ['success' => false, 'error' => 'Could not read image file.', 'data' => null];
+        }
+
+        // Convert to base64
+        $base64Content = base64_encode($fileContent);
+
+        return $this->sendImage($to, $base64Content, $caption);
+    }
+
+    /**
+     * Send an image from a URL.
+     *
+     * @param string $to Phone number with international format
+     * @param string $imageUrl HTTP URL to the image
+     * @param string $caption Caption text under the image
+     * @return array{success: bool, data: mixed, error?: string}
+     */
+    public function sendImageFromUrl(string $to, string $imageUrl, string $caption = ''): array
+    {
+        return $this->sendImage($to, $imageUrl, $caption);
+    }
+
+    /**
      * Handles the response from the Ultramsg API.
      *
      * @param Response $response

@@ -182,4 +182,18 @@ class CompanyController extends Controller
             'updated_count' => $updated,
         ]);
     }
+
+    /**
+     * Update the Firestore ID for a company
+     */
+    public function updateFirestoreId(Request $request, Company $company)
+    {
+        $validatedData = $request->validate([
+            'lab2lab_firestore_id' => 'nullable|string|max:255',
+        ]);
+
+        $company->update($validatedData);
+
+        return new CompanyResource($company->load('financeAccount'));
+    }
 }

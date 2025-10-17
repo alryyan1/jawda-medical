@@ -47,7 +47,7 @@ return [
         'base_url' => env('AIRTEL_SMS_BASE_URL', 'https://www.airtel.sd'),
         'endpoint' => env('AIRTEL_SMS_ENDPOINT', '/api/rest_send_sms/'),
         'api_key' => env('AIRTEL_SMS_API_KEY'),
-        'default_sender' => env('AIRTEL_SMS_SENDER', 'Jawda'),
+        'default_sender' => env('AIRTEL_SMS_SENDER', 'JAWDA'),
         'timeout' => env('AIRTEL_SMS_TIMEOUT', 10),
         // Optional credentials if needed in future
         'user_id' => env('AIRTEL_SMS_USER_ID'),

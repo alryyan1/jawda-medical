@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use App\Services\Pdf\LabResultReport;
 use App\Services\UltramsgService;
+use App\Services\GeminiService;
 
 class WebHookController extends Controller
 {
@@ -60,6 +61,16 @@ class WebHookController extends Controller
 			// Handle image messages
 			if ($type === 'image' && ($mediaId || $messageId)) {
 				return $this->handleImageMessage($from_sms, $mediaId ?: $messageId, $mimeType, $event);
+			}
+
+			// Handle "بنكك اليوم" message
+			if ($msg === 'بنكك اليوم') {
+				return $this->handleBankakTodayMessage($from_sms);
+			}
+
+			// Handle "الاشعارات" message
+			if ($msg === 'الاشعارات') {
+				return $this->handleNotificationsMessage($from_sms);
 			}
 
 			// If the message is numeric, treat it as a Doctorvisit id
@@ -502,6 +513,347 @@ EOD;
 		];
 
 		return $mimeToExtension[$mimeType] ?? 'jpg';
+	}
+
+	/**
+	 * Handle "بنكك اليوم" message - fetch today's images and analyze amounts
+	 *
+	 * @param string $from_sms
+	 * @return \Illuminate\Http\JsonResponse
+	 */
+	private function handleBankakTodayMessage(string $from_sms)
+	{
+		try {
+			Log::info('Processing "بنكك اليوم" request', ['from' => $from_sms]);
+
+			// Send immediate preparing message to the user
+			$to = UltramsgService::formatPhoneNumber($from_sms);
+			if ($to) {
+				(new UltramsgService())->sendTextMessage($to, 'نقوم الآن بتحضير وجمع المعلومات، يرجى الانتظار قليلًا...');
+			}
+
+			// Fetch all images for today
+			$today = now()->format('Y-m-d');
+			$todayImages = BankakImage::whereDate('created_at', $today)->get();
+
+			if ($todayImages->isEmpty()) {
+				$message = 'لا توجد صور في بنك الصور لهذا اليوم';
+				$to = UltramsgService::formatPhoneNumber($from_sms);
+				if ($to) {
+					(new UltramsgService())->sendTextMessage($to, $message);
+				}
+				return response()->json(['ok' => true]);
+			}
+
+			Log::info('Found images for today', [
+				'count' => $todayImages->count(),
+				'date' => $today
+			]);
+
+			// Initialize Gemini service
+			$geminiService = new GeminiService();
+			$amounts = [];
+			$totalAmount = 0;
+
+			// Analyze each image
+			foreach ($todayImages as $index => $image) {
+				try {
+					// Get full image URL
+					$imageUrl = url('storage/' . $image->image_url);
+					
+					Log::info('Analyzing image', [
+						'index' => $index + 1,
+						'image_id' => $image->id,
+						'url' => $imageUrl
+					]);
+
+					// Analyze image with Gemini
+					$result = $geminiService->analyzeImage($imageUrl, 'استخرج المبلغ فقط');
+					
+					if ($result['success'] && isset($result['data']['analysis'])) {
+						$analysis = $result['data']['analysis'];
+						
+						// Extract numeric amount from analysis
+						$amount = $this->extractAmountFromAnalysis($analysis);
+						
+						if ($amount > 0) {
+							$amounts[] = [
+								'notification_number' => $index + 1,
+								'amount' => $amount,
+								'analysis' => $analysis
+							];
+							$totalAmount += $amount;
+						}
+						
+						Log::info('Image analysis completed', [
+							'image_id' => $image->id,
+							'analysis' => $analysis,
+							'extracted_amount' => $amount
+						]);
+					} else {
+						Log::warning('Failed to analyze image', [
+							'image_id' => $image->id,
+							'error' => $result['error'] ?? 'Unknown error'
+						]);
+					}
+				} catch (\Exception $e) {
+					Log::error('Error analyzing individual image', [
+						'image_id' => $image->id,
+						'error' => $e->getMessage()
+					]);
+				}
+			}
+
+			// Format response message
+			$message = $this->formatBankakTodayMessage($amounts, $totalAmount);
+			
+			// Send message to user
+			$to = UltramsgService::formatPhoneNumber($from_sms);
+			if ($to) {
+				(new UltramsgService())->sendTextMessage($to, $message);
+			}
+
+			Log::info('Bankak today message sent', [
+				'from' => $from_sms,
+				'total_images' => $todayImages->count(),
+				'analyzed_amounts' => count($amounts),
+				'total_amount' => $totalAmount
+			]);
+
+			return response()->json(['ok' => true]);
+
+		} catch (\Exception $e) {
+			Log::error('Error processing "بنكك اليوم" message', [
+				'from' => $from_sms,
+				'error' => $e->getMessage(),
+				'trace' => $e->getTraceAsString()
+			]);
+
+			// Send error message to user
+			try {
+				$to = UltramsgService::formatPhoneNumber($from_sms);
+				if ($to) {
+					(new UltramsgService())->sendTextMessage($to, 'عذراً، حدث خطأ في معالجة طلب "بنكك اليوم". يرجى المحاولة مرة أخرى.');
+				}
+			} catch (\Exception $sendError) {
+				Log::error('Failed to send error message for bankak today', [
+					'original_error' => $e->getMessage(),
+					'send_error' => $sendError->getMessage()
+				]);
+			}
+
+			return response()->json(['ok' => true]);
+		}
+	}
+
+	/**
+	 * Extract numeric amount from Gemini analysis text
+	 *
+	 * @param string $analysis
+	 * @return float
+	 */
+	private function extractAmountFromAnalysis(string $analysis): float
+	{
+		// Normalize Arabic-Indic digits to Western digits
+		$digitsMap = [
+			'٠' => '0','١' => '1','٢' => '2','٣' => '3','٤' => '4',
+			'٥' => '5','٦' => '6','٧' => '7','٨' => '8','٩' => '9',
+			'۰' => '0','۱' => '1','۲' => '2','۳' => '3','۴' => '4',
+			'۵' => '5','۶' => '6','۷' => '7','۸' => '8','۹' => '9'
+		];
+		$normalized = strtr($analysis, $digitsMap);
+
+		// Keep only digits and separators
+		$onlyNums = preg_replace('/[^0-9.,]/u', '', $normalized);
+		if ($onlyNums === null) {
+			return 0.0;
+		}
+
+		// Decide on decimal vs thousands separators
+		$hasDot = strpos($onlyNums, '.') !== false;
+		$hasComma = strpos($onlyNums, ',') !== false;
+
+		$candidate = $onlyNums;
+		if ($hasDot && $hasComma) {
+			// Assume comma is thousands, dot is decimal
+			$candidate = str_replace(',', '', $candidate);
+		} elseif ($hasComma && !$hasDot) {
+			// Only comma present: determine if it's thousands (groups of 3) or decimal (1-2 digits at end)
+			if (preg_match('/,\d{1,2}$/', $candidate)) {
+				// Treat as decimal comma -> convert to dot
+				$candidate = str_replace(',', '.', $candidate);
+			} else {
+				// Treat as thousands -> remove
+				$candidate = str_replace(',', '', $candidate);
+			}
+		} else {
+			// Only dot or no separator -> leave as is
+		}
+
+		// If there are multiple dots, keep only the last as decimal and remove others
+		if (substr_count($candidate, '.') > 1) {
+			$lastDotPos = strrpos($candidate, '.');
+			$candidate = str_replace('.', '', substr($candidate, 0, $lastDotPos)) . substr($candidate, $lastDotPos);
+		}
+
+		// If there's no decimal context, remove all dots (treat as thousands)
+		if (strpos($candidate, '.') !== false && !preg_match('/\.\d{1,2}$/', $candidate)) {
+			$candidate = str_replace('.', '', $candidate);
+		}
+
+		// Finally, extract the longest numeric sequence possibly with a single decimal
+		if (preg_match_all('/\d+(?:\.\d{1,2})?/', $candidate, $matches)) {
+			$numbers = $matches[0];
+			usort($numbers, static function ($a, $b) { return strlen($b) <=> strlen($a); });
+			$number = $numbers[0];
+			return (float) $number;
+		}
+
+		return 0.0;
+	}
+
+	/**
+	 * Format the bankak today message
+	 *
+	 * @param array $amounts
+	 * @param float $totalAmount
+	 * @return string
+	 */
+	private function formatBankakTodayMessage(array $amounts, float $totalAmount): string
+	{
+		$message = "بسم الله الرحمن الرحيم\n\n";
+		
+		if (empty($amounts)) {
+			$message .= "لا توجد مبالغ محددة في الصور لهذا اليوم";
+		} else {
+			foreach ($amounts as $item) {
+				$message .= "الاشعار رقم {$item['notification_number']} المبلغ يساوي {$item['amount']}\n";
+			}
+			
+			$message .= "\nالمجموع {$totalAmount}";
+		}
+		
+		return $message;
+	}
+
+	/**
+	 * Handle "الاشعارات" message - send today's images back to user
+	 *
+	 * @param string $from_sms
+	 * @return \Illuminate\Http\JsonResponse
+	 */
+	private function handleNotificationsMessage(string $from_sms)
+	{
+		try {
+			Log::info('Processing "الاشعارات" request', ['from' => $from_sms]);
+
+			// Send immediate preparing message to the user
+			$to = UltramsgService::formatPhoneNumber($from_sms);
+			if ($to) {
+				(new UltramsgService())->sendTextMessage($to, 'نقوم الآن بجمع صور الاشعارات لهذا اليوم، يرجى الانتظار قليلًا...');
+			}
+
+			// Fetch all images for today
+			$today = now()->format('Y-m-d');
+			$todayImages = BankakImage::whereDate('created_at', $today)->get();
+
+			if ($todayImages->isEmpty()) {
+				$message = 'لا توجد صور اشعارات في بنك الصور لهذا اليوم';
+				$to = UltramsgService::formatPhoneNumber($from_sms);
+				if ($to) {
+					(new UltramsgService())->sendTextMessage($to, $message);
+				}
+				return response()->json(['ok' => true]);
+			}
+
+			Log::info('Found images for notifications', [
+				'count' => $todayImages->count(),
+				'date' => $today
+			]);
+
+			// Send each image back to the user
+			$sentCount = 0;
+			foreach ($todayImages as $index => $image) {
+				try {
+					// Get full image URL
+					$imageUrl = url('storage/' . $image->image_url);
+					
+					Log::info('Sending image back to user', [
+						'index' => $index + 1,
+						'image_id' => $image->id,
+						'url' => $imageUrl
+					]);
+
+					// Send image directly via URL using the new image method
+					$to = UltramsgService::formatPhoneNumber($from_sms);
+					if ($to) {
+						$result = (new UltramsgService())->sendImageFromUrl($to, $imageUrl, 'اشعار ' . ($index + 1));
+						
+						if ($result['success']) {
+							$sentCount++;
+							Log::info('Image sent successfully', [
+								'image_id' => $image->id,
+								'index' => $index + 1,
+								'message_id' => $result['message_id'] ?? null
+							]);
+						} else {
+							Log::error('Failed to send image', [
+								'image_id' => $image->id,
+								'index' => $index + 1,
+								'error' => $result['error'] ?? 'Unknown error'
+							]);
+						}
+					}
+					
+					// Add small delay between images to avoid rate limiting
+					sleep(1);
+					
+				} catch (\Exception $e) {
+					Log::error('Error sending individual image', [
+						'image_id' => $image->id,
+						'index' => $index + 1,
+						'error' => $e->getMessage()
+					]);
+				}
+			}
+
+			// Send summary message
+			$summaryMessage = "تم إرسال {$sentCount} من أصل " . $todayImages->count() . " صورة اشعارات لهذا اليوم";
+			$to = UltramsgService::formatPhoneNumber($from_sms);
+			if ($to) {
+				(new UltramsgService())->sendTextMessage($to, $summaryMessage);
+			}
+
+			Log::info('Notifications message processing completed', [
+				'from' => $from_sms,
+				'total_images' => $todayImages->count(),
+				'sent_images' => $sentCount
+			]);
+
+			return response()->json(['ok' => true]);
+
+		} catch (\Exception $e) {
+			Log::error('Error processing "الاشعارات" message', [
+				'from' => $from_sms,
+				'error' => $e->getMessage(),
+				'trace' => $e->getTraceAsString()
+			]);
+
+			// Send error message to user
+			try {
+				$to = UltramsgService::formatPhoneNumber($from_sms);
+				if ($to) {
+					(new UltramsgService())->sendTextMessage($to, 'عذراً، حدث خطأ في معالجة طلب "الاشعارات". يرجى المحاولة مرة أخرى.');
+				}
+			} catch (\Exception $sendError) {
+				Log::error('Failed to send error message for notifications', [
+					'original_error' => $e->getMessage(),
+					'send_error' => $sendError->getMessage()
+				]);
+			}
+
+			return response()->json(['ok' => true]);
+		}
 	}
 }
 

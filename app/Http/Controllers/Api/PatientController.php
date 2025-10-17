@@ -145,13 +145,13 @@ class PatientController extends Controller
         $user = Auth::user();
         if ($request->filled('company_id')) {
             if(!$user->user_type == 'تامين') {
-                return response()->json(['message' => '   المستخدم ليس من نوع تامين .'], 400);
+                // return response()->json(['message' => '   المستخدم ليس من نوع تامين .'], 400);
             }else{
-                if(!$user->hasRole('admin')) return response()->json(['message' => '  المستخدم من نوع نقدي لا يمكنه تسجيل مريض من نوع تامين .'], 400);
+                // if(!$user->hasRole('admin')) return response()->json(['message' => '  المستخدم من نوع نقدي لا يمكنه تسجيل مريض من نوع تامين .'], 400);
             }
             // $this->authorize('register insurance_patient');
         } else {
-            if( $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+            // if( $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
             // $this->authorize('register cash_patient');
         }
         DB::beginTransaction();
@@ -608,7 +608,7 @@ class PatientController extends Controller
         }
 
         $user = Auth::user();
-        if($doctorVisit->patient->company_id == null && $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+        // if($doctorVisit->patient->company_id == null && $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
        
 
         $fileToUseId = null;
@@ -1568,6 +1568,16 @@ class PatientController extends Controller
             return response()->json(['message' => 'لا توجد وردية مفتوحة حالياً.'], 400);
         }
 
+        $company = Company::where('lab2lab_firestore_id', $validated['labId'])->first();
+        if (!$company) {
+            return response()->json(['message' => 'العقد غير مرتبط مع الشركات يجب ربط العقد مع الشركه'], 400);
+        }
+
+        $patient = Patient::where('lab_to_lab_object_id', $validated['external_patient_id'])->first();
+        if ($patient) {
+            return response()->json(['message' => 'المريض موجود بالفعل في النظام.'], 400);
+        }
+
         DB::beginTransaction();
         try {
             // Create a new file
@@ -1580,6 +1590,7 @@ class PatientController extends Controller
             $patient = Patient::create([
                 'name' => $validated['name'],
                 'phone' => $validated['phone'],
+                'company_id' => $company->id,
                 'gender' => 'male', // Default gender, could be made configurable
                 'age_year' => 0, // Default age, could be made configurable
                 'age_month' => 0,
@@ -1622,7 +1633,7 @@ class PatientController extends Controller
                     'main_test_id' => $labRequestData['testId'],
                     'pid' => $patient->id,
                     'doctor_visit_id' => $doctorVisit->id,
-                    'hidden' => true,
+                    'hidden' => 0,
                     'is_lab2lab' => true, // Mark as lab-to-lab request
                     'valid' => true,
                     'no_sample' => false,
@@ -1632,7 +1643,7 @@ class PatientController extends Controller
                     'is_bankak' => false,
                     'comment' => 'لاب تو' . $labRequestData['testId'],
                     'user_requested' => Auth::id(),
-                    'approve' => true,
+                    'approve' => 0,
                     'endurance' => 0,
                     'is_paid' => false,
                 ]);

@@ -57,6 +57,7 @@ class Company extends Model
     protected $fillable = [
         'name', 'lab_endurance', 'service_endurance', 'status',
         'lab_roof', 'service_roof', 'phone', 'email', 'finance_account_id',
+        'lab2lab_firestore_id',
     ];
     protected $casts = [
         'lab_endurance' => 'decimal:2',

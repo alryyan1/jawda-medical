@@ -25,8 +25,19 @@ class AirtelSmsClient implements SmsClient
 
     public function send(string $to, string $message, bool $isOtp = false, ?string $sender = null): array
     {
+        $senderId = $sender ?: $this->defaultSender;
+        
+        // Validate sender ID format (typically 3-11 alphanumeric characters)
+        if (!preg_match('/^[A-Z0-9]{3,11}$/', $senderId)) {
+            return [
+                'success' => false,
+                'error' => "Invalid sender ID format: '{$senderId}'. Must be 3-11 alphanumeric characters (uppercase).",
+                'raw' => null,
+            ];
+        }
+
         $payload = [
-            'sender' => $sender ?: $this->defaultSender,
+            'sender' => $senderId,
             'messages' => [
                 [
                     'to' => $to,
@@ -42,6 +53,18 @@ class AirtelSmsClient implements SmsClient
 
     public function sendBulk(array $messages, ?string $sender = null): array
     {
+        $senderId = $sender ?: $this->defaultSender;
+        
+        // Validate sender ID format (typically 3-11 alphanumeric characters)
+        if (!preg_match('/^[A-Z0-9]{3,11}$/', $senderId)) {
+            return [
+                'success' => false,
+                'results' => [],
+                'error' => "Invalid sender ID format: '{$senderId}'. Must be 3-11 alphanumeric characters (uppercase).",
+                'raw' => null,
+            ];
+        }
+
         $normalized = [];
         foreach ($messages as $msg) {
             $normalized[] = [
@@ -52,7 +75,7 @@ class AirtelSmsClient implements SmsClient
         }
 
         $payload = [
-            'sender' => $sender ?: $this->defaultSender,
+            'sender' => $senderId,
             'messages' => $normalized,
         ];
 

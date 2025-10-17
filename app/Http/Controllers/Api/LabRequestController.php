@@ -865,6 +865,9 @@ class LabRequestController extends Controller
             'main_test_ids' => 'required|array',
             'main_test_ids.*' => 'required|integer|exists:main_tests,id',
             'comment' => 'nullable|string',
+            // Optional per-test override prices (e.g., from offers)
+            'override_prices' => 'sometimes|array',
+            'override_prices.*' => 'numeric|min:0',
         ]);
 
         $patient = $visit->patient()->firstOrFail();
@@ -874,6 +877,11 @@ class LabRequestController extends Controller
         $createdLabRequests = []; // To hold the LabRequest models created
         DB::beginTransaction();
         try {
+            $overridePrices = collect($request->input('override_prices', []))
+                ->mapWithKeys(function ($value, $key) {
+                    // Ensure keys are integers (main_test_id) and values are numeric
+                    return [(int)$key => (float)$value];
+                });
             foreach ($validated['main_test_ids'] as $mainTestId) {
                 $mainTest = MainTest::with('childTests.unit')->find($mainTestId); // Eager load child tests and their units
                 if (!$mainTest)
@@ -888,7 +896,10 @@ class LabRequestController extends Controller
                     return response()->json(['message' => 'الفحص غير متوفر.'], 400);
                 }
 
-                $price = $mainTest->price;
+                // Prefer override price if provided (e.g., from an Offer's per-test price)
+                $price = $overridePrices->has((int)$mainTestId)
+                    ? (float)$overridePrices->get((int)$mainTestId)
+                    : $mainTest->price;
                 $endurance = 0;
                 $approve = true; // Default approval
 

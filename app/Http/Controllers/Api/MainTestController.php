@@ -150,7 +150,7 @@ class MainTestController extends Controller
     public function destroy(MainTest $mainTest)
     {
         // Add checks: e.g., cannot delete if linked to lab_requests or child_tests
-        if ($mainTest->labRequests()->exists() || $mainTest->childTests()->exists()) {
+        if ($mainTest->labRequests()->exists()) {
             return response()->json(['message' => 'لا يمكن حذف هذا الفحص لارتباطه بطلبات أو فحوصات فرعية.'], 403);
         }
         $mainTest->delete();

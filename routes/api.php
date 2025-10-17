@@ -197,6 +197,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('companies-list', [CompanyController::class, 'indexList']);
   Route::apiResource('companies', CompanyController::class);
   Route::post('companies/activate-all', [CompanyController::class, 'activateAll']);
+  Route::put('companies/{company}/firestore-id', [CompanyController::class, 'updateFirestoreId']);
 
   // Company Services
   Route::get('companies/{company}/contracted-services', [CompanyServiceController::class, 'index']);
