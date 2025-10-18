@@ -4,7 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-
+use App\Models\Shift;
 class ShiftResource extends JsonResource
 {
     /**
@@ -14,10 +14,13 @@ class ShiftResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $lastShift = Shift::orderBy('id', 'desc')->first();
         return [
             'id' => $this->id,
             'name' => $this->name ?? "Shift #".$this->id, // Use a 'name' field if you add one, or generate
             'total' => (float) $this->total,
+            'is_last_shift' =>  $this->id == $lastShift->id,
+    'last_id' => $lastShift->id,
             'bank' => (float) $this->bank,
             'expenses' => (float) $this->expenses,
             'net_cash' => $this->net_cash, // Accessor defined in model

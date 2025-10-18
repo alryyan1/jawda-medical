@@ -129,7 +129,7 @@ class ShiftController extends Controller
             ->first();
 
         if ($lastClosedShift) {
-            $hoursSinceLastShift = Carbon::now()->diffInHours($lastClosedShift->closed_at);
+            $hoursSinceLastShift = Carbon::now()->diffInHours($lastClosedShift->created_at);
             if ($hoursSinceLastShift < 6) {
                 $remainingHours = 6 - $hoursSinceLastShift;
                 return response()->json([
