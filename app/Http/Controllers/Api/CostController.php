@@ -119,8 +119,16 @@ class CostController extends Controller
         ]]);
     }
     
-    // ... (show, update, destroy if full CRUD management page for costs exists) ...
-      
-    // ... index, show, update, destroy for managing costs ...
+    public function destroy($id)
+    {
+        $cost = Cost::findOrFail($id);
+        
+        // Check if user can delete this cost (optional authorization)
+        // $this->authorize('delete', $cost);
+        
+        $cost->delete();
+        
+        return response()->json(['message' => 'Cost deleted successfully'], 200);
+    }
 
 }

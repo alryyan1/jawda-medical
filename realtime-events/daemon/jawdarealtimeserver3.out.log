@@ -1,0 +1,908 @@
+http://server2/jawda-medical/public/api API_BASE
+SANCTUM_TOKEN: Not set
+Realtime server listening on :4001
+New connection from: aUbryqOxYexG9Z6JAAAD
+New connection from: LEmuN4wsYz6dZpgGAAAE
+New connection from: EbeiFGHvaubwIUQsAAAF
+New connection from: mxb3JyvXbUgpH7A9AAAL
+New connection from: awk6ypE_vq1iIOjWAAAM
+New connection from: WP3EsIik6ZexZvFcAAAN
+New connection from: NI5J-kAS_AMWBqaHAAAO
+New connection from: oqN0FHbCj-6jX6hAAAAP
+New connection from: Ig6aDmpWa8UkJj7lAAAR
+New connection from: hB-d5SPLIAbHRRsIAAAU
+New connection from: kmZDEff_Lyu91cf1AAAV
+New connection from: c_ehQD2O781jEEUbAAAa
+New connection from: tNbSHpTs8luharf4AAAb
+New connection from: c3vlvAYxxMQDUwX3AAAc
+New connection from: UnCvDrDoBNfnfJM8AAAd
+New connection from: M6mntQxc6Pj-Z7yOAAAh
+New connection from: btehJfb0_T-u2kKOAAAi
+New connection from: _wftDtPUe3MP_osJAAAj
+New connection from: xCYThTg-RTut6t5jAAAl
+New connection from: iCSCT-qHEcFH0wMoAAAn
+New connection from: k32WVCm7zayeTbESAAAp
+New connection from: JE0FVhzJILCHRsEfAAAr
+New connection from: 5Lwd__Rd7QUPAH3sAAAu
+New connection from: wUqa_YrrrgE9jShjAAAv
+New connection from: Lf_CSlKKuTDvfljvAAAy
+New connection from: aQGkl-cPT1CfAaEbAAAz
+New connection from: 92q5b-Tf9LjP5q4YAAA2
+New connection from: Q0tJhJazQxHwJmdTAAA3
+New connection from: 2PKWV4xDLFourTENAAA6
+New connection from: GKmp6VlnUXjyaA1XAAA7
+New connection from: SiefZ26BHmmxX-gWAAA-
+New connection from: gDg8jdC1RMNh3g1vAAA_
+New connection from: 23u3AUMCFQ9MUTssAABC
+New connection from: o9lO42SvfWZlVCrWAABD
+New connection from: nqe8hYzFEE14hTs7AABG
+New connection from: ZK8whysAOrXsJGq2AABH
+New connection from: MQKGutX4TM0Gl9KuAABK
+New connection from: 2MXZVzVRQCeKHEcYAABL
+New connection from: QOXr24D6uD1sOfKFAABT
+New connection from: MOz9qguHKPjURTklAABU
+New connection from: YDXOLkz21g9GfS4KAABV
+New connection from: BOVbNtrulmI_gtZuAABW
+New connection from: ec7yd4esilN9jE-RAABX
+New connection from: W_LwPc5dvxAl_S49AABY
+New connection from: CWGl7PVVsLLeRYj_AABZ
+New connection from: b04GoQC_f4fNx5hKAABc
+New connection from: Y9TruBGMba6dd_kJAABe
+New connection from: CSZwA8YYgKFn88gYAABg
+New connection from: 1CdZBwI3eu_5Sk3mAABh
+New connection from: vrzi1UvZXQQF1V6AAABk
+New connection from: 3ee5cpFypvJ4XoihAABl
+New connection from: 3O91qfGcg4uGTLrlAABn
+New connection from: CellQnGznQikE4w_AABq
+New connection from: ok82lEchaj-5yxPUAABr
+New connection from: jiclp930iiIw-poXAABu
+New connection from: NaPspMZYvAthi5vpAABv
+New connection from: D1XeJaH9UBBNeSIXAABy
+New connection from: o-Nljt7ydPJmzyVcAABz
+New connection from: RTlX2JNxf1lLtHr8AAB2
+New connection from: m1-hw27hH4YvhpYnAAB3
+New connection from: u4ngSUC80dAFOxUOAAB5
+New connection from: 9hN0kgrgt3BqaLEaAAB7
+New connection from: dZMTo-03S9F4QYhNAAB9
+New connection from: KBMyd4Z70JncPWsMAACA
+New connection from: lsr9Y3R1IImtY0UiAACB
+New connection from: y7uz7FY1lPgcBVtcAACD
+New connection from: CkqFyHnDP-Mqx9dTAACH
+New connection from: WmmAv4Ex2DgJQcSqAACI
+New connection from: EwCr3A5_tNoJWNbCAACJ
+New connection from: 0aSUXKGhE7k1brOwAACM
+New connection from: euI_MoRAUCnklY3NAACN
+New connection from: -gyTLpc4vc4RHA6lAACQ
+New connection from: CYYCL7Wx6Tc-GWJ5AACR
+New connection from: HdnfqEKbL9e6F_VzAACT
+New connection from: 3TbW49A5rIe77MwnAACX
+New connection from: srIz77LcYHYRyLrsAACY
+New connection from: RPIDjEdXZXBdQDO4AACZ
+New connection from: aAGi4ZoUXahaeITKAACb
+New connection from: We1O3QcnF7tbZcgcAACd
+New connection from: UyWeT8cJKQ5Dj5ipAACf
+New connection from: R5CU1nAjNo_qK6PiAACh
+New connection from: qbtXwdBloRQcvTNTAACj
+New connection from: Bnu5LtGU9QIEHpOoAACl
+New connection from: 6rUixNbRt9o6WzAxAACn
+New connection from: lg7PhyZT7wMLqwqtAACp
+New connection from: YjQfj_XwahX3NW_dAACr
+New connection from: ZdTzznnDC0l8LvPlAACt
+New connection from: 9PoPdQzxSr9wS5ZzAACv
+New connection from: wLGCkfPc8emr51MVAACx
+New connection from: K1Ad_ljidZKrf0UFAACz
+New connection from: qbEU3IHZguRoIyzdAAC1
+New connection from: JGM0ljJzaQv64JD7AAC3
+New connection from: A-jLcNpBfg4mS_pUAAC5
+New connection from: pIZpqmUpoLpjnzaQAAC7
+New connection from: 1Mg7ua1SER2do3rWAAC9
+New connection from: aDiNYMIX3wyHiHfdAAC_
+New connection from: krzRhnJ-lxcZbOIQAADB
+New connection from: KMuMzf9NIlxpYEVGAADD
+New connection from: PsInMxEZBGABaJW4AADF
+New connection from: A-irlbOavdqRwSexAADH
+New connection from: l0HubsfOmXRZoZwmAADJ
+New connection from: CjmxY8m5BxhmnzUQAADL
+New connection from: XyOTuUXJI73t7dkLAADN
+New connection from: HKWIo7k_2Tpg8kPRAADP
+New connection from: alDh-l54DnrWFy8JAADR
+New connection from: qPGNp3A2BH6tOlT5AADT
+New connection from: UuKOVCMzSd7oM5SmAADV
+New connection from: ds3RVwuNekweHMbFAADY
+New connection from: iDBkxCq09KZmIbaGAADa
+New connection from: YKvZmfTdLkARspRpAADc
+New connection from: eukTjG3sXaaUN4V1AADd
+New connection from: UM9wDq9oXafJvJBIAADf
+New connection from: M07OeFUWtTycsKltAADh
+New connection from: AIOjV5F9Df_rCVG-AADj
+New connection from: qu0nIlMv-ynGAWLpAADl
+New connection from: Ynmda3jRMxhw5KwrAADn
+New connection from: _8fXYVJhiTaBhRpaAADp
+New connection from: b1-7pmdJaF84URo2AADr
+New connection from: 9tG5vVkHYHPtOi6AAADt
+New connection from: tUabGe8Z590gb5UxAADv
+New connection from: g6YEfQrHQgE-x1ldAADx
+New connection from: Adda5TC6Kr28h6mcAADz
+New connection from: wfTm0iEiJFq4Bjz3AAD1
+New connection from: d3GQXr8zgWCQiysQAAD3
+New connection from: heLHefWFSiXHTcL7AAD5
+New connection from: ZDSMJUI099_gf0nmAAD7
+New connection from: zHqfJxlV7e1RPCFuAAD9
+New connection from: Z9MtSC1r6r3roswXAAD_
+New connection from: 3f6uJIYhip6q4jFLAAEB
+New connection from: IyVqNzAC6i7V-yGnAAED
+New connection from: zyITc2HBRLJRn1etAAEF
+New connection from: soDr7Z4q6l5iUn3HAAEH
+New connection from: IUEl8A7Ek1Jk_tSiAAEJ
+New connection from: IW90xDitWBdVBtBdAAEL
+New connection from: wxpHiMiNEqHErY3ZAAEN
+New connection from: 2FhgsVtwFOqr0V2CAAEP
+New connection from: l-dSGS8IcuiSUDJCAAER
+New connection from: nXiItkOKjX0gILhOAAET
+New connection from: k3hw6ImQENLF9BfkAAEV
+New connection from: ULjJX84GXacqqwRdAAEX
+New connection from: jubJKxNihiBTxRNiAAEZ
+New connection from: he4HvcgMiVi5dYa7AAEb
+New connection from: UzFpPyl4WfiSSPLHAAEd
+New connection from: AJrvqbSQ_bg8Kzb0AAEf
+New connection from: fkSKcpAKh5n78oPHAAEh
+New connection from: 3JaO0fimWz7GO42cAAEj
+New connection from: ubIZpQW0vYGX8jVWAAEl
+New connection from: _JRjp9wpxqDPNALwAAEn
+New connection from: d-w8a-OjUN-HVhu4AAEp
+New connection from: CZqcaaC4QPo4NOzLAAEr
+New connection from: lbI_KD9wyVA1ao6SAAEt
+New connection from: sot1_KFhQlJ38uyrAAEv
+New connection from: NXqBUGVrAgaXt4qaAAEx
+New connection from: K4a7gmWw-hSJyFzLAAEz
+New connection from: iJFcp5VglUV4xW3PAAE1
+New connection from: sAkvbFi6yy_iXlnDAAE3
+New connection from: enYg_sILKwf4MkJ8AAE5
+New connection from: zra0TvLua4v8D9KsAAE7
+New connection from: E_kDEnascShM7sjTAAE9
+New connection from: UBYPTg65Q6EDcYZyAAE_
+New connection from: DQvnZfrX5Rjx7ebgAAFB
+New connection from: Fr-LzSMrUNx8LX8FAAFD
+New connection from: -NiZrsZTC1x8Pb76AAFF
+New connection from: Dn_m35cCelPp186SAAFH
+New connection from: 0wCA7os3KuzEPl3nAAFJ
+New connection from: oxbEHTFLLKQPIhxPAAFL
+New connection from: j3KVkEELInvpBWthAAFN
+New connection from: vBzIYMYKP-PZTd5lAAFP
+New connection from: J7VgNNfZc0sH6xH-AAFR
+New connection from: bdwTgh3nMfhn_w2DAAFT
+New connection from: e5BaqCp0zA5Qf8wXAAFV
+New connection from: SnejAxQtMhbmCTfKAAFX
+New connection from: DPgiy9IVPhwupRj7AAFZ
+New connection from: 51ir3mnZ6M-K-TMbAAFb
+New connection from: R41uB56qBMQ7s9CrAAFd
+New connection from: smMqBiVFVSx5ye8wAAFf
+New connection from: FV3w0Bt2ubkyOM1nAAFh
+New connection from: shYs4YNGX8OOAYYCAAFj
+New connection from: Of0F8qLbRQI4K1-WAAFl
+New connection from: _vUOU0Mr-AFMttdwAAFn
+New connection from: _F2L4oNNzE3ZYEHIAAFp
+New connection from: bwEOFQLNUUIlvmJJAAFr
+New connection from: KcYhP5w_mO2Sv3MLAAFt
+New connection from: 8hBA9X5aqu_2qNfLAAFv
+New connection from: u3395vQ_RyP64uCXAAFx
+New connection from: 9BSV6kW_ktDiKfKxAAFz
+New connection from: jjBGHWhwIpx1kmGcAAF1
+New connection from: DZwfuBWx7UnsABLrAAF3
+Client disconnected: -NiZrsZTC1x8Pb76AAFF Reason: transport close
+New connection from: wK7Kc3EdayQLBu8uAAF5
+Client disconnected: wK7Kc3EdayQLBu8uAAF5 Reason: transport close
+New connection from: _RUdn7Ypwb5AAz9VAAF7
+New connection from: UGwCnE9XnrTnhOuPAAF9
+Client disconnected: _vUOU0Mr-AFMttdwAAFn Reason: transport close
+Client disconnected: _F2L4oNNzE3ZYEHIAAFp Reason: transport close
+Client disconnected: bwEOFQLNUUIlvmJJAAFr Reason: transport close
+Client disconnected: e5BaqCp0zA5Qf8wXAAFV Reason: transport close
+Client disconnected: DPgiy9IVPhwupRj7AAFZ Reason: transport close
+Client disconnected: R41uB56qBMQ7s9CrAAFd Reason: transport close
+Client disconnected: shYs4YNGX8OOAYYCAAFj Reason: transport close
+Client disconnected: Of0F8qLbRQI4K1-WAAFl Reason: transport close
+Client disconnected: PsInMxEZBGABaJW4AADF Reason: transport close
+Client disconnected: lsr9Y3R1IImtY0UiAACB Reason: transport close
+Client disconnected: 0wCA7os3KuzEPl3nAAFJ Reason: transport close
+Client disconnected: j3KVkEELInvpBWthAAFN Reason: transport close
+Client disconnected: vBzIYMYKP-PZTd5lAAFP Reason: transport close
+Client disconnected: J7VgNNfZc0sH6xH-AAFR Reason: transport close
+Client disconnected: bdwTgh3nMfhn_w2DAAFT Reason: transport close
+Client disconnected: Lf_CSlKKuTDvfljvAAAy Reason: transport close
+Client disconnected: zyITc2HBRLJRn1etAAEF Reason: transport close
+Client disconnected: soDr7Z4q6l5iUn3HAAEH Reason: transport close
+Client disconnected: d3GQXr8zgWCQiysQAAD3 Reason: transport close
+Client disconnected: b1-7pmdJaF84URo2AADr Reason: transport close
+Client disconnected: ZDSMJUI099_gf0nmAAD7 Reason: transport close
+Client disconnected: krzRhnJ-lxcZbOIQAADB Reason: transport close
+Client disconnected: A-irlbOavdqRwSexAADH Reason: transport close
+Client disconnected: qbEU3IHZguRoIyzdAAC1 Reason: transport close
+Client disconnected: Bnu5LtGU9QIEHpOoAACl Reason: transport close
+Client disconnected: SnejAxQtMhbmCTfKAAFX Reason: transport close
+Client disconnected: K1Ad_ljidZKrf0UFAACz Reason: transport close
+Client disconnected: IyVqNzAC6i7V-yGnAAED Reason: transport close
+Client disconnected: tUabGe8Z590gb5UxAADv Reason: transport close
+Client disconnected: ZdTzznnDC0l8LvPlAACt Reason: transport close
+Client disconnected: 51ir3mnZ6M-K-TMbAAFb Reason: transport close
+Client disconnected: aUbryqOxYexG9Z6JAAAD Reason: transport close
+Client disconnected: lg7PhyZT7wMLqwqtAACp Reason: transport close
+Client disconnected: YjQfj_XwahX3NW_dAACr Reason: transport close
+Client disconnected: R5CU1nAjNo_qK6PiAACh Reason: transport close
+Client disconnected: zHqfJxlV7e1RPCFuAAD9 Reason: transport close
+Client disconnected: 3f6uJIYhip6q4jFLAAEB Reason: transport close
+Client disconnected: UyWeT8cJKQ5Dj5ipAACf Reason: transport close
+Client disconnected: FV3w0Bt2ubkyOM1nAAFh Reason: transport close
+Client disconnected: vrzi1UvZXQQF1V6AAABk Reason: transport close
+Client disconnected: oxbEHTFLLKQPIhxPAAFL Reason: transport close
+Client disconnected: aAGi4ZoUXahaeITKAACb Reason: transport close
+Client disconnected: HdnfqEKbL9e6F_VzAACT Reason: transport close
+Client disconnected: xCYThTg-RTut6t5jAAAl Reason: transport close
+Client disconnected: Dn_m35cCelPp186SAAFH Reason: transport close
+Client disconnected: 3TbW49A5rIe77MwnAACX Reason: transport close
+Client disconnected: RTlX2JNxf1lLtHr8AAB2 Reason: transport close
+Client disconnected: y7uz7FY1lPgcBVtcAACD Reason: transport close
+Client disconnected: 9hN0kgrgt3BqaLEaAAB7 Reason: transport close
+Client disconnected: euI_MoRAUCnklY3NAACN Reason: transport close
+Client disconnected: NI5J-kAS_AMWBqaHAAAO Reason: transport close
+Client disconnected: YKvZmfTdLkARspRpAADc Reason: transport close
+Client disconnected: MQKGutX4TM0Gl9KuAABK Reason: transport close
+Client disconnected: b04GoQC_f4fNx5hKAABc Reason: transport close
+Client disconnected: 92q5b-Tf9LjP5q4YAAA2 Reason: transport close
+Client disconnected: btehJfb0_T-u2kKOAAAi Reason: transport close
+Client disconnected: -gyTLpc4vc4RHA6lAACQ Reason: transport close
+Client disconnected: ZK8whysAOrXsJGq2AABH Reason: transport close
+Client disconnected: Ig6aDmpWa8UkJj7lAAAR Reason: transport close
+Client disconnected: k32WVCm7zayeTbESAAAp Reason: transport close
+Client disconnected: wLGCkfPc8emr51MVAACx Reason: transport close
+Client disconnected: heLHefWFSiXHTcL7AAD5 Reason: transport close
+Client disconnected: KMuMzf9NIlxpYEVGAADD Reason: transport close
+Client disconnected: KcYhP5w_mO2Sv3MLAAFt Reason: transport close
+Client disconnected: mxb3JyvXbUgpH7A9AAAL Reason: transport close
+Client disconnected: UnCvDrDoBNfnfJM8AAAd Reason: transport close
+Client disconnected: AIOjV5F9Df_rCVG-AADj Reason: transport close
+Client disconnected: XyOTuUXJI73t7dkLAADN Reason: transport close
+Client disconnected: SiefZ26BHmmxX-gWAAA- Reason: transport close
+Client disconnected: 6rUixNbRt9o6WzAxAACn Reason: transport close
+Client disconnected: g6YEfQrHQgE-x1ldAADx Reason: transport close
+Client disconnected: A-jLcNpBfg4mS_pUAAC5 Reason: transport close
+Client disconnected: Adda5TC6Kr28h6mcAADz Reason: transport close
+Client disconnected: tNbSHpTs8luharf4AAAb Reason: transport close
+Client disconnected: qbtXwdBloRQcvTNTAACj Reason: transport close
+Client disconnected: c3vlvAYxxMQDUwX3AAAc Reason: transport close
+Client disconnected: We1O3QcnF7tbZcgcAACd Reason: transport close
+Client disconnected: 23u3AUMCFQ9MUTssAABC Reason: transport close
+Client disconnected: oqN0FHbCj-6jX6hAAAAP Reason: transport close
+Client disconnected: Z9MtSC1r6r3roswXAAD_ Reason: transport close
+Client disconnected: M6mntQxc6Pj-Z7yOAAAh Reason: transport close
+Client disconnected: jiclp930iiIw-poXAABu Reason: transport close
+Client disconnected: 5Lwd__Rd7QUPAH3sAAAu Reason: transport close
+Client disconnected: JGM0ljJzaQv64JD7AAC3 Reason: transport close
+Client disconnected: kmZDEff_Lyu91cf1AAAV Reason: transport close
+Client disconnected: 2PKWV4xDLFourTENAAA6 Reason: transport close
+Client disconnected: smMqBiVFVSx5ye8wAAFf Reason: transport close
+Client disconnected: CkqFyHnDP-Mqx9dTAACH Reason: transport close
+Client disconnected: CellQnGznQikE4w_AABq Reason: transport close
+New connection from: DRTKZhb-jJf2c56CAAF_
+Client disconnected: DRTKZhb-jJf2c56CAAF_ Reason: transport close
+New connection from: Q9vybX0as34l8kB3AAGB
+lab-payment {
+  visit: {
+    id: 904,
+    created_at: '2025-10-19T18:34:35+02:00',
+    visit_time: '18:34:35',
+    visit_time_formatted: '06:34 PM',
+    status: 'waiting',
+    visit_type: null,
+    company: null,
+    queue_number: 188,
+    number: 188,
+    reason_for_visit: '',
+    visit_notes: null,
+    is_new: true,
+    only_lab: false,
+    requested_services_count: null,
+    patient_id: 904,
+    patient: {
+      id: 904,
+      name: 'الشيخ بدرالدين الشيخ حسن',
+      phone: '0912957271',
+      gender: 'male',
+      age_year: 37,
+      age_month: null,
+      age_day: null,
+      full_age: '37 Y',
+      doctor: [Object],
+      result_is_locked: false,
+      address: null,
+      gov_id: null,
+      company_id: null,
+      company: null,
+      subcompany_id: null,
+      subcompany: null,
+      company_relation_id: null,
+      insurance_no: null,
+      expire_date: null,
+      guarantor: null,
+      paper_fees: 0,
+      is_lab_paid: false,
+      lab_paid: 0,
+      sample_collected: false,
+      sample_collect_time: null,
+      result_print_date: null,
+      sample_print_date: null,
+      visit_number: 2,
+      result_auth: false,
+      auth_date: '2025-10-19T18:34:35+02:00',
+      discount: 0,
+      discount_comment: '',
+      doctor_finish: false,
+      doctor_lab_request_confirm: false,
+      doctor_lab_urgent_confirm: false,
+      created_at: '2025-10-19T18:34:35+02:00',
+      updated_at: '2025-10-19T18:34:35+02:00',
+      user: [Object],
+      has_cbc: false,
+      result_url: null
+    },
+    patient_subcompany: null,
+    doctor_id: 1,
+    doctor: { id: 1, name: 'outpatient', specialist_name: 'عمومي' },
+    doctor_name: 'outpatient',
+    user_id: 1,
+    created_by_user: { id: 1, name: 'admin', username: 'admin' },
+    shift_id: 84,
+    doctor_shift_id: null,
+    total_amount: 100000,
+    total_paid: 0,
+    total_discount: 0,
+    balance_due: 100000,
+    lab_requests: [ [Object] ],
+    updated_at: '2025-10-19T18:34:35+02:00'
+  },
+  patient: {
+    id: 904,
+    name: 'الشيخ بدرالدين الشيخ حسن',
+    phone: '0912957271',
+    gender: 'male',
+    age_year: 37,
+    age_month: null,
+    age_day: null,
+    full_age: '37 Y',
+    doctor: { id: 1, name: 'outpatient', specialist_name: 'عمومي' },
+    result_is_locked: false,
+    address: null,
+    gov_id: null,
+    company_id: null,
+    company: null,
+    subcompany_id: null,
+    subcompany: null,
+    company_relation_id: null,
+    insurance_no: null,
+    expire_date: null,
+    guarantor: null,
+    paper_fees: 0,
+    is_lab_paid: false,
+    lab_paid: 0,
+    sample_collected: false,
+    sample_collect_time: null,
+    result_print_date: null,
+    sample_print_date: null,
+    visit_number: 2,
+    result_auth: false,
+    auth_date: '2025-10-19T18:34:35+02:00',
+    discount: 0,
+    discount_comment: '',
+    doctor_finish: false,
+    doctor_lab_request_confirm: false,
+    doctor_lab_urgent_confirm: false,
+    created_at: '2025-10-19T18:34:35+02:00',
+    updated_at: '2025-10-19T18:34:35+02:00',
+    user: { id: 1, name: 'admin', username: 'admin' },
+    has_cbc: false,
+    result_url: null
+  },
+  labRequests: [
+    {
+      id: 1896,
+      main_test_id: 291,
+      main_test: [Object],
+      pid: 904,
+      patient_name: 'الشيخ بدرالدين الشيخ حسن',
+      doctor_visit_id: 904,
+      hidden: false,
+      is_lab2lab: false,
+      valid: true,
+      no_sample: false,
+      price: 100000,
+      amount_paid: 100000,
+      discount_per: 0,
+      is_bankak: false,
+      comment: null,
+      user_requested: 1,
+      requesting_user_name: 'admin',
+      user_deposited: 1,
+      deposit_user_name: 'admin',
+      approve: true,
+      endurance: 0,
+      is_paid: true,
+      sample_id: null,
+      created_at: '2025-10-19T18:34:55+02:00',
+      updated_at: '2025-10-19T19:40:31+02:00'
+    }
+  ]
+}
+lab-payment emitted
+Client disconnected: UGwCnE9XnrTnhOuPAAF9 Reason: transport close
+New connection from: 9HHNqeTqWMAPOifkAAGD
+Client disconnected: aDiNYMIX3wyHiHfdAAC_ Reason: transport close
+Client disconnected: wUqa_YrrrgE9jShjAAAv Reason: transport close
+Client disconnected: aQGkl-cPT1CfAaEbAAAz Reason: transport close
+Client disconnected: c_ehQD2O781jEEUbAAAa Reason: transport close
+Client disconnected: LEmuN4wsYz6dZpgGAAAE Reason: transport close
+Client disconnected: NaPspMZYvAthi5vpAABv Reason: transport close
+Client disconnected: JE0FVhzJILCHRsEfAAAr Reason: transport close
+Client disconnected: gDg8jdC1RMNh3g1vAAA_ Reason: transport close
+Client disconnected: o9lO42SvfWZlVCrWAABD Reason: transport close
+Client disconnected: EbeiFGHvaubwIUQsAAAF Reason: transport close
+Client disconnected: Q0tJhJazQxHwJmdTAAA3 Reason: transport close
+Client disconnected: awk6ypE_vq1iIOjWAAAM Reason: transport close
+Client disconnected: 2MXZVzVRQCeKHEcYAABL Reason: transport close
+Client disconnected: ok82lEchaj-5yxPUAABr Reason: transport close
+Client disconnected: iCSCT-qHEcFH0wMoAAAn Reason: transport close
+Client disconnected: hB-d5SPLIAbHRRsIAAAU Reason: transport close
+Client disconnected: nqe8hYzFEE14hTs7AABG Reason: transport close
+Client disconnected: _wftDtPUe3MP_osJAAAj Reason: transport close
+Client disconnected: Y9TruBGMba6dd_kJAABe Reason: transport close
+Client disconnected: dZMTo-03S9F4QYhNAAB9 Reason: transport close
+Client disconnected: GKmp6VlnUXjyaA1XAAA7 Reason: transport close
+Client disconnected: alDh-l54DnrWFy8JAADR Reason: transport close
+Client disconnected: 9PoPdQzxSr9wS5ZzAACv Reason: transport close
+Client disconnected: m1-hw27hH4YvhpYnAAB3 Reason: transport close
+Client disconnected: 3ee5cpFypvJ4XoihAABl Reason: transport close
+Client disconnected: WP3EsIik6ZexZvFcAAAN Reason: transport close
+New connection from: _oYUNR6AqhgQtTlzAAGF
+New connection from: kehkdOY4CSZGVGFxAAGH
+New connection from: PwmDo_AwO1-HA17TAAGJ
+New connection from: K_iHbvjhsicUT4j3AAGL
+New connection from: ZfdfU7zJap5EASa6AAGN
+New connection from: z2d8f32qDdilQEZvAAGP
+New connection from: EK6QGCPA62GOfaOMAAGR
+New connection from: uQzO3lNoLBB9ZHMfAAGT
+New connection from: AHhb0cTmvQibPkrsAAGV
+New connection from: R6rRLbJqwmXr_yYxAAGX
+New connection from: 38W-S3XtGobf8IZHAAGZ
+New connection from: 6HVOiFjTSrUaoR75AAGb
+New connection from: HcIRJMcd2Cj5M0_6AAGd
+New connection from: WNaDjsu3iD4Rqe6vAAGf
+New connection from: tj5DxwTcTDNo52VGAAGh
+New connection from: MGHeDlSEft5kctrZAAGj
+New connection from: 1oy1ysdtFlwut70FAAGl
+New connection from: UY_r2UokP4yUtDNHAAGn
+New connection from: HxgR-84pB19e_BBdAAGp
+New connection from: KM21wufpktbLSoE1AAGr
+New connection from: 9GU_WP__atEUPgYnAAGt
+New connection from: 3A-l9vm5ZezpIsFCAAGv
+New connection from: 4AKB8EGEe8RCdnoZAAGx
+New connection from: e-rPMa2LWBOL53dKAAGz
+New connection from: -WTBojrpG8ljbxXVAAG1
+New connection from: L_5bnLhgfNyyG6SOAAG3
+New connection from: NMp00yxkV9JT_CxuAAG5
+New connection from: P93jGIS3vpGoENR6AAG7
+New connection from: XqJleF0Tl4xkaifFAAG9
+New connection from: 2zLvoPQwVv4N663ZAAG_
+New connection from: LXNFpGtDgNE5zkSCAAHB
+New connection from: TYr5_4BKOUbtpjYpAAHD
+New connection from: 6Ao4vIZPMBPHviwtAAHF
+New connection from: guPyi_IqUe1gu5ANAAHH
+New connection from: xjO-fkm7AuiKieWXAAHJ
+New connection from: KFN8maO7n21oVAc2AAHL
+New connection from: 1oKUdOkpW_0bRNpSAAHN
+New connection from: B3Ak83bKvJGygfylAAHP
+New connection from: ku_iIWuiCI_0Le9AAAHR
+New connection from: J5fwhCpuNAyKGTnrAAHT
+New connection from: 4E39waJQCPjbI0_dAAHV
+New connection from: ypymNznft6zYDNCPAAHX
+New connection from: JwWo0ISFO-Vdcq6SAAHZ
+New connection from: XRrBnUp0tMpHBfF2AAHb
+New connection from: H9WlW6409l-posGoAAHd
+New connection from: 3W0a4jUx2IH-eS_pAAHf
+New connection from: EKXv5W5wDenMHHTcAAHh
+New connection from: aePt0m6E8XrhD3WbAAHj
+New connection from: GZLxi1w1Cvx9SkXuAAHl
+New connection from: MkmQ5DvGoKRqjZBwAAHn
+New connection from: T5XAhuFi1aOEViO8AAHp
+New connection from: 9P-e5P9Tso8CabLVAAHr
+New connection from: ZhyuT65TVMtYjXsYAAHv
+New connection from: m_AED4SDBXbtSd2gAAHw
+New connection from: q3uQqoZIqDWPfagMAAHx
+New connection from: Q4nlZytu-XJkXuiJAAHz
+New connection from: 6Jl2A_9A5oxUVH_YAAH1
+New connection from: 6jNJUatrdAJovYLfAAH3
+New connection from: 39pAdkDgGUv7eeDBAAH5
+New connection from: 1OAWprPBbI8wHssoAAH7
+New connection from: FiumfwJTmVGI-m71AAH9
+New connection from: IoLobkO50hqj0s3DAAH_
+New connection from: kF-dkvcVw7E300jfAAIB
+New connection from: fyIJfNSIPH6sQ9boAAID
+New connection from: OEOdoXDAYmdTw7E3AAIF
+New connection from: a3p5ro2pbkkreazvAAIH
+New connection from: lHh6ocoZskaOrW-JAAIJ
+New connection from: g8XUYysQHTzNLKVHAAIL
+New connection from: HE0eLt2F7OSwNoQhAAIN
+New connection from: -Z_8OFzP6z_FdQeDAAIP
+New connection from: eZdfGaCi0ZRPpgfrAAIR
+New connection from: tNIINGt_IdH05VVUAAIT
+New connection from: ipgqK4d2puAe2LouAAIV
+New connection from: uVvSF-5aTIiYT7vYAAIX
+New connection from: 6vZWvpJ2iQ_Zwu9hAAIZ
+New connection from: ilKO4_q48znpuYVJAAIb
+New connection from: 2k7ollTLR7ULF_GkAAId
+New connection from: zi0y2BxpBIB8kBQ6AAIf
+New connection from: OQRvnm1Ia_OFYb_rAAIh
+New connection from: bMDJEzjaf4jzLfuaAAIj
+New connection from: XyC7EXQLny5jwHEKAAIl
+New connection from: iiAq4Drrp0Y8TbJpAAIn
+New connection from: atrMlOqOuSmZWXmYAAIp
+New connection from: ygQe3QulKsf8bcJIAAIr
+New connection from: RtqxzxYRtmcu2ZjsAAIt
+New connection from: rd6-yTJqzU0PkkTiAAIv
+New connection from: b6t2W5mT9g1hKgOQAAIx
+New connection from: vnZE77y0VWCf4gmGAAIz
+New connection from: sCpPzBejJXSqmfHgAAI1
+New connection from: 6MAO141QKpy32oaBAAI3
+New connection from: 2VmoHULwVwHLtftzAAI5
+New connection from: cnf_aP-hC5MuFGeHAAI7
+New connection from: osFbTpe8QlL6ereEAAI9
+New connection from: ENLqVGmSb__vuXq6AAI_
+New connection from: FzyfMjj_T7L5KToHAAJB
+New connection from: eholIwh5xPc6ARkaAAJD
+New connection from: hIBPI-G6NRPgMiseAAJF
+New connection from: gMOUzNp_ys83OGhfAAJH
+New connection from: ax1psn3ukvmBAkgaAAJJ
+Client disconnected: lHh6ocoZskaOrW-JAAIJ Reason: transport close
+Client disconnected: uVvSF-5aTIiYT7vYAAIX Reason: transport close
+Client disconnected: IoLobkO50hqj0s3DAAH_ Reason: transport close
+Client disconnected: 6vZWvpJ2iQ_Zwu9hAAIZ Reason: transport close
+Client disconnected: FzyfMjj_T7L5KToHAAJB Reason: transport close
+Client disconnected: b6t2W5mT9g1hKgOQAAIx Reason: transport close
+Client disconnected: sCpPzBejJXSqmfHgAAI1 Reason: transport close
+Client disconnected: vnZE77y0VWCf4gmGAAIz Reason: transport close
+Client disconnected: K_iHbvjhsicUT4j3AAGL Reason: transport close
+Client disconnected: hIBPI-G6NRPgMiseAAJF Reason: transport close
+Client disconnected: 1oy1ysdtFlwut70FAAGl Reason: transport close
+Client disconnected: eZdfGaCi0ZRPpgfrAAIR Reason: transport close
+Client disconnected: ygQe3QulKsf8bcJIAAIr Reason: transport close
+Client disconnected: TYr5_4BKOUbtpjYpAAHD Reason: transport close
+Client disconnected: ilKO4_q48znpuYVJAAIb Reason: transport close
+Client disconnected: gMOUzNp_ys83OGhfAAJH Reason: transport close
+Client disconnected: B3Ak83bKvJGygfylAAHP Reason: transport close
+Client disconnected: eholIwh5xPc6ARkaAAJD Reason: transport close
+Client disconnected: iiAq4Drrp0Y8TbJpAAIn Reason: transport close
+Client disconnected: Q4nlZytu-XJkXuiJAAHz Reason: transport close
+Client disconnected: L_5bnLhgfNyyG6SOAAG3 Reason: transport close
+Client disconnected: RtqxzxYRtmcu2ZjsAAIt Reason: transport close
+Client disconnected: 4E39waJQCPjbI0_dAAHV Reason: transport close
+Client disconnected: 2VmoHULwVwHLtftzAAI5 Reason: transport close
+Client disconnected: 6MAO141QKpy32oaBAAI3 Reason: transport close
+Client disconnected: XRrBnUp0tMpHBfF2AAHb Reason: transport close
+Client disconnected: 39pAdkDgGUv7eeDBAAH5 Reason: transport close
+Client disconnected: 3W0a4jUx2IH-eS_pAAHf Reason: transport close
+Client disconnected: 2k7ollTLR7ULF_GkAAId Reason: transport close
+Client disconnected: FiumfwJTmVGI-m71AAH9 Reason: transport close
+Client disconnected: H9WlW6409l-posGoAAHd Reason: transport close
+Client disconnected: XyC7EXQLny5jwHEKAAIl Reason: transport close
+Client disconnected: 6Ao4vIZPMBPHviwtAAHF Reason: transport close
+Client disconnected: EKXv5W5wDenMHHTcAAHh Reason: transport close
+Client disconnected: z2d8f32qDdilQEZvAAGP Reason: transport close
+Client disconnected: guPyi_IqUe1gu5ANAAHH Reason: transport close
+Client disconnected: 2zLvoPQwVv4N663ZAAG_ Reason: transport close
+Client disconnected: EK6QGCPA62GOfaOMAAGR Reason: transport close
+Client disconnected: zi0y2BxpBIB8kBQ6AAIf Reason: transport close
+Client disconnected: HxgR-84pB19e_BBdAAGp Reason: transport close
+Client disconnected: uQzO3lNoLBB9ZHMfAAGT Reason: transport close
+Client disconnected: WNaDjsu3iD4Rqe6vAAGf Reason: transport close
+Client disconnected: NMp00yxkV9JT_CxuAAG5 Reason: transport close
+Client disconnected: 6jNJUatrdAJovYLfAAH3 Reason: transport close
+Client disconnected: _oYUNR6AqhgQtTlzAAGF Reason: transport close
+Client disconnected: KM21wufpktbLSoE1AAGr Reason: transport close
+Client disconnected: UY_r2UokP4yUtDNHAAGn Reason: transport close
+Client disconnected: 4AKB8EGEe8RCdnoZAAGx Reason: transport close
+Client disconnected: ku_iIWuiCI_0Le9AAAHR Reason: transport close
+Client disconnected: kF-dkvcVw7E300jfAAIB Reason: transport close
+Client disconnected: osFbTpe8QlL6ereEAAI9 Reason: transport close
+Client disconnected: HcIRJMcd2Cj5M0_6AAGd Reason: transport close
+Client disconnected: cnf_aP-hC5MuFGeHAAI7 Reason: transport close
+Client disconnected: 6HVOiFjTSrUaoR75AAGb Reason: transport close
+Client disconnected: ZhyuT65TVMtYjXsYAAHv Reason: transport close
+Client disconnected: rd6-yTJqzU0PkkTiAAIv Reason: transport close
+Client disconnected: ZfdfU7zJap5EASa6AAGN Reason: transport close
+Client disconnected: MkmQ5DvGoKRqjZBwAAHn Reason: transport close
+Client disconnected: 1oKUdOkpW_0bRNpSAAHN Reason: transport close
+Client disconnected: MGHeDlSEft5kctrZAAGj Reason: transport close
+Client disconnected: 6Jl2A_9A5oxUVH_YAAH1 Reason: transport close
+Client disconnected: ENLqVGmSb__vuXq6AAI_ Reason: transport close
+Client disconnected: HE0eLt2F7OSwNoQhAAIN Reason: transport close
+Client disconnected: g8XUYysQHTzNLKVHAAIL Reason: transport close
+Client disconnected: e-rPMa2LWBOL53dKAAGz Reason: transport close
+Client disconnected: XqJleF0Tl4xkaifFAAG9 Reason: transport close
+Client disconnected: -WTBojrpG8ljbxXVAAG1 Reason: transport close
+Client disconnected: m_AED4SDBXbtSd2gAAHw Reason: transport close
+Client disconnected: xjO-fkm7AuiKieWXAAHJ Reason: transport close
+Client disconnected: 1OAWprPBbI8wHssoAAH7 Reason: transport close
+Client disconnected: PwmDo_AwO1-HA17TAAGJ Reason: transport close
+Client disconnected: bMDJEzjaf4jzLfuaAAIj Reason: transport close
+Client disconnected: OEOdoXDAYmdTw7E3AAIF Reason: transport close
+New connection from: 4RUWaVxQBmQNqw2IAAJL
+Client disconnected: KFN8maO7n21oVAc2AAHL Reason: transport close
+Client disconnected: kehkdOY4CSZGVGFxAAGH Reason: transport close
+Client disconnected: ax1psn3ukvmBAkgaAAJJ Reason: transport close
+Client disconnected: atrMlOqOuSmZWXmYAAIp Reason: transport close
+Client disconnected: AHhb0cTmvQibPkrsAAGV Reason: transport close
+Client disconnected: J5fwhCpuNAyKGTnrAAHT Reason: transport close
+Client disconnected: a3p5ro2pbkkreazvAAIH Reason: transport close
+Client disconnected: R6rRLbJqwmXr_yYxAAGX Reason: transport close
+Client disconnected: T5XAhuFi1aOEViO8AAHp Reason: transport close
+Client disconnected: -Z_8OFzP6z_FdQeDAAIP Reason: transport close
+Client disconnected: ypymNznft6zYDNCPAAHX Reason: transport close
+Client disconnected: tNIINGt_IdH05VVUAAIT Reason: transport close
+Client disconnected: 38W-S3XtGobf8IZHAAGZ Reason: transport close
+Client disconnected: ipgqK4d2puAe2LouAAIV Reason: transport close
+Client disconnected: q3uQqoZIqDWPfagMAAHx Reason: transport close
+Client disconnected: 9GU_WP__atEUPgYnAAGt Reason: transport close
+Client disconnected: tj5DxwTcTDNo52VGAAGh Reason: transport close
+Client disconnected: JwWo0ISFO-Vdcq6SAAHZ Reason: transport close
+Client disconnected: LXNFpGtDgNE5zkSCAAHB Reason: transport close
+Client disconnected: P93jGIS3vpGoENR6AAG7 Reason: transport close
+Client disconnected: 3A-l9vm5ZezpIsFCAAGv Reason: transport close
+Client disconnected: OQRvnm1Ia_OFYb_rAAIh Reason: transport close
+Client disconnected: 9P-e5P9Tso8CabLVAAHr Reason: transport close
+Client disconnected: aePt0m6E8XrhD3WbAAHj Reason: transport close
+Client disconnected: GZLxi1w1Cvx9SkXuAAHl Reason: transport close
+Client disconnected: fyIJfNSIPH6sQ9boAAID Reason: transport close
+New connection from: r1kQdFjYrfEASO60AAJN
+Client disconnected: 4RUWaVxQBmQNqw2IAAJL Reason: transport close
+New connection from: TbwFZUAedvTewBBQAAJP
+Client disconnected: TbwFZUAedvTewBBQAAJP Reason: transport close
+Client disconnected: Q9vybX0as34l8kB3AAGB Reason: transport close
+Client disconnected: r1kQdFjYrfEASO60AAJN Reason: transport close
+New connection from: 7qts37fmSTAuEau2AAJR
+Client disconnected: 7qts37fmSTAuEau2AAJR Reason: transport close
+New connection from: SuwNXe6TPUE3OVmaAAJT
+Client disconnected: SuwNXe6TPUE3OVmaAAJT Reason: transport close
+New connection from: BRWJypgaK31GDR3pAAJV
+Client disconnected: BRWJypgaK31GDR3pAAJV Reason: transport close
+New connection from: dEIg1zoXEf78gK1HAAJX
+Client disconnected: dEIg1zoXEf78gK1HAAJX Reason: transport close
+New connection from: 5F8s4rudyHj1fK5CAAJZ
+Client disconnected: 5F8s4rudyHj1fK5CAAJZ Reason: transport close
+New connection from: dSPWCJNLZf1kYxfPAAJb
+New connection from: MqZCKQMDvWeOPsLxAAJd
+Client disconnected: MqZCKQMDvWeOPsLxAAJd Reason: transport close
+New connection from: tM3cUV1SKc4sV-OVAAJf
+lab-payment {
+  visit: {
+    id: 905,
+    created_at: '2025-10-19T21:36:18+02:00',
+    visit_time: '21:36:18',
+    visit_time_formatted: '09:36 PM',
+    status: 'waiting',
+    visit_type: null,
+    company: null,
+    queue_number: 189,
+    number: 189,
+    reason_for_visit: '',
+    visit_notes: null,
+    is_new: true,
+    only_lab: false,
+    requested_services_count: null,
+    patient_id: 905,
+    patient: {
+      id: 905,
+      name: 'لملم اسرس عرنخلي',
+      phone: '0120812030',
+      gender: 'female',
+      age_year: 80,
+      age_month: null,
+      age_day: null,
+      full_age: '80 Y',
+      doctor: [Object],
+      result_is_locked: false,
+      address: null,
+      gov_id: null,
+      company_id: null,
+      company: null,
+      subcompany_id: null,
+      subcompany: null,
+      company_relation_id: null,
+      insurance_no: null,
+      expire_date: null,
+      guarantor: null,
+      paper_fees: 0,
+      is_lab_paid: false,
+      lab_paid: 0,
+      sample_collected: false,
+      sample_collect_time: null,
+      result_print_date: null,
+      sample_print_date: null,
+      visit_number: 3,
+      result_auth: false,
+      auth_date: '2025-10-19T21:36:18+02:00',
+      discount: 0,
+      discount_comment: '',
+      doctor_finish: false,
+      doctor_lab_request_confirm: false,
+      doctor_lab_urgent_confirm: false,
+      created_at: '2025-10-19T21:36:18+02:00',
+      updated_at: '2025-10-19T21:36:18+02:00',
+      user: [Object],
+      has_cbc: false,
+      result_url: null
+    },
+    patient_subcompany: null,
+    doctor_id: 1,
+    doctor: { id: 1, name: 'outpatient', specialist_name: 'عمومي' },
+    doctor_name: 'outpatient',
+    user_id: 4,
+    created_by_user: { id: 4, name: 'عبدالرحمن يس', username: '3bdo' },
+    shift_id: 84,
+    doctor_shift_id: null,
+    total_amount: 50000,
+    total_paid: 0,
+    total_discount: 0,
+    balance_due: 50000,
+    lab_requests: [ [Object] ],
+    updated_at: '2025-10-19T21:36:18+02:00'
+  },
+  patient: {
+    id: 905,
+    name: 'لملم اسرس عرنخلي',
+    phone: '0120812030',
+    gender: 'female',
+    age_year: 80,
+    age_month: null,
+    age_day: null,
+    full_age: '80 Y',
+    doctor: { id: 1, name: 'outpatient', specialist_name: 'عمومي' },
+    result_is_locked: false,
+    address: null,
+    gov_id: null,
+    company_id: null,
+    company: null,
+    subcompany_id: null,
+    subcompany: null,
+    company_relation_id: null,
+    insurance_no: null,
+    expire_date: null,
+    guarantor: null,
+    paper_fees: 0,
+    is_lab_paid: false,
+    lab_paid: 0,
+    sample_collected: false,
+    sample_collect_time: null,
+    result_print_date: null,
+    sample_print_date: null,
+    visit_number: 3,
+    result_auth: false,
+    auth_date: '2025-10-19T21:36:18+02:00',
+    discount: 0,
+    discount_comment: '',
+    doctor_finish: false,
+    doctor_lab_request_confirm: false,
+    doctor_lab_urgent_confirm: false,
+    created_at: '2025-10-19T21:36:18+02:00',
+    updated_at: '2025-10-19T21:36:18+02:00',
+    user: { id: 4, name: 'عبدالرحمن يس', username: '3bdo' },
+    has_cbc: false,
+    result_url: null
+  },
+  labRequests: [
+    {
+      id: 1897,
+      main_test_id: 43,
+      main_test: [Object],
+      pid: 905,
+      patient_name: 'لملم اسرس عرنخلي',
+      doctor_visit_id: 905,
+      hidden: false,
+      is_lab2lab: false,
+      valid: true,
+      no_sample: false,
+      price: 50000,
+      amount_paid: 50000,
+      discount_per: 0,
+      is_bankak: false,
+      comment: null,
+      user_requested: 4,
+      requesting_user_name: 'عبدالرحمن يس',
+      user_deposited: 4,
+      deposit_user_name: 'عبدالرحمن يس',
+      approve: true,
+      endurance: 0,
+      is_paid: true,
+      sample_id: null,
+      created_at: '2025-10-19T21:36:56+02:00',
+      updated_at: '2025-10-19T21:37:34+02:00'
+    }
+  ]
+}
+lab-payment emitted
+Client disconnected: eukTjG3sXaaUN4V1AADd Reason: transport close
+New connection from: 0ta4UiPwUowZ0zkxAAJh
+Client disconnected: dSPWCJNLZf1kYxfPAAJb Reason: transport close
+Client disconnected: tM3cUV1SKc4sV-OVAAJf Reason: transport close
+Client disconnected: DZwfuBWx7UnsABLrAAF3 Reason: transport close
+Client disconnected: WmmAv4Ex2DgJQcSqAACI Reason: transport close
+Client disconnected: 9BSV6kW_ktDiKfKxAAFz Reason: transport close
+Client disconnected: Fr-LzSMrUNx8LX8FAAFD Reason: transport close
+Client disconnected: 9tG5vVkHYHPtOi6AAADt Reason: transport close
+Client disconnected: UuKOVCMzSd7oM5SmAADV Reason: transport close
+Client disconnected: sot1_KFhQlJ38uyrAAEv Reason: transport close
+Client disconnected: sAkvbFi6yy_iXlnDAAE3 Reason: transport close
+Client disconnected: E_kDEnascShM7sjTAAE9 Reason: transport close
+Client disconnected: _JRjp9wpxqDPNALwAAEn Reason: transport close
+Client disconnected: CZqcaaC4QPo4NOzLAAEr Reason: transport close
+Client disconnected: lbI_KD9wyVA1ao6SAAEt Reason: transport close
+Client disconnected: 3O91qfGcg4uGTLrlAABn Reason: transport close
+Client disconnected: DQvnZfrX5Rjx7ebgAAFB Reason: transport close
+Client disconnected: ubIZpQW0vYGX8jVWAAEl Reason: transport close
+Client disconnected: jjBGHWhwIpx1kmGcAAF1 Reason: transport close
+Client disconnected: 3JaO0fimWz7GO42cAAEj Reason: transport close
+Client disconnected: fkSKcpAKh5n78oPHAAEh Reason: transport close
+Client disconnected: AJrvqbSQ_bg8Kzb0AAEf Reason: transport close
+Client disconnected: 1Mg7ua1SER2do3rWAAC9 Reason: transport close
+Client disconnected: ULjJX84GXacqqwRdAAEX Reason: transport close
+Client disconnected: UzFpPyl4WfiSSPLHAAEd Reason: transport close
+Client disconnected: IW90xDitWBdVBtBdAAEL Reason: transport close
+Client disconnected: l0HubsfOmXRZoZwmAADJ Reason: transport close
+Client disconnected: 2FhgsVtwFOqr0V2CAAEP Reason: transport close
+Client disconnected: CjmxY8m5BxhmnzUQAADL Reason: transport close
+Client disconnected: nXiItkOKjX0gILhOAAET Reason: transport close
+Client disconnected: M07OeFUWtTycsKltAADh Reason: transport close
+Client disconnected: qu0nIlMv-ynGAWLpAADl Reason: transport close
+Client disconnected: Ynmda3jRMxhw5KwrAADn Reason: transport close
+Client disconnected: _8fXYVJhiTaBhRpaAADp Reason: transport close
+Client disconnected: k3hw6ImQENLF9BfkAAEV Reason: transport close
+Client disconnected: wxpHiMiNEqHErY3ZAAEN Reason: transport close
+Client disconnected: d-w8a-OjUN-HVhu4AAEp Reason: transport close
+Client disconnected: HKWIo7k_2Tpg8kPRAADP Reason: transport close
+Client disconnected: srIz77LcYHYRyLrsAACY Reason: transport close
+Client disconnected: l-dSGS8IcuiSUDJCAAER Reason: transport close
+Client disconnected: D1XeJaH9UBBNeSIXAABy Reason: transport close
+Client disconnected: K4a7gmWw-hSJyFzLAAEz Reason: transport close
+Client disconnected: ds3RVwuNekweHMbFAADY Reason: transport close
+Client disconnected: iDBkxCq09KZmIbaGAADa Reason: transport close
+Client disconnected: UM9wDq9oXafJvJBIAADf Reason: transport close
+Client disconnected: YDXOLkz21g9GfS4KAABV Reason: transport close
+Client disconnected: iJFcp5VglUV4xW3PAAE1 Reason: transport close
+Client disconnected: zra0TvLua4v8D9KsAAE7 Reason: transport close
+Client disconnected: CWGl7PVVsLLeRYj_AABZ Reason: transport close
+Client disconnected: BOVbNtrulmI_gtZuAABW Reason: transport close
+Client disconnected: NXqBUGVrAgaXt4qaAAEx Reason: transport close
+Client disconnected: CSZwA8YYgKFn88gYAABg Reason: transport close
+Client disconnected: KBMyd4Z70JncPWsMAACA Reason: transport close
+Client disconnected: EwCr3A5_tNoJWNbCAACJ Reason: transport close
+Client disconnected: CYYCL7Wx6Tc-GWJ5AACR Reason: transport close
+Client disconnected: UBYPTg65Q6EDcYZyAAE_ Reason: transport close
+Client disconnected: RPIDjEdXZXBdQDO4AACZ Reason: transport close
+Client disconnected: wfTm0iEiJFq4Bjz3AAD1 Reason: transport close
+Client disconnected: pIZpqmUpoLpjnzaQAAC7 Reason: transport close
+Client disconnected: he4HvcgMiVi5dYa7AAEb Reason: transport close
+Client disconnected: 8hBA9X5aqu_2qNfLAAFv Reason: transport close
+Client disconnected: jubJKxNihiBTxRNiAAEZ Reason: transport close
+Client disconnected: enYg_sILKwf4MkJ8AAE5 Reason: transport close
+Client disconnected: qPGNp3A2BH6tOlT5AADT Reason: transport close
+Client disconnected: u3395vQ_RyP64uCXAAFx Reason: transport close
+Client disconnected: ec7yd4esilN9jE-RAABX Reason: transport close
+Client disconnected: o-Nljt7ydPJmzyVcAABz Reason: transport close
+Client disconnected: 1CdZBwI3eu_5Sk3mAABh Reason: transport close
+Client disconnected: u4ngSUC80dAFOxUOAAB5 Reason: transport close
+Client disconnected: MOz9qguHKPjURTklAABU Reason: transport close
+Client disconnected: IUEl8A7Ek1Jk_tSiAAEJ Reason: transport close
+Client disconnected: W_LwPc5dvxAl_S49AABY Reason: transport close
+Client disconnected: QOXr24D6uD1sOfKFAABT Reason: transport close
+Client disconnected: 0aSUXKGhE7k1brOwAACM Reason: transport close
+Client disconnected: 0ta4UiPwUowZ0zkxAAJh Reason: transport close
+New connection from: tAj-XgjTLi9IcxnzAAJj
+Client disconnected: _RUdn7Ypwb5AAz9VAAF7 Reason: transport close
+New connection from: vlidInFyKyNYMORaAAJl

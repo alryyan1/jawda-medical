@@ -133,6 +133,9 @@ class MainTestController extends Controller
             'divided' => 'sometimes|required|boolean',
             'available' => 'sometimes|required|boolean',
             'is_special_test' => 'sometimes|boolean',
+            'conditions' => 'sometimes|string',
+            'timer' => 'sometimes|integer',
+            'hide_unit' => 'sometimes|boolean',
         ]);
         if ($request->has('is_special_test')) {
             $validatedData['is_special_test'] = (bool) $request->boolean('is_special_test');
@@ -142,6 +145,9 @@ class MainTestController extends Controller
         }
         if ($request->has('timer')) {
             $validatedData['timer'] = $request->timer;
+        }
+        if ($request->has('hide_unit')) {
+            $validatedData['hide_unit'] = (bool) $request->boolean('hide_unit');
         }
         $mainTest->update($validatedData);
         return new MainTestResource($mainTest->load('container'));

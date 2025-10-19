@@ -52,6 +52,7 @@ class MainTest extends Model
         'is_special_test',
         'conditions',
         'timer',
+        'hide_unit',
     ];
 
     protected $casts = [
@@ -62,6 +63,7 @@ class MainTest extends Model
         'is_special_test' => 'boolean',
         'conditions' => 'string',
         'timer' => 'integer',
+        'hide_unit' => 'boolean',
     ];
 
     // Timestamps are NOT in your main_tests schema by default. If you added them:

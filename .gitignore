@@ -17,3 +17,5 @@ yarn-error.log
 /.idea
 /.vscode
 /realtime-events/node_modules
+/service workers/node_modules/
+/service workers/realtime/daemon/

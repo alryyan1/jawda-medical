@@ -91,6 +91,26 @@ use App\Http\Controllers\Api\SmsController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+/*
+|--------------------------------------------------------------------------
+| HL7 Client Routes (No Authentication Required)
+|--------------------------------------------------------------------------
+*/
+Route::get('/hl7-client/status', [\App\Http\Controllers\Api\HL7ClientController::class, 'status']);
+Route::post('/hl7-client/start', [\App\Http\Controllers\Api\HL7ClientController::class, 'start']);
+Route::post('/hl7-client/stop', [\App\Http\Controllers\Api\HL7ClientController::class, 'stop']);
+Route::post('/hl7-client/toggle', [\App\Http\Controllers\Api\HL7ClientController::class, 'toggle']);
+
+/*
+|--------------------------------------------------------------------------
+| Queue Worker Routes (No Authentication Required)
+|--------------------------------------------------------------------------
+*/
+Route::get('/queue-worker/status', [\App\Http\Controllers\Api\QueueWorkerController::class, 'status']);
+Route::post('/queue-worker/start', [\App\Http\Controllers\Api\QueueWorkerController::class, 'start']);
+Route::post('/queue-worker/stop', [\App\Http\Controllers\Api\QueueWorkerController::class, 'stop']);
+Route::post('/queue-worker/toggle', [\App\Http\Controllers\Api\QueueWorkerController::class, 'toggle']);
+
 Route::middleware('auth:sanctum')->group(function () {
   // SMS
   Route::post('/sms/send', [SmsController::class, 'send']);
@@ -307,6 +327,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::delete('/visits/{visit}/lab-requests/clear-pending', [LabRequestController::class, 'clearPendingRequests'])->middleware('auth:sanctum');
   Route::post('/labrequests/{labrequest}/unpay', [LabRequestController::class, 'unpay'])->middleware('auth:sanctum');
   Route::post('/costs', [CostController::class, 'store']); // For the dialog
+  Route::delete('/costs/{cost}', [CostController::class, 'destroy']); // For deleting costs
   // The route api/visits/48/lab-requests/batch-pay could not be found
   Route::post('/visits/{visit}/lab-requests/batch-pay', [LabRequestController::class, 'batchPayLabRequests'])->middleware('auth:sanctum');
   // Route::apiResource('costs', CostController::class); // For full CRUD page later
@@ -641,6 +662,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // HL7 Message Insert Routes
     Route::post('/hl7-messages/insert', [HL7MessageInsertController::class, 'store']);
     Route::post('/hl7-messages/insert-batch', [HL7MessageInsertController::class, 'storeBatch']);
+
 
     /*
     |--------------------------------------------------------------------------

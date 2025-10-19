@@ -24,7 +24,8 @@ class MainTestResource extends JsonResource
             'is_special_test' => (bool) $this->is_special_test,
             'conditions' => $this->conditions,
             'timer' => $this->timer,
-                        'child_tests' => ChildTestResource::collection($this->whenLoaded('childTests')),
+            'hide_unit' => (bool) $this->hide_unit,
+            'child_tests' => ChildTestResource::collection($this->whenLoaded('childTests')),
 
             // Include timestamps if your model has them
             // 'created_at' => $this->created_at?->toIso8601String(),

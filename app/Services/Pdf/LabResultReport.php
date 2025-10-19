@@ -349,7 +349,8 @@ class LabResultReport
             
             if ($has_more_than1_child == false) {
                 if ($show_headers) {
-                    $this->renderResultTableHeader($pdf, $table_col_widht, $m_test->mainTest->divided == 1);
+                    $hideUnit = $m_test->mainTest->hide_unit ?? false;
+                    $this->renderResultTableHeader($pdf, $table_col_widht, $m_test->mainTest->divided == 1, $hideUnit);
                 }
                 $show_headers = false;
             }
@@ -392,7 +393,8 @@ class LabResultReport
         // $pdf->Ln(5);
         // $pdf->Ln();
         $y_position_for_divided_section = $pdf->getY();
-        $this->renderResultTableHeader($pdf, $table_col_widht, $m_test->mainTest->divided == 1);
+        $hideUnit = $m_test->mainTest->hide_unit ?? false;
+        $this->renderResultTableHeader($pdf, $table_col_widht, $m_test->mainTest->divided == 1, $hideUnit);
     }
 
     /**
@@ -426,7 +428,8 @@ class LabResultReport
                 if ($m_test->mainTest->divided == 1) {
                     $pdf->selectColumn(col: 1);
                     $y_position_for_divided_section = $pdf->getY();
-                    $this->renderResultTableHeader($pdf, $table_col_widht, true);
+                    $hideUnit = $m_test->mainTest->hide_unit ?? false;
+                    $this->renderResultTableHeader($pdf, $table_col_widht, true, $hideUnit);
                     $this->addVerticalSpacing($pdf, $this->smallSpacing);
                 }
             }
@@ -465,7 +468,8 @@ class LabResultReport
             $report_result = $result->result;
 
             // Pre-measure row height using actual column widths to decide on page break
-            [$testW, $resultColWidth, $unitColWidth, $normalColWidth] = $this->computeColumnWidths($pdf, $table_col_widht, $m_test->mainTest->divided == 1);
+            $hideUnit = $m_test->mainTest->hide_unit ?? false;
+            [$testW, $resultColWidth, $unitColWidth, $normalColWidth] = $this->computeColumnWidths($pdf, $table_col_widht, $m_test->mainTest->divided == 1, $hideUnit);
             $estimatedResultHeight = $this->measureTextHeight($pdf, $resultColWidth, (string)$report_result, $this->baseLineHeight);
             $estimatedNormalHeight = $this->measureTextHeight($pdf, $normalColWidth, (string)$normal_range, $this->baseLineHeight);
             $estimatedRowHeight = max($this->baseLineHeight, $estimatedResultHeight, $estimatedNormalHeight);
@@ -488,8 +492,10 @@ class LabResultReport
                 $pdf->SetFont('arial', '', 7, '', true);
             }
             
-            $pdf->MultiCell($unitColWidth, 5, "$unit", 0, 'C', 0, 0, '', '', true);
-            $pdf->SetFont('arial', '', 9, '', true);
+            if (!$hideUnit) {
+                $pdf->MultiCell($unitColWidth, 5, "$unit", 0, 'C', 0, 0, '', '', true);
+            }
+            $pdf->SetFont('arial', '', 7, '', true);
 
             $normalRangeCellHeight = $pdf->MultiCell($normalColWidth, 5, "$normal_range", 0, 'C', 0, 1, '', '', true);
             $pdf->SetFont('arial', '', 11, '', true);
@@ -598,8 +604,9 @@ class LabResultReport
         }
         
         // Render each group as a separate section
+        $hideUnit = $m_test->mainTest->hide_unit ?? false;
         foreach ($groupedResults as $groupName => $results) {
-            $this->renderSpecialTestGroup($pdf, $groupName, $results, $page_width, false);
+            $this->renderSpecialTestGroup($pdf, $groupName, $results, $page_width, false, $hideUnit);
         }
     }
     
@@ -1046,7 +1053,7 @@ class LabResultReport
     /**
      * Render a single group within a special test
      */
-    private function renderSpecialTestGroup($pdf, $groupName, $results, $page_width, $isSemenAnalysis = false): void
+    private function renderSpecialTestGroup($pdf, $groupName, $results, $page_width, $isSemenAnalysis = false, bool $hideUnit = false): void
     {
         // Special styling for semen analysis groups
         if ($isSemenAnalysis) {
@@ -1073,11 +1080,11 @@ class LabResultReport
         $this->addVerticalSpacing($pdf, $this->smallSpacing);
         
         // Render table header for this group
-        $this->renderSpecialTestTableHeader($pdf, $page_width);
+        $this->renderSpecialTestTableHeader($pdf, $page_width, $hideUnit);
         
         // Render each result in the group
         foreach ($results as $result) {
-            $this->renderSpecialTestResultRow($pdf, $result, $page_width, $isSemenAnalysis);
+            $this->renderSpecialTestResultRow($pdf, $result, $page_width, $isSemenAnalysis, $hideUnit);
         }
         
         // Add spacing after group
@@ -1120,7 +1127,7 @@ class LabResultReport
     /**
      * Render table header for special test groups
      */
-    private function renderSpecialTestTableHeader($pdf, $page_width): void
+    private function renderSpecialTestTableHeader($pdf, $page_width, bool $hideUnit = false): void
     {
         $pdf->SetFont('arial', 'B', 10, '', true);
         $pdf->SetFillColor(245, 247, 250);
@@ -1129,12 +1136,14 @@ class LabResultReport
         // Calculate column widths for special test layout
         $testColWidth = $page_width * 0.4; // 40% for test name
         $resultColWidth = $page_width * 0.25; // 25% for result
-        $unitColWidth = $page_width * 0.15; // 15% for unit
-        $rangeColWidth = $page_width * 0.2; // 20% for normal range
+        $unitColWidth = $hideUnit ? 0 : $page_width * 0.15; // 15% for unit (0 if hidden)
+        $rangeColWidth = $hideUnit ? $page_width * 0.35 : $page_width * 0.2; // 35% if unit hidden, 20% if shown
         
         $pdf->Cell($testColWidth, 6, "Test", 1, 0, 'C', 1);
         $pdf->Cell($resultColWidth, 6, "Result", 1, 0, 'C', 1);
-        $pdf->Cell($unitColWidth, 6, "Unit", 1, 0, 'C', 1);
+        if (!$hideUnit) {
+            $pdf->Cell($unitColWidth, 6, "Unit", 1, 0, 'C', 1);
+        }
         $pdf->Cell($rangeColWidth, 6, "Normal Range", 1, 1, 'C', 1);
         
         $this->addVerticalSpacing($pdf, $this->smallSpacing);
@@ -1143,7 +1152,7 @@ class LabResultReport
     /**
      * Render a single result row for special tests
      */
-    private function renderSpecialTestResultRow($pdf, $result, $page_width, $isSemenAnalysis = false): void
+    private function renderSpecialTestResultRow($pdf, $result, $page_width, $isSemenAnalysis = false, bool $hideUnit = false): void
     {
         $child_test = $result->childTest;
         $unit = $child_test?->unit?->name ?? '';
@@ -1153,8 +1162,8 @@ class LabResultReport
         // Calculate column widths (same as header)
         $testColWidth = $page_width * 0.4;
         $resultColWidth = $page_width * 0.25;
-        $unitColWidth = $page_width * 0.15;
-        $rangeColWidth = $page_width * 0.2;
+        $unitColWidth = $hideUnit ? 0 : $page_width * 0.15;
+        $rangeColWidth = $hideUnit ? $page_width * 0.35 : $page_width * 0.2;
         
         // Estimate row height for page break
         $estimatedResultHeight = $this->measureTextHeight($pdf, $resultColWidth, (string)$report_result, $this->baseLineHeight);
@@ -1178,8 +1187,10 @@ class LabResultReport
         }
         
         // Unit
-        $pdf->SetFont('arial', '', 9, '', true);
-        $pdf->MultiCell($unitColWidth, 5, $unit, 1, 'C', 0, 0, '', '', true);
+        if (!$hideUnit) {
+            $pdf->SetFont('arial', '', 9, '', true);
+            $pdf->MultiCell($unitColWidth, 5, $unit, 1, 'C', 0, 0, '', '', true);
+        }
         
         // Normal range
         $pdf->SetFont('arial', '', 9, '', true);
@@ -1263,15 +1274,17 @@ class LabResultReport
     /**
      * Draw a standardized result table header for both single and divided layouts
      */
-    private function renderResultTableHeader($pdf, $table_col_widht, bool $isDivided): void
+    private function renderResultTableHeader($pdf, $table_col_widht, bool $isDivided, bool $hideUnit = false): void
     {
         $pdf->SetFont('arial', 'b', 11, '', true);
-        [$colW, $resultW, $unitW, $rangeW] = $this->computeColumnWidths($pdf, $table_col_widht, $isDivided);
+        [$colW, $resultW, $unitW, $rangeW] = $this->computeColumnWidths($pdf, $table_col_widht, $isDivided, $hideUnit);
         $pdf->SetFillColor(...$this->themeHeaderFill);
         $pdf->SetDrawColor(...$this->themeBorderColor);
         $pdf->cell($colW, 6, "Test", 1, 0, 'C', 1);
         $pdf->cell($resultW, 6, "Result", 1, 0, 'C', 1);
-        $pdf->cell($unitW, 6, "Unit", 1, 0, 'C', 1);
+        if (!$hideUnit) {
+            $pdf->cell($unitW, 6, "Unit", 1, 0, 'C', 1);
+        }
         $pdf->cell($rangeW, 6, "R.Values", 1, 1, 'C', 1);
         $this->addVerticalSpacing($pdf, $this->smallSpacing);
     }
@@ -1279,13 +1292,13 @@ class LabResultReport
     /**
      * Compute column widths (test, result, unit, range) depending on layout
      */
-    private function computeColumnWidths($pdf, float $table_col_widht, bool $isDivided): array
+    private function computeColumnWidths($pdf, float $table_col_widht, bool $isDivided, bool $hideUnit = false): array
     {
         $base = $isDivided ? (($pdf->getPageWidth() - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT) / 8) : $table_col_widht;
         $testW = $base;
         $resultW = $base * 1.5;
-        $unitW = $base / 2;
-        $rangeW = $base;
+        $unitW = $hideUnit ? 0 : $base / 2;
+        $rangeW = $hideUnit ? $base + ($base / 2) : $base; // Add unit width to range when hiding unit
         return [$testW, $resultW, $unitW, $rangeW];
     }
 
