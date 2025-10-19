@@ -6,9 +6,13 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "tunnel": "node tunnel.js",
+    "tunnel:dev": "node --watch tunnel.js",
+    "start-with-tunnel": "node start-with-tunnel.js"
   },
   "dependencies": {
+    "@pinggy/pinggy": "^0.1.9",
     "axios": "^1.6.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -17,4 +21,3 @@
     "socket.io": "^4.7.5"
   }
 }
-

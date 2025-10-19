@@ -1,0 +1,2 @@
+2025-10-20 00:12:24 - Starting C:\Program Files\nodejs\node.exe  --harmony --max_old_space_size=4096 "C:\xampp\htdocs\jawda-medical\service workers\pinggy\node_modules\node-windows\lib\wrapper.js" --file C:\xampp\htdocs\jawda-medical\realtime-events\tunnel.js --scriptoptions= --log "jawda pinggy start-with-tunnel wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
+2025-10-20 00:12:24 - Started 15072
