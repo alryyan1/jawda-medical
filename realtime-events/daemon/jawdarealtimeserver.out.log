@@ -1,0 +1,69 @@
+http://server2/jawda-medical/public/api API_BASE
+SANCTUM_TOKEN: Not set
+http://server2/jawda-medical/public/api API_BASE
+SANCTUM_TOKEN: Not set
+http://server2/jawda-medical/public/api API_BASE
+SANCTUM_TOKEN: Not set
+http://server1/jawda-medical/public/api API_BASE
+SANCTUM_TOKEN: Not set
+Realtime server listening on :4001
+New connection from: fwfC627IguwBO89bAAAB
+Client disconnected: fwfC627IguwBO89bAAAB Reason: transport close
+New connection from: uR3oqpkshByLs5uIAAAD
+Client disconnected: uR3oqpkshByLs5uIAAAD Reason: transport close
+New connection from: RgvwQpoRb0NJTHkHAAAF
+Client disconnected: RgvwQpoRb0NJTHkHAAAF Reason: transport close
+New connection from: 8g7Eo3C-2DA_3QSmAAAH
+Client disconnected: 8g7Eo3C-2DA_3QSmAAAH Reason: transport close
+New connection from: WAXewURZN7e8wvv5AAAJ
+Client disconnected: WAXewURZN7e8wvv5AAAJ Reason: transport close
+New connection from: NfoiUZy2EQedcJXkAAAL
+Client disconnected: NfoiUZy2EQedcJXkAAAL Reason: transport close
+New connection from: -mM4WLVyX_w9YF4uAAAN
+Client disconnected: -mM4WLVyX_w9YF4uAAAN Reason: transport close
+New connection from: Gr-ech3CYv-1TumRAAAP
+Client disconnected: Gr-ech3CYv-1TumRAAAP Reason: transport close
+New connection from: iBxALucZ9EV4LDcNAAAR
+Client disconnected: iBxALucZ9EV4LDcNAAAR Reason: transport close
+New connection from: QXGatbSop0Zz606YAAAT
+Client disconnected: QXGatbSop0Zz606YAAAT Reason: transport close
+New connection from: CHBEFWLwzW5u44N4AAAV
+New connection from: ozFdIHOeyueGCR4gAAAX
+Client disconnected: CHBEFWLwzW5u44N4AAAV Reason: transport close
+New connection from: -7RedtFUCgxCnhGVAAAZ
+Client disconnected: -7RedtFUCgxCnhGVAAAZ Reason: transport close
+Client disconnected: ozFdIHOeyueGCR4gAAAX Reason: transport close
+New connection from: vW3ns4MajqQRMmLZAAAc
+New connection from: XseZWHpifwyO7DYWAAAd
+Client disconnected: XseZWHpifwyO7DYWAAAd Reason: transport close
+Client disconnected: vW3ns4MajqQRMmLZAAAc Reason: transport close
+New connection from: AOJziaXcPmTG17E-AAAg
+Client disconnected: AOJziaXcPmTG17E-AAAg Reason: transport close
+New connection from: NC_nPukEYLvZOUN7AAAi
+New connection from: BRawPnigPFE9ODRYAAAj
+Client disconnected: BRawPnigPFE9ODRYAAAj Reason: transport close
+New connection from: cHntTnhyWUg_t3sPAAAl
+Client disconnected: cHntTnhyWUg_t3sPAAAl Reason: transport close
+Client disconnected: NC_nPukEYLvZOUN7AAAi Reason: transport close
+New connection from: _TlWtFOiYEUylHYgAAAo
+New connection from: 1rQzly9BjxrF6T5fAAAp
+Client disconnected: 1rQzly9BjxrF6T5fAAAp Reason: transport close
+Client disconnected: _TlWtFOiYEUylHYgAAAo Reason: transport close
+New connection from: uRLyUtu8h2IT7eIGAAAr
+New connection from: F0I9C4EyvhZfdkIwAAAt
+Client disconnected: uRLyUtu8h2IT7eIGAAAr Reason: transport close
+New connection from: uXFA0TptDbpom-7aAAAv
+Client disconnected: uXFA0TptDbpom-7aAAAv Reason: transport close
+Client disconnected: F0I9C4EyvhZfdkIwAAAt Reason: transport close
+New connection from: DV9GgyGEwaO7mpF6AAAy
+New connection from: z2u-gJfhW9vPBQtOAAAz
+Client disconnected: z2u-gJfhW9vPBQtOAAAz Reason: transport close
+Client disconnected: DV9GgyGEwaO7mpF6AAAy Reason: transport close
+New connection from: s1dFqjb2ED52ZslqAAA2
+New connection from: dxoyf9CPAxvXjmQuAAA3
+Client disconnected: s1dFqjb2ED52ZslqAAA2 Reason: transport close
+New connection from: dPNlh-QwQtVjvAaSAAA5
+Client disconnected: dPNlh-QwQtVjvAaSAAA5 Reason: transport close
+New connection from: ZNndrri-hwjpuDiCAAA7
+Client disconnected: ZNndrri-hwjpuDiCAAA7 Reason: transport close
+New connection from: 3hZn6xGkzaic0YSPAAA9

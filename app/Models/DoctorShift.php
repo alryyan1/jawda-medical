@@ -285,6 +285,22 @@ class DoctorShift extends Model
         }
         return $total_cash;
     }
+        
+    public function clinic_enurance()
+    {
+        $total_insurance = 0;
+        $start = 0;
+        /** @var Doctorvisit $doctorvisit */
+        foreach ($this->visits as $doctorvisit) {
+                if ($doctorvisit->patient->company_id != null) {
+                // echo "s";
+
+                   $cash =  $doctorvisit->total_paid_services($this->doctor) ;
+                   $total_insurance += $cash;
+            }
+        }
+        return $total_insurance;
+    }
     public function clinic_bank()
     {
         $total_bank = 0;

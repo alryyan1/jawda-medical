@@ -180,6 +180,23 @@ class ReportController extends Controller
             return response()->json(['message' => $e->getMessage()], 404);
         }
     }
+
+    public function doctorShiftsReportExcel(Request $request)
+    {
+        // if (!Auth::user()->can('print doctor_shift_reports')) { /* ... */ }
+
+        try {
+            $doctorShiftsReport = new \App\Services\Excel\DoctorShiftsReport();
+            $excelContent = $doctorShiftsReport->generate($request);
+            
+            $excelFileName = 'Doctor_Shifts_Report_' . date('Ymd_His') . '.xlsx';
+            return response($excelContent, 200)
+                ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                ->header('Content-Disposition', "attachment; filename=\"{$excelFileName}\"");
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+    }
     private function getMonthlyAttendanceSummaryData(Request $request): array
     {
         $validated = $request->validate([

@@ -28,6 +28,8 @@ class DoctorShiftResource extends JsonResource
         return [
             'id' => $this->id,
             'doctor_id' => $this->doctor_id,
+            'total_income' => $this->total_services(),
+            'clinic_enurance' => $this->clinic_enurance(),
             'doctor_name' => $this->whenLoaded('doctor', $this->doctor?->name),
             'doctor_specialist_name' => $this->whenLoaded('doctor', $this->doctor?->specialist?->name),
             'user_id_opened' => $this->user_id,

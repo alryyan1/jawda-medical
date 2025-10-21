@@ -2,8 +2,8 @@ var Service = require('node-windows').Service;
 
 // Create a new service object
 var svc = new Service({
-  name:'jawda realtime-server3 ',
-  description: 'start-realtime-server3',
+  name:'jawda realtime-server',
+  description: 'start-realtime-server',
   script: 'C:/xampp/htdocs/jawda-medical/realtime-events/server.js',
   nodeOptions: [
     '--harmony',
