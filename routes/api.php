@@ -316,6 +316,10 @@ Route::middleware('auth:sanctum')->group(function () {
   // Comment suggestions endpoints
   Route::get('/lab/comment-suggestions', [LabRequestController::class, 'getCommentSuggestions']);
   Route::post('/lab/comment-suggestions', [LabRequestController::class, 'addCommentSuggestion']);
+  
+  // Organism suggestions endpoints
+        Route::get('/lab/suggestions', [LabRequestController::class, 'getSuggestions']);
+        Route::post('/lab/suggestions', [LabRequestController::class, 'addSuggestion']);
 
   // Generic LabRequest CRUD (if needed separately from visit context for some actions)
   Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']);
@@ -469,6 +473,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift']);
     Route::post('/labrequests/{labrequest}/set-default-results', [LabRequestController::class, 'setDefaultResults']);
     Route::post('/labrequests/{labrequest}/populate-cbc-from-sysmex', [LabRequestController::class, 'populateCbcResultsFromSysmex']);
+  Route::post('/labrequests/{labrequest}/add-organism', [LabRequestController::class, 'addOrganism']);
+  Route::get('/labrequests/{labrequest}/organisms', [LabRequestController::class, 'getOrganisms']);
+  Route::patch('/requested-organisms/{organism}', [LabRequestController::class, 'updateOrganism']);
+  Route::delete('/requested-organisms/{organism}', [LabRequestController::class, 'deleteOrganism']);
         Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
         Route::patch('/patients/{patient}/authenticate-results', [PatientController::class, 'authenticateResults']);
         Route::get('/patients/{patient}/result-url', [PatientController::class, 'getResultUrl']);

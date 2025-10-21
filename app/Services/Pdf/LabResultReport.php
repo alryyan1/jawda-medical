@@ -1250,24 +1250,43 @@ class LabResultReport
      */
     private function renderOrganisms($pdf, $m_test, $col_number, $column_width): void
     {
-        foreach ($m_test->requestedOrganisms as $organism) {
-            // Estimate organism block height: title + headers + max(text heights)
-            $sensHeight = $this->measureTextHeight($pdf, $column_width, (string)$organism->sensitive, $this->baseLineHeight);
-            $resHeight = $this->measureTextHeight($pdf, $column_width, (string)$organism->resistant, $this->baseLineHeight);
-            $blockHeight = 10 + 5 + max($sensHeight, $resHeight) + $this->smallSpacing;
-            $this->ensureSpaceFor($pdf, $blockHeight);
-            $pdf->selectColumn($col_number);
-            $pdf->SetFont('arial', 'b', 15, '', true);
-            $pdf->SetFillColor(...$this->themeHeaderFill);
-            $pdf->SetDrawColor(...$this->themeBorderColor);
-            $pdf->cell($column_width * 2, 10, $organism->organism, 1, 1, 'C', 1);
-            $pdf->SetFont('arial', '', 11, '', true);
-            $pdf->SetFont('arial', '', 12, '', true);
-            $pdf->cell($column_width, 5, 'Sensitive', 1, 0, 'C', 0);
-            $pdf->cell($column_width, 5, 'Resistant', 1, 1, 'C', 0);
-            $pdf->MultiCell($column_width, 5, $organism->sensitive, 1, 'L', ln: 0);
-            $pdf->MultiCell($column_width, 5, $organism->resistant, 1, 'L', ln: 1);
-            $col_number++;
+        $organismCount = $m_test->requestedOrganisms()->count();
+        
+        if ($organismCount > 0) {
+            // Set up columns for multiple organisms
+            if ($organismCount > 1) {
+                $pdf->setEqualColumns($organismCount, $pdf->getPageWidth() - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT - 10);
+            }
+            
+            foreach ($m_test->requestedOrganisms as $index => $organism) {
+                // Estimate organism block height: title + headers + max(text heights)
+                $sensHeight = $this->measureTextHeight($pdf, $column_width, (string)$organism->sensitive, $this->baseLineHeight);
+                $resHeight = $this->measureTextHeight($pdf, $column_width, (string)$organism->resistant, $this->baseLineHeight);
+                $blockHeight = 10 + 5 + max($sensHeight, $resHeight) + $this->smallSpacing;
+                $this->ensureSpaceFor($pdf, $blockHeight);
+                
+                // Select the appropriate column
+                if ($organismCount > 1) {
+                    $pdf->selectColumn($index);
+                } else {
+                    $pdf->selectColumn($col_number);
+                }
+                
+                $pdf->SetFont('arial', 'b', 15, '', true);
+                $pdf->SetFillColor(...$this->themeHeaderFill);
+                $pdf->SetDrawColor(...$this->themeBorderColor);
+                $pdf->cell($column_width * 2, 10, $organism->organism, 1, 1, 'C', 1);
+                $pdf->SetFont('arial', '', 11, '', true);
+                $pdf->SetFont('arial', '', 12, '', true);
+                $pdf->cell($column_width, 5, 'Sensitivity', 1, 0, 'C', 0);
+                $pdf->cell($column_width, 5, 'Resistant', 1, 1, 'C', 0);
+                $pdf->MultiCell($column_width, 5, $organism->sensitive, 1, 'C', ln: 0);
+                $pdf->MultiCell($column_width, 5, $organism->resistant, 1, 'C', ln: 1);
+                $col_number++;
+            }
+            
+            // Reset columns after rendering organisms
+            $pdf->resetColumns();
         }
     }
 

@@ -26,4 +26,23 @@ use Illuminate\Database\Eloquent\Model;
 class RequestedOrganism extends Model
 {
     use HasFactory;
+    
+    /**
+     * Indicates if the model should be timestamped.
+     *
+     * @var bool
+     */
+    public $timestamps = false;
+    
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'lab_request_id',
+        'organism',
+        'sensitive',
+        'resistant',
+    ];
 }

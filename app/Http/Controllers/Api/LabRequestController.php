@@ -11,6 +11,7 @@ use App\Models\MainTest;
 use App\Models\Patient;
 use App\Models\Company;
 use App\Models\RequestedResult;
+use App\Models\RequestedOrganism;
 use App\Models\ChildTest;
 use App\Models\Shift;
 use Illuminate\Http\Request;
@@ -1038,6 +1039,7 @@ class LabRequestController extends Controller
                 ]);
             },
             'results.childTest:id,child_test_name', // Needed to map existing results to child tests
+            'requestedOrganisms', // Load organisms for the lab request
         ]);
 
         // Transform into the MainTestWithChildrenResults structure
@@ -1074,6 +1076,15 @@ class LabRequestController extends Controller
                     'result_flags' => $existingResult->flags ?? null,
                     'result_comment' => $existingResult->result_comment ?? null,
                     'entered_at' => null,
+                ];
+            })->all(),
+            'requested_organisms' => $labrequest->requestedOrganisms->map(function ($organism) {
+                return [
+                    'id' => $organism->id,
+                    'lab_request_id' => $organism->lab_request_id,
+                    'organism' => $organism->organism,
+                    'sensitive' => $organism->sensitive,
+                    'resistant' => $organism->resistant,
                 ];
             })->all(),
         ];
@@ -1624,5 +1635,189 @@ class LabRequestController extends Controller
             'data' => $suggestions,
             'count' => count($suggestions)
         ]);
+    }
+
+    /**
+     * Get suggestions for autocomplete
+     */
+    public function getSuggestions(Request $request)
+    {
+        $table = $request->query('table');
+        $limit = $request->query('limit', 100);
+        $result = [];
+        if ($table == 'suggested_organisms') {
+            $result = \App\Models\SuggestedOrganism::getSuggestions($limit);
+        } else if ($table == 'drugs') {
+            $result = Db::table('drugs')->select('name')->get()->pluck('name')->toArray();
+        }
+        return response()->json([
+            'data' => $result
+        ]);
+    }
+
+    /**
+     * Add new suggestion
+     */
+    public function addSuggestion(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $suggestion = \App\Models\SuggestedOrganism::addSuggestion($validated['name']);
+
+        return response()->json([
+            'message' => 'Suggestion added successfully',
+            'data' => $suggestion
+        ]);
+    }
+
+    /**
+     * Add organism to lab request
+     */
+    public function addOrganism(Request $request, LabRequest $labrequest)
+    {
+        $validated = $request->validate([
+            'organism' => 'required|string|max:255',
+            'sensitive' => 'nullable|string|max:1000',
+            'resistant' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            // Handle empty strings by converting them to null for nullable fields
+            $createData = [
+                'organism' => $validated['organism'],
+                'sensitive' => $validated['sensitive'] ?? null,
+                'resistant' => $validated['resistant'] ?? null,
+            ];
+            
+            // Convert empty strings to null
+            if ($createData['sensitive'] === '') {
+                $createData['sensitive'] = null;
+            }
+            if ($createData['resistant'] === '') {
+                $createData['resistant'] = null;
+            }
+            
+            $organism = $labrequest->requestedOrganisms()->create($createData);
+
+            // Save organism suggestion for future autocomplete
+            try {
+                \App\Models\SuggestedOrganism::addSuggestion($createData['organism']);
+            } catch (\Exception $e) {
+                // Don't fail the main operation if suggestion save fails
+                \Log::warning('Failed to save organism suggestion: ' . $e->getMessage());
+            }
+
+            // Return the updated lab request with organisms
+            $labrequest->load('requestedOrganisms');
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'تم إضافة الكائن الحي بنجاح',
+                'data' => [
+                    'organism' => $organism,
+                    'lab_request' => new LabRequestResource($labrequest)
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Add organism failed for LabRequest ID {$labrequest->id}: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في إضافة الكائن الحي',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get organisms for a lab request
+     */
+    public function getOrganisms(LabRequest $labrequest)
+    {
+        try {
+            $organisms = $labrequest->requestedOrganisms()->get();
+            
+            return response()->json([
+                'success' => true,
+                'data' => $organisms
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Get organisms failed for LabRequest ID {$labrequest->id}: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في جلب الكائنات الحية',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update organism
+     */
+    public function updateOrganism(Request $request, RequestedOrganism $organism)
+    {
+        $validated = $request->validate([
+            'organism' => 'sometimes|string|max:255',
+            'sensitive' => 'sometimes|nullable|string|max:1000',
+            'resistant' => 'sometimes|nullable|string|max:1000',
+        ]);
+
+        try {
+            // Handle empty strings by converting them to null for nullable fields
+            $updateData = $validated;
+            if (isset($updateData['sensitive']) && $updateData['sensitive'] === '') {
+                $updateData['sensitive'] = null;
+            }
+            if (isset($updateData['resistant']) && $updateData['resistant'] === '') {
+                $updateData['resistant'] = null;
+            }
+            
+            $organism->update($updateData);
+
+            // Save organism suggestion for future autocomplete
+            try {
+                \App\Models\SuggestedOrganism::addSuggestion($organism->organism);
+            } catch (\Exception $e) {
+                // Don't fail the main operation if suggestion save fails
+                \Log::warning('Failed to save organism suggestion: ' . $e->getMessage());
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تحديث الكائن الحي بنجاح',
+                'data' => $organism
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Update organism failed for Organism ID {$organism->id}: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في تحديث الكائن الحي',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete organism
+     */
+    public function deleteOrganism(RequestedOrganism $organism)
+    {
+        try {
+            $organism->delete();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'تم حذف الكائن الحي بنجاح'
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Delete organism failed for Organism ID {$organism->id}: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'فشل في حذف الكائن الحي',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

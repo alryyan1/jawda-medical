@@ -154,3 +154,4 @@ Press `Ctrl+C` to stop both the server and tunnel gracefully.
 5. Update your Laravel backend configuration if needed
 
 Your realtime-events server is now accessible from anywhere on the internet! 🌐
+

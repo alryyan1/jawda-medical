@@ -363,7 +363,7 @@ class ShiftController extends Controller
             ->get();
 
         //if current user has role superadmin skip this check
-        if (!Auth::user()->hasRole('Super Admin')) {
+        if (!Auth::user()->hasRole('admin')) {
 
 
             if ($openDoctorShiftsForThisGeneralShift->isNotEmpty()) {
@@ -425,6 +425,7 @@ class ShiftController extends Controller
             if ($request->has('touched')) {
                 $shiftDataToUpdate['touched'] = $request->boolean('touched');
             }
+            // $shift->user_closed = $closingUserId;
 
             $shift->update($shiftDataToUpdate);
 

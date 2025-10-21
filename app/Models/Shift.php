@@ -66,6 +66,7 @@ class Shift extends Model
         'closed_at',
         'is_closed',
         'pharamacy_entry',
+        'user_closed',
         'user_id', // If you add this
         // 'user_id_opened', // If you add this
         // 'user_id_closed', // If you add this
@@ -87,6 +88,7 @@ class Shift extends Model
         'closed_at' => 'datetime',
         'is_closed' => 'boolean',
         'pharamacy_entry' => 'boolean',
+        'user_closed' => 'integer',
     ];
 
     // Relationships
