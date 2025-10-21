@@ -355,6 +355,19 @@ class ShiftController extends Controller
         if ($shift->is_closed) {
             return response()->json(['message' => 'وردية العمل هذه مغلقة بالفعل.'], 400);
         }
+        
+        // Enforce minimum 6 hours since this shift was opened
+        $openedAt = $shift->created_at;
+        $hoursOpen = $openedAt ? Carbon::parse($openedAt)->diffInHours(Carbon::now()) : 0;
+        if ($hoursOpen < 6) {
+            $remainingHours = 6 - $hoursOpen;
+            return response()->json([
+                'message' => "لا يمكن إغلاق الوردية قبل مرور 6 ساعات من فتحها. الوقت المتبقي: {$remainingHours} ساعة.",
+                'hours_remaining' => $remainingHours,
+                'opened_at' => $openedAt?->toDateTimeString(),
+            ], 409);
+        }
+
 
         // Check for any open DoctorShift records specifically associated with THIS general Shift ($shift)
         $openDoctorShiftsForThisGeneralShift = DoctorShift::where('shift_id', $shift->id)
