@@ -181,22 +181,6 @@ class ReportController extends Controller
         }
     }
 
-    public function doctorShiftsReportExcel(Request $request)
-    {
-        // if (!Auth::user()->can('print doctor_shift_reports')) { /* ... */ }
-
-        try {
-            $doctorShiftsReport = new \App\Services\Excel\DoctorShiftsReport();
-            $excelContent = $doctorShiftsReport->generate($request);
-            
-            $excelFileName = 'Doctor_Shifts_Report_' . date('Ymd_His') . '.xlsx';
-            return response($excelContent, 200)
-                ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                ->header('Content-Disposition', "attachment; filename=\"{$excelFileName}\"");
-        } catch (\Exception $e) {
-            return response()->json(['message' => $e->getMessage()], 404);
-        }
-    }
     private function getMonthlyAttendanceSummaryData(Request $request): array
     {
         $validated = $request->validate([
@@ -1338,8 +1322,8 @@ class ReportController extends Controller
         $userCollectionsPresented = false;
 
         foreach ($users as $user) {
-            $totalPaid = $shift->paidLab($user->id) + $shift->totalPaidService($user->id);
-            $totalBank = $shift->bankakLab($user->id) + $shift->totalPaidServiceBank($user->id);
+            $totalPaid =  $shift->totalPaidService($user->id);
+            $totalBank = $shift->totalPaidServiceBank($user->id);
             // Costs specific to this user within this shift (if applicable)
             $totalCostForUser = $shift->totalCost($user->id); // Ensure this method exists and is relevant
             $totalCostBankForUser = $shift->totalCostBank($user->id);

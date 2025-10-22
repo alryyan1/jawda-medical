@@ -1,4 +1,0 @@
-2025-10-21 22:55:24 - Starting C:\Program Files\nodejs\node.exe  --harmony --max_old_space_size=4096 "C:\xampp\htdocs\jawda-medical\service workers\realtime\node_modules\node-windows\lib\wrapper.js" --file C:\xampp\htdocs\jawda-medical\realtime-events\server.js --scriptoptions= --log "jawda realtime-server wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
-2025-10-21 22:55:24 - Started 9596
-2025-10-21 23:01:46 - Starting C:\Program Files\nodejs\node.exe  --harmony --max_old_space_size=4096 "C:\xampp\htdocs\jawda-medical\service workers\realtime\node_modules\node-windows\lib\wrapper.js" --file C:\xampp\htdocs\jawda-medical\realtime-events\server.js --scriptoptions= --log "jawda realtime-server wrapper" --grow 0.25 --wait 1 --maxrestarts 3 --abortonerror n --stopparentfirst undefined
-2025-10-21 23:01:46 - Started 25880

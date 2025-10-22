@@ -127,7 +127,7 @@ class DoctorShiftsReport
             $insuranceEntitlement = $shift->doctor_credit_company();
             $staticWageApplied = ($shift->status == false && $shift->doctor) ? (float)$shift->doctor->static_wage : 0;
             $totalDoctorEntitlementValue = $cashEntitlement + $insuranceEntitlement + $staticWageApplied;
-            $totalIncomeValue = $shift->total_services();
+            $totalIncomeValue = $shift->total_paid_services();
             $enduranceValue = $shift->clinic_enurance();
 
             // Date as Excel serial with proper format

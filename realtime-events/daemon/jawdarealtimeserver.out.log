@@ -67,3 +67,552 @@ Client disconnected: dPNlh-QwQtVjvAaSAAA5 Reason: transport close
 New connection from: ZNndrri-hwjpuDiCAAA7
 Client disconnected: ZNndrri-hwjpuDiCAAA7 Reason: transport close
 New connection from: 3hZn6xGkzaic0YSPAAA9
+Client disconnected: 3hZn6xGkzaic0YSPAAA9 Reason: transport close
+New connection from: 55-5xyfaymcm2AjAAAA_
+Client disconnected: dxoyf9CPAxvXjmQuAAA3 Reason: transport close
+Client disconnected: 55-5xyfaymcm2AjAAAA_ Reason: transport close
+http://server1/jawda-medical/public/api API_BASE
+SANCTUM_TOKEN: Not set
+Realtime server listening on :4001
+New connection from: LOqzGLkQmS2VskyEAAAB
+New connection from: MMiqn6GTsROCp2-RAAAD
+Client disconnected: LOqzGLkQmS2VskyEAAAB Reason: transport close
+Client disconnected: MMiqn6GTsROCp2-RAAAD Reason: transport close
+New connection from: t6ymsCqtFNT_gTO5AAAG
+New connection from: a0d7OO-mmX5krxFFAAAH
+http://server1/jawda-medical/public/api API_BASE
+SANCTUM_TOKEN: Not set
+Realtime server listening on :4001
+New connection from: BCUZrtoWOIaJLXa9AAAB
+Client disconnected: BCUZrtoWOIaJLXa9AAAB Reason: transport close
+New connection from: ego1rGg_2U629zu_AAAD
+New connection from: WsWD2GlbU0VdbWexAAAF
+Client disconnected: ego1rGg_2U629zu_AAAD Reason: transport close
+Client disconnected: WsWD2GlbU0VdbWexAAAF Reason: transport close
+New connection from: FlPUsLjSs--PRHGFAAAH
+Client disconnected: FlPUsLjSs--PRHGFAAAH Reason: transport close
+New connection from: Rjm3SXUtLRRG4uJxAAAJ
+Client disconnected: Rjm3SXUtLRRG4uJxAAAJ Reason: transport close
+New connection from: _pX21qEw1P8Bnqq7AAAL
+New connection from: vuoSEKI5DYWgiN9cAAAN
+Client disconnected: vuoSEKI5DYWgiN9cAAAN Reason: transport close
+New connection from: do45wIduNjfYlfucAAAP
+Client disconnected: do45wIduNjfYlfucAAAP Reason: transport close
+New connection from: U1GEIX0GfHV4WRuzAAAR
+Client disconnected: _pX21qEw1P8Bnqq7AAAL Reason: transport close
+New connection from: CLj8IsOPlLrrv_o9AAAT
+Client disconnected: U1GEIX0GfHV4WRuzAAAR Reason: transport close
+New connection from: NMD0KXP2zRLlE17QAAAV
+New connection from: Hw8pPPrV6SlWTCRuAAAX
+Client disconnected: Hw8pPPrV6SlWTCRuAAAX Reason: transport close
+New connection from: h_sb51Ra26v96WEvAAAZ
+Client disconnected: CLj8IsOPlLrrv_o9AAAT Reason: transport close
+New connection from: jstTWMsKIKbkML5IAAAb
+Client disconnected: h_sb51Ra26v96WEvAAAZ Reason: transport close
+Client disconnected: NMD0KXP2zRLlE17QAAAV Reason: transport close
+New connection from: shQghs1azCzyTKYCAAAd
+Client disconnected: shQghs1azCzyTKYCAAAd Reason: transport close
+New connection from: 00JcWij6SRzJjBFEAAAf
+New connection from: cog76C75na4KP7QcAAAh
+close-general-shift {
+  user_id: 2,
+  user_name: 'sadah',
+  shift_id: 482,
+  closed_at: '2025-10-22T14:01:13.251Z'
+}
+Client disconnected: 00JcWij6SRzJjBFEAAAf Reason: transport close
+New connection from: 2y93CQjjBkEc0RwtAAAj
+open-general-shift {
+  user_id: 1,
+  user_name: 'admin',
+  opened_at: '2025-10-22T14:55:33.188Z'
+}
+print-services-receipt
+print-services-receipt { visit_id: 38503, patient_id: 38374 }
+visit_id type: number value: 38503
+[Print] Generating services PDF for visit 38503: http://server1/jawda-medical/public/api/visits/38503/thermal-receipt/pdf
+[Print] Making request to: http://server1/jawda-medical/public/api/visits/38503/thermal-receipt/pdf
+[Print] Using SANCTUM_TOKEN: No
+[Print] Services PDF saved to: C:\WINDOWS\TEMP\services-receipt-38503-1761145034023.pdf
+[Print] Printing services PDF: C:\WINDOWS\TEMP\services-receipt-38503-1761145034023.pdf
+[Print] Successfully printed services receipt for visit 38503
+[Print] Cleaned up temporary file: C:\WINDOWS\TEMP\services-receipt-38503-1761145034023.pdf
+New connection from: kI_0XOIAIpdsb9s2AAAl
+lab-payment {
+  visit: {
+    id: 38503,
+    created_at: '2025-10-22T16:55:56+02:00',
+    visit_time: '16:55:56',
+    visit_time_formatted: '04:55 PM',
+    status: 'waiting',
+    visit_type: null,
+    company: null,
+    queue_number: 1,
+    number: 1,
+    reason_for_visit: '',
+    visit_notes: null,
+    is_new: true,
+    only_lab: false,
+    requested_services_count: null,
+    patient_id: 38374,
+    patient: {
+      id: 38374,
+      name: 'test',
+      phone: '0',
+      gender: 'female',
+      age_year: null,
+      age_month: null,
+      age_day: null,
+      full_age: 'N/A',
+      doctor: [Object],
+      result_is_locked: false,
+      address: null,
+      gov_id: null,
+      company_id: null,
+      company: null,
+      subcompany_id: null,
+      subcompany: null,
+      company_relation_id: null,
+      insurance_no: null,
+      expire_date: null,
+      guarantor: null,
+      paper_fees: 0,
+      is_lab_paid: false,
+      lab_paid: 0,
+      sample_collected: false,
+      sample_collect_time: null,
+      result_print_date: null,
+      sample_print_date: null,
+      visit_number: 1,
+      result_auth: false,
+      auth_date: '2025-10-22T16:55:56+02:00',
+      discount: 0,
+      discount_comment: '',
+      doctor_finish: false,
+      doctor_lab_request_confirm: false,
+      doctor_lab_urgent_confirm: false,
+      created_at: '2025-10-22T16:55:56+02:00',
+      updated_at: '2025-10-22T16:55:56+02:00',
+      user: [Object],
+      has_cbc: false,
+      result_url: null
+    },
+    patient_subcompany: null,
+    doctor_id: 9,
+    doctor: { id: 9, name: 'د.مزن عبدالمنعم', specialist_name: 'الاشعه' },
+    doctor_name: 'د.مزن عبدالمنعم',
+    user_id: 1,
+    created_by_user: { id: 1, name: 'admin', username: 'starsIntaj' },
+    shift_id: 483,
+    doctor_shift_id: 4202,
+    total_amount: 12000,
+    total_paid: 0,
+    total_discount: 0,
+    balance_due: 12000,
+    lab_requests: [ [Object] ],
+    updated_at: '2025-10-22T16:55:56+02:00'
+  },
+  patient: {
+    id: 38374,
+    name: 'test',
+    phone: '0',
+    gender: 'female',
+    age_year: null,
+    age_month: null,
+    age_day: null,
+    full_age: 'N/A',
+    doctor: { id: 9, name: 'د.مزن عبدالمنعم', specialist_name: 'الاشعه' },
+    result_is_locked: false,
+    address: null,
+    gov_id: null,
+    company_id: null,
+    company: null,
+    subcompany_id: null,
+    subcompany: null,
+    company_relation_id: null,
+    insurance_no: null,
+    expire_date: null,
+    guarantor: null,
+    paper_fees: 0,
+    is_lab_paid: false,
+    lab_paid: 0,
+    sample_collected: false,
+    sample_collect_time: null,
+    result_print_date: null,
+    sample_print_date: null,
+    visit_number: 1,
+    result_auth: false,
+    auth_date: '2025-10-22T16:55:56+02:00',
+    discount: 0,
+    discount_comment: '',
+    doctor_finish: false,
+    doctor_lab_request_confirm: false,
+    doctor_lab_urgent_confirm: false,
+    created_at: '2025-10-22T16:55:56+02:00',
+    updated_at: '2025-10-22T16:55:56+02:00',
+    user: { id: 1, name: 'admin', username: 'starsIntaj' },
+    has_cbc: false,
+    result_url: null
+  },
+  labRequests: [
+    {
+      id: 57,
+      main_test_id: 1,
+      main_test: [Object],
+      pid: 38374,
+      patient_name: 'test',
+      doctor_visit_id: 38503,
+      hidden: false,
+      is_lab2lab: false,
+      valid: true,
+      no_sample: false,
+      price: 12000,
+      amount_paid: 12000,
+      discount_per: 0,
+      is_bankak: false,
+      comment: null,
+      user_requested: 1,
+      requesting_user_name: 'admin',
+      user_deposited: 1,
+      deposit_user_name: 'admin',
+      approve: true,
+      endurance: 0,
+      is_paid: true,
+      sample_id: null,
+      created_at: '2025-10-22T17:10:52+02:00',
+      updated_at: '2025-10-22T17:10:54+02:00'
+    }
+  ]
+}
+lab-payment emitted
+print-services-receipt
+print-services-receipt { visit_id: 38504, patient_id: 38375 }
+visit_id type: number value: 38504
+[Print] Generating services PDF for visit 38504: http://server1/jawda-medical/public/api/visits/38504/thermal-receipt/pdf
+[Print] Making request to: http://server1/jawda-medical/public/api/visits/38504/thermal-receipt/pdf
+[Print] Using SANCTUM_TOKEN: No
+[Print] Services PDF saved to: C:\WINDOWS\TEMP\services-receipt-38504-1761145995743.pdf
+[Print] Printing services PDF: C:\WINDOWS\TEMP\services-receipt-38504-1761145995743.pdf
+[Print] Successfully printed services receipt for visit 38504
+[Print] Cleaned up temporary file: C:\WINDOWS\TEMP\services-receipt-38504-1761145995743.pdf
+print-services-receipt
+print-services-receipt { visit_id: 38505, patient_id: 38376 }
+visit_id type: number value: 38505
+[Print] Generating services PDF for visit 38505: http://server1/jawda-medical/public/api/visits/38505/thermal-receipt/pdf
+[Print] Making request to: http://server1/jawda-medical/public/api/visits/38505/thermal-receipt/pdf
+[Print] Using SANCTUM_TOKEN: No
+[Print] Services PDF saved to: C:\WINDOWS\TEMP\services-receipt-38505-1761146098321.pdf
+[Print] Printing services PDF: C:\WINDOWS\TEMP\services-receipt-38505-1761146098321.pdf
+[Print] Successfully printed services receipt for visit 38505
+[Print] Cleaned up temporary file: C:\WINDOWS\TEMP\services-receipt-38505-1761146098321.pdf
+Client disconnected: 2y93CQjjBkEc0RwtAAAj Reason: transport close
+print-services-receipt
+print-services-receipt { visit_id: 38505, patient_id: 38376 }
+visit_id type: number value: 38505
+[Print] Generating services PDF for visit 38505: http://server1/jawda-medical/public/api/visits/38505/thermal-receipt/pdf
+[Print] Making request to: http://server1/jawda-medical/public/api/visits/38505/thermal-receipt/pdf
+[Print] Using SANCTUM_TOKEN: No
+[Print] Services PDF saved to: C:\WINDOWS\TEMP\services-receipt-38505-1761147019278.pdf
+[Print] Printing services PDF: C:\WINDOWS\TEMP\services-receipt-38505-1761147019278.pdf
+[Print] Successfully printed services receipt for visit 38505
+[Print] Cleaned up temporary file: C:\WINDOWS\TEMP\services-receipt-38505-1761147019278.pdf
+lab-payment {
+  visit: {
+    id: 38504,
+    created_at: '2025-10-22T17:12:16+02:00',
+    visit_time: '17:12:16',
+    visit_time_formatted: '05:12 PM',
+    status: 'waiting',
+    visit_type: null,
+    company: null,
+    queue_number: 2,
+    number: 2,
+    reason_for_visit: '',
+    visit_notes: null,
+    is_new: true,
+    only_lab: false,
+    requested_services_count: null,
+    patient_id: 38375,
+    patient: {
+      id: 38375,
+      name: 'فثسف',
+      phone: '0',
+      gender: 'female',
+      age_year: null,
+      age_month: null,
+      age_day: null,
+      full_age: 'N/A',
+      doctor: [Object],
+      result_is_locked: false,
+      address: null,
+      gov_id: null,
+      company_id: null,
+      company: null,
+      subcompany_id: null,
+      subcompany: null,
+      company_relation_id: null,
+      insurance_no: null,
+      expire_date: null,
+      guarantor: null,
+      paper_fees: 0,
+      is_lab_paid: false,
+      lab_paid: 0,
+      sample_collected: false,
+      sample_collect_time: null,
+      result_print_date: null,
+      sample_print_date: null,
+      visit_number: 2,
+      result_auth: false,
+      auth_date: '2025-10-22T17:12:16+02:00',
+      discount: 0,
+      discount_comment: '',
+      doctor_finish: false,
+      doctor_lab_request_confirm: false,
+      doctor_lab_urgent_confirm: false,
+      created_at: '2025-10-22T17:12:16+02:00',
+      updated_at: '2025-10-22T17:12:16+02:00',
+      user: [Object],
+      has_cbc: false,
+      result_url: null
+    },
+    patient_subcompany: null,
+    doctor_id: 9,
+    doctor: { id: 9, name: 'د.مزن عبدالمنعم', specialist_name: 'الاشعه' },
+    doctor_name: 'د.مزن عبدالمنعم',
+    user_id: 1,
+    created_by_user: { id: 1, name: 'admin', username: 'starsIntaj' },
+    shift_id: 483,
+    doctor_shift_id: 4202,
+    total_amount: 12000,
+    total_paid: 0,
+    total_discount: 0,
+    balance_due: 12000,
+    lab_requests: [ [Object] ],
+    updated_at: '2025-10-22T17:12:16+02:00'
+  },
+  patient: {
+    id: 38375,
+    name: 'فثسف',
+    phone: '0',
+    gender: 'female',
+    age_year: null,
+    age_month: null,
+    age_day: null,
+    full_age: 'N/A',
+    doctor: { id: 9, name: 'د.مزن عبدالمنعم', specialist_name: 'الاشعه' },
+    result_is_locked: false,
+    address: null,
+    gov_id: null,
+    company_id: null,
+    company: null,
+    subcompany_id: null,
+    subcompany: null,
+    company_relation_id: null,
+    insurance_no: null,
+    expire_date: null,
+    guarantor: null,
+    paper_fees: 0,
+    is_lab_paid: false,
+    lab_paid: 0,
+    sample_collected: false,
+    sample_collect_time: null,
+    result_print_date: null,
+    sample_print_date: null,
+    visit_number: 2,
+    result_auth: false,
+    auth_date: '2025-10-22T17:12:16+02:00',
+    discount: 0,
+    discount_comment: '',
+    doctor_finish: false,
+    doctor_lab_request_confirm: false,
+    doctor_lab_urgent_confirm: false,
+    created_at: '2025-10-22T17:12:16+02:00',
+    updated_at: '2025-10-22T17:12:16+02:00',
+    user: { id: 1, name: 'admin', username: 'starsIntaj' },
+    has_cbc: false,
+    result_url: null
+  },
+  labRequests: [
+    {
+      id: 59,
+      main_test_id: 1,
+      main_test: [Object],
+      pid: 38375,
+      patient_name: 'فثسف',
+      doctor_visit_id: 38504,
+      hidden: false,
+      is_lab2lab: false,
+      valid: true,
+      no_sample: false,
+      price: 12000,
+      amount_paid: 12000,
+      discount_per: 0,
+      is_bankak: false,
+      comment: null,
+      user_requested: 1,
+      requesting_user_name: 'admin',
+      user_deposited: 1,
+      deposit_user_name: 'admin',
+      approve: true,
+      endurance: 0,
+      is_paid: true,
+      sample_id: null,
+      created_at: '2025-10-22T17:31:32+02:00',
+      updated_at: '2025-10-22T17:31:58+02:00'
+    }
+  ]
+}
+lab-payment emitted
+Client disconnected: kI_0XOIAIpdsb9s2AAAl Reason: transport close
+New connection from: 19tsRw0Jmx_-6NJmAAAn
+lab-payment {
+  visit: {
+    id: 38504,
+    created_at: '2025-10-22T17:12:16+02:00',
+    visit_time: '17:12:16',
+    visit_time_formatted: '05:12 PM',
+    status: 'waiting',
+    visit_type: null,
+    company: null,
+    queue_number: 2,
+    number: 2,
+    reason_for_visit: '',
+    visit_notes: null,
+    is_new: true,
+    only_lab: false,
+    requested_services_count: null,
+    patient_id: 38375,
+    patient: {
+      id: 38375,
+      name: 'فثسف',
+      phone: '0',
+      gender: 'female',
+      age_year: null,
+      age_month: null,
+      age_day: null,
+      full_age: 'N/A',
+      doctor: [Object],
+      result_is_locked: false,
+      address: null,
+      gov_id: null,
+      company_id: null,
+      company: null,
+      subcompany_id: null,
+      subcompany: null,
+      company_relation_id: null,
+      insurance_no: null,
+      expire_date: null,
+      guarantor: null,
+      paper_fees: 0,
+      is_lab_paid: false,
+      lab_paid: 0,
+      sample_collected: false,
+      sample_collect_time: null,
+      result_print_date: null,
+      sample_print_date: null,
+      visit_number: 2,
+      result_auth: false,
+      auth_date: '2025-10-22T17:12:16+02:00',
+      discount: 0,
+      discount_comment: '',
+      doctor_finish: false,
+      doctor_lab_request_confirm: false,
+      doctor_lab_urgent_confirm: false,
+      created_at: '2025-10-22T17:12:16+02:00',
+      updated_at: '2025-10-22T17:12:16+02:00',
+      user: [Object],
+      has_cbc: false,
+      result_url: null
+    },
+    patient_subcompany: null,
+    doctor_id: 9,
+    doctor: { id: 9, name: 'د.مزن عبدالمنعم', specialist_name: 'الاشعه' },
+    doctor_name: 'د.مزن عبدالمنعم',
+    user_id: 1,
+    created_by_user: { id: 1, name: 'admin', username: 'starsIntaj' },
+    shift_id: 483,
+    doctor_shift_id: 4202,
+    total_amount: 9000,
+    total_paid: 0,
+    total_discount: 0,
+    balance_due: 9000,
+    lab_requests: [ [Object] ],
+    updated_at: '2025-10-22T17:12:16+02:00'
+  },
+  patient: {
+    id: 38375,
+    name: 'فثسف',
+    phone: '0',
+    gender: 'female',
+    age_year: null,
+    age_month: null,
+    age_day: null,
+    full_age: 'N/A',
+    doctor: { id: 9, name: 'د.مزن عبدالمنعم', specialist_name: 'الاشعه' },
+    result_is_locked: false,
+    address: null,
+    gov_id: null,
+    company_id: null,
+    company: null,
+    subcompany_id: null,
+    subcompany: null,
+    company_relation_id: null,
+    insurance_no: null,
+    expire_date: null,
+    guarantor: null,
+    paper_fees: 0,
+    is_lab_paid: false,
+    lab_paid: 0,
+    sample_collected: false,
+    sample_collect_time: null,
+    result_print_date: null,
+    sample_print_date: null,
+    visit_number: 2,
+    result_auth: false,
+    auth_date: '2025-10-22T17:12:16+02:00',
+    discount: 0,
+    discount_comment: '',
+    doctor_finish: false,
+    doctor_lab_request_confirm: false,
+    doctor_lab_urgent_confirm: false,
+    created_at: '2025-10-22T17:12:16+02:00',
+    updated_at: '2025-10-22T17:12:16+02:00',
+    user: { id: 1, name: 'admin', username: 'starsIntaj' },
+    has_cbc: false,
+    result_url: null
+  },
+  labRequests: [
+    {
+      id: 60,
+      main_test_id: 5,
+      main_test: [Object],
+      pid: 38375,
+      patient_name: 'فثسف',
+      doctor_visit_id: 38504,
+      hidden: false,
+      is_lab2lab: false,
+      valid: true,
+      no_sample: false,
+      price: 9000,
+      amount_paid: 9000,
+      discount_per: 0,
+      is_bankak: false,
+      comment: null,
+      user_requested: 1,
+      requesting_user_name: 'admin',
+      user_deposited: 1,
+      deposit_user_name: 'admin',
+      approve: true,
+      endurance: 0,
+      is_paid: true,
+      sample_id: null,
+      created_at: '2025-10-22T17:34:31+02:00',
+      updated_at: '2025-10-22T17:34:33+02:00'
+    }
+  ]
+}
+lab-payment emitted
+New connection from: jdna2zaFsruELtz-AAAp
+Client disconnected: cog76C75na4KP7QcAAAh Reason: transport close
+Client disconnected: jdna2zaFsruELtz-AAAp Reason: transport close
+Client disconnected: 19tsRw0Jmx_-6NJmAAAn Reason: transport close

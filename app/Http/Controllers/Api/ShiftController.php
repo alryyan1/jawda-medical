@@ -117,8 +117,8 @@ class ShiftController extends Controller
         $user = Auth::user();
         
         // Check if there's already an open shift to prevent multiple open shifts
-        $currentOpenShift = Shift::where('is_closed', false)->first();
-        if ($currentOpenShift) {
+        $currentOpenShift = Shift::latest('id')->first();
+        if ($currentOpenShift && $currentOpenShift->is_closed == false) {
             return response()->json(['message' => 'يوجد وردية عمل مفتوحة بالفعل. يجب إغلاق الوردية الحالية قبل فتح وردية جديدة.'], 409);
         }
 
