@@ -374,6 +374,17 @@ class DoctorShift extends Model
         }
         return $total_paid;
     }
+    public function total_services_cash()
+    {
+        $total_cash = 0;
+        /** @var Doctorvisit $doctorvisit */
+        foreach ($this->visits as $doctorvisit) {
+            if ($doctorvisit->patient->company_id == null) {
+                $total_cash += $doctorvisit->total_services($this->doctor);
+                }
+        }
+        return $total_cash;
+    }
       public function count_insurance()
     {
         $count = 0;
