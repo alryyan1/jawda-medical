@@ -1322,8 +1322,8 @@ class ReportController extends Controller
         $userCollectionsPresented = false;
 
         foreach ($users as $user) {
-            $totalPaid =  $shift->totalPaidService($user->id);
-            $totalBank = $shift->totalPaidServiceBank($user->id);
+            $totalPaid = $shift->paidLab($user->id) + $shift->totalPaidService($user->id);
+            $totalBank = $shift->bankakLab($user->id) + $shift->totalPaidServiceBank($user->id);
             // Costs specific to this user within this shift (if applicable)
             $totalCostForUser = $shift->totalCost($user->id); // Ensure this method exists and is relevant
             $totalCostBankForUser = $shift->totalCostBank($user->id);
