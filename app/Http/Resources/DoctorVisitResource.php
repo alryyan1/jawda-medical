@@ -62,11 +62,14 @@ class DoctorVisitResource extends JsonResource
             'doctor_shift_details' => new DoctorShiftResource($this->whenLoaded('doctorShift')),
 
             // Financial summary
-            'total_amount' => $financialSummary['total_amount'],
+            'total_lab_amount' =>  $financialSummary['total_lab_amount'],
             'total_paid' => $financialSummary['total_paid'],
             'total_discount' => $financialSummary['total_discount'],
             'balance_due' => $financialSummary['balance_due'],
-
+            'total_lab_paid' => $financialSummary['total_lab_paid'],
+            'total_lab_discount' => $financialSummary['total_lab_discount'],
+            'total_lab_endurance' => $financialSummary['total_lab_endurance'],
+            'total_lab_balance' => $financialSummary['total_lab_balance'],
             // Related resources
             'requested_services' => RequestedServiceResource::collection($this->whenLoaded('requestedServices')),
             'lab_requests' => LabRequestResource::collection($this->whenLoaded('patientLabRequests')),
@@ -90,6 +93,11 @@ class DoctorVisitResource extends JsonResource
         $totalDiscount = 0;
         $isCompanyPatient = !empty($this->patient?->company_id);
         $totalEndurance = 0;
+        $totalLabAmount = 0;
+        $totalLabPaid = 0;
+        $totalLabDiscount = 0;
+        $totalLabEndurance = 0;
+        $totalLabBalance = 0;
 
         // Calculate from requested services
         if ($this->relationLoaded('requestedServices')) {
@@ -106,18 +114,24 @@ class DoctorVisitResource extends JsonResource
             foreach ($this->patientLabRequests as $labRequest) {
                 $labCalculation = $this->calculateLabRequestFinancials($labRequest, $isCompanyPatient);
 
-                $totalAmount += $labCalculation['price'];
-                $totalPaid += $labCalculation['amount_paid'];
-                $totalDiscount += $labCalculation['discount'];
-                $totalEndurance += $labCalculation['endurance'];
+              
+                $totalLabAmount += $labCalculation['price'];
+                $totalLabPaid += $labCalculation['amount_paid'];
+                $totalLabDiscount += $labCalculation['discount'];
+                $totalLabEndurance += $labCalculation['endurance'];
+                $totalLabBalance += $labCalculation['balance'];
             }
         }
 
         return [
-            'total_amount' => round($totalAmount, 2),
+            'total_lab_amount' => round($totalLabAmount, 2),
             'total_paid' => round($totalPaid, 2),
             'total_discount' => round($totalDiscount, 2),
             'balance_due' => round($isCompanyPatient ? $totalEndurance - $totalPaid : ($totalAmount- $totalDiscount )- $totalPaid, 2),
+            'total_lab_paid' => round($totalLabPaid, 2),
+            'total_lab_discount' => round($totalLabDiscount, 2),
+            'total_lab_endurance' => round($totalLabEndurance, 2),
+            'total_lab_balance' => round($totalLabBalance, 2),
         ];
     }
 
@@ -176,14 +190,19 @@ class DoctorVisitResource extends JsonResource
         }else{
             $netPayable = $price - $totalDiscount;
         }
-        $amountPaid = (float) ($labRequest->amount_paid ?? 0);
-
+        $amountPaid = (float) ($labRequest->amount_paid ?? 0);  
+        if($isCompanyPatient){
+            $balance = $endurance - $amountPaid;
+        }else{
+            $balance = $price - $totalDiscount - $amountPaid;
+        }
         return [
             'price' => $price,
             'net_payable' => $netPayable,
             'amount_paid' => $amountPaid,
             'discount' => $totalDiscount,
             'endurance' => $endurance,
+            'balance' => $balance,
         ];
     }
 

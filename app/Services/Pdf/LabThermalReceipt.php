@@ -175,30 +175,50 @@ class LabThermalReceipt extends MyCustomTCPDF
 
     protected function generateBarcode(): void
     {
-        if ($this->appSettings?->barcode && !empty($this->labRequestsToPrint[0]['id'])) {
-            // $this->Ln(5);
-            $barcodeValue = (string) $this->labRequestsToPrint[0]['id'];
-            $style = [
-                'position' => '',
-                'align' => 'C',
-                'stretch' => false,
-                'fitwidth' => true,
-                'cellfitalign' => '',
-                'border' => false,
-                'hpadding' => 'auto',
-                'vpadding' => 'auto',
-                'fgcolor' => [0, 0, 0],
-                'bgcolor' => false,
-                'text' => true,
-                'font' => $this->fontName,
-                'fontsize' => 10,
-                'stretchtext' => 4
-            ];
-            $this->write1DBarcode($barcodeValue, 'C128B', '50', '', '', (float)15, (float)0.3, $style, 'N');
-            // $this->Ln(5);
-        }
-
-        $this->Ln(5);
+        // Always generate barcode using visit ID
+        $barcodeValue = (string) $this->visit->id;
+        
+        // Add some space before barcode
+        $this->Ln(3);
+        
+        // Calculate center position for barcode
+        $pageWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
+        $barcodeWidth = 50; // Width of the barcode
+        $centerX = ($pageWidth - $barcodeWidth) / 2;
+        
+        // Set position to center the barcode
+        $this->SetX($this->getMargins()['left'] + $centerX);
+        
+        $style = [
+            'position' => '',
+            'align' => 'C',
+            'stretch' => false,
+            'fitwidth' => true,
+            'cellfitalign' => '',
+            'border' => false,
+            'hpadding' => 'auto',
+            'vpadding' => 'auto',
+            'fgcolor' => [0, 0, 0],
+            'bgcolor' => false,
+            'text' => true,
+            'font' => $this->fontName,
+            'fontsize' => 8,
+            'stretchtext' => 4
+        ];
+        
+        // Generate the barcode
+        $this->write1DBarcode($barcodeValue, 'C128B', $barcodeWidth, '', '', (float)15, (float)0.3, $style, 'N');
+        
+        // Add visit ID text below barcode
+        $this->Ln(2);
+        $this->SetFont($this->fontName, '', 8);
+        $visitIdText = "رقم الزيارة: " . $barcodeValue;
+        $textWidth = $this->GetStringWidth($visitIdText);
+        $textCenterX = ($pageWidth - $textWidth) / 2;
+        $this->SetX($this->getMargins()['left'] + $textCenterX);
+        $this->Cell($textWidth, $this->lineHeight, $visitIdText, 0, 1, 'C');
+        
+        $this->Ln(3);
         $this->Cell(0, 0.1, '', 'T', 1, 'C');
         $this->Ln(0.5);
     }

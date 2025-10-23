@@ -17,7 +17,7 @@ class ClinicWorkspaceController extends Controller
             'search' => 'nullable|string|max:100',
         ]);
 
-        $query = DoctorVisit::with(['patient.subcompany', 'doctor','patient.company'])
+        $query = DoctorVisit::with(['patient.subcompany', 'doctor','patient.company','requestedServices','patientLabRequests'])
                            ->withCount('requestedServices'); // Add count of requested services
                             // ->whereDate('visit_date', Carbon::today()) // Example: visits for today
                             // ->whereNotIn('status', ['completed', 'cancelled']); // Example: not completed or cancelled

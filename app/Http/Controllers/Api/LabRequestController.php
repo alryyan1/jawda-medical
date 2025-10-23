@@ -1460,7 +1460,11 @@ class LabRequestController extends Controller
             // Add fixed discount if applicable: + (float)($labrequest->fixed_discount_amount ?? 0);
             $enduranceAmount = (float) ($labrequest->endurance ?? 0);
 
-            $netPayableByPatient = $itemSubTotal - $discountAmount - $enduranceAmount;
+            if($labrequest->patient->company_id){
+                $netPayableByPatient = $enduranceAmount ;
+            }else{
+                $netPayableByPatient = $itemSubTotal - $discountAmount - $enduranceAmount;
+            }
 
             // Amount being effectively "paid" now is the remaining balance to reach netPayableByPatient
             $amountBeingPaidNow = $netPayableByPatient - (float) $labrequest->amount_paid;
