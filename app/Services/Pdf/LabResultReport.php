@@ -130,8 +130,14 @@ class LabResultReport
 
         Log::info('$settings->lab_name',['settigns'=>$settings]);
 
+        if ($settings?->show_title_in_lab_result) {
         $pdf->Ln(20);
-        $pdf->Cell($page_width, 5, $settings?->lab_name ?? 'Lab Name' , 0, 1, 'C');
+        }else{
+            $pdf->Ln(25);
+        }
+        if ($settings?->show_title_in_lab_result) {
+            $pdf->Cell($page_width, 5, $settings?->lab_name ?? 'Lab Name' , 0, 1, 'C');
+        }
 
         $pdf->Ln(20);
 

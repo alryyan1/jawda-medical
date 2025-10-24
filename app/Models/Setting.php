@@ -143,6 +143,7 @@ class Setting extends Model
         'watermark_image',
         'show_logo',
         'show_logo_only_whatsapp',
+        'show_title_in_lab_result',
     ];
 
     protected $casts = [
@@ -168,6 +169,7 @@ class Setting extends Model
         'watermark_image' => 'string',
         'show_logo' => 'boolean',
         'show_logo_only_whatsapp' => 'boolean',
+        'show_title_in_lab_result' => 'boolean',
     ];
 
     // Helper to always get the first (and only) settings record

@@ -20,4 +20,7 @@ yarn-error.log
 /service workers/node_modules/
 /service workers/realtime/daemon/
 /service workers/pinggy/daemon/
-/realtime-events/daemon/
+realtime-events/daemon
+/database
+/config
+.env

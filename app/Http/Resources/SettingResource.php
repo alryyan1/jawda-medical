@@ -70,6 +70,8 @@ class SettingResource extends JsonResource
             'watermark_image' => $this->watermark_image,
             'show_logo' => (bool) $this->show_logo,
             'show_logo_only_whatsapp' => (bool) $this->show_logo_only_whatsapp,
+            'show_title_in_lab_result' => (bool) $this->show_title_in_lab_result,
+            
 
             // Eager load related finance accounts if needed for display
             // 'default_finance_account_details' => new FinanceAccountResource($this->whenLoaded('defaultFinanceAccount')),
