@@ -139,9 +139,9 @@ class RequestedServiceDepositController extends Controller
         // $this->authorize('update', $requestedServiceDeposit);
         // Typically, you might only allow updating notes or is_claimed, not amount or payment method after creation.
         // For this example, allowing amount and is_bank update.
-        if(!Auth::user()->can('manage service_payments_deposits')) {
-            return response()->json(['message' => 'لا يمكنك تحديث دفعة للخدمة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
-        }
+        // if(!Auth::user()->can('manage service_payments_deposits')) {
+        //     return response()->json(['message' => 'لا يمكنك تحديث دفعة للخدمة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
+        // }
 
         $validated = $request->validate([
             'amount' => 'sometimes|required|numeric|min:0.01',

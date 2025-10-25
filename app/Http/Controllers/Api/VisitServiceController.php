@@ -27,6 +27,32 @@ class VisitServiceController extends Controller
     }
 
     /**
+     * Create a standardized error response with file and line information
+     */
+    private function createErrorResponse(\Exception $e, string $message, int $statusCode = 500)
+    {
+        $errorContext = [
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'message' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ];
+        
+        Log::error("VisitServiceController Error: " . $e->getMessage(), [
+            'exception' => $e,
+            'context' => $errorContext
+        ]);
+        
+        return response()->json([
+            'message' => $message,
+            'error' => $e->getMessage(),
+            'file' => basename($e->getFile()),
+            'line' => $e->getLine(),
+            'context' => $errorContext
+        ], $statusCode);
+    }
+
+    /**
      * Central guard to prevent add/delete/update on requested services when conditions are met.
      * Returns a JSON response on failure, or null if operation is allowed.
      */
@@ -105,15 +131,14 @@ class VisitServiceController extends Controller
                     Log::warning("Service ID {$serviceId} not found during visit service request.");
                     continue;
                 }
-
-                $alreadyExists = $visit->requestedServices()->where('service_id', $serviceId)->exists();
-                if ($alreadyExists && !$request->boolean('allow_duplicates')) {
-                    continue;
+                if($service->price == 0){
+                    return response()->json(['message' => 'لا يمكنك إضافة خدمة بسعر 0.'], 403);
                 }
 
-                $price = (float) $service->price;
+                // Initialize default values
+                $price = (float) $service->price; // Default to service price
                 $companyEnduranceAmount = 0;
-                $contractApproval = true; // Default to true
+                $contractApproval = false;
 
                 if ($company) {
                     $contract = $company->contractedServices()
@@ -213,8 +238,7 @@ class VisitServiceController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to add services to visit {$visit->id}: " . $e->getMessage(), ['exception' => $e]);
-            return response()->json(['message' => 'فشل إضافة الخدمات للزيارة.', 'error' => $e->getMessage()], 500);
+            return $this->createErrorResponse($e, 'فشل إضافة الخدمات للزيارة.', 500);
         }
 
         $loadedItems = collect($createdItems)->map(function ($item) {
@@ -241,8 +265,7 @@ class VisitServiceController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to remove requested service {$requestedService->id}: " . $e->getMessage());
-            return response()->json(['message' => 'فشل حذف الخدمة.', 'error' => 'خطأ داخلي.'], 500);
+            return $this->createErrorResponse($e, 'فشل حذف الخدمة.', 500);
         }
 
         return response()->json(null, 204);
