@@ -126,6 +126,9 @@ class VisitServiceController extends Controller
                         // if ($contractPivot->status) { // Assuming company_service pivot has 'status' for active contract item
                             // return $contractPivot;
                             $price = (float) $contractPivot->price;
+                            if($contractPivot->price == 0){
+                               return response()->json(['message' => 'لا يمكنك إضافة خدمة  غير مسعره في العقد  .'], 403);
+                            }
                             $contractApproval = (bool) $contractPivot->approval;
                             if ($contractPivot->use_static) {
                                 $companyEnduranceAmount = (float) $contractPivot->static_endurance;
