@@ -143,7 +143,7 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
         // Company details (if present) - shown after date
         if ($this->isCompanyPatient && $this->visit->patient) {
             $this->SetFont($this->fontName, 'B', 10);
-            $this->MultiCell(0, $this->lineHeight, 'معلومات شركة المريض', 0, $this->alignStart, false, 1);
+            $this->MultiCell(0, $this->lineHeight, 'بيانات التامين', 0, $this->alignStart, false, 1);
             $this->SetFont($this->fontName, '', 9);
 
             // Company name
