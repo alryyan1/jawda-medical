@@ -908,6 +908,7 @@ class LabRequestController extends Controller
                     $contract = $company->contractedMainTests()
                         ->where('main_tests.id', $mainTestId)
                         ->first();
+                        if(!$contract) return response()->json(['message' => 'الفحص غير موجود في العقد الموقع مع الشركة.'], 400);
                         if(!$contract->pivot->status ){
                             return response()->json(['message' => 'الفحص غير مفعل في العقد الموقع مع الشركة.'], 400);
                         }

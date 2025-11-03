@@ -151,8 +151,7 @@ class PatientController extends Controller
             }
             // $this->authorize('register insurance_patient');
         } else {
-            // if( $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
-            // $this->authorize('register cash_patient');
+            if(!$user->can('تسجيل مريض كاش')) return response()->json(['message' => '  المستخدم ليس لديه صلاحية تسجيل مريض كاش .'], 400);
         }
         DB::beginTransaction();
         try {
@@ -598,7 +597,7 @@ class PatientController extends Controller
             'previous_visit_id' => 'nullable|integer|exists:doctorvisits,id,patient_id,' . $doctorVisit->patient_id,
         ]);
 
-        $currentGeneralShift = Shift::open()->latest('created_at')->first();
+        $currentGeneralShift = Shift::open()->latest('id')->first();
         if (!$currentGeneralShift) {
             return response()->json(['message' => 'لا توجد وردية عيادة مفتوحة حالياً.'], 400);
         }
@@ -653,6 +652,8 @@ class PatientController extends Controller
                 'lab_paid' => 0,
                 'result_is_locked' => false,
                 'sample_collected' => false,
+                'lab_to_lab_object_id'=>null,
+                'last_visit_doctor_id'=>null,
                 // Potentially update some demographics if the form was partially filled for this "new" visit using old data as base
                 // 'phone' => $request->input('new_phone', $existingPatient->phone), // Example
             ])->toArray();
@@ -1283,6 +1284,9 @@ class PatientController extends Controller
         }
         $currentGeneralShift = $shiftCheck;
 
+        $user = Auth::user();
+    
+
         // Verify the doctor shift is active and belongs to the specified doctor
         $doctorShift = DoctorShift::where('id', $validated['doctor_shift_id'])
             ->where('doctor_id', $validated['doctor_id'])
@@ -1294,7 +1298,11 @@ class PatientController extends Controller
         }
 
         $patient = $doctorVisit->patient;
-        
+        $company_id =   $validated['company_id'] ?? $patient->company_id;
+        if($company_id != null && !$user->can('تسجيل مريض تامين')){
+            return response()->json(['message' => 'المستخدم ليس لديه صلاحية تسجيل مريض تامين.'], 400);
+        }
+
         DB::beginTransaction();
         try {
             // Get file_id from the current doctorVisit or create a new file

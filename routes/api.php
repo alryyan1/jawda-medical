@@ -101,6 +101,9 @@ Route::post('/hl7-client/start', [\App\Http\Controllers\Api\HL7ClientController:
 Route::post('/hl7-client/stop', [\App\Http\Controllers\Api\HL7ClientController::class, 'stop']);
 Route::post('/hl7-client/toggle', [\App\Http\Controllers\Api\HL7ClientController::class, 'toggle']);
 
+// Public PDF route for Doctors List (opens in new tab)
+Route::get('/reports/doctors-list/pdf', [ReportController::class, 'exportDoctorsListToPdf']);
+
 /*
 |--------------------------------------------------------------------------
 | Queue Worker Routes (No Authentication Required)

@@ -345,53 +345,14 @@ class ReportController extends Controller
              return response()->json(['message' => 'No attendance data to generate PDF for the selected criteria.'], 404);
         }
 
-        // ... (rest of your PDF generation logic using $summaryList and $meta) ...
-        $reportTitle = 'Monthly Staff Attendance Summary'; // Translate as needed
-        $filterCriteria = "For: {$meta['month_name']}";
-        if ($meta['shift_name']) {
-            $filterCriteria .= " | Shift: {$meta['shift_name']}";
-        }
+        // Use dedicated PDF service (similar to LabResultReport)
+        $pdfService = new \App\Services\Pdf\MonthlyAttendanceReport();
+        $pdfContent = $pdfService->generate($summaryList, $meta);
 
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
-        $pdf->AddPage();
-        $pdf->SetFont('helvetica', '', 8);
-
-        $headers = [ /* ... Your headers ... */
-            '#', 'Employee Name', 'Scheduled', 'Present', 'Late', 'Early Leave', 'Absent', 'On Leave', 'Sick Leave', 'Holidays'
-        ];
-        // ... (Define $colWidths and $aligns for these headers) ...
-        // This is just an example, adjust to your needs
-        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-        $colWidths = [8, 55, 20, 20, 20, 22, 20, 25, 25, 0]; 
-        $colWidths[count($colWidths)-1] = $pageWidth - array_sum(array_slice($colWidths,0,-1));
-        $aligns = ['C', 'L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'];
-
-
-        $pdf->DrawTableHeader($headers, $colWidths, $aligns, 7);
-
-        $fill = false;
-        foreach ($summaryList as $idx => $summary) {
-            $rowData = [
-                $idx + 1,
-                $summary['user_name'],
-                $summary['total_scheduled_days'],
-                $summary['present_days'],
-                $summary['late_present_days'],
-                $summary['early_leave_days'],
-                $summary['absent_days'],
-                $summary['on_leave_days'],
-                $summary['sick_leave_days'],
-                $summary['holidays_on_workdays'],
-            ];
-            $pdf->DrawTableRow($rowData, $colWidths, $aligns, $fill, 6);
-            $fill = !$fill;
-        }
-        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
-        
-        // ... (Footer, output logic as before) ...
-        $pdfFileName = "MonthlyAttendance_{$meta['year']}-{$meta['month']}" . ($meta['shift_name'] ? '_' . str_replace(' ', '_', $meta['shift_name']) : '') . '.pdf';
-        $pdfContent = $pdf->Output($pdfFileName, 'S');
-        return response($pdfContent, 200)->header('Content-Type', 'application/pdf')->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+        $pdfFileName = "MonthlyAttendance_{$meta['year']}-{$meta['month']}" . (!empty($meta['shift_name']) ? '_' . str_replace(' ', '_', $meta['shift_name']) : '') . '.pdf';
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
     public function generatePriceListPdf(Request $request)
     {
@@ -4634,6 +4595,72 @@ class ReportController extends Controller
         
         $pdfFileName = 'Services_List_' . date('Y-m-d') . '.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
+
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+    }
+
+    /**
+     * Export the list of doctors to a PDF file (opens inline).
+     */
+    public function exportDoctorsListToPdf(Request $request)
+    {
+        $request->validate([
+            'search' => 'nullable|string|max:255',
+        ]);
+
+        $query = \App\Models\Doctor::with('specialist:id,name')->orderBy('id', 'desc');
+
+        $filterCriteria = [];
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('name', 'LIKE', '%' . $searchTerm . '%')
+                  ->orWhere('phone', 'LIKE', '%' . $searchTerm . '%');
+            });
+            $filterCriteria[] = "Search: " . $searchTerm;
+        }
+
+        $doctors = $query->get();
+        $filterCriteriaString = !empty($filterCriteria) ? implode(' | ', $filterCriteria) : "All Doctors";
+
+        $reportTitle = 'Doctors List';
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteriaString);
+        $pdf->AddPage();
+
+        // Table headers
+        $headers = ['ID', 'Name', 'Phone', 'Specialist', 'Cash %', 'Company %', 'Static Wage'];
+        // Calculate last column width to fit page
+        $colWidths = [12, 60, 28, 35, 17, 22, 22];
+        $colWidths[count($colWidths) - 1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
+        $alignments = ['C', 'C', 'C', 'C', 'C', 'C', 'C'];
+
+        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
+
+        $fill = false;
+        if ($doctors->isEmpty()) {
+            $pdf->Cell(array_sum($colWidths), 10, 'No doctors found matching the criteria.', 1, 1, 'C');
+        } else {
+            foreach ($doctors as $doctor) {
+                $rowData = [
+                    $doctor->id,
+                    $doctor->name,
+                    $doctor->phone,
+                    $doctor->specialist?->name ?? 'N/A',
+                    $doctor->cash_percentage !== null ? (string)$doctor->cash_percentage : 'N/A',
+                    $doctor->company_percentage !== null ? (string)$doctor->company_percentage : 'N/A',
+                    $doctor->static_wage !== null ? number_format((float)$doctor->static_wage, 2) : 'N/A',
+                ];
+                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 6);
+                $fill = !$fill;
+            }
+        }
+
+        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
+
+        $pdfFileName = 'Doctors_List_' . date('Y-m-d') . '.pdf';
+        $pdfContent = $pdf->Output($pdfFileName, 'S');
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')

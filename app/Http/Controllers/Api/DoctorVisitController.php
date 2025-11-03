@@ -72,10 +72,12 @@ class DoctorVisitController extends Controller
         $query = DoctorVisit::with([
             'patient:id,name,phone,gender,age_year,age_month,age_day,company_id',
             'patient.company:id,name', // Eager load company for patient
-            'doctor:id,name',          // EAGER LOAD DOCTOR
+            'patient.doctor:id,name',          // EAGER LOAD DOCTOR
             'createdByUser:id,name',
             'requestedServices.service', // For calculating totals
             'patientLabRequests.mainTest' ,
+            'doctorShift:id,doctor_id',
+            'doctorShift.doctor:id,name',
             'patient.user:id,username'        // For calculating totals
         ])
         ->latest('created_at'); // Or created_at if visit_time is not reliable

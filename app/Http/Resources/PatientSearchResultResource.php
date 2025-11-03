@@ -11,7 +11,10 @@ class PatientSearchResultResource extends JsonResource {
             'last_visit_id' => $this?->id,
             'last_visit_date' => $this?->created_at?->toDateString(),
             'last_visit_doctor_name' => $this?->doctor?->name,
+            'last_visit_doctor_id' => $this?->doctor?->id,
             'last_visit_file_id' => $this?->file_id, // For copying
+            'last_visit_company_name' => $this?->patient?->company?->name,
+            'last_visit_company_id' => $this?->patient?->company?->id,
         ];
     }
 }
