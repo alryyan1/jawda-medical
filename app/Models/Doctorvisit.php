@@ -375,7 +375,11 @@ class DoctorVisit extends Model
         }
         return $total;
     }
-    
+ 
+    public function total_paid()
+    {
+        return $this->total_paid_services() + $this->patient->paid_lab();
+    }
     /**
      * Calculate total amount paid for services/labs in this visit.
      */

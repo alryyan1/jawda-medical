@@ -261,7 +261,19 @@ class Patient extends Model
     {
         return $this->belongsTo(Company::class);
     }
+    public function total_lab_value_will_pay(){
+        $total =0;
+        foreach ($this->labrequests as $requested) {
+            if ($this->company){
+                $total+= $requested->endurance;
 
+            }else{
+                $total+= $requested->price ;
+
+            }
+        }
+        return $total;
+    }
 
     /**
      * Get the subcompany associated with this patient.

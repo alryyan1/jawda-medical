@@ -60,7 +60,10 @@ class DoctorVisitResource extends JsonResource
             'general_shift_details' => new ShiftResource($this->whenLoaded('generalShift')),
             'doctor_shift_id' => $this->doctor_shift_id,
             'doctor_shift_details' => new DoctorShiftResource($this->whenLoaded('doctorShift')),
-
+            'total_services_amount' => $this->total_services(),
+            'total_services_paid' => $this->total_paid_services(),
+            'total_lab_value_will_pay' => $this->patient->total_lab_value_will_pay() - $this->patient->discountAmount(),
+            'lab_paid' => $this->patient->paid_lab(),
             // Financial summary
             'total_lab_amount' =>  $financialSummary['total_lab_amount'],
             'total_paid' => $financialSummary['total_paid'],
@@ -98,6 +101,7 @@ class DoctorVisitResource extends JsonResource
         $totalLabDiscount = 0;
         $totalLabEndurance = 0;
         $totalLabBalance = 0;
+        $totalServicesAmount = 0;
 
         // Calculate from requested services
         if ($this->relationLoaded('requestedServices')) {
@@ -106,6 +110,7 @@ class DoctorVisitResource extends JsonResource
                 $totalAmount += $serviceCalculation['net_payable'];
                 $totalPaid += $serviceCalculation['amount_paid'];
                 $totalDiscount += $serviceCalculation['discount'];
+                $totalServicesAmount += $serviceCalculation['net_payable'];
             }
         }
 
