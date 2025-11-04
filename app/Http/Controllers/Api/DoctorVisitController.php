@@ -76,7 +76,7 @@ class DoctorVisitController extends Controller
             'createdByUser:id,name',
             'requestedServices.service', // For calculating totals
             'patientLabRequests.mainTest' ,
-            'doctorShift:id,doctor_id',
+            // 'doctorShift:id,doctor_id',
             'doctorShift.doctor:id,name',
             'patient.user:id,username'        // For calculating totals
         ])
