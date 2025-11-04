@@ -66,7 +66,7 @@ class DoctorVisitController extends Controller
             'doctor_id' => 'nullable|integer|exists:doctors,id',
             'status' => 'nullable|string', // Add validation for allowed statuses if needed
             'search' => 'nullable|string|max:255',
-            'per_page' => 'nullable|integer|min:5|max:100',
+            'per_page' => 'nullable|integer',
         ]);
 
         $query = DoctorVisit::with([
