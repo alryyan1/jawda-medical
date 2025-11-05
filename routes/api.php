@@ -718,3 +718,4 @@ Route::middleware('auth:sanctum')->group(function () {
 // Webhook endpoints (no CSRF protection needed)
 Route::get('/webhook', [WebHookController::class, 'webhook']);
 Route::post('/webhook', [WebHookController::class, 'webhook']);
+Route::post('populatePatientChemistryData/{doctorvisit}',[PatientController::class,'populatePatientChemistryData']);

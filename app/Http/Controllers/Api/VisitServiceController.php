@@ -131,9 +131,9 @@ class VisitServiceController extends Controller
                     Log::warning("Service ID {$serviceId} not found during visit service request.");
                     continue;
                 }
-                if($service->price == 0){
-                    return response()->json(['message' => 'لا يمكنك إضافة خدمة بسعر 0.'], 403);
-                }
+                // if($service->price == 0){
+                //     return response()->json(['message' => 'لا يمكنك إضافة خدمة بسعر 0.'], 403);
+                // }
 
                 // Initialize default values
                 $price = (float) $service->price; // Default to service price

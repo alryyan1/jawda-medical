@@ -142,7 +142,8 @@ class LabRequestController extends Controller
                 'doctorvisits.created_at as visit_creation_time',
                 'doctorvisits.visit_date', // Keep for context
                 'patients.id as patient_id',
-                'patients.name as patient_name'
+                'patients.name as patient_name',
+                'doctorvisits.id as id'
                 // Add other patient fields if needed by PatientLabQueueItemResource
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
@@ -272,7 +273,8 @@ class LabRequestController extends Controller
                 'doctorvisits.created_at as visit_creation_time',
                 'doctorvisits.visit_date',
                 'patients.id as patient_id',
-                'patients.name as patient_name'
+                'patients.name as patient_name',
+                'doctorvisits.id as id'
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
             ->where('doctorvisits.id', $visitId)
@@ -433,7 +435,8 @@ class LabRequestController extends Controller
                 'doctorvisits.created_at as visit_creation_time',
                 'doctorvisits.visit_date',
                 'patients.id as patient_id',
-                'patients.name as patient_name'
+                    'patients.name as patient_name',
+                'doctorvisits.id as id'
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
             ->whereHas('patientLabRequests', function ($lrQuery) use ($request) {
@@ -542,7 +545,8 @@ class LabRequestController extends Controller
                 'doctorvisits.id as visit_id',
                 'doctorvisits.created_at as visit_creation_time',
                 'patients.id as patient_id',
-                'patients.name as patient_name'
+                'patients.name as patient_name',
+                'doctorvisits.id as id'
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id');
             // ->where('doctorvisits.only_lab', true); // ** THE KEY FILTER **

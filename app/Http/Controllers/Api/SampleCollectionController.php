@@ -52,7 +52,8 @@ class SampleCollectionController extends Controller
                 'patients.age_year',
                 'patients.age_month',
                 'patients.age_day',
-                'doctors.name as doctor_name'
+                'doctors.name as doctor_name',
+                'doctorvisits.id as id'
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
             ->leftJoin('doctors', 'doctorvisits.doctor_id', '=', 'doctors.id')

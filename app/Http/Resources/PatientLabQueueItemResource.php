@@ -43,7 +43,7 @@ class PatientLabQueueItemResource extends JsonResource {
         return [
             'total_result_count'=>$totalResultsCount,
             'pending_result_count'=>$pendingResultsCount,
-            'visit_id' => $this->visit_id,
+            'visit_id' => $this->id,
             'patient_id' => $this->patient_id,
             'patient_name' => $this->patient->name,
              'company'=>$this->patient->company,
@@ -80,6 +80,7 @@ class PatientLabQueueItemResource extends JsonResource {
              'registered_by' => $this->patient?->user?->name,
              'auth_date' => $this->patient?->auth_date,
              'result_auth' => $this->patient?->result_auth,
+             'id' => $this->id,
             // 'status_summary' => ... // Calculate if needed
         ];
     }

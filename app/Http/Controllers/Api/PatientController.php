@@ -38,6 +38,7 @@ use App\Jobs\SendWelcomeSmsJob;
 use App\Models\Setting;
 use App\Services\UltramsgService;
 use App\Jobs\SendAuthWhatsappMessage;
+use App\Models\Mindray;
 
 class PatientController extends Controller
 {
@@ -400,7 +401,7 @@ class PatientController extends Controller
         if ($patient->result_auth) {
             return response()->json([
                 'message' => "Results are already authenticated.",
-                'data' => new PatientResource($patient->fresh())
+                'data' => new PatientLabQueueItemResource($patient->doctorVisit)
             ], 200);
         }
 
@@ -1075,6 +1076,7 @@ class PatientController extends Controller
                 ])
                 ->where('id', $searchTerm)
                 ->take($limit)
+                // ->orderBy('id', 'desc')
                 ->get();
         } else {
             // Search by patient name or phone (minimum 2 characters for text search)
@@ -1090,7 +1092,7 @@ class PatientController extends Controller
                     $query->where('name', 'LIKE', "%{$searchTerm}%")
                           ->orWhere('phone', 'LIKE', "%{$searchTerm}%"); // Optionally search by phone too
                 })
-                ->orderBy('id', 'desc')
+                ->orderBy('id', 'asc')
                 ->take($limit)
                 ->get();
         }
@@ -1733,6 +1735,33 @@ class PatientController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+    public function populatePatientChemistryData(Request $request, Doctorvisit $doctorvisit)
+    {
+        $main_test_id = $request->get('main_test_id');
+        $chemistry =   Mindray::where('doctorvisit_id', '=', $doctorvisit->id)->first();
+        if ($chemistry == null) {
+            return  ['status' => false, 'message' => 'no data found'];
+        }
+        $bindings =   \App\Models\ChemistryBinder::all();
+        /** @var \App\Models\ChemistryBinder $binding */
+        $object = null;
+        foreach ($bindings as $binding) {
+            $object[$binding->name_in_mindray_table] = [
+                'child_id' => [$binding->child_id_array],
+                'result' => $chemistry[$binding->name_in_mindray_table]
+            ];
+            $child_array =  explode(',', $binding->child_id_array);
+            foreach ($child_array as $child_id) {
+                $requested_result = RequestedResult::whereChildTestId($child_id)->where('main_test_id', '=', $main_test_id)->where('patient_id', '=', $doctorvisit->patient->id)->first();
+                if ($requested_result != null) {
+
+                    $requested_result->update(['result' => $chemistry[$binding->name_in_mindray_table]]);
+                }
+            }
+        }
+
+        return ['status' => true, 'data' => $doctorvisit->prepareForResponse(), 'chemistryObj' => $object];
     }
 
 }
