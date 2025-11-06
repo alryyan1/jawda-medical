@@ -8,14 +8,16 @@ use App\Models\Cost;
 use App\Models\Deno;
 use App\Models\DenoUser;
 use App\Http\Controllers\Api\UserController;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class CashReconciliationReport
 {
     private TCPDF $pdf;
     private array $data;
-
     public function __construct(array $data)
     {
         $this->data = $data;
@@ -32,13 +34,13 @@ class CashReconciliationReport
         $this->pdf->SetTitle($this->data['title']);
         $this->pdf->SetSubject('Cash Reconciliation Report');
 
-        // Set margins
-        $this->pdf->SetMargins(15, 30, 15);
-        $this->pdf->SetHeaderMargin(5);
-        $this->pdf->SetFooterMargin(10);
+        // Set margins - more generous for professional look
+        $this->pdf->SetMargins(20, 40, 20);
+        $this->pdf->SetHeaderMargin(10);
+        $this->pdf->SetFooterMargin(15);
 
         // Set auto page breaks
-        $this->pdf->SetAutoPageBreak(TRUE, 25);
+        $this->pdf->SetAutoPageBreak(TRUE, 30);
 
         // Set RTL direction for Arabic text
         $this->pdf->setRTL(true);
@@ -49,266 +51,291 @@ class CashReconciliationReport
 
     public function generate(): string
     {
+        $this->renderHeader();
         $this->renderTitle();
         $this->renderShiftInfo();
-        $this->renderTwoColumnLayout();
+        $this->renderFinancialSummary();
+        // $this->renderDenominations();
+        $this->renderCosts();
         $this->renderFooter();
 
         return $this->pdf->Output('', 'S');
     }
 
+    private function renderHeader(): void
+    {
+        // Monochrome professional header
+        $this->pdf->SetY(12);
+        $this->pdf->SetFont('arial', 'B', 16);
+        $this->pdf->SetTextColor(0, 0, 0);
+
+        $this->pdf->SetFont('arial', '', 11);
+
+        // Separator line
+    }
+
     private function renderTitle(): void
     {
-        $this->pdf->SetFont('arial', 'B', 16);
+        $this->pdf->SetFont('arial', '', 12);
+        $this->pdf->SetTextColor(0, 0, 0);
+
+        //extract the date only $this->data['shiftDate']
+        $shiftDate = Carbon::parse($this->data['shiftDate'])->format('Y-m-d');
+        // $this->pdf->Cell(0, 10, $this->data['title'], 0, 0, 'C');
         $this->pdf->Cell(0, 10, $this->data['title'], 0, 1, 'C');
-        $this->pdf->Ln(5);
+        $this->pdf->Cell(20, 10, 'اسم المستخدم: ', 0, 0, 'C');
+        $this->pdf->Cell(40, 10, $this->data['user'], 0, 0, 'C');
+        $this->pdf->Cell(  40, 10, '', 0, 0, 'C');
+        $this->pdf->Cell(25, 10, 'تاريخ الوردية: ', 0, 0, 'C');
+        $this->pdf->Cell(45, 10, $shiftDate, 0, 1, 'C');
+
+
+        // Underline
+        $this->pdf->SetDrawColor(150, 150, 150);
+        $this->pdf->SetLineWidth(0.3);
+        $this->pdf->Ln(6);
     }
 
     private function renderShiftInfo(): void
     {
-        $this->pdf->SetFont('arial', 'B', 16);
-        $this->pdf->Cell(0, 10, 'معلومات الوردية', 0, 1, 'C');
-        $this->pdf->Ln(5);
-        
-        $this->pdf->SetFont('arial', '', 12);
-        
-        // Get page width and calculate column width
         $pageWidth = $this->pdf->getPageWidth();
-        $margin = 15; // Left and right margins
+        $margin = 20;
         $usableWidth = $pageWidth - (2 * $margin);
-        $columnWidth = $usableWidth / 2;
-        
-        // Row 1: Shift Name and English Date
-        $this->pdf->SetX($margin);
-        $this->pdf->Cell($columnWidth, 8, 'اسم الوردية: ' . $this->data['shiftName'], 0, 0, 'R');
-        $this->pdf->SetX($margin + $columnWidth);
-        $this->pdf->Cell($columnWidth, 8, 'تاريخ التقرير (إنجليزي): ' . $this->data['englishDate'], 0, 1, 'R');
-        
-        // Row 2: Shift ID and User Name
-        $this->pdf->SetX($margin);
-        $this->pdf->Cell($columnWidth, 8, 'رقم الوردية: ' . $this->data['shiftId'], 0, 0, 'R');
-        $this->pdf->SetX($margin + $columnWidth);
-        $this->pdf->Cell($columnWidth, 8, 'اسم المستخدم: ' . $this->data['userName'], 0, 1, 'R');
-        
-        // Row 3: Report Date and Shift Type
-        $this->pdf->SetX($margin);
-        $this->pdf->Cell($columnWidth, 8, 'تاريخ التقرير: ' . $this->data['date'], 0, 0, 'R');
-        $this->pdf->SetX($margin + $columnWidth);
-        $this->pdf->Cell($columnWidth, 8, 'نوع الوردية: ' . $this->data['shiftType'], 0, 1, 'R');
-        
-        $this->pdf->Ln(10);
-    }
 
-    private function renderTwoColumnLayout(): void
-    {
-        // Get page dimensions
-        $pageWidth = $this->pdf->getPageWidth();
-        $margin = 15;
-        $usableWidth = $pageWidth - (2 * $margin);
-        $columnWidth = $usableWidth / 2;
-        $currentY = $this->pdf->GetY();
-        
-        // Right column: Financial Summary and Denominations
-        $rightEndY = $this->renderRightColumn($margin, $columnWidth, $currentY);
-        
-        // Left column: Cost Details
-        $this->renderLeftColumn($margin + $columnWidth, $columnWidth, $currentY);
-        $leftEndY = $this->pdf->GetY();
-
-        // Vertical separator between columns
-        $this->pdf->SetDrawColor(220, 220, 220);
+        // Section header (monochrome)
+        $this->pdf->SetFont('arial', 'B', 12);
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->SetDrawColor(180, 180, 180);
         $this->pdf->SetLineWidth(0.2);
-        $separatorX = $margin + $columnWidth;
-        $this->pdf->Line($separatorX, $currentY, $separatorX, max($rightEndY, $leftEndY));
 
-        // Move cursor to end of the lower column
-        $this->pdf->SetY(max($rightEndY, $leftEndY));
-    }
+        // Info rows
+        $this->pdf->SetDrawColor(200, 200, 200);
+        $this->pdf->SetLineWidth(0.2);
+        $this->pdf->SetFont('arial', '', 11);
 
-    private function renderRightColumn($startX, $width, $startY): float
-    {
-        $this->pdf->SetXY($startX, $startY);
-        $this->renderFinancialSummaryColumn($width);
+   
+        //each row has 3 columns
+        $colWidth = $usableWidth / 5;
+        //current date
+        $currentDate = Carbon::now()->format('Y-m-d');
+        // $this->pdf->SetEqualColumns(2);
+        $this->pdf->Cell($colWidth,5,' الوردية: ',1,0,'R');
+        $this->pdf->Cell($colWidth,5,$this->data['shiftType'],1,0,'R');
+        $this->pdf->Cell($colWidth,5,'',1,0,'R');
+        $this->pdf->Cell($colWidth,5,'رقم الوردية: ',1,0,'R');
+        $this->pdf->Cell($colWidth,5,$this->data['shiftId'],1,1,'R');
+        // $this->pdf->Cell($colWidth,5,'',1,0,'R');
+
+        $this->pdf->Cell($colWidth,5,'اسم المستخدم: ',1,0,'R');
         
-        // Add some space between tables
+        $this->pdf->Cell($colWidth,5,$this->data['user'],1,0,'R');
+        $this->pdf->Cell($colWidth,5,'',1,0,'R');
+
+        $this->pdf->Cell($colWidth,5,'تاريخ الطباعه: ',1,0,'R');
+        $this->pdf->Cell($colWidth,5,$currentDate,1,1,'R');
+        // $this->pdf->Cell($colWidth,5,'نوع الوردية: ',1,0,'R');
+        // $this->pdf->Cell($colWidth,5,$this->data['shiftType'],1,1,'R');
+
+
         $this->pdf->Ln(10);
+    }
+
+    private function renderFinancialSummary(): void
+    {
+        $pageWidth = $this->pdf->getPageWidth();
+        $margin = 20;
+        $usableWidth = $pageWidth - (2 * $margin);
         
-        $this->renderDenominationsColumn($width);
-
-        return $this->pdf->GetY();
-    }
-
-    private function renderLeftColumn($startX, $width, $startY): void
-    {
-        $this->pdf->SetXY($startX, $startY);
-        $this->renderCostsColumn($width);
-    }
-
-    private function renderFinancialSummaryColumn($width): void
-    {
-        $this->pdf->SetFont('arial', 'B', 16);
-        $this->pdf->Cell($width, 10, 'الملخص المالي', 0, 1, 'C');
-        $this->pdf->Ln(5);
+        // Section header (monochrome)
+        $this->pdf->SetFont('arial', 'B', 12);
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->Cell($usableWidth, 8, 'الملخص المالي', 0, 1, 'C');
+        $this->pdf->SetDrawColor(180, 180, 180);
+        $this->pdf->SetLineWidth(0.2);
+        $this->pdf->Line(20, $this->pdf->GetY(), $this->pdf->getPageWidth() - 20, $this->pdf->GetY());
+        $this->pdf->Ln(4);
 
         $incomeData = $this->data['incomeData'];
         
-        // Create financial summary table (styled header)
-        $this->pdf->SetFillColor(245, 245, 245);
+        // Table header (monochrome)
         $this->pdf->SetDrawColor(200, 200, 200);
         $this->pdf->SetLineWidth(0.2);
-        $this->pdf->SetFont('arial', 'B', 12);
-        $this->pdf->Cell($width * 0.4, 10, '', 1, 0, 'C', true); // Empty cell for alignment
-        $this->pdf->Cell($width * 0.3, 10, 'النقدي', 1, 0, 'C', true);
-        $this->pdf->Cell($width * 0.3, 10, 'البنك', 1, 1, 'C', true);
+        $this->pdf->SetFont('arial', 'B', 11);
+        $this->pdf->Cell($usableWidth * 0.4, 9, 'البند', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, 'النقدي', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, 'البنك', 1, 1, 'C', false);
 
-        $this->pdf->SetFont('arial', '', 12);
-        
+        $this->pdf->SetFont('arial', '', 11);
+
         // Income row
-        $this->pdf->Cell($width * 0.4, 10, 'المتحصل', 1, 0, 'R');
-        $this->pdf->Cell($width * 0.3, 10, number_format($incomeData->total_cash, 0), 1, 0, 'C');
-        $this->pdf->Cell($width * 0.3, 10, number_format($incomeData->total_bank, 0), 1, 1, 'C');
-        
+        $this->pdf->Cell($usableWidth * 0.4, 9, 'المتحصل', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->total_cash, 0), 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->total_bank, 0), 1, 1, 'C', false);
+
         // Expenses row
-        $this->pdf->Cell($width * 0.4, 10, 'المصروف', 1, 0, 'R');
-        $this->pdf->Cell($width * 0.3, 10, number_format($incomeData->total_cash_expenses, 0), 1, 0, 'C');
-        $this->pdf->Cell($width * 0.3, 10, number_format($incomeData->total_bank_expenses, 0), 1, 1, 'C');
-        
+        $this->pdf->Cell($usableWidth * 0.4, 9, 'المصروف', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->total_cash_expenses, 0), 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->total_bank_expenses, 0), 1, 1, 'C', false);
+
         // Net balance row
-        $this->pdf->SetFont('arial', 'B', 12);
-        $this->pdf->Cell($width * 0.4, 10, 'الصافي', 1, 0, 'R');
-        $this->pdf->Cell($width * 0.3, 10, number_format($incomeData->net_cash, 0), 1, 0, 'C');
-        $this->pdf->Cell($width * 0.3, 10, number_format($incomeData->net_bank, 0), 1, 1, 'C');
-        
+        $this->pdf->SetFont('arial', 'B', 11);
+        $this->pdf->Cell($usableWidth * 0.4, 9, 'الصافي', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->net_cash, 0), 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, '-', 1, 1, 'C', false);
+
         // Total denominations row
-        $this->pdf->Cell($width * 0.4, 10, 'إجمالي الفئات', 1, 0, 'R');
-        $this->pdf->Cell($width * 0.3, 10, number_format($this->data['totalDenominations'], 0), 1, 0, 'C');
-        $this->pdf->Cell($width * 0.3, 10, '-', 1, 1, 'C');
-        
-        // Difference row
+        $this->pdf->SetFont('arial', '', 11);
+        $this->pdf->Cell($usableWidth * 0.4, 9, 'إجمالي الفئات', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($this->data['totalDenominations'], 0), 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, '-', 1, 1, 'C', false);
+
+        // Difference row (monochrome)
         $cashDifference = $incomeData->net_cash - $this->data['totalDenominations'];
-        $this->pdf->Cell($width * 0.4, 10, 'الفرق', 1, 0, 'R');
-        $this->pdf->Cell($width * 0.3, 10, number_format($cashDifference, 0), 1, 0, 'C');
-        $this->pdf->Cell($width * 0.3, 10, '-', 1, 1, 'C');
+        $this->pdf->SetFont('arial', 'B', 11);
+        $this->pdf->Cell($usableWidth * 0.4, 9, 'الفرق', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($cashDifference, 0), 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.3, 9, '-', 1, 1, 'C', false);
+        
+        $this->pdf->Ln(12);
     }
 
-    private function renderDenominationsColumn($width): void
+    private function renderDenominations(): void
     {
-        $this->pdf->SetFont('arial', 'B', 16);
-        $this->pdf->Cell($width, 10, 'تفاصيل الفئات النقدية', 0, 1, 'C');
-        $this->pdf->Ln(5);
+        $pageWidth = $this->pdf->getPageWidth();
+        $margin = 20;
+        $usableWidth = $pageWidth - (2 * $margin);
+        
+        // Section header (monochrome)
+        $this->pdf->SetFont('arial', 'B', 12);
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->Cell($usableWidth, 8, 'تفاصيل الفئات النقدية', 0, 1, 'C');
+        $this->pdf->SetDrawColor(180, 180, 180);
+        $this->pdf->SetLineWidth(0.2);
+        $this->pdf->Line(20, $this->pdf->GetY(), $this->pdf->getPageWidth() - 20, $this->pdf->GetY());
+        $this->pdf->Ln(4);
 
-        // Header with fill
-        $this->pdf->SetFillColor(245, 245, 245);
+        // Table header (monochrome)
         $this->pdf->SetDrawColor(200, 200, 200);
         $this->pdf->SetLineWidth(0.2);
-        $this->pdf->SetFont('arial', 'B', 12);
-        $this->pdf->Cell($width * 0.33, 10, 'الفئة', 1, 0, 'C', true);
-        $this->pdf->Cell($width * 0.33, 10, 'العدد', 1, 0, 'C', true);
-        $this->pdf->Cell($width * 0.34, 10, 'المجموع', 1, 1, 'C', true);
+        $this->pdf->SetFont('arial', 'B', 11);
+        $this->pdf->Cell($usableWidth * 0.33, 9, 'الفئة', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.33, 9, 'العدد', 1, 0, 'C', false);
+        $this->pdf->Cell($usableWidth * 0.34, 9, 'المجموع', 1, 1, 'C', false);
 
-        $this->pdf->SetFont('arial', '', 12);
-        $this->pdf->SetFillColor(252, 252, 252);
-        $fill = false;
+        $this->pdf->SetFont('arial', '', 11);
+        $hasDenominations = false;
+        
         foreach ($this->data['denominations'] as $denomination) {
             if ($denomination['count'] > 0) {
-                $this->pdf->Cell($width * 0.33, 10, number_format($denomination['name']), 1, 0, 'C', $fill);
-                $this->pdf->Cell($width * 0.33, 10, number_format($denomination['count']), 1, 0, 'C', $fill);
-                $this->pdf->Cell($width * 0.34, 10, number_format($denomination['name'] * $denomination['count']), 1, 1, 'C', $fill);
-                $fill = !$fill;
+                $hasDenominations = true;
+                $this->pdf->Cell($usableWidth * 0.33, 9, number_format($denomination['name']), 1, 0, 'C', false);
+                $this->pdf->Cell($usableWidth * 0.33, 9, number_format($denomination['count']), 1, 0, 'C', false);
+                $this->pdf->Cell($usableWidth * 0.34, 9, number_format($denomination['name'] * $denomination['count']), 1, 1, 'C', false);
             }
         }
 
+        if (!$hasDenominations) {
+            $this->pdf->SetFont('arial', '', 11);
+            $this->pdf->Cell($usableWidth, 9, 'لا توجد فئات نقدية مسجلة', 1, 1, 'C', false);
+        }
+
         // Totals row
-        $this->pdf->SetFont('arial', 'B', 12);
-        $this->pdf->SetFillColor(245, 245, 245);
-        $this->pdf->Cell($width * 0.66, 10, 'الإجمالي', 1, 0, 'R', true);
-        $this->pdf->Cell($width * 0.34, 10, number_format($this->data['totalDenominations'], 0), 1, 1, 'C', true);
+        $this->pdf->SetFont('arial', 'B', 11);
+        $this->pdf->Cell($usableWidth * 0.66, 9, 'الإجمالي', 1, 0, 'R', false);
+        $this->pdf->Cell($usableWidth * 0.34, 9, number_format($this->data['totalDenominations'], 0), 1, 1, 'C', false);
+        
+        $this->pdf->Ln(12);
     }
 
-    private function renderCostsColumn($width): void
+    private function renderCosts(): void
     {
-        $this->pdf->SetFont('arial', 'B', 16);
-        $this->pdf->Cell($width, 10, 'تفاصيل المصروفات', 0, 1, 'C');
-        $this->pdf->Ln(5);
+        $pageWidth = $this->pdf->getPageWidth();
+        $margin = 20;
+        $usableWidth = $pageWidth - (2 * $margin);
+        
+        // Section header (monochrome)
+        $this->pdf->SetFont('arial', 'B', 12);
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->Cell($usableWidth, 8, 'تفاصيل المصروفات', 0, 1, 'C');
+        $this->pdf->SetDrawColor(180, 180, 180);
+        $this->pdf->SetLineWidth(0.2);
+        $this->pdf->Line(20, $this->pdf->GetY(), $this->pdf->getPageWidth() - 20, $this->pdf->GetY());
+        $this->pdf->Ln(4);
 
         if (!empty($this->data['costs'])) {
-            // Header with fill
-            $this->pdf->SetFillColor(245, 245, 245);
+            // Table header (monochrome)
             $this->pdf->SetDrawColor(200, 200, 200);
             $this->pdf->SetLineWidth(0.2);
-            $this->pdf->SetFont('arial', 'B', 12);
-            $this->pdf->Cell($width * 0.4, 10, 'الوصف', 1, 0, 'C', true);
-            $this->pdf->Cell($width * 0.2, 10, 'النقدي', 1, 0, 'C', true);
-            $this->pdf->Cell($width * 0.2, 10, 'البنكي', 1, 0, 'C', true);
-            $this->pdf->Cell($width * 0.2, 10, 'المجموع', 1, 1, 'C', true);
+            $this->pdf->SetFont('arial', 'B', 11);
+            $this->pdf->Cell($usableWidth * 0.4, 9, 'الوصف', 1, 0, 'C', false);
+            $this->pdf->Cell($usableWidth * 0.2, 9, 'النقدي', 1, 0, 'C', false);
+            $this->pdf->Cell($usableWidth * 0.2, 9, 'البنكي', 1, 0, 'C', false);
+            $this->pdf->Cell($usableWidth * 0.2, 9, 'المجموع', 1, 1, 'C', false);
 
             $this->pdf->SetFont('arial', '', 11);
-            $this->pdf->SetFillColor(252, 252, 252);
-            $fill = false;
             $sumCash = 0;
             $sumBank = 0;
             $sumTotal = 0;
+            
             foreach ($this->data['costs'] as $cost) {
                 $total = $cost['amount'] + $cost['amount_bankak'];
                 $sumCash += $cost['amount'];
                 $sumBank += $cost['amount_bankak'];
                 $sumTotal += $total;
-                $this->pdf->Cell($width * 0.4, 10, $cost['description'], 1, 0, 'R', $fill);
-                $this->pdf->Cell($width * 0.2, 10, $cost['amount'] > 0 ? number_format($cost['amount']) : '-', 1, 0, 'C', $fill);
-                $this->pdf->Cell($width * 0.2, 10, $cost['amount_bankak'] > 0 ? number_format($cost['amount_bankak']) : '-', 1, 0, 'C', $fill);
-                $this->pdf->Cell($width * 0.2, 10, number_format($total), 1, 1, 'C', $fill);
-                $fill = !$fill;
+                $this->pdf->Cell($usableWidth * 0.4, 9, $cost['description'], 1, 0, 'R', false);
+                $this->pdf->Cell($usableWidth * 0.2, 9, $cost['amount'] > 0 ? number_format($cost['amount']) : '-', 1, 0, 'C', false);
+                $this->pdf->Cell($usableWidth * 0.2, 9, $cost['amount_bankak'] > 0 ? number_format($cost['amount_bankak']) : '-', 1, 0, 'C', false);
+                $this->pdf->Cell($usableWidth * 0.2, 9, number_format($total), 1, 1, 'C', false);
             }
 
             // Totals row
-            $this->pdf->SetFont('arial', 'B', 12);
-            $this->pdf->SetFillColor(245, 245, 245);
-            $this->pdf->Cell($width * 0.4, 10, 'الإجمالي', 1, 0, 'R', true);
-            $this->pdf->Cell($width * 0.2, 10, number_format($sumCash, 0), 1, 0, 'C', true);
-            $this->pdf->Cell($width * 0.2, 10, number_format($sumBank, 0), 1, 0, 'C', true);
-            $this->pdf->Cell($width * 0.2, 10, number_format($sumTotal, 0), 1, 1, 'C', true);
+            $this->pdf->SetFont('arial', 'B', 11);
+            $this->pdf->Cell($usableWidth * 0.4, 9, 'الإجمالي', 1, 0, 'R', false);
+            $this->pdf->Cell($usableWidth * 0.2, 9, number_format($sumCash, 0), 1, 0, 'C', false);
+            $this->pdf->Cell($usableWidth * 0.2, 9, number_format($sumBank, 0), 1, 0, 'C', false);
+            $this->pdf->Cell($usableWidth * 0.2, 9, number_format($sumTotal, 0), 1, 1, 'C', false);
         } else {
-            $this->pdf->SetFont('arial', '', 12);
-            // $this->pdf->Ln(10);
-            // $this->pdf->Cell($width, 10, 'لا توجد مصروفات مسجلة', 0, 1, 'C');
+            $this->pdf->SetFont('arial', '', 11);
+            $this->pdf->Cell($usableWidth, 9, 'لا توجد مصروفات مسجلة', 1, 1, 'C', false);
         }
+        
+        $this->pdf->Ln(12);
     }
 
     private function renderFooter(): void
     {
-        $this->pdf->SetY(-18);
-        $this->pdf->SetFont('arial', 'I', 8);
-        $this->pdf->SetTextColor(100, 100, 100);
-        $footerText = 'صفحة ' . $this->pdf->getAliasNumPage() . ' من ' . $this->pdf->getAliasNbPages() . '  |  تم الإنشاء بواسطة نظام جوادة';
+        $pageWidth = $this->pdf->getPageWidth();
+        $this->pdf->SetY(-20);
+        
+        // Draw footer line
+        $this->pdf->SetDrawColor(200, 200, 200);
+        $this->pdf->SetLineWidth(0.3);
+        $this->pdf->Line(20, $this->pdf->GetY() - 2, $pageWidth - 20, $this->pdf->GetY() - 2);
+        
+        $this->pdf->SetFont('arial', 'I', 9);
+        $this->pdf->SetTextColor(120, 120, 120);
+        $footerText = 'صفحة ' . $this->pdf->getAliasNumPage() . ' من ' . $this->pdf->getAliasNbPages() . '  |  تم الإنشاء بواسطة نظام جوادة الطبي';
         $this->pdf->Cell(0, 8, $footerText, 0, 0, 'C');
         $this->pdf->SetTextColor(0, 0, 0);
     }
 
-    // Old methods replaced by column-based layout
-    // private function renderFinancialSummary(): void { ... }
-    // private function renderDenominations(): void { ... }
-    // private function renderCosts(): void { ... }
-
     public static function generateFromRequest(Request $request): array
     {
         try {
-            Log::info('Cash Reconciliation PDF Request', [
-                'all_params' => $request->all(),
-                'shift_id' => $request->get('shift_id'),
-                'title' => $request->get('title'),
-                'date' => $request->get('date')
-            ]);
-
+      
             $validated = $request->validate([
                 'shift_id' => 'required|string',
                 'title' => 'nullable|string|max:255',
                 'date' => 'nullable|string',
+                'user_id' => 'required|string',
             ]);
 
             $shiftId = $validated['shift_id'];
-            $title =  '  تقرير موظف المعمل';
+            $shift = Shift::find($shiftId);
+            $title =  'تقرير ملخص دخل المستخدم';
             $date = $validated['date'] ?? date('Y-m-d');
-
+            $userId = $validated['user_id'];
+            $user = User::find($userId);
             Log::info('Cash Reconciliation PDF - Validated params', [
                 'shiftId' => $shiftId,
                 'title' => $title,
@@ -325,7 +352,6 @@ class CashReconciliationReport
             $shiftName = $shift->name ?? "وردية #{$shiftId}";
             
             // Get user name
-            $userName = $shift->userOpened ? $shift->userOpened->name : 'غير محدد';
             
             // Get English date
             $englishDate = $shift->created_at ? $shift->created_at->format('Y-m-d H:i:s') : date('Y-m-d H:i:s');
@@ -341,18 +367,20 @@ class CashReconciliationReport
 
             // Fetch income summary data
             try {
-                $incomeResponse = app(UserController::class)->getCurrentUserShiftIncomeSummary(new Request(['shift_id' => $shiftId]));
+                $incomeResponse = app(UserController::class)->getCurrentUserShiftIncomeSummary(new Request(['shift_id' => $shiftId, 'user_id' => $userId]));
                 $incomeData = $incomeResponse->getData()->data;
             } catch (\Exception $e) {
+                // dd($incomeData);
+                dd($e->getMessage(),$e->getLine(),$e->getFile());
                 Log::error("Error fetching income data: " . $e->getMessage());
-                $incomeData = (object) [
-                    'total_cash' => 0,
-                    'total_bank' => 0,
-                    'total_cash_expenses' => 0,
-                    'total_bank_expenses' => 0,
-                    'net_cash' => 0,
-                    'net_bank' => 0
-                ];
+                // $incomeData = (object) [
+                //     'total_cash' => 0,
+                //     'total_bank' => 0,
+                //     'total_cash_expenses' => 0,
+                //     'total_bank_expenses' => 0,
+                //     'net_cash' => 0,
+                //     'net_bank' => 0
+                // ];
             }
 
             // Fetch denominations data
@@ -395,8 +423,9 @@ class CashReconciliationReport
                 'date' => $date,
                 'shiftId' => $shiftId,
                 'shiftName' => $shiftName,
-                'userName' => $userName,
+                'user' => $user->name,
                 'englishDate' => $englishDate,
+                'shiftDate' => $shift->created_at->format('Y-m-d H:i:s A'),
                 'shiftType' => $shiftType,
                 'denominations' => $denominations->toArray(),
                 'totalDenominations' => $totalDenominations,
@@ -418,7 +447,7 @@ class CashReconciliationReport
 
         } catch (\Exception $e) {
             Log::error('Cash Reconciliation PDF Generation Error: ' . $e->getMessage());
-            return ['error' => 'فشل في إنشاء التقرير', 'status' => 500];
+            return ['error' => $e->getMessage(), 'status' => 500];
         }
     }
 }

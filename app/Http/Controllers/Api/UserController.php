@@ -218,9 +218,9 @@ class UserController extends Controller
             'shift_id' => 'required|integer|exists:shifts,id',
         ]);
 
-        $user = Auth::user();
+        $user_id = $request->input('user_id');
         $shiftId = $request->input('shift_id');
-
+        $user = User::find($user_id);
         // Ensure the provided shift is actually open, or allow for closed shifts if that's the requirement
         // $shift = Shift::where('id', $shiftId)->open()->first();
         // if (!$shift) {
