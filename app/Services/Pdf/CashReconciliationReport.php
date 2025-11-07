@@ -27,6 +27,8 @@ class CashReconciliationReport
     private function initializePdf(): void
     {
         $this->pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+        $this->pdf->setFontSubsetting(true);
+        $this->pdf->SetFont('arial', '', 10);
         
         // Set document information
         $this->pdf->SetCreator('Jawda Medical System');
@@ -34,13 +36,13 @@ class CashReconciliationReport
         $this->pdf->SetTitle($this->data['title']);
         $this->pdf->SetSubject('Cash Reconciliation Report');
 
-        // Set margins - more generous for professional look
-        $this->pdf->SetMargins(20, 40, 20);
-        $this->pdf->SetHeaderMargin(10);
-        $this->pdf->SetFooterMargin(15);
+        // Set margins - optimized for professional look
+        $this->pdf->SetMargins(15, 20, 15);
+        $this->pdf->SetHeaderMargin(5);
+        $this->pdf->SetFooterMargin(10);
 
         // Set auto page breaks
-        $this->pdf->SetAutoPageBreak(TRUE, 30);
+        $this->pdf->SetAutoPageBreak(TRUE, 25);
 
         // Set RTL direction for Arabic text
         $this->pdf->setRTL(true);
@@ -64,139 +66,222 @@ class CashReconciliationReport
 
     private function renderHeader(): void
     {
-        // Monochrome professional header
-        $this->pdf->SetY(12);
-        $this->pdf->SetFont('arial', 'B', 16);
-        $this->pdf->SetTextColor(0, 0, 0);
-
-        $this->pdf->SetFont('arial', '', 11);
-
-        // Separator line
+        // Header removed - clean start
+        $this->pdf->SetY(20);
     }
 
     private function renderTitle(): void
     {
-        $this->pdf->SetFont('arial', '', 12);
-        $this->pdf->SetTextColor(0, 0, 0);
+        $pageWidth = $this->pdf->getPageWidth();
+        $margin = 15;
+        $usableWidth = $pageWidth - (2 * $margin);
 
-        //extract the date only $this->data['shiftDate']
+        // Title with modern styling
+        $this->pdf->SetFont('arial', 'B', 16);
+        $this->pdf->SetTextColor(45, 55, 72);
         $shiftDate = Carbon::parse($this->data['shiftDate'])->format('Y-m-d');
-        // $this->pdf->Cell(0, 10, $this->data['title'], 0, 0, 'C');
+        
+        $this->pdf->Ln(4);
         $this->pdf->Cell(0, 10, $this->data['title'], 0, 1, 'C');
-        $this->pdf->Cell(20, 10, 'اسم المستخدم: ', 0, 0, 'C');
-        $this->pdf->Cell(40, 10, $this->data['user'], 0, 0, 'C');
-        $this->pdf->Cell(  40, 10, '', 0, 0, 'C');
-        $this->pdf->Cell(25, 10, 'تاريخ الوردية: ', 0, 0, 'C');
-        $this->pdf->Cell(45, 10, $shiftDate, 0, 1, 'C');
-
-
-        // Underline
-        $this->pdf->SetDrawColor(150, 150, 150);
-        $this->pdf->SetLineWidth(0.3);
+        
+        // Decorative line under title
+        $this->pdf->SetDrawColor(45, 55, 72);
+        $this->pdf->SetLineWidth(0.5);
+        $lineY = $this->pdf->GetY();
+        $this->pdf->Line($pageWidth / 2 - 40, $lineY, $pageWidth / 2 + 40, $lineY);
         $this->pdf->Ln(6);
+
+        // Modern info cards
+        $labelWidth = $usableWidth * 0.20;
+        $valueWidth = $usableWidth * 0.30;
+
+        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetDrawColor(230, 230, 230);
+        $this->pdf->SetLineWidth(0.3);
+        
+        // Row: user + shift date with modern card design
+        $this->pdf->SetFillColor(248, 249, 250);
+        $this->pdf->Cell($labelWidth, 9, 'اسم المستخدم', 1, 0, 'R', true);
+        $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($valueWidth, 9, $this->data['user'], 1, 0, 'R', true);
+        
+        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFillColor(248, 249, 250);
+        $this->pdf->Cell($labelWidth, 9, 'تاريخ الوردية', 1, 0, 'R', true);
+        $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($valueWidth, 9, $shiftDate, 1, 1, 'R', true);
+
+        $this->pdf->Ln(5);
     }
 
     private function renderShiftInfo(): void
     {
         $pageWidth = $this->pdf->getPageWidth();
-        $margin = 20;
+        $margin = 15;
         $usableWidth = $pageWidth - (2 * $margin);
 
-        // Section header (monochrome)
-        $this->pdf->SetFont('arial', 'B', 12);
-        $this->pdf->SetTextColor(0, 0, 0);
-        $this->pdf->SetDrawColor(180, 180, 180);
-        $this->pdf->SetLineWidth(0.2);
-
-        // Info rows
-        $this->pdf->SetDrawColor(200, 200, 200);
-        $this->pdf->SetLineWidth(0.2);
-        $this->pdf->SetFont('arial', '', 11);
-
-   
-        //each row has 3 columns
-        $colWidth = $usableWidth / 5;
-        //current date
-        $currentDate = Carbon::now()->format('Y-m-d');
-        // $this->pdf->SetEqualColumns(2);
-        $this->pdf->Cell($colWidth,5,' الوردية: ',1,0,'R');
-        $this->pdf->Cell($colWidth,5,$this->data['shiftType'],1,0,'R');
-        $this->pdf->Cell($colWidth,5,'',1,0,'R');
-        $this->pdf->Cell($colWidth,5,'رقم الوردية: ',1,0,'R');
-        $this->pdf->Cell($colWidth,5,$this->data['shiftId'],1,1,'R');
-        // $this->pdf->Cell($colWidth,5,'',1,0,'R');
-
-        $this->pdf->Cell($colWidth,5,'اسم المستخدم: ',1,0,'R');
+        // Modern section header with accent
+        $this->pdf->SetFont('arial', 'B', 13);
+        $this->pdf->SetTextColor(45, 55, 72);
+        $this->pdf->Ln(1);
+        $titleText = 'بيانات الوردية';
+        $this->pdf->Cell($usableWidth, 8, $titleText, 0, 1, 'R');
         
-        $this->pdf->Cell($colWidth,5,$this->data['user'],1,0,'R');
-        $this->pdf->Cell($colWidth,5,'',1,0,'R');
+        // Accent line - width matches title length
+        $this->pdf->SetDrawColor(45, 55, 72);
+        $this->pdf->SetLineWidth(1);
+        $lineY = $this->pdf->GetY();
+        $titleWidth = $this->pdf->GetStringWidth($titleText);
+        $lineStartX = $pageWidth - $margin - $titleWidth;
+        $this->pdf->Line($lineStartX, $lineY, $pageWidth - $margin, $lineY);
+        $this->pdf->Ln(4);
 
-        $this->pdf->Cell($colWidth,5,'تاريخ الطباعه: ',1,0,'R');
-        $this->pdf->Cell($colWidth,5,$currentDate,1,1,'R');
-        // $this->pdf->Cell($colWidth,5,'نوع الوردية: ',1,0,'R');
-        // $this->pdf->Cell($colWidth,5,$this->data['shiftType'],1,1,'R');
+        // Modern grid layout
+        $this->pdf->SetDrawColor(235, 237, 240);
+        $this->pdf->SetLineWidth(0.3);
+        $this->pdf->SetFont('arial', '', 10);
 
+        $labelWidth = $usableWidth * 0.20;
+        $valueWidth = $usableWidth * 0.30;
+        $currentDate = Carbon::now()->format('Y-m-d');
 
-        $this->pdf->Ln(10);
+        // Row 1: shift type + shift id
+        $this->pdf->SetFillColor(248, 249, 250);
+        $this->pdf->Cell($labelWidth, 9, 'الوردية', 1, 0, 'R', true);
+        $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($valueWidth, 9, $this->data['shiftType'], 1, 0, 'R', true);
+        
+        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFillColor(248, 249, 250);
+        $this->pdf->Cell($labelWidth, 9, 'رقم الوردية', 1, 0, 'R', true);
+        $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($valueWidth, 9, $this->data['shiftId'], 1, 1, 'R', true);
+
+        // Row 2: user + print date
+        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFillColor(248, 249, 250);
+        $this->pdf->Cell($labelWidth, 9, 'اسم المستخدم', 1, 0, 'R', true);
+        $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($valueWidth, 9, $this->data['user'], 1, 0, 'R', true);
+        
+        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFillColor(248, 249, 250);
+        $this->pdf->Cell($labelWidth, 9, 'تاريخ الطباعة', 1, 0, 'R', true);
+        $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($valueWidth, 9, $currentDate, 1, 1, 'R', true);
+
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->Ln(8);
     }
 
     private function renderFinancialSummary(): void
     {
         $pageWidth = $this->pdf->getPageWidth();
-        $margin = 20;
+        $margin = 15;
         $usableWidth = $pageWidth - (2 * $margin);
         
-        // Section header (monochrome)
-        $this->pdf->SetFont('arial', 'B', 12);
-        $this->pdf->SetTextColor(0, 0, 0);
-        $this->pdf->Cell($usableWidth, 8, 'الملخص المالي', 0, 1, 'C');
-        $this->pdf->SetDrawColor(180, 180, 180);
-        $this->pdf->SetLineWidth(0.2);
-        $this->pdf->Line(20, $this->pdf->GetY(), $this->pdf->getPageWidth() - 20, $this->pdf->GetY());
+        // Modern section header
+        $this->pdf->SetFont('arial', 'B', 13);
+        $this->pdf->SetTextColor(45, 55, 72);
+        $this->pdf->Ln(1);
+        $titleText = 'الملخص المالي';
+        $this->pdf->Cell($usableWidth, 8, $titleText, 0, 1, 'R');
+        
+        // Accent line - width matches title length
+        $this->pdf->SetDrawColor(45, 55, 72);
+        $this->pdf->SetLineWidth(1);
+        $lineY = $this->pdf->GetY();
+        $titleWidth = $this->pdf->GetStringWidth($titleText);
+        $lineStartX = $pageWidth - $margin - $titleWidth;
+        $this->pdf->Line($lineStartX, $lineY, $pageWidth - $margin, $lineY);
         $this->pdf->Ln(4);
 
         $incomeData = $this->data['incomeData'];
         
-        // Table header (monochrome)
-        $this->pdf->SetDrawColor(200, 200, 200);
-        $this->pdf->SetLineWidth(0.2);
+        // Modern table header with lighter gray background
+        $this->pdf->SetDrawColor(220, 223, 230);
+        $this->pdf->SetLineWidth(0.3);
         $this->pdf->SetFont('arial', 'B', 11);
-        $this->pdf->Cell($usableWidth * 0.4, 9, 'البند', 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, 'النقدي', 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, 'البنك', 1, 1, 'C', false);
+        $this->pdf->SetFillColor(240, 240, 240);
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->Cell($usableWidth * 0.4, 8, 'البند', 1, 0, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, 'النقدي', 1, 0, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, 'البنك', 1, 1, 'C', true);
 
-        $this->pdf->SetFont('arial', '', 11);
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->SetFont('arial', '', 10);
+        $rowFill = false;
 
         // Income row
-        $this->pdf->Cell($usableWidth * 0.4, 9, 'المتحصل', 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->total_cash, 0), 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->total_bank, 0), 1, 1, 'C', false);
+        if ($rowFill) {
+            $this->pdf->SetFillColor(252, 252, 253);
+        } else {
+            $this->pdf->SetFillColor(255, 255, 255);
+        }
+        $this->pdf->Cell($usableWidth * 0.4, 7, 'المتحصل', 1, 0, 'C', $rowFill);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_cash, 0), 1, 0, 'C', $rowFill);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_bank, 0), 1, 1, 'C', $rowFill);
+        $rowFill = !$rowFill;
 
         // Expenses row
-        $this->pdf->Cell($usableWidth * 0.4, 9, 'المصروف', 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->total_cash_expenses, 0), 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->total_bank_expenses, 0), 1, 1, 'C', false);
+        $this->pdf->SetFont('arial', '', 10);
+        if ($rowFill) {
+            $this->pdf->SetFillColor(252, 252, 253);
+        } else {
+            $this->pdf->SetFillColor(255, 255, 255);
+        }
+        $this->pdf->Cell($usableWidth * 0.4, 7, 'المصروف', 1, 0, 'C', $rowFill);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_cash_expenses, 0), 1, 0, 'C', $rowFill);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_bank_expenses, 0), 1, 1, 'C', $rowFill);
+        $rowFill = !$rowFill;
 
-        // Net balance row
+        // Net balance row - emphasized
         $this->pdf->SetFont('arial', 'B', 11);
-        $this->pdf->Cell($usableWidth * 0.4, 9, 'الصافي', 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($incomeData->net_cash, 0), 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, '-', 1, 1, 'C', false);
+        $this->pdf->SetFillColor(240, 245, 250);
+        $this->pdf->SetTextColor(45, 55, 72);
+        $this->pdf->Cell($usableWidth * 0.4, 8, 'الصافي', 1, 0, 'C', true);
+        $this->pdf->SetFont('arial', 'B', 11);
+        $this->pdf->Cell($usableWidth * 0.3, 8, number_format($incomeData->net_cash, 0), 1, 0, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, '-', 1, 1, 'C', true);
+        $this->pdf->SetTextColor(0, 0, 0);
 
         // Total denominations row
-        $this->pdf->SetFont('arial', '', 11);
-        $this->pdf->Cell($usableWidth * 0.4, 9, 'إجمالي الفئات', 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($this->data['totalDenominations'], 0), 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, '-', 1, 1, 'C', false);
+        $this->pdf->SetFont('arial', '', 10);
+        if ($rowFill) {
+            $this->pdf->SetFillColor(252, 252, 253);
+        } else {
+            $this->pdf->SetFillColor(255, 255, 255);
+        }
+        $this->pdf->Cell($usableWidth * 0.4, 7, 'إجمالي الفئات', 1, 0, 'C', $rowFill);
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($this->data['totalDenominations'], 0), 1, 0, 'C', $rowFill);
+        $this->pdf->Cell($usableWidth * 0.3, 7, '-', 1, 1, 'C', $rowFill);
 
-        // Difference row (monochrome)
+        // Difference row - with conditional styling
         $cashDifference = $incomeData->net_cash - $this->data['totalDenominations'];
         $this->pdf->SetFont('arial', 'B', 11);
-        $this->pdf->Cell($usableWidth * 0.4, 9, 'الفرق', 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, number_format($cashDifference, 0), 1, 0, 'C', false);
-        $this->pdf->Cell($usableWidth * 0.3, 9, '-', 1, 1, 'C', false);
+        if ($cashDifference == 0) {
+            $this->pdf->SetFillColor(236, 253, 245);
+            $this->pdf->SetTextColor(16, 185, 129);
+        } else {
+            $this->pdf->SetFillColor(254, 242, 242);
+            $this->pdf->SetTextColor(220, 38, 38);
+        }
+        $this->pdf->Cell($usableWidth * 0.4, 8, 'الفرق', 1, 0, 'C', true);
+        $this->pdf->SetFont('arial', 'B', 11);
+        $this->pdf->Cell($usableWidth * 0.3, 8, number_format($cashDifference, 0), 1, 0, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, '-', 1, 1, 'C', true);
+        $this->pdf->SetTextColor(0, 0, 0);
         
-        $this->pdf->Ln(12);
+        $this->pdf->Ln(8);
     }
 
     private function renderDenominations(): void
@@ -250,72 +335,103 @@ class CashReconciliationReport
     private function renderCosts(): void
     {
         $pageWidth = $this->pdf->getPageWidth();
-        $margin = 20;
+        $margin = 15;
         $usableWidth = $pageWidth - (2 * $margin);
         
-        // Section header (monochrome)
-        $this->pdf->SetFont('arial', 'B', 12);
-        $this->pdf->SetTextColor(0, 0, 0);
-        $this->pdf->Cell($usableWidth, 8, 'تفاصيل المصروفات', 0, 1, 'C');
-        $this->pdf->SetDrawColor(180, 180, 180);
-        $this->pdf->SetLineWidth(0.2);
-        $this->pdf->Line(20, $this->pdf->GetY(), $this->pdf->getPageWidth() - 20, $this->pdf->GetY());
+        // Modern section header
+        $this->pdf->SetFont('arial', 'B', 13);
+        $this->pdf->SetTextColor(45, 55, 72);
+        $this->pdf->Ln(1);
+        $titleText = 'تفاصيل المصروفات';
+        $this->pdf->Cell($usableWidth, 8, $titleText, 0, 1, 'R');
+        
+        // Accent line - width matches title length
+        $this->pdf->SetDrawColor(45, 55, 72);
+        $this->pdf->SetLineWidth(1);
+        $lineY = $this->pdf->GetY();
+        $titleWidth = $this->pdf->GetStringWidth($titleText);
+        $lineStartX = $pageWidth - $margin - $titleWidth;
+        $this->pdf->Line($lineStartX, $lineY, $pageWidth - $margin, $lineY);
         $this->pdf->Ln(4);
 
         if (!empty($this->data['costs'])) {
-            // Table header (monochrome)
-            $this->pdf->SetDrawColor(200, 200, 200);
-            $this->pdf->SetLineWidth(0.2);
+            // Modern table header with lighter gray background
+            $this->pdf->SetDrawColor(220, 223, 230);
+            $this->pdf->SetLineWidth(0.3);
             $this->pdf->SetFont('arial', 'B', 11);
-            $this->pdf->Cell($usableWidth * 0.4, 9, 'الوصف', 1, 0, 'C', false);
-            $this->pdf->Cell($usableWidth * 0.2, 9, 'النقدي', 1, 0, 'C', false);
-            $this->pdf->Cell($usableWidth * 0.2, 9, 'البنكي', 1, 0, 'C', false);
-            $this->pdf->Cell($usableWidth * 0.2, 9, 'المجموع', 1, 1, 'C', false);
+            $this->pdf->SetFillColor(240, 240, 240);
+            $this->pdf->SetTextColor(0, 0, 0);
+            $this->pdf->Cell($usableWidth * 0.4, 8, 'الوصف', 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.2, 8, 'النقدي', 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.2, 8, 'البنكي', 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.2, 8, 'المجموع', 1, 1, 'C', true);
 
-            $this->pdf->SetFont('arial', '', 11);
+            $this->pdf->SetTextColor(0, 0, 0);
+            $this->pdf->SetFont('arial', '', 10);
             $sumCash = 0;
             $sumBank = 0;
             $sumTotal = 0;
+            $rowFill = false;
             
             foreach ($this->data['costs'] as $cost) {
                 $total = $cost['amount'] + $cost['amount_bankak'];
                 $sumCash += $cost['amount'];
                 $sumBank += $cost['amount_bankak'];
                 $sumTotal += $total;
-                $this->pdf->Cell($usableWidth * 0.4, 9, $cost['description'], 1, 0, 'R', false);
-                $this->pdf->Cell($usableWidth * 0.2, 9, $cost['amount'] > 0 ? number_format($cost['amount']) : '-', 1, 0, 'C', false);
-                $this->pdf->Cell($usableWidth * 0.2, 9, $cost['amount_bankak'] > 0 ? number_format($cost['amount_bankak']) : '-', 1, 0, 'C', false);
-                $this->pdf->Cell($usableWidth * 0.2, 9, number_format($total), 1, 1, 'C', false);
+                
+                // Alternating row colors for better readability
+                if ($rowFill) {
+                    $this->pdf->SetFillColor(252, 252, 253);
+                } else {
+                    $this->pdf->SetFillColor(255, 255, 255);
+                }
+                $this->pdf->Cell($usableWidth * 0.4, 7, $cost['description'], 1, 0, 'C', $rowFill);
+                $this->pdf->SetFont('arial', '', 10);
+                $this->pdf->Cell($usableWidth * 0.2, 7, $cost['amount'] > 0 ? number_format($cost['amount']) : '-', 1, 0, 'C', $rowFill);
+                $this->pdf->Cell($usableWidth * 0.2, 7, $cost['amount_bankak'] > 0 ? number_format($cost['amount_bankak']) : '-', 1, 0, 'C', $rowFill);
+                $this->pdf->SetFont('arial', 'B', 10);
+                $this->pdf->Cell($usableWidth * 0.2, 7, number_format($total), 1, 1, 'C', $rowFill);
+                $rowFill = !$rowFill;
             }
 
-            // Totals row
+            // Totals row - emphasized
             $this->pdf->SetFont('arial', 'B', 11);
-            $this->pdf->Cell($usableWidth * 0.4, 9, 'الإجمالي', 1, 0, 'R', false);
-            $this->pdf->Cell($usableWidth * 0.2, 9, number_format($sumCash, 0), 1, 0, 'C', false);
-            $this->pdf->Cell($usableWidth * 0.2, 9, number_format($sumBank, 0), 1, 0, 'C', false);
-            $this->pdf->Cell($usableWidth * 0.2, 9, number_format($sumTotal, 0), 1, 1, 'C', false);
+            $this->pdf->SetFillColor(240, 245, 250);
+            $this->pdf->SetTextColor(45, 55, 72);
+            $this->pdf->Cell($usableWidth * 0.4, 8, 'الإجمالي', 1, 0, 'R', true);
+            $this->pdf->SetFont('arial', 'B', 11);
+            $this->pdf->Cell($usableWidth * 0.2, 8, number_format($sumCash, 0), 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.2, 8, number_format($sumBank, 0), 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.2, 8, number_format($sumTotal, 0), 1, 1, 'C', true);
+            $this->pdf->SetTextColor(0, 0, 0);
         } else {
-            $this->pdf->SetFont('arial', '', 11);
-            $this->pdf->Cell($usableWidth, 9, 'لا توجد مصروفات مسجلة', 1, 1, 'C', false);
+            // Empty state with modern styling
+            $this->pdf->SetDrawColor(235, 237, 240);
+            $this->pdf->SetFillColor(248, 249, 250);
+            $this->pdf->SetFont('arial', '', 10);
+            $this->pdf->SetTextColor(107, 114, 128);
+            $this->pdf->Cell($usableWidth, 10, 'لا توجد مصروفات مسجلة', 1, 1, 'C', true);
+            $this->pdf->SetTextColor(0, 0, 0);
         }
         
-        $this->pdf->Ln(12);
+        $this->pdf->Ln(8);
     }
 
     private function renderFooter(): void
     {
         $pageWidth = $this->pdf->getPageWidth();
-        $this->pdf->SetY(-20);
+        $this->pdf->SetY(-18);
         
-        // Draw footer line
-        $this->pdf->SetDrawColor(200, 200, 200);
+        // Modern footer line
+        $this->pdf->SetDrawColor(220, 223, 230);
         $this->pdf->SetLineWidth(0.3);
-        $this->pdf->Line(20, $this->pdf->GetY() - 2, $pageWidth - 20, $this->pdf->GetY() - 2);
+        $this->pdf->Line(15, $this->pdf->GetY() - 3, $pageWidth - 15, $this->pdf->GetY() - 3);
         
-        $this->pdf->SetFont('arial', 'I', 9);
-        $this->pdf->SetTextColor(120, 120, 120);
+        // Footer text with better styling
+        $this->pdf->SetFont('arial', '', 8);
+        $this->pdf->SetTextColor(107, 114, 128);
         $footerText = 'صفحة ' . $this->pdf->getAliasNumPage() . ' من ' . $this->pdf->getAliasNbPages() . '  |  تم الإنشاء بواسطة نظام جوادة الطبي';
-        $this->pdf->Cell(0, 8, $footerText, 0, 0, 'C');
+        $this->pdf->Cell(0, 6, $footerText, 0, 0, 'C');
         $this->pdf->SetTextColor(0, 0, 0);
     }
 
@@ -411,7 +527,7 @@ class CashReconciliationReport
 
             // Fetch costs data
             try {
-                $costs = Cost::where('shift_id', $shiftId)->get();
+                $costs = Cost::where('shift_id', $shiftId )->where('user_cost', $userId)->get();
             } catch (\Exception $e) {
                 Log::error("Error fetching costs data: " . $e->getMessage());
                 $costs = collect([]);
