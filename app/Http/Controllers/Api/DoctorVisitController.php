@@ -64,15 +64,32 @@ class DoctorVisitController extends Controller
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'company_id' => 'nullable|integer|exists:companies,id',
+            'has_company' => ['nullable', function ($attribute, $value, $fail) {
+                if (!in_array($value, ['true', 'false', true, false, '1', '0', 1, 0], true)) {
+                    $fail('The has company field must be true or false.');
+                }
+            }],
             'status' => 'nullable|string', // Add validation for allowed statuses if needed
             'search' => 'nullable|string|max:255',
             'per_page' => 'nullable|integer',
         ]);
+        
+        // Normalize has_company to boolean
+        if ($request->has('has_company')) {
+            $hasCompany = $request->has_company;
+            if (in_array($hasCompany, ['true', '1', 1, true], true)) {
+                $request->merge(['has_company' => true]);
+            } else {
+                $request->merge(['has_company' => false]);
+            }
+        }
 
         $query = DoctorVisit::with([
             'patient:id,name,phone,gender,age_year,age_month,age_day,company_id',
             'patient.company:id,name', // Eager load company for patient
             'patient.doctor:id,name',          // EAGER LOAD DOCTOR
+            'doctor:id,name', // Eager load direct doctor relationship
             'createdByUser:id,name',
             'requestedServices.service', // For calculating totals
             'patientLabRequests.mainTest' ,
@@ -99,6 +116,24 @@ class DoctorVisitController extends Controller
 
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
+        }
+        if ($request->filled('company_id')) {
+            $query->whereHas('patient', function ($q) use ($request) {
+                $q->where('company_id', $request->company_id);
+            });
+        }
+        if ($request->has('has_company')) {
+            if ($request->has_company) {
+                // Show only patients with companies
+                $query->whereHas('patient', function ($q) {
+                    $q->whereNotNull('company_id');
+                });
+            } else {
+                // Show only patients without companies
+                $query->whereHas('patient', function ($q) {
+                    $q->whereNull('company_id');
+                });
+            }
         }
         if ($request->filled('status') && $request->status !== 'all') {
             $query->where('status', $request->status);

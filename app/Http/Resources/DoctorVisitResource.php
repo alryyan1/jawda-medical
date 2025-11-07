@@ -23,7 +23,6 @@ class DoctorVisitResource extends JsonResource
 
         return [
             'id' => $this->id,
-            'created_at' => $this->created_at?->format('Y-m-d'),
             'visit_time' => $this->visit_time,
             'visit_time_formatted' => $this->formatVisitTime(),
             'status' => $this->status,
@@ -47,9 +46,9 @@ class DoctorVisitResource extends JsonResource
             }),
             
             // Doctor information
-            'doctor_id' => $this->patient?->doctor_id,
-            'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor') ? $this->patient->doctor : null),
-            'doctor_name' => $this->whenLoaded('patient', $this->patient?->doctor?->name),
+            'doctor_id' => $this->doctor_id ?? $this->patient?->doctor_id,
+            'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor') ? $this->doctor : ($this->whenLoaded('patient.doctor') ? $this->patient->doctor : null)),
+            'doctor_name' => $this->getDoctorName(),
              
             // User information
             'user_id' => $this->user_id,
@@ -249,5 +248,33 @@ class DoctorVisitResource extends JsonResource
                 ];
             });
         });
+    }
+
+    /**
+     * Get doctor name with fallback priority:
+     * 1. doctorShift.doctor.name (if doctorShift is loaded)
+     * 2. doctor.name (direct relationship)
+     * 3. patient.doctor.name (patient's assigned doctor)
+     *
+     * @return string|null
+     */
+    private function getDoctorName(): ?string
+    {
+        // Priority 1: Doctor from doctorShift
+        if ($this->relationLoaded('doctorShift') && $this->doctorShift?->relationLoaded('doctor')) {
+            return $this->doctorShift->doctor?->name;
+        }
+        
+        // Priority 2: Direct doctor relationship
+        if ($this->relationLoaded('doctor')) {
+            return $this->doctor?->name;
+        }
+        
+        // Priority 3: Patient's assigned doctor
+        if ($this->relationLoaded('patient') && $this->patient?->relationLoaded('doctor')) {
+            return $this->patient->doctor?->name;
+        }
+        
+        return null;
     }
 }
