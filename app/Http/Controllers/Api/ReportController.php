@@ -35,6 +35,7 @@ use App\Models\Holiday;
 use App\Models\Patient;
 use App\Models\RequestedServiceCost;
 use App\Models\RequestedServiceDeposit;
+use App\Models\RequestedService;
 use App\Models\ShiftDefinition;
 use App\Models\SubServiceCost;
 use App\Models\Deno;
@@ -1528,6 +1529,31 @@ class ReportController extends Controller
         
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
         $filename = 'ServiceReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+    
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$filename}\"");
+    }
+
+    public function generateSingleServiceThermalReceipt(Request $request, DoctorVisit $visit, RequestedService $requestedService)
+    {
+        // Verify the requested service belongs to this visit
+        if ($requestedService->doctorvisits_id !== $visit->id) {
+            return response()->json(['message' => 'الخدمة المطلوبة لا تنتمي إلى هذه الزيارة.'], 404);
+        }
+    
+        // Load the service relationship for the PDF generation
+        $requestedService->load('service');
+        
+        // Convert to array format expected by ThermalServiceReceiptReport
+        $requestedServiceArray = $requestedService->toArray();
+    
+        $report = new \App\Services\Pdf\ThermalServiceReceiptReport($visit, [$requestedServiceArray]);
+        $pdfContent = $report->generate();
+        
+        $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
+        $serviceNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $requestedService->service->name ?? 'Service');
+        $filename = 'ServiceReceipt_Visit_' . $visit->id . '_' . $serviceNameSanitized . '_' . $patientNameSanitized . '.pdf';
     
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')

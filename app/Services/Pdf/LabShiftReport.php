@@ -48,15 +48,15 @@ class LabShiftReport
         $headerString = "تقرير المختبر للوردية رقم: " . $shift->id . "\n" .
                         "تاريخ: " . $shift->created_at->format('Y/m/d') . " - " .
                         "الوقت: " . $shift->created_at->format('H:i A');
-
+        // $pdf->SetFont('arial', '', 10);
         if (file_exists($logoPath)) {
             $pdf->SetHeaderData($logoPath, $headerLogoWidth, $headerTitle, $headerString);
         } else {
             $pdf->SetHeaderData('', 0, $headerTitle, $headerString);
         }
 
-        $pdf->setHeaderFont([PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN]);
-        $pdf->setFooterFont([PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA]);
+        $pdf->setHeaderFont(['arial', '', 10]);
+        $pdf->setFooterFont(['arial', '', 10]);
 
         // Margins, Auto Page Breaks, Language, Font
         $pdf->SetMargins(10, 25, 10);

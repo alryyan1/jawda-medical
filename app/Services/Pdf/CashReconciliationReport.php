@@ -79,7 +79,8 @@ class CashReconciliationReport
         // Title with modern styling
         $this->pdf->SetFont('arial', 'B', 16);
         $this->pdf->SetTextColor(45, 55, 72);
-        $shiftDate = Carbon::parse($this->data['shiftDate'])->format('Y-m-d');
+        // Parse the shift date - handle both formats
+       
         
         $this->pdf->Ln(4);
         $this->pdf->Cell(0, 10, $this->data['title'], 0, 1, 'C');
@@ -111,7 +112,7 @@ class CashReconciliationReport
         $this->pdf->Cell($labelWidth, 9, 'تاريخ الوردية', 1, 0, 'R', true);
         $this->pdf->SetFillColor(255, 255, 255);
         $this->pdf->SetFont('arial', 'B', 10);
-        $this->pdf->Cell($valueWidth, 9, $shiftDate, 1, 1, 'R', true);
+        $this->pdf->Cell($valueWidth, 9, $this->data['shiftDate'], 1, 1, 'R', true);
 
         $this->pdf->Ln(5);
     }
@@ -541,7 +542,7 @@ class CashReconciliationReport
                 'shiftName' => $shiftName,
                 'user' => $user->name,
                 'englishDate' => $englishDate,
-                'shiftDate' => $shift->created_at->format('Y-m-d H:i:s A'),
+                'shiftDate' => $shift->created_at ? $shift->created_at->format('Y-m-d H:i:s') : date('Y-m-d H:i:s'),
                 'shiftType' => $shiftType,
                 'denominations' => $denominations->toArray(),
                 'totalDenominations' => $totalDenominations,

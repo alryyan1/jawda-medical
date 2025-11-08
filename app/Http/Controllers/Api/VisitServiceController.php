@@ -37,12 +37,12 @@ class VisitServiceController extends Controller
             'message' => $e->getMessage(),
             'trace' => $e->getTraceAsString()
         ];
-        
+
         Log::error("VisitServiceController Error: " . $e->getMessage(), [
             'exception' => $e,
             'context' => $errorContext
         ]);
-        
+
         return response()->json([
             'message' => $message,
             'error' => $e->getMessage(),
@@ -131,9 +131,11 @@ class VisitServiceController extends Controller
                     Log::warning("Service ID {$serviceId} not found during visit service request.");
                     continue;
                 }
-                // if($service->price == 0){
-                //     return response()->json(['message' => 'لا يمكنك إضافة خدمة بسعر 0.'], 403);
-                // }
+                if ($company == null) {
+                    if ($service->price == 0) {
+                        return response()->json(['message' => 'لا يمكنك إضافة خدمة بسعر 0.'], 403);
+                    }
+                }
 
                 // Initialize default values
                 $price = (float) $service->price; // Default to service price
@@ -144,34 +146,36 @@ class VisitServiceController extends Controller
                     $contract = $company->contractedServices()
                         ->where('services.id', $serviceId)
                         ->first();
-                        // return $contract;
+                    // return $contract;
                     if ($contract && $contract->pivot) { // Ensure pivot exists
                         $contractPivot = $contract->pivot;
+                        if ($contractPivot->price == 0) {
+                            return response()->json(['message' => 'لا يمكنك إضافة خدمة  غير مسعره في العقد  .'], 403);
+                        }
                         // return $contractPivot;
                         // if ($contractPivot->status) { // Assuming company_service pivot has 'status' for active contract item
-                            // return $contractPivot;
-                            $price = (float) $contractPivot->price;
-                            if($contractPivot->price == 0){
-                               return response()->json(['message' => 'لا يمكنك إضافة خدمة  غير مسعره في العقد  .'], 403);
-                            }
-                            $contractApproval = (bool) $contractPivot->approval;
-                            if ($contractPivot->use_static) {
-                                $companyEnduranceAmount = (float) $contractPivot->static_endurance;
+                        // return $contractPivot;
+                        $price = (float) $contractPivot->price;
+                        if ($contractPivot->price == 0) {
+                            return response()->json(['message' => 'لا يمكنك إضافة خدمة  غير مسعره في العقد  .'], 403);
+                        }
+                        $contractApproval = (bool) $contractPivot->approval;
+                        if ($contractPivot->use_static) {
+                            $companyEnduranceAmount = (float) $contractPivot->static_endurance;
+                        } else {
+                            if ($contractPivot->percentage_endurance > 0) {
+                                $companyServiceEndurance = ($price * (float) ($contractPivot->percentage_endurance ?? 0)) / 100;
+                                $companyEnduranceAmount = $price - $companyServiceEndurance;
                             } else {
-                                if($contractPivot->percentage_endurance > 0){
-                                    $companyServiceEndurance = ($price * (float)($contractPivot->percentage_endurance ?? 0)) / 100;
-                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
-                                }
-                                else{
-                                    // return $company;
-                                    $companyServiceEndurance = ($price * (float)($company->service_endurance ?? 0)) / 100;
-                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
-                                }
-                                //then use $company->service_endurance which is percentage
-                               
-                                   
-                                
+                                // return $company;
+                                $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
+                                $companyEnduranceAmount = $price - $companyServiceEndurance;
                             }
+                            //then use $company->service_endurance which is percentage
+
+
+
+                        }
                         // }
                     }
                 }

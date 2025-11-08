@@ -702,6 +702,7 @@ Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::c
 Route::patch('/doctor-visits/{visit}/update-all-lab-requests-bankak', [LabRequestController::class, 'updateAllLabRequestsBankak'])->middleware('auth:sanctum');
 Route::get('/lab-requests/visit/{visit}/thermal-receipt-pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
 Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
+Route::get('/visits/{visit}/requested-services/{requestedService}/thermal-receipt/pdf', [ReportController::class, 'generateSingleServiceThermalReceipt']);
 Route::post('/reports/cash-reconciliation/pdf', [ReportController::class, 'generateCashReconciliationPdf'])->middleware('auth:sanctum');
 
 // Firestore update endpoints

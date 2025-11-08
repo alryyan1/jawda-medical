@@ -7,8 +7,9 @@ use App\Models\Service;
 use App\Models\Setting;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use TCPDF;
 
-class ThermalServiceReceiptReport extends MyCustomTCPDF
+class ThermalServiceReceiptReport extends TCPDF
 {
     protected DoctorVisit $visit;
     protected array $requestedServicesToPrint;
@@ -24,7 +25,8 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
 
     public function __construct(DoctorVisit $visit, array $requestedServicesToPrint = [])
     {
-        parent::__construct('إيصال خدمات', $visit);
+        // Call TCPDF constructor directly
+        parent::__construct('P', 'mm', [76, 297], true, 'UTF-8', false, false);
         
         $this->visit = $visit;
         $this->requestedServicesToPrint = $requestedServicesToPrint ?: $visit->requestedServices->load('service')->toArray();
@@ -48,22 +50,156 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
         $this->alignEnd = 'L'; // Left alignment for RTL
         $this->alignCenter = 'C';
         $this->lineHeight = 3.5;
+        
+        // Set document properties
+        $this->SetCreator(config('app.name', 'Lab System'));
+        $this->SetAuthor($this->appSettings?->hospital_name ?? $this->appSettings?->lab_name ?? config('app.name'));
+        $this->SetTitle('إيصال خدمات - Visit #' . $visit->id);
+        $this->SetSubject('Service Receipt');
+        $this->setLanguageArray(['a_meta_charset' => 'UTF-8', 'a_meta_dir' => 'rtl', 'a_meta_language' => 'ar', 'w_page' => 'صفحة']);
+    }
+    
+    protected function setThermalDefaults($pageWidthMM = 76, $fontFamily = 'dejavusanscondensed', $fontSize = 7): void
+    {
+        $this->setPrintHeader(false); // Often no complex header on thermal
+        $this->setPrintFooter(false); // Often no complex footer
+        $this->SetMargins(3, 3, 3); // Small margins
+        $this->SetAutoPageBreak(TRUE, 3);
+        $this->setPageFormat([$pageWidthMM, 297], 'P'); // Custom width, standard height
+        $this->SetFont($fontFamily, '', $fontSize);
+        $this->setCellPaddings(0.5, 0.5, 0.5, 0.5); // Minimal padding
+        $this->setCellHeightRatio(1.1);
     }
 
     public function generate(): string
     {
         $this->AddPage();
-        $this->generateHeader();
-        $this->generateReceiptInfo();
-        $this->generateRequiredServices();
-        $this->generateTotalsSection();
-        $this->generateBarcode();
-        $this->generateFooter();
+        
+        // Check if single unpaid service - use different format
+        $isSingleUnpaidService = count($this->requestedServicesToPrint) === 1 
+            && (($this->requestedServicesToPrint[0]['amount_paid'] ?? 0) == 0 
+                || ($this->requestedServicesToPrint[0]['is_paid'] ?? false) == false);
+        
+        if ($isSingleUnpaidService) {
+            $this->generateUnpaidReceiptFormat();
+        } else {
+            $this->generateHeader();
+            $this->generateReceiptInfo();
+            $this->generateRequiredServices();
+            $this->generateTotalsSection();
+            $this->generateBarcode();
+            $this->generateFooter();
+        }
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $this->visit->patient->name);
         $pdfFileName = 'ServiceReceipt_Visit_' . $this->visit->id . '_' . $patientNameSanitized . '.pdf';
         
         return $this->Output($pdfFileName, 'S');
+    }
+    
+    protected function generateUnpaidReceiptFormat(): void
+    {
+        // "ايصال غير مدفوع" at the top, centered
+        $this->SetFont($this->fontName, 'B', 14);
+        $this->Cell(0, $this->lineHeight + 2, 'ايصال غير مدفوع', 0, 1, $this->alignCenter);
+        $this->Ln(2);
+        
+        // Doctor name on separate line, left aligned
+        if ($this->visit->doctor) {
+            $this->SetFont($this->fontName, '', 12);
+            $this->Cell(0, $this->lineHeight, 'الطبيب / ' . $this->visit->doctor->name, 0, 1, $this->alignStart);
+        }
+        
+        // Patient name on separate line, left aligned
+        $this->SetFont($this->fontName, '', 12);
+        $this->Cell(0, $this->lineHeight, 'الاسم / ' . $this->visit->patient->name, 0, 1, $this->alignStart);
+        $this->Ln(3);
+        
+        // Visit ID and Lab Number (visit_number) on same line - separate cells
+        $this->SetFont($this->fontName, '', 10);
+        $visitIdText = 'SERIAL ' . $this->visit->id;
+        $labNumberText = 'LAB NUMBER ' . ($this->visit->patient->visit_number ?? '');
+        
+        // Calculate widths for proper spacing
+        $pageWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
+        $visitIdWidth = $this->GetStringWidth($visitIdText);
+        $labNumberWidth = $this->GetStringWidth($labNumberText);
+        $spacing = 5; // Space between cells
+        
+        // First cell: SERIAL
+        $this->Cell($visitIdWidth, $this->lineHeight, $visitIdText, 0, 0, $this->alignStart);
+        
+        // Add spacing
+        $this->Cell($spacing, $this->lineHeight, '', 0, 0, $this->alignStart);
+        
+        // Second cell: LAB NUMBER
+        $this->Cell($labNumberWidth, $this->lineHeight, $labNumberText, 0, 1, $this->alignStart);
+        
+        // Horizontal line separator
+        $this->Ln(2);
+        $this->Cell(0, 0.1, '', 'T', 1, 'C');
+        $this->Ln(2);
+        
+        // Barcode centered
+        if ($this->appSettings?->barcode) {
+            $barcodeValue = (string) $this->visit->id;
+            $style = [
+                'position' => '',
+                'align' => 'C',
+                'stretch' => false,
+                'fitwidth' => true,
+                'cellfitalign' => '',
+                'border' => false,
+                'hpadding' => 'auto',
+                'vpadding' => 'auto',
+                'fgcolor' => [0, 0, 0],
+                'bgcolor' => false,
+                'text' => true,
+                'font' => $this->fontName,
+                'fontsize' => 10,
+                'stretchtext' => 4
+            ];
+            
+            // Center the barcode - use write1DBarcode with center alignment
+            $pageWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
+            $barcodeWidth = 50; // Barcode width in mm
+            // $barcodeX = $this->getMargins()['left'] + ($pageWidth - $barcodeWidth) / 2;
+            // $this->SetX($barcodeX);
+            $this->write1DBarcode($barcodeValue, 'C128B', 55, $this->GetY(), $barcodeWidth, (float)15, (float)0.3, $style, 'N');
+            
+            // Visit ID number below barcode, centered
+            // $this->Ln(18); // Space after barcode
+            $this->SetFont($this->fontName, '', 10);
+            // $this->Cell(0, $this->lineHeight, $barcodeValue, 0, 1, $this->alignCenter);
+        }
+        
+        $this->Ln(3);
+        
+        // User name
+        $this->SetFont($this->fontName, '', 12);
+        $this->Cell(0, $this->lineHeight, 'المستخدم / ' . $this->cashierName, 0, 1, $this->alignStart);
+        
+        // Required value (amount due)
+        $this->Ln(2);
+        $this->SetFont($this->fontName, '', 12);
+        $this->Cell(0, $this->lineHeight, 'القيمه المطلوبه', 0, 1, $this->alignStart);
+        
+        // Calculate and display the amount due
+        $rs = $this->requestedServicesToPrint[0];
+        $quantity = (int) ($rs['count'] ?? 1);
+        $unitPrice = (float) ($rs['price'] ?? 0);
+        $itemGrossTotal = $unitPrice * $quantity;
+        
+        $itemDiscountPercent = (float) ($rs['discount_per'] ?? 0);
+        $itemDiscountFixed = (float) ($rs['discount'] ?? 0);
+        $itemDiscountAmount = (($itemGrossTotal * $itemDiscountPercent) / 100) + $itemDiscountFixed;
+        
+        $amountDue = $itemGrossTotal - $itemDiscountAmount;
+        
+        // Display amount due, centered
+        $this->Ln(2);
+        $this->SetFont($this->fontName, 'B', 14);
+        $this->Cell(0, $this->lineHeight + 2, number_format($amountDue, 2), 0, 1, $this->alignCenter);
     }
 
     protected function generateHeader(): void
@@ -116,6 +252,11 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
             $this->SetFont($this->fontName, '', 12);
             $this->Cell(0, $this->lineHeight, 'اسم الطبيب/ '.$this->visit->doctor->name, 0, 1, $this->alignStart);
         }
+        
+        // Cashier/User name (third line, left aligned)
+        $this->SetFont($this->fontName, '', 12);
+        // $this->Cell(0, $this->lineHeight, 'الكاشير/ '.$this->cashierName, 0, 1, $this->alignStart);
+        
         $this->Ln(5);
         
         // Visit number in the middle and date on the right
@@ -282,7 +423,7 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
         //     $this->drawThermalTotalRow('تحمل الشركة:', -$totalEnduranceOnServices, $pageUsableWidth);
         // }
 
-        $this->drawThermalTotalRow('المدفوع:', $this->visit->total_paid_services(), $pageUsableWidth);
+        $this->drawThermalTotalRow('المدفوع:', $totalActuallyPaidForTheseServices, $pageUsableWidth);
 
         $this->Ln(5);
     }
@@ -291,7 +432,7 @@ class ThermalServiceReceiptReport extends MyCustomTCPDF
     {
         $this->Ln(3);
         $this->SetFont($this->fontName, 'I', 6);
-        $footerMessage = $this->appSettings?->receipt_footer_message ?: 'شكراً لزيارتكم!';
+        $footerMessage = $this->appSettings?->receipt_footer_message ?: 'الكاشير: ' . $this->cashierName;
         $this->MultiCell(0, $this->lineHeight - 1, $footerMessage, 0, $this->alignCenter, false, 1);
         $this->Ln(3);
     }
