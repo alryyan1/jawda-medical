@@ -108,6 +108,7 @@ class RequestedServiceDepositController extends Controller
             $newBalance = $netPayable - (float) $requestedService->amount_paid;
             if ($newBalance <= 0.009) {
                 $requestedService->is_paid = true;
+                $requestedService->user_deposited = Auth::id();
                 if (abs($newBalance) < 0.01) { // If very close to zero, set amount_paid to netPayable
                     $requestedService->amount_paid = $netPayable;
                 }

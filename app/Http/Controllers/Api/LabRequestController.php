@@ -1104,10 +1104,16 @@ class LabRequestController extends Controller
     {
         // ... (Authorization checks) ...
       
-
+        // Get the result value, ensuring empty strings are preserved (not converted to null)
+        // The database column 'result' cannot be null, so we ensure we always have a string value
+        $result = $request->input('result', '');
+        // Explicitly convert null to empty string to satisfy the NOT NULL constraint
+        if ($result === null) {
+            $result = '';
+        }
         
         $requestedResult->update([
-            'result' => $request->input('result'),
+            'result' => $result,
         ]);
 
         return new RequestedResultResource($requestedResult->load(['childTest.unit', /* 'enteredBy' */]));

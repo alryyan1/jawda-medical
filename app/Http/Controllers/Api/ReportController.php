@@ -44,6 +44,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Services\UltramsgService;
 use App\Services\Pdf\LabResultReport;
 use App\Services\Pdf\CashReconciliationReport;
+use App\Http\Resources\PatientLabQueueItemResource;
+use Illuminate\Support\Facades\Http as HttpClient;
 
 class ReportController extends Controller
 {
@@ -3525,6 +3527,69 @@ class ReportController extends Controller
             ->header('Expires', '0');
 
 
+    }
+
+    /**
+     * Mark lab report as printed/viewed
+     * Updates the patient's result_print_date and emits a realtime event
+     *
+     * @param Request $request
+     * @param DoctorVisit $doctorvisit
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function markReportPrinted(Request $request, DoctorVisit $doctorvisit)
+    {
+        $patient = $doctorvisit->patient;
+        
+        if (!$patient) {
+            return response()->json([
+                'message' => 'Patient not found for this visit.',
+            ], 404);
+        }
+
+        // Update print date if not already set
+        if (!$patient->result_print_date) {
+            $patient->result_print_date = now();
+            $patient->save();
+        }
+
+        // Load necessary relationships for PatientLabQueueItemResource
+        $doctorvisit->load([
+            'patient',
+            'patientLabRequests',
+            'patientLabRequests.mainTest',
+            'patientLabRequests.results'
+        ]);
+        
+        // Set test_count attribute (expected by PatientLabQueueItemResource)
+        $doctorvisit->test_count = $doctorvisit->patientLabRequests->count();
+        
+        // Calculate oldest_request_time manually from loaded relationship
+        if ($doctorvisit->patientLabRequests->isNotEmpty()) {
+            $oldestRequest = $doctorvisit->patientLabRequests->min('created_at');
+            $doctorvisit->oldest_request_time = $oldestRequest ? $oldestRequest : $doctorvisit->created_at;
+        } else {
+            $doctorvisit->oldest_request_time = $doctorvisit->created_at;
+        }
+
+        $queueItemResource = new PatientLabQueueItemResource($doctorvisit);
+        
+        // Emit realtime update event (fire-and-forget)
+        try {
+            $payload = [
+                'queueItem' => $queueItemResource->resolve(),
+            ];
+            $url = config('services.realtime.url') . '/emit/lab-queue-item-updated';
+            HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                ->post($url, $payload);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to emit lab-queue-item-updated realtime event: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'message' => "Lab report marked as printed.",
+            'data' => $queueItemResource
+        ]);
     }
     /**
      * Generate PDF barcode labels for lab containers (Ahmed Altamayoz config for printer ZY809)

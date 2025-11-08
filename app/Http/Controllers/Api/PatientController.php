@@ -399,9 +399,31 @@ class PatientController extends Controller
         // }
 
         if ($patient->result_auth) {
+            // Get the doctor visit and load necessary relationships for PatientLabQueueItemResource
+            $doctorVisit = $patient->doctorVisit;
+            if ($doctorVisit) {
+                $doctorVisit->load([
+                    'patient',
+                    'patientLabRequests',
+                    'patientLabRequests.mainTest',
+                    'patientLabRequests.results'
+                ]);
+                
+                // Set test_count attribute (expected by PatientLabQueueItemResource)
+                $doctorVisit->test_count = $doctorVisit->patientLabRequests->count();
+                
+                // Calculate oldest_request_time manually from loaded relationship
+                if ($doctorVisit->patientLabRequests->isNotEmpty()) {
+                    $oldestRequest = $doctorVisit->patientLabRequests->min('created_at');
+                    $doctorVisit->oldest_request_time = $oldestRequest ? $oldestRequest : $doctorVisit->created_at;
+                } else {
+                    $doctorVisit->oldest_request_time = $doctorVisit->created_at;
+                }
+            }
+            
             return response()->json([
                 'message' => "Results are already authenticated.",
-                'data' => new PatientLabQueueItemResource($patient->doctorVisit)
+                'data' => $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null
             ], 200);
         }
 
@@ -410,9 +432,30 @@ class PatientController extends Controller
         $patient->auth_date = now();
         $patient->save();
 
+        // Get the doctor visit and load necessary relationships for PatientLabQueueItemResource
+        $doctorVisit = $patient->doctorVisit;
+        if ($doctorVisit) {
+            $doctorVisit->load([
+                'patient',
+                'patientLabRequests',
+                'patientLabRequests.mainTest',
+                'patientLabRequests.results'
+            ]);
+            
+            // Set test_count attribute (expected by PatientLabQueueItemResource)
+            $doctorVisit->test_count = $doctorVisit->patientLabRequests->count();
+            
+            // Calculate oldest_request_time manually from loaded relationship
+            if ($doctorVisit->patientLabRequests->isNotEmpty()) {
+                $oldestRequest = $doctorVisit->patientLabRequests->min('created_at');
+                $doctorVisit->oldest_request_time = $oldestRequest ? $oldestRequest : $doctorVisit->created_at;
+            } else {
+                $doctorVisit->oldest_request_time = $doctorVisit->created_at;
+            }
+        }
+
         // Dispatch job to upload lab result to Firebase
         try {
-            $doctorVisit = $patient->doctorVisit;
             if ($doctorVisit) {
                 \App\Jobs\UploadLabResultToFirebase::dispatch(
                     $patient->id,
@@ -426,9 +469,25 @@ class PatientController extends Controller
             Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
         }
 
+        $queueItemResource = $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null;
+        
+        // Emit realtime update event (fire-and-forget)
+        if ($queueItemResource) {
+            try {
+                $payload = [
+                    'queueItem' => $queueItemResource->resolve(),
+                ];
+                $url = config('services.realtime.url') . '/emit/lab-queue-item-updated';
+                HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                    ->post($url, $payload);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to emit lab-queue-item-updated realtime event: ' . $e->getMessage());
+            }
+        }
+
         $responseData = [
             'message' => "Patient results have been successfully authenticated. Upload to cloud storage has been queued.",
-            'data' => new  PatientLabQueueItemResource($patient->doctorVisit)
+            'data' => $queueItemResource
         ];
 
         // Queue WhatsApp message job (respects settings flag internally)
@@ -579,9 +638,47 @@ class PatientController extends Controller
         
         $patient->save();
 
+        // Get the doctor visit and load necessary relationships for PatientLabQueueItemResource
+        $doctorVisit = $patient->doctorVisit;
+        if ($doctorVisit) {
+            $doctorVisit->load([
+                'patient',
+                'patientLabRequests',
+                'patientLabRequests.mainTest',
+                'patientLabRequests.results'
+            ]);
+            
+            // Set test_count attribute (expected by PatientLabQueueItemResource)
+            $doctorVisit->test_count = $doctorVisit->patientLabRequests->count();
+            
+            // Calculate oldest_request_time manually from loaded relationship
+            if ($doctorVisit->patientLabRequests->isNotEmpty()) {
+                $oldestRequest = $doctorVisit->patientLabRequests->min('created_at');
+                $doctorVisit->oldest_request_time = $oldestRequest ? $oldestRequest : $doctorVisit->created_at;
+            } else {
+                $doctorVisit->oldest_request_time = $doctorVisit->created_at;
+            }
+        }
+
+        $queueItemResource = $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null;
+        
+        // Emit realtime update event (fire-and-forget)
+        if ($queueItemResource) {
+            try {
+                $payload = [
+                    'queueItem' => $queueItemResource->resolve(),
+                ];
+                $url = config('services.realtime.url') . '/emit/lab-queue-item-updated';
+                HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                    ->post($url, $payload);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to emit lab-queue-item-updated realtime event: ' . $e->getMessage());
+            }
+        }
+
         return response()->json([
             'message' => $patient->result_auth ? "Patient results have been authenticated." : "Patient results authentication has been revoked.",
-            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor', 'resultAuthUser']))
+            'data' => $queueItemResource
         ]);
     }
     /**
@@ -1761,7 +1858,7 @@ class PatientController extends Controller
             }
         }
 
-        return ['status' => true, 'data' => $doctorvisit->prepareForResponse(), 'chemistryObj' => $object];
+        return ['status' => true, 'data' => new DoctorVisitResource($doctorvisit->load(['patient.subcompany', 'patient.doctor'])), 'chemistryObj' => $object];
     }
 
 }

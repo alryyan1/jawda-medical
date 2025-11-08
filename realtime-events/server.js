@@ -390,6 +390,20 @@ app.post('/emit/bankak-image-inserted', verifyAuth, (req, res) => {
   }
 });
 
+// Emit lab-queue-item-updated
+app.post('/emit/lab-queue-item-updated', verifyAuth, (req, res) => {
+  try {
+    const payload = req.body; // Expecting { queueItem: PatientLabQueueItem }
+    console.log('lab-queue-item-updated', payload);
+    io.emit('lab-queue-item-updated', payload);
+    console.log('lab-queue-item-updated emitted');
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error emitting lab-queue-item-updated:', err?.message || err);
+    return res.status(500).json({ error: 'Failed to emit lab-queue-item-updated' });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);
 });

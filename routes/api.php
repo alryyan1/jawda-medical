@@ -637,6 +637,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf']);
     Route::post('/visits/{doctorvisit}/print-barcode', [PatientController::class, 'printBarcode']); // For Zebra printer barcode printing
     Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result']); // For "View Report Preview"
+    Route::post('/visits/{doctorvisit}/lab-report/mark-printed', [ReportController::class, 'markReportPrinted']); // Mark report as printed
     Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns
     Route::apiResource('service-groups', ServiceGroupController::class);
     Route::prefix('sample-collection')->group(function () {
