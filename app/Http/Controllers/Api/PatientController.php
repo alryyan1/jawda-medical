@@ -703,8 +703,17 @@ class PatientController extends Controller
         if ($dateCheck instanceof \Illuminate\Http\JsonResponse) {
             return $dateCheck; // Ensure latest shift is from today
         }
-
         $user = Auth::user();
+        //  'تسجيل مريض كاش',
+        // 'تسجيل مريض تامين',
+        // if($user->can('تسجيل مريض كاش')){
+            // return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+        // }
+        // if($user->can('تسجيل مريض تامين')){
+        //     return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+        // }
+
+        // $user = Auth::user();
         // if($doctorVisit->patient->company_id == null && $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
        
 
@@ -1059,6 +1068,19 @@ class PatientController extends Controller
         if ($dateCheck instanceof \Illuminate\Http\JsonResponse) {
             return $dateCheck; // Ensure latest shift is from today
         }
+        $user = Auth::user();
+    
+        if(isset($validated['company_id']) && $validated['company_id'] != null){
+            if(!$user->can('تسجيل مريض تامين')){
+                return response()->json(['message' => 'المستخدم لا يمكنه تسجيل مريض تامين'], 400);
+            }
+
+        }else{
+            if(!$user->can('تسجيل مريض كاش')){
+                return response()->json(['message' => 'المستخدم لا يمكنه تسجيل مريض كاش'], 400);
+            }
+        }
+      
         $currentGeneralShift = $shiftCheck;
         DB::beginTransaction();
         try {
@@ -1385,7 +1407,12 @@ class PatientController extends Controller
 
         $user = Auth::user();
     
-
+        // if($user->can('تسجيل مريض كاش')){
+            // return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+        // }
+        // if($user->can('تسجيل مريض تامين')){
+        //     return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+        // }
         // Verify the doctor shift is active and belongs to the specified doctor
         $doctorShift = DoctorShift::where('id', $validated['doctor_shift_id'])
             ->where('doctor_id', $validated['doctor_id'])

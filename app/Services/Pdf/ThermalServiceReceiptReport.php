@@ -141,7 +141,7 @@ class ThermalServiceReceiptReport extends TCPDF
         $this->Ln(2);
         
         // Barcode centered
-        if ($this->appSettings?->barcode) {
+        // if ($this->appSettings?->barcode) {
             $barcodeValue = (string) $this->visit->id;
             $style = [
                 'position' => '',
@@ -171,7 +171,7 @@ class ThermalServiceReceiptReport extends TCPDF
             // $this->Ln(18); // Space after barcode
             $this->SetFont($this->fontName, '', 10);
             // $this->Cell(0, $this->lineHeight, $barcodeValue, 0, 1, $this->alignCenter);
-        }
+        // }
         
         $this->Ln(3);
         

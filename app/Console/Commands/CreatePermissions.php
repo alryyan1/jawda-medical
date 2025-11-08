@@ -47,6 +47,7 @@ class CreatePermissions extends Command
         'عرض الاعدادات',
         'اضافه خدمه',
         'اضافه فحص',
+        'تعديل نتائج المختبر'
     ];
 
     /**
