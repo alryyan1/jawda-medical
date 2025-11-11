@@ -128,17 +128,17 @@ class ShiftController extends Controller
             ->orderBy('closed_at', 'desc')
             ->first();
 
-        if ($lastClosedShift) {
-            $hoursSinceLastShift = Carbon::now()->diffInHours($lastClosedShift->created_at);
-            if ($hoursSinceLastShift < 6) {
-                $remainingHours = 6 - $hoursSinceLastShift;
-                return response()->json([
-                    'message' => "يجب أن تمر 6 ساعات على الأقل بين الورديات. الوقت المتبقي: {$remainingHours} ساعة.",
-                    'hours_remaining' => $remainingHours,
-                    'last_shift_closed_at' => $lastClosedShift->closed_at->toDateTimeString()
-                ], 409);
-            }
-        }
+        // if ($lastClosedShift) {
+        //     $hoursSinceLastShift = Carbon::now()->diffInHours($lastClosedShift->created_at);
+        //     if ($hoursSinceLastShift < 6) {
+        //         $remainingHours = 6 - $hoursSinceLastShift;
+        //         return response()->json([
+        //             'message' => "يجب أن تمر 6 ساعات على الأقل بين الورديات. الوقت المتبقي: {$remainingHours} ساعة.",
+        //             'hours_remaining' => $remainingHours,
+        //             'last_shift_closed_at' => $lastClosedShift->closed_at->toDateTimeString()
+        //         ], 409);
+        //     }
+        // }
 
         $validatedData = $request->validate([
             // 'name' => 'nullable|string|max:255', // If you add a name field
@@ -359,14 +359,14 @@ class ShiftController extends Controller
         // Enforce minimum 6 hours since this shift was opened
         $openedAt = $shift->created_at;
         $hoursOpen = $openedAt ? Carbon::parse($openedAt)->diffInHours(Carbon::now()) : 0;
-        if ($hoursOpen < 6) {
-            $remainingHours = 6 - $hoursOpen;
-            return response()->json([
-                'message' => "لا يمكن إغلاق الوردية قبل مرور 6 ساعات من فتحها. الوقت المتبقي: {$remainingHours} ساعة.",
-                'hours_remaining' => $remainingHours,
-                'opened_at' => $openedAt?->toDateTimeString(),
-            ], 409);
-        }
+        // if ($hoursOpen < 6) {
+        //     $remainingHours = 6 - $hoursOpen;
+        //     return response()->json([
+        //         'message' => "لا يمكن إغلاق الوردية قبل مرور 6 ساعات من فتحها. الوقت المتبقي: {$remainingHours} ساعة.",
+        //         'hours_remaining' => $remainingHours,
+        //         'opened_at' => $openedAt?->toDateTimeString(),
+        //     ], 409);
+        // }
 
 
         // Check for any open DoctorShift records specifically associated with THIS general Shift ($shift)

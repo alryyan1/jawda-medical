@@ -49,9 +49,10 @@ class ChildTestOptionController extends Controller
 
     public function destroy(ChildTest $childTest, ChildTestOption $option)
     {
-        if ($option->child_test_id !== $childTest->id) abort(404);
+        // if ($option->child_test_id !== $childTest->id) abort(404);
         // $this->authorize('update', $childTest);
         $option->delete();
-        return response()->json(null, 204);
+        // return response()->json(null, 204);
+        // return response()->json(['message' => 'تم حذف الخيار بنجاح'], 200);
     }
 }

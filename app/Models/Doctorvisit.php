@@ -418,6 +418,14 @@ class DoctorVisit extends Model
     {
         return SysmexResult::where('doctorvisit_id', '=', $this->id)->get()->count() > 0;
     }
+    public function hasChemistry()
+    {
+        return Mindray::where('doctorvisit_id', '=', $this->id)->get()->count() > 0;
+    }
+    public function getHasChemistryAttribute()
+    {
+        return $this->hasChemistry();
+    }
     public function getHascbcAttribute()
     {
         return $this->hasCbc();

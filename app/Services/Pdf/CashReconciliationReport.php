@@ -28,7 +28,7 @@ class CashReconciliationReport
     {
         $this->pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $this->pdf->setFontSubsetting(true);
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
         
         // Set document information
         $this->pdf->SetCreator('Jawda Medical System');
@@ -96,23 +96,23 @@ class CashReconciliationReport
         $labelWidth = $usableWidth * 0.20;
         $valueWidth = $usableWidth * 0.30;
 
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->SetDrawColor(230, 230, 230);
         $this->pdf->SetLineWidth(0.3);
         
         // Row: user + shift date with modern card design
         $this->pdf->SetFillColor(248, 249, 250);
-        $this->pdf->Cell($labelWidth, 9, 'اسم المستخدم', 1, 0, 'R', true);
-        $this->pdf->SetFillColor(255, 255, 255);
-        $this->pdf->SetFont('arial', 'B', 10);
-        $this->pdf->Cell($valueWidth, 9, $this->data['user'], 1, 0, 'R', true);
+        // $this->pdf->Cell($labelWidth, 9, 'اسم المستخدم', 1, 0, 'R', true);
+        // $this->pdf->SetFillColor(255, 255, 255);
+        // $this->pdf->SetFont('arial', 'B', 10);
+        // $this->pdf->Cell($valueWidth, 9, $this->data['user'], 1, 0, 'R', true);
         
-        $this->pdf->SetFont('arial', '', 10);
-        $this->pdf->SetFillColor(248, 249, 250);
-        $this->pdf->Cell($labelWidth, 9, 'تاريخ الوردية', 1, 0, 'R', true);
-        $this->pdf->SetFillColor(255, 255, 255);
-        $this->pdf->SetFont('arial', 'B', 10);
-        $this->pdf->Cell($valueWidth, 9, $this->data['shiftDate'], 1, 1, 'R', true);
+        // $this->pdf->SetFont('arial', '', 10);
+        // $this->pdf->SetFillColor(248, 249, 250);
+        // $this->pdf->Cell($labelWidth, 9, 'تاريخ الوردية', 1, 0, 'R', true);
+        // $this->pdf->SetFillColor(255, 255, 255);
+        // $this->pdf->SetFont('arial', 'B', 10);
+        // $this->pdf->Cell($valueWidth, 9, $this->data['shiftDate'], 1, 1, 'R', true);
 
         $this->pdf->Ln(5);
     }
@@ -142,7 +142,7 @@ class CashReconciliationReport
         // Modern grid layout
         $this->pdf->SetDrawColor(235, 237, 240);
         $this->pdf->SetLineWidth(0.3);
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
 
         $labelWidth = $usableWidth * 0.20;
         $valueWidth = $usableWidth * 0.30;
@@ -155,7 +155,7 @@ class CashReconciliationReport
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->Cell($valueWidth, 9, $this->data['shiftType'], 1, 0, 'R', true);
         
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->SetFillColor(248, 249, 250);
         $this->pdf->Cell($labelWidth, 9, 'رقم الوردية', 1, 0, 'R', true);
         $this->pdf->SetFillColor(255, 255, 255);
@@ -163,19 +163,19 @@ class CashReconciliationReport
         $this->pdf->Cell($valueWidth, 9, $this->data['shiftId'], 1, 1, 'R', true);
 
         // Row 2: user + print date
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->SetFillColor(248, 249, 250);
         $this->pdf->Cell($labelWidth, 9, 'اسم المستخدم', 1, 0, 'R', true);
         $this->pdf->SetFillColor(255, 255, 255);
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->Cell($valueWidth, 9, $this->data['user'], 1, 0, 'R', true);
         
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->SetFillColor(248, 249, 250);
-        $this->pdf->Cell($labelWidth, 9, 'تاريخ الطباعة', 1, 0, 'R', true);
+        $this->pdf->Cell($labelWidth, 9, 'تاريخ الورديه', 1, 0, 'R', true);
         $this->pdf->SetFillColor(255, 255, 255);
         $this->pdf->SetFont('arial', 'B', 10);
-        $this->pdf->Cell($valueWidth, 9, $currentDate, 1, 1, 'R', true);
+        $this->pdf->Cell($valueWidth, 9, $this->data['shiftDate'], 1, 1, 'R', true);
 
         $this->pdf->SetTextColor(0, 0, 0);
         $this->pdf->Ln(8);
@@ -216,7 +216,7 @@ class CashReconciliationReport
         $this->pdf->Cell($usableWidth * 0.3, 8, 'البنك', 1, 1, 'C', true);
 
         $this->pdf->SetTextColor(0, 0, 0);
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
         $rowFill = false;
 
         // Income row
@@ -232,7 +232,7 @@ class CashReconciliationReport
         $rowFill = !$rowFill;
 
         // Expenses row
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
         if ($rowFill) {
             $this->pdf->SetFillColor(252, 252, 253);
         } else {
@@ -251,11 +251,11 @@ class CashReconciliationReport
         $this->pdf->Cell($usableWidth * 0.4, 8, 'الصافي', 1, 0, 'C', true);
         $this->pdf->SetFont('arial', 'B', 11);
         $this->pdf->Cell($usableWidth * 0.3, 8, number_format($incomeData->net_cash, 0), 1, 0, 'C', true);
-        $this->pdf->Cell($usableWidth * 0.3, 8, '-', 1, 1, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, number_format($incomeData->net_bank, 0), 1, 1, 'C', true);
         $this->pdf->SetTextColor(0, 0, 0);
 
         // Total denominations row
-        $this->pdf->SetFont('arial', '', 10);
+        $this->pdf->SetFont('arial', 'B', 10);
         if ($rowFill) {
             $this->pdf->SetFillColor(252, 252, 253);
         } else {
@@ -308,7 +308,7 @@ class CashReconciliationReport
         $this->pdf->Cell($usableWidth * 0.33, 9, 'العدد', 1, 0, 'C', false);
         $this->pdf->Cell($usableWidth * 0.34, 9, 'المجموع', 1, 1, 'C', false);
 
-        $this->pdf->SetFont('arial', '', 11);
+        $this->pdf->SetFont('arial', 'B', 11);
         $hasDenominations = false;
         
         foreach ($this->data['denominations'] as $denomination) {
@@ -321,7 +321,7 @@ class CashReconciliationReport
         }
 
         if (!$hasDenominations) {
-            $this->pdf->SetFont('arial', '', 11);
+            $this->pdf->SetFont('arial', 'B', 11);
             $this->pdf->Cell($usableWidth, 9, 'لا توجد فئات نقدية مسجلة', 1, 1, 'C', false);
         }
 
@@ -368,7 +368,7 @@ class CashReconciliationReport
             $this->pdf->Cell($usableWidth * 0.2, 8, 'المجموع', 1, 1, 'C', true);
 
             $this->pdf->SetTextColor(0, 0, 0);
-            $this->pdf->SetFont('arial', '', 10);
+            $this->pdf->SetFont('arial', 'B', 10);
             $sumCash = 0;
             $sumBank = 0;
             $sumTotal = 0;
@@ -387,7 +387,7 @@ class CashReconciliationReport
                     $this->pdf->SetFillColor(255, 255, 255);
                 }
                 $this->pdf->Cell($usableWidth * 0.4, 7, $cost['description'], 1, 0, 'C', $rowFill);
-                $this->pdf->SetFont('arial', '', 10);
+                $this->pdf->SetFont('arial', 'B', 10);
                 $this->pdf->Cell($usableWidth * 0.2, 7, $cost['amount'] > 0 ? number_format($cost['amount']) : '-', 1, 0, 'C', $rowFill);
                 $this->pdf->Cell($usableWidth * 0.2, 7, $cost['amount_bankak'] > 0 ? number_format($cost['amount_bankak']) : '-', 1, 0, 'C', $rowFill);
                 $this->pdf->SetFont('arial', 'B', 10);
@@ -409,7 +409,7 @@ class CashReconciliationReport
             // Empty state with modern styling
             $this->pdf->SetDrawColor(235, 237, 240);
             $this->pdf->SetFillColor(248, 249, 250);
-            $this->pdf->SetFont('arial', '', 10);
+            $this->pdf->SetFont('arial', 'B', 10);
             $this->pdf->SetTextColor(107, 114, 128);
             $this->pdf->Cell($usableWidth, 10, 'لا توجد مصروفات مسجلة', 1, 1, 'C', true);
             $this->pdf->SetTextColor(0, 0, 0);
@@ -429,7 +429,7 @@ class CashReconciliationReport
         $this->pdf->Line(15, $this->pdf->GetY() - 3, $pageWidth - 15, $this->pdf->GetY() - 3);
         
         // Footer text with better styling
-        $this->pdf->SetFont('arial', '', 8);
+        $this->pdf->SetFont('arial', 'B', 8);
         $this->pdf->SetTextColor(107, 114, 128);
         $footerText = 'صفحة ' . $this->pdf->getAliasNumPage() . ' من ' . $this->pdf->getAliasNbPages() . '  |  تم الإنشاء بواسطة نظام جوادة الطبي';
         $this->pdf->Cell(0, 6, $footerText, 0, 0, 'C');
@@ -477,7 +477,7 @@ class CashReconciliationReport
             $shiftType = 'الوردية المسائيه'; // Default to evening
             if ($shift->created_at) {
                 $hour = $shift->created_at->format('H');
-                if ($hour >= 6 && $hour < 18) { // 6 AM to 6 PM
+                if ($hour >= 6 && $hour <= 12) { // 6 AM to 6 PM
                     $shiftType = 'الورديه الصباحيه';
                 }
             }
@@ -506,7 +506,7 @@ class CashReconciliationReport
                     ->whereNotIn('name', [10, 20, 50])
                     ->get();
                 
-                $denoUsers = DenoUser::where('shift_id', $shiftId)->get();
+                $denoUsers = DenoUser::where('shift_id', $shiftId)->where('user_id', $userId)->get();
                 
                 $denominations = $denos->map(function ($deno) use ($denoUsers) {
                     $denoUser = $denoUsers->where('deno_id', $deno->id)->first();

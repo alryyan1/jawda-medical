@@ -80,6 +80,8 @@ class DoctorVisitResource extends JsonResource
             // Timestamps
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'company_relation' => $this->patient?->companyRelation,
+
         ];
     }
 

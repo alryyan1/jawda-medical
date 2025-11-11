@@ -481,7 +481,7 @@ class LabResultReport
             $estimatedRowHeight = max($this->baseLineHeight, $estimatedResultHeight, $estimatedNormalHeight);
             $this->ensureSpaceFor($pdf, $estimatedRowHeight + $this->smallSpacing);
 
-            if (($child_id == 46 || $child_id == 70 || $child_id == 213) && $report_result != '' && is_numeric($report_result)) {
+            if (($child_id == 46 || $child_id == 70 ) && $report_result != '' && is_numeric($report_result)) {
                 $percent = ($report_result / 15) * 100;
                 $percent = ceil($percent);
                 $resultCellHeight = $pdf->MultiCell($table_col_widht * 1.5, 5, "$report_result         $percent % ", 0, 'C', 0, 0, '', '', true);

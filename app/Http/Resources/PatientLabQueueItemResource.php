@@ -51,6 +51,7 @@ class PatientLabQueueItemResource extends JsonResource
             'patient_id' => $this->patient_id,
             'patient_name' => $this->patient->name,
             'company' => $this->patient->company,
+            'shift_id' => $this->patient->shift_id,
             'lab_to_lab_object_id' => $this->patient->lab_to_lab_object_id,
             'has_cbc' => $this->patient->doctorVisit?->hasCbc(),
             'patient_phone_for_whatsapp' => $this->patient ? UltramsgService::formatPhoneNumber($this->patient->phone) : null,
@@ -80,6 +81,7 @@ class PatientLabQueueItemResource extends JsonResource
             // NEW FIELD
             'is_ready_for_print' => ($pendingResultsCount == 0 && !$isPrinted),
             'sample_collected' => $this->patient?->sample_collect_time != null,
+            'sample_collection_time' => $this->patient?->sample_collect_time,
             'result_url' => $this->patient?->result_url,
             'registered_by' => $this->patient?->user?->name,
             'auth_date' => $this->patient?->auth_date,

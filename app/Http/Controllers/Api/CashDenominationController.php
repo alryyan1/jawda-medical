@@ -19,8 +19,8 @@ class CashDenominationController extends Controller
         $shiftId = $request->shift_id;
         $userId = Auth::id();
 
-        $denominations = Deno::orderBy('id','desc')
-            ->whereNotIn('name', [10, 20, 50])
+        $denominations = Deno::orderBy('id','asc')
+            // ->whereNotIn('name', [10, 20, 50])
             ->get();
 
         // Get existing counts for this user and shift

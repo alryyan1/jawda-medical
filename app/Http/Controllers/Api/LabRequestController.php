@@ -121,7 +121,7 @@ class LabRequestController extends Controller
     public function getLabPendingQueue(Request $request)
     {
         $request->validate([
-            'shift_id' => 'nullable|integer|exists:shifts,id',
+            // 'shift_id' => 'nullable|integer|exists:shifts,id',
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'search' => 'nullable|string|max:100', // Patient name/ID, Visit ID, Sample ID, Lab Request ID
@@ -174,9 +174,15 @@ class LabRequestController extends Controller
             });
 
         // Context for DoctorVisit itself (shift or date range)
+        // $query->where('doctorvisits.shift_id', $request->shift_id);
+
+
+        if ($request->filled('shift_id')) {
             $query->where('doctorvisits.shift_id', $request->shift_id);
-        
-      
+        } else {
+            $max_shift_id = Shift::max('id');
+            $query->where('doctorvisits.shift_id', $max_shift_id);
+        }
 
 
         // Filter by Main Test
@@ -208,9 +214,9 @@ class LabRequestController extends Controller
         // Filter by Result Status (this is complex for a visit with multiple lab requests)
 // You might need an aggregated status on the visit or a more complex subquery.
 // Simple example: Show visit if *any* lab request matches the status.
-       
 
-       
+
+
         // Eager load data needed for PatientLabQueueItemResource after filtering
         // This uses the hypothetical 'patientLabRequests' relation on DoctorVisit model.
         // If it doesn't exist, we have to construct this data manually or adjust the resource.
@@ -333,13 +339,13 @@ class LabRequestController extends Controller
             ->whereHas('patientLabRequests.results', function ($resultsQuery) {
                 // Ensure there are results
                 $resultsQuery->whereNotNull('result')
-                           ->where('result', '!=', '');
+                    ->where('result', '!=', '');
             })
             ->whereDoesntHave('patientLabRequests.results', function ($resultsQuery) {
                 // Ensure no pending results (empty or null)
                 $resultsQuery->where(function ($q) {
                     $q->whereNull('result')
-                      ->orWhere('result', '=', '');
+                        ->orWhere('result', '=', '');
                 });
             });
 
@@ -379,8 +385,8 @@ class LabRequestController extends Controller
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('patients.name', 'like', "%{$searchTerm}%")
-                  ->orWhere('patients.phone', 'like', "%{$searchTerm}%")
-                  ->orWhere('doctorvisits.id', 'like', "%{$searchTerm}%");
+                    ->orWhere('patients.phone', 'like', "%{$searchTerm}%")
+                    ->orWhere('doctorvisits.id', 'like', "%{$searchTerm}%");
             });
         }
 
@@ -435,7 +441,7 @@ class LabRequestController extends Controller
                 'doctorvisits.created_at as visit_creation_time',
                 'doctorvisits.visit_date',
                 'patients.id as patient_id',
-                    'patients.name as patient_name',
+                'patients.name as patient_name',
                 'doctorvisits.id as id'
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
@@ -455,7 +461,7 @@ class LabRequestController extends Controller
                 // Ensure there are some pending results (empty or null)
                 $resultsQuery->where(function ($q) {
                     $q->whereNull('result')
-                      ->orWhere('result', '=', '');
+                        ->orWhere('result', '=', '');
                 });
             });
 
@@ -495,8 +501,8 @@ class LabRequestController extends Controller
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('patients.name', 'like', "%{$searchTerm}%")
-                  ->orWhere('patients.phone', 'like', "%{$searchTerm}%")
-                  ->orWhere('doctorvisits.id', 'like', "%{$searchTerm}%");
+                    ->orWhere('patients.phone', 'like', "%{$searchTerm}%")
+                    ->orWhere('doctorvisits.id', 'like', "%{$searchTerm}%");
             });
         }
 
@@ -524,7 +530,7 @@ class LabRequestController extends Controller
         return PatientLabQueueItemResource::collection($unfinishedVisits);
     }
 
- /**
+    /**
      * Get the queue of patients registered through the lab for a specific shift or day.
      * This method shows ALL lab-specific visits, even those without tests added yet.
      */
@@ -549,44 +555,44 @@ class LabRequestController extends Controller
                 'doctorvisits.id as id'
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id');
-            // ->where('doctorvisits.only_lab', true); // ** THE KEY FILTER **
-            if ($request->filled('isBankak')) {
-                // $q_lab->where('is_bankak', $request->boolean('is_bankak'));
-                $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
-                    $q_lr->where('is_bankak', $request->boolean('isBankak'));
-                });
-            }
+        // ->where('doctorvisits.only_lab', true); // ** THE KEY FILTER **
+        if ($request->filled('isBankak')) {
+            // $q_lab->where('is_bankak', $request->boolean('is_bankak'));
+            $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
+                $q_lr->where('is_bankak', $request->boolean('isBankak'));
+            });
+        }
         // Prioritize shift_id if provided
         if ($request->filled('shift_id')) {
             $query->where('doctorvisits.shift_id', $request->shift_id);
-        } 
-  // NEW Filter for referring doctor
-    $query->where('patients.user_id', Auth::id());
-    // --- APPLY FILTERS ON RELATED TABLES ---
-    if ($request->filled('company_id')) {
-        $query->where('patients.company_id', $request->company_id);
-    }
+        }
+        // NEW Filter for referring doctor
+        $query->where('patients.user_id', Auth::id());
+        // --- APPLY FILTERS ON RELATED TABLES ---
+        if ($request->filled('company_id')) {
+            $query->where('patients.company_id', $request->company_id);
+        }
 
-    if ($request->filled('doctor_id')) {
-        $query->where('patients.doctor_id', $request->doctor_id);
-    }
-    
-    if ($request->filled('specialist_id')) {
-        $query->whereHas('doctor.specialist', function($q_spec) use ($request) {
-            $q_spec->where('id', $request->specialist_id);
-        });
-    }
+        if ($request->filled('doctor_id')) {
+            $query->where('patients.doctor_id', $request->doctor_id);
+        }
+
+        if ($request->filled('specialist_id')) {
+            $query->whereHas('doctor.specialist', function ($q_spec) use ($request) {
+                $q_spec->where('id', $request->specialist_id);
+            });
+        }
 
         // Apply search filter
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q_search) use ($searchTerm) {
                 $q_search->where('patients.name', 'LIKE', "%{$searchTerm}%")
-                         ->orWhere('patients.id', $searchTerm)
-                         ->orWhere('doctorvisits.id', $searchTerm);
+                    ->orWhere('patients.id', $searchTerm)
+                    ->orWhere('doctorvisits.id', $searchTerm);
             });
         }
-        
+
         // Eager load details needed for the PatientLabQueueItemResource
         $query->withCount(['patientLabRequests as test_count']) // Count all lab requests
             // ->withMin('patientLabRequests', 'labrequests.created_at', 'oldest_request_time') // Get time of first request
@@ -598,9 +604,9 @@ class LabRequestController extends Controller
         //     'bindings' => $query->getBindings(),
         //     'filters' => $request->all()
         // ]);
-        
+
         $pendingVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
-    
+
         return PatientLabQueueItemResource::collection($pendingVisits);
     }
 
@@ -625,27 +631,27 @@ class LabRequestController extends Controller
         try {
             // Get the patient information
             $patient = $visit->patient;
-            
+
             // Get container information
             $container = \App\Models\Container::find($containerId);
             if (!$container) {
                 return response()->json(['message' => 'Container not found'], 404);
             }
-            
+
             // Create barcode data (visit ID + container ID)
             $barcodeData = $visit->id . '-' . $containerId;
-            
+
             // Generate PDF with barcode
             $pdf = new \App\Mypdf\Pdf();
             $pdf->AddPage();
             $pdf->SetFont('Arial', 'B', 16);
-            
+
             // Add patient information
             $pdf->Cell(0, 10, 'Patient: ' . $patient->name, 0, 1, 'C');
             $pdf->Cell(0, 10, 'Visit ID: ' . $visit->id, 0, 1, 'C');
             $pdf->Cell(0, 10, 'Container: ' . $container->container_name, 0, 1, 'C');
             $pdf->Ln(10);
-            
+
             // Add barcode
             $pdf->write1DBarcode($barcodeData, 'C128', 50, 50, 100, 20, 0.4, [
                 'position' => 'C',
@@ -658,19 +664,19 @@ class LabRequestController extends Controller
                 'fontsize' => 8,
                 'stretchtext' => 4
             ]);
-            
+
             // Add barcode text
             $pdf->SetXY(50, 75);
             $pdf->SetFont('Arial', '', 10);
             $pdf->Cell(100, 10, $barcodeData, 0, 0, 'C');
-            
+
             $filename = 'container_barcode_' . $visit->id . '_' . $containerId . '.pdf';
-            
+
             return response($pdf->Output('S'), 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . $filename . '"'
             ]);
-            
+
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Error generating container barcode: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to generate barcode'], 500);
@@ -759,7 +765,7 @@ class LabRequestController extends Controller
                 $labrequest->user_deposited = $userId;
                 $labrequest->is_paid = true;
 
-            
+
                 $labrequest->save();
                 $paidRequestsCount++;
                 $remainingPaymentToDistribute -= $netPayableByPatient;
@@ -876,7 +882,8 @@ class LabRequestController extends Controller
         ]);
 
         $patient = $visit->patient()->firstOrFail();
-        if($patient->result_auth) return response()->json(['message' => 'لا يمكن اضافه فحص بعد التحقيق.'], 400);
+        if ($patient->result_auth)
+            return response()->json(['message' => 'لا يمكن اضافه فحص بعد التحقيق.'], 400);
         $company = $patient->company_id ? Company::find($patient->company_id) : null;
 
         $createdLabRequests = []; // To hold the LabRequest models created
@@ -885,7 +892,7 @@ class LabRequestController extends Controller
             $overridePrices = collect($request->input('override_prices', []))
                 ->mapWithKeys(function ($value, $key) {
                     // Ensure keys are integers (main_test_id) and values are numeric
-                    return [(int)$key => (float)$value];
+                    return [(int) $key => (float) $value];
                 });
             foreach ($validated['main_test_ids'] as $mainTestId) {
                 $mainTest = MainTest::with('childTests.unit')->find($mainTestId); // Eager load child tests and their units
@@ -897,13 +904,13 @@ class LabRequestController extends Controller
                     // Handle or log duplicate, for now skipping
                     continue;
                 }
-                if($mainTest->available == false){
+                if ($mainTest->available == false) {
                     return response()->json(['message' => 'الفحص غير متوفر.'], 400);
                 }
 
                 // Prefer override price if provided (e.g., from an Offer's per-test price)
-                $price = $overridePrices->has((int)$mainTestId)
-                    ? (float)$overridePrices->get((int)$mainTestId)
+                $price = $overridePrices->has((int) $mainTestId)
+                    ? (float) $overridePrices->get((int) $mainTestId)
                     : $mainTest->price;
                 $endurance = 0;
                 $approve = true; // Default approval
@@ -912,42 +919,47 @@ class LabRequestController extends Controller
                     $contract = $company->contractedMainTests()
                         ->where('main_tests.id', $mainTestId)
                         ->first();
-                        if(!$contract) return response()->json(['message' => 'الفحص غير موجود في العقد الموقع مع الشركة.'], 400);
-                        if(!$contract->pivot->status ){
-                            return response()->json(['message' => 'الفحص غير مفعل في العقد الموقع مع الشركة.'], 400);
-                        }
+                    if (!$contract)
+                        return response()->json(['message' => 'الفحص غير موجود في العقد الموقع مع الشركة.'], 400);
+                    if (!$contract->pivot->status) {
+                        return response()->json(['message' => 'الفحص غير مفعل في العقد الموقع مع الشركة.'], 400);
+                    }
                     if ($contract && $contract->pivot->status) {
                         $price = $contract->pivot->price;
                         $approve = $contract->pivot->approve;
+                   
                         if ($contract->pivot->use_static) {
                             $endurance = $contract->pivot->endurance_static;
                         } else {
-                            if($contract->pivot->endurance_percentage > 0 ) {
-                                    //log here
-                                    Log::info('endurance_percentage: ' . $contract->pivot->endurance_percentage);
-                                    //log the contract
-                                    Log::info('contract: ' . $contract);
+                            if ($contract->pivot->endurance_percentage > 0) {
+                                // return response()->json(['message' => 'العلاقة غير موجودة في الشركة.'], 400);
+
+                                //log here
+                                //log the contract
                                 $amount_company_will_endure = ($price * $contract->pivot->endurance_percentage) / 100;
                                 $endurance = $price - $amount_company_will_endure;
-                            } else{
-                                 if($patient->relation != null){
-                                $amount_company_will_endure = ($price * $patient->relation->lab_endurance) / 100;
-                                $endurance = $price - $amount_company_will_endure;
-                            }else{
-                                if($patient->subcompany_id != null){
-                                    $amount_company_will_endure = ($price * $patient->subcompany->lab_endurance) / 100;
-                                    $endurance = $price - $amount_company_will_endure;
-                                }else{
-                                    Log::info('patient->company: ' . $patient->company);
-                                    Log::info('patient->company->lab_endurance: ' . $patient->company->lab_endurance);
-                                    $amount_company_will_endure = ($price * $patient->company->lab_endurance) / 100;
-                                    $endurance = $price - $amount_company_will_endure;
-                                }
+                            } else {
+                                $patient->load('companyRelation');
+                     
+                                if ($patient->companyRelation != null) {
+                                    // return response()->json(['message' => $patient->companyRelation], 400);
 
+                                    $amount_company_will_endure = ($price * $patient->companyRelation->lab_endurance) / 100;
+                                    $endurance = $price - $amount_company_will_endure;
+                                } else {
+                                    if ($patient->subcompany_id != null) {
+                                        $amount_company_will_endure = ($price * $patient->subcompany->lab_endurance) / 100;
+                                        $endurance = $price - $amount_company_will_endure;
+                                    } else {
+
+                                        $amount_company_will_endure = ($price * $patient->company->lab_endurance) / 100;
+                                        $endurance = $price - $amount_company_will_endure;
+                                    }
+
+                                }
                             }
-                            } 
-                              
-                            
+
+
                         }
                     }
                 }
@@ -1103,7 +1115,7 @@ class LabRequestController extends Controller
     public function saveSingleResult(Request $request, RequestedResult $requestedResult)
     {
         // ... (Authorization checks) ...
-      
+
         // Get the result value, ensuring empty strings are preserved (not converted to null)
         // The database column 'result' cannot be null, so we ensure we always have a string value
         $result = $request->input('result', '');
@@ -1111,7 +1123,7 @@ class LabRequestController extends Controller
         if ($result === null) {
             $result = '';
         }
-        
+
         $requestedResult->update([
             'result' => $result,
         ]);
@@ -1324,7 +1336,7 @@ class LabRequestController extends Controller
     {
         // ... (logic for cancellation/deletion with checks) ...
         //start transaction
-        DB::beginTransaction(); 
+        DB::beginTransaction();
         try {
             $deleted = $labrequest->delete();
             if ($deleted) {
@@ -1373,7 +1385,7 @@ class LabRequestController extends Controller
         try {
             foreach ($unpaidRequests as $labrequest) {
                 // Calculate net payable for this item
-          
+
                 $doctorvisitResource = new DoctorVisitResource($visit);
                 $labCalculation = $doctorvisitResource->calculateLabRequestFinancials($labrequest, $visit->patient->company_id ? true : false);
                 $netPayableByPatient = $labCalculation['net_payable'];
@@ -1471,9 +1483,9 @@ class LabRequestController extends Controller
             // Add fixed discount if applicable: + (float)($labrequest->fixed_discount_amount ?? 0);
             $enduranceAmount = (float) ($labrequest->endurance ?? 0);
 
-            if($labrequest->patient->company_id){
-                $netPayableByPatient = $enduranceAmount ;
-            }else{
+            if ($labrequest->patient->company_id) {
+                $netPayableByPatient = $enduranceAmount;
+            } else {
                 $netPayableByPatient = $itemSubTotal - $discountAmount - $enduranceAmount;
             }
 
@@ -1628,7 +1640,7 @@ class LabRequestController extends Controller
     public function getCommentSuggestions()
     {
         $suggestions = \App\Models\LabCommentSuggestion::getPopularSuggestions(50);
-        
+
         return response()->json([
             'data' => $suggestions
         ]);
@@ -1705,7 +1717,7 @@ class LabRequestController extends Controller
                 'sensitive' => $validated['sensitive'] ?? null,
                 'resistant' => $validated['resistant'] ?? null,
             ];
-            
+
             // Convert empty strings to null
             if ($createData['sensitive'] === '') {
                 $createData['sensitive'] = null;
@@ -1713,7 +1725,7 @@ class LabRequestController extends Controller
             if ($createData['resistant'] === '') {
                 $createData['resistant'] = null;
             }
-            
+
             $organism = $labrequest->requestedOrganisms()->create($createData);
 
             // Save organism suggestion for future autocomplete
@@ -1726,7 +1738,7 @@ class LabRequestController extends Controller
 
             // Return the updated lab request with organisms
             $labrequest->load('requestedOrganisms');
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'تم إضافة الكائن الحي بنجاح',
@@ -1753,7 +1765,7 @@ class LabRequestController extends Controller
     {
         try {
             $organisms = $labrequest->requestedOrganisms()->get();
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $organisms
@@ -1788,7 +1800,7 @@ class LabRequestController extends Controller
             if (isset($updateData['resistant']) && $updateData['resistant'] === '') {
                 $updateData['resistant'] = null;
             }
-            
+
             $organism->update($updateData);
 
             // Save organism suggestion for future autocomplete
@@ -1798,7 +1810,7 @@ class LabRequestController extends Controller
                 // Don't fail the main operation if suggestion save fails
                 \Log::warning('Failed to save organism suggestion: ' . $e->getMessage());
             }
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'تم تحديث الكائن الحي بنجاح',
@@ -1821,7 +1833,7 @@ class LabRequestController extends Controller
     {
         try {
             $organism->delete();
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'تم حذف الكائن الحي بنجاح'

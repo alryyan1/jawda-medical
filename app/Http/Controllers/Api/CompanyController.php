@@ -166,7 +166,7 @@ class CompanyController extends Controller
     public function indexList()
     {
         // For dropdowns, usually only active companies
-        $companies = Company::where('status', true)->orderBy('name')->get(['id', 'name']);
+        $companies = Company::where('status', true)->where('name', '!=', '')->orderBy('name')->get(['id', 'name']);
         // Using CompanyResource for consistency, but could return raw array for performance
         return CompanyResource::collection($companies);
     }

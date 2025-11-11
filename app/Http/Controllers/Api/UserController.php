@@ -115,7 +115,7 @@ class UserController extends Controller
     {
         // Validate per_page if you want to restrict its range
         $request->validate([
-            'per_page' => 'nullable|integer|min:5|max:200', // Example range
+            'per_page' => 'nullable|integer', // Example range
             'search' => 'nullable|string|max:255', // Optional search term
             'role' => 'nullable|string|max:255', // Optional filter by role name
             'user_type' => 'nullable|string|max:255', // Optional filter by user_type
