@@ -211,9 +211,9 @@ class Patient extends Model
             if (empty($patient->visit_number)) {
                 $patient->visit_number = 1; // Or calculate next visit number
             }
-            if (empty($patient->auth_date) && $patient->result_auth === false) { // Default auth_date if not set
-                $patient->auth_date = Carbon::now();
-            }
+            // if (empty($patient->auth_date) && $patient->result_auth === false) { // Default auth_date if not set
+            //     $patient->auth_date = Carbon::now();
+            // }
             // You can set other defaults for the many NOT NULL string fields here if needed
             // e.g., $patient->history_of_present_illness = $patient->history_of_present_illness ?? '';
         });

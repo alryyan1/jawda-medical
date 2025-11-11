@@ -81,6 +81,8 @@ class DoctorVisitResource extends JsonResource
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'company_relation' => $this->patient?->companyRelation,
+            'result_auth' => $this->patient?->result_auth,
+            'auth_date' => $this->patient?->auth_date,
 
         ];
     }

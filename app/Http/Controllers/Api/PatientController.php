@@ -196,6 +196,7 @@ class PatientController extends Controller
                 'result_auth' => false,
                 'referred' => 'no',
                 'discount_comment' => '',
+                'auth_date' => null,
             ]));
 
             // 3. Create the DoctorVisit record linked to this new Patient record and new File
