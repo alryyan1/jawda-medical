@@ -77,7 +77,7 @@ class ThermalServiceReceiptReport extends TCPDF
         
         // Check if single unpaid service - use different format
         $isSingleUnpaidService = count($this->requestedServicesToPrint) === 1 
-            && (($this->requestedServicesToPrint[0]['amount_paid'] ?? 0) == 0 
+            && (($this->requestedServicesToPrint[0]['amount_paid'] ?? 0) == 0 &&$this->requestedServicesToPrint[0]['endurance'] !=0
                 // || ($this->requestedServicesToPrint[0]['is_paid'] ?? false) == false);
                 );
         
