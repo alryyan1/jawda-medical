@@ -102,10 +102,13 @@ class RequestedServiceDepositController extends Controller
             ]);
 
             // Update amount_paid on RequestedService
-            $requestedService->amount_paid = (float) $requestedService->amount_paid + $paymentAmount;
+            // Use getRawOriginal to get the actual DB value, not the accessor that sums deposits
+            $currentAmountPaid = (float) $requestedService->getRawOriginal('amount_paid') ?? 0;
+            $newAmountPaid = $currentAmountPaid + $paymentAmount;
+            $requestedService->amount_paid = $newAmountPaid;
 
             // Recalculate balance with the new payment for accuracy
-            $newBalance = $netPayable - (float) $requestedService->amount_paid;
+            $newBalance = $netPayable - $newAmountPaid;
             if ($newBalance <= 0.009) {
                 $requestedService->is_paid = true;
                 $requestedService->user_deposited = Auth::id();
@@ -171,7 +174,9 @@ class RequestedServiceDepositController extends Controller
             $netPayable -= (float) $requestedService->endurance;
         }
 
-        $newTotalPaidOnService = (float) $requestedService->amount_paid + $diff;
+        // Use getRawOriginal to get the actual DB value, not the accessor that sums deposits
+        $currentAmountPaid = (float) $requestedService->getRawOriginal('amount_paid') ?? 0;
+        $newTotalPaidOnService = $currentAmountPaid + $diff;
 
         if ($newTotalPaidOnService > ($netPayable + 0.009)) {
             return response()->json(['message' => 'التعديل سيؤدي إلى تجاوز المبلغ المستحق للخدمة.'], 422);
@@ -216,7 +221,9 @@ class RequestedServiceDepositController extends Controller
 
         DB::beginTransaction();
         try {
-            $requestedService->amount_paid = (float) $requestedService->amount_paid - $amountBeingReversed;
+            // Use getRawOriginal to get the actual DB value, not the accessor that sums deposits
+            $currentAmountPaid = (float) $requestedService->getRawOriginal('amount_paid') ?? 0;
+            $requestedService->amount_paid = $currentAmountPaid - $amountBeingReversed;
 
             // Recalculate is_paid status
             $pricePerItem = (float) $requestedService->price;

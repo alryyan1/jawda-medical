@@ -264,7 +264,7 @@ class VisitServiceController extends Controller
         DB::beginTransaction();
         try {
             if($requestedService->deposits()->count() > 0){
-                return response()->json(['message' => 'لا يمكنك حذف الخدمة لأنها مدفوعة.'], 403);
+                // return response()->json(['message' => 'لا يمكنك حذف الخدمة لأنها مدفوعة.'], 403);
             }
             $requestedService->costBreakdown()->delete(); // Delete associated cost breakdown entries
             $requestedService->deposits()->delete(); // Delete associated deposits entries

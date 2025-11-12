@@ -40,7 +40,7 @@ class ThermalServiceReceiptReport extends TCPDF
         $this->setThermalDefaults($thermalWidth);
         
         // Set custom margins
-        $this->SetMargins(5, 20, 5); // Left, Top, Right margins
+        $this->SetMargins(5, 0, 5); // Left, Top, Right margins
         
         // Set font and alignment properties
         $this->fontName = 'ae_alhor'; // Use the converted Arabic font
@@ -78,7 +78,8 @@ class ThermalServiceReceiptReport extends TCPDF
         // Check if single unpaid service - use different format
         $isSingleUnpaidService = count($this->requestedServicesToPrint) === 1 
             && (($this->requestedServicesToPrint[0]['amount_paid'] ?? 0) == 0 
-                || ($this->requestedServicesToPrint[0]['is_paid'] ?? false) == false);
+                // || ($this->requestedServicesToPrint[0]['is_paid'] ?? false) == false);
+                );
         
         if ($isSingleUnpaidService) {
             $this->generateUnpaidReceiptFormat();

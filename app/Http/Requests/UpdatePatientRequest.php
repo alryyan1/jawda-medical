@@ -29,6 +29,7 @@ class UpdatePatientRequest extends FormRequest
             'company_id' => 'nullable|integer|exists:companies,id',
             'subcompany_id' => 'nullable|integer|exists:subcompanies,id',
             'company_relation_id' => 'nullable|integer|exists:company_relations,id',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
             'paper_fees' => 'nullable|integer|min:0',
             'guarantor' => 'nullable|string|max:255',
             'expire_date' => 'nullable|date_format:Y-m-d',

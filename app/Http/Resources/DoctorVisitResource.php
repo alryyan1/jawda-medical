@@ -83,6 +83,7 @@ class DoctorVisitResource extends JsonResource
             'company_relation' => $this->patient?->companyRelation,
             'result_auth' => $this->patient?->result_auth,
             'auth_date' => $this->patient?->auth_date,
+            // 'doctor_in_patient' => $this->patient?->doctor->name,
 
         ];
     }

@@ -1724,7 +1724,7 @@ class PatientController extends Controller
             // Create the patient record
             $patient = Patient::create([
                 'name' => $validated['name'],
-                'phone' => $validated['phone'],
+                'phone' => $validated['phone'] ?? 0,
                 'company_id' => $company->id,
                 'gender' => 'male', // Default gender, could be made configurable
                 'age_year' => 0, // Default age, could be made configurable
