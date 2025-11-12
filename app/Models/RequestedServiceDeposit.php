@@ -36,8 +36,12 @@ class RequestedServiceDeposit extends Model
 {
     use HasFactory;
     protected $fillable = [
-        'requested_service_id', 'amount', 'user_id', 
-        'is_bank', 'is_claimed', 'shift_id'
+        'requested_service_id',
+        'amount',
+        'user_id',
+        'is_bank',
+        'is_claimed',
+        'shift_id'
     ];
     protected $casts = [
         'amount' => 'decimal:2',
@@ -45,7 +49,16 @@ class RequestedServiceDeposit extends Model
         'is_claimed' => 'boolean',
     ];
 
-    public function requestedService() { return $this->belongsTo(RequestedService::class); }
-    public function user() { return $this->belongsTo(User::class); } // User who processed payment
-    public function shift() { return $this->belongsTo(Shift::class); } // Shift of payment
+    public function requestedService()
+    {
+        return $this->belongsTo(RequestedService::class, 'requested_service_id', 'id');
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    } // User who processed payment
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class);
+    } // Shift of payment
 }

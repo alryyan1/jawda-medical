@@ -33,7 +33,8 @@ class RequestedServiceDepositController extends Controller
         // $this->authorize('view', $requestedService); 
 
         $deposits = $requestedService->deposits() // Assuming 'deposits' is the relationship name
-            ->with('user:id,name') // Eager load user who made the deposit
+            ->with(['user:id,name', 'requestedService']) // Eager load user who made the deposit
+            // ->with('requestedService') // Eager load requestedService
             ->orderBy('created_at', 'desc') // Show newest first
             ->get();
 

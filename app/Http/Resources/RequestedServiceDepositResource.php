@@ -11,6 +11,7 @@ class RequestedServiceDepositResource extends JsonResource {
             'shift_id' => $this->shift_id,
             'user_id' => $this->user_id,
             'user' => new UserStrippedResource($this->whenLoaded('user')),
+            'requested_service' => new RequestedServiceResource($this->whenLoaded('requestedService')),
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
