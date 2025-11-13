@@ -7,6 +7,7 @@ use App\Models\Service;
 use App\Models\Setting;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use TCPDF;
 
 class ThermalServiceReceiptReport extends TCPDF
@@ -75,11 +76,59 @@ class ThermalServiceReceiptReport extends TCPDF
     {
         $this->AddPage();
         
+        // Log::info('ThermalServiceReceiptReport generate', ['requestedServicesToPrint' => $this->requestedServicesToPrint, 'company_id' => $this->visit->patient]);
+        
         // Check if single unpaid service - use different format
-        $isSingleUnpaidService = count($this->requestedServicesToPrint) === 1 
-            && (($this->requestedServicesToPrint[0]['amount_paid'] ?? 0) == 0 &&$this->requestedServicesToPrint[0]['endurance'] !=0
-                // || ($this->requestedServicesToPrint[0]['is_paid'] ?? false) == false);
-                );
+        // Log each condition result
+        $condition1_count = count($this->requestedServicesToPrint);
+        $condition1_result = $condition1_count === 1;
+        Log::info('Condition 1: Single service check', [
+            'count' => $condition1_count,
+            'result' => $condition1_result
+        ]);
+        
+        $firstService = $this->requestedServicesToPrint[0] ?? null;
+        $condition2_amountPaid = $firstService ? ($firstService['amount_paid'] ?? 0) : null;
+        $condition2_result = $condition2_amountPaid == 0;
+        Log::info('Condition 2: Amount paid check', [
+            'amount_paid' => $condition2_amountPaid,
+            'result' => $condition2_result
+        ]);
+        
+        $condition3_endurance = $firstService ? ($firstService['endurance'] ?? null) : null;
+        $condition3_result = $condition3_endurance != 0;
+        Log::info('Condition 3: Endurance check', [
+            'endurance' => $condition3_endurance,
+            'result' => $condition3_result
+        ]);
+        
+        $condition4_companyId = $this->visit->patient->company_id ?? null;
+        $condition4_result = $condition4_companyId != null;
+        Log::info('Condition 4: Company ID check', [
+            'company_id' => $condition4_companyId,
+            'result' => $condition4_result
+        ]);
+        
+        $isSingleUnpaidService = $condition1_result 
+            && ($condition2_result && $condition3_result && $condition4_result);
+            if($this->visit->patient->company_id == null){
+                $isSingleUnpaidService = $condition1_result && $condition2_result;
+                Log::info('Company ID is not null', ['isSingleUnpaidService' => $isSingleUnpaidService]);
+             
+            }else{
+                $isSingleUnpaidService = $condition1_result 
+                && ($condition2_result && $condition3_result );
+            }
+        
+        Log::info('Final condition result', [
+            'isSingleUnpaidService' => $isSingleUnpaidService,
+            'all_conditions' => [
+                'condition1_single_service' => $condition1_result,
+                'condition2_amount_paid_zero' => $condition2_result,
+                'condition3_endurance_not_zero' => $condition3_result,
+                'condition4_has_company_id' => $condition4_result,
+            ]
+        ]);
         
         if ($isSingleUnpaidService) {
             $this->generateUnpaidReceiptFormat();
@@ -200,7 +249,13 @@ class ThermalServiceReceiptReport extends TCPDF
         // Display amount due, centered
         $this->Ln(2);
         $this->SetFont($this->fontName, 'B', 14);
-        $this->Cell(0, $this->lineHeight + 2, number_format($amountDue, 2), 0, 1, $this->alignCenter);
+        if($this->visit->patient->company_id != null){
+            $this->Cell(0, $this->lineHeight + 2, number_format($rs['endurance'], 2), 0, 1, $this->alignCenter);
+
+        }else{
+            $this->Cell(0, $this->lineHeight + 2, number_format($amountDue, 2), 0, 1, $this->alignCenter);
+
+        }
     }
 
     protected function generateHeader(): void

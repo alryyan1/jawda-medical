@@ -32,12 +32,14 @@ use App\Zebra;
 use App\Models\RequestedResult;
 use App\Models\Service;
 use App\Models\Company;
+use App\Services\RequestedServiceHelper;
 use Illuminate\Support\Facades\Http as HttpClient;
 use App\Jobs\EmitPatientRegisteredJob;
 use App\Jobs\SendWelcomeSmsJob;
 use App\Models\Setting;
 use App\Services\UltramsgService;
 use App\Jobs\SendAuthWhatsappMessage;
+use App\Models\CompanyService;
 use App\Models\Mindray;
 
 class PatientController extends Controller
@@ -224,89 +226,17 @@ class PatientController extends Controller
 
             if ($fav && $fav->fav_service) {
                 $service = Service::with('serviceCosts.subServiceCost')->find($fav->fav_service);
-                if ($service) {
-                    $company = $patient->company_id ? Company::find($patient->company_id) : null;
-
-                    $price = (float) $service->price;
-                    $companyEnduranceAmount = 0;
-                    $contractApproval = true;
-
-                    if ($company) {
-                        $contract = $company->contractedServices()
-                            ->where('services.id', $service->id)
-                            ->first();
-
-                        if ($contract && $contract->pivot) {
-                            $pivot = $contract->pivot;
-                            $price = (float) $pivot->price;
-                            $contractApproval = (bool) $pivot->approval;
-                            if ($pivot->use_static) {
-                                $companyEnduranceAmount = (float) $pivot->static_endurance;
-                            } else {
-                                if ($pivot->percentage_endurance > 0) {
-                                    $companyServiceEndurance = ($price * (float) ($pivot->percentage_endurance ?? 0)) / 100;
-                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
-                                } else {
-                                    $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
-                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
-                                }
-                            }
-                        }
-                    }
-
-                    $requestedService = RequestedService::create([
-                        'doctorvisits_id' => $doctorVisit->id,
-                        'service_id' => $service->id,
-                        'user_id' => $userId,
-                        'doctor_id' => $patient->doctor_id,
-                        'price' => $price,
-                        'amount_paid' => 0,
-                        'endurance' => $companyEnduranceAmount,
-                        'is_paid' => false,
-                        'discount' => 0,
-                        'discount_per' => 0,
-                        'bank' => false,
-                        'count' => 1,
-                        'approval' => $contractApproval,
-                        'done' => false,
-                    ]);
-
-                    // Auto-create RequestedServiceCost breakdowns similar to manual add
-                    if ($service->serviceCosts->isNotEmpty()) {
-                        $costEntriesData = [];
-                        $baseAmountForCostCalc = $price * 1; // count is 1
-
-                        foreach ($service->serviceCosts as $serviceCostDefinition) {
-                            $calculatedCostAmount = 0;
-                            $currentBase = $baseAmountForCostCalc;
-
-                            if ($serviceCostDefinition->cost_type === 'after cost') {
-                                $alreadyCalculatedCostsSum = collect($costEntriesData)->sum('amount');
-                                $currentBase = $baseAmountForCostCalc - $alreadyCalculatedCostsSum;
-                            }
-
-                            if ($serviceCostDefinition->fixed !== null && $serviceCostDefinition->fixed > 0) {
-                                $calculatedCostAmount = (float) $serviceCostDefinition->fixed;
-                            } elseif ($serviceCostDefinition->percentage !== null && $serviceCostDefinition->percentage > 0) {
-                                $calculatedCostAmount = ($currentBase * (float) $serviceCostDefinition->percentage) / 100;
-                            }
-
-                            if ($calculatedCostAmount > 0) {
-                                $costEntriesData[] = [
-                                    'requested_service_id' => $requestedService->id,
-                                    'sub_service_cost_id' => $serviceCostDefinition->sub_service_cost_id,
-                                    'service_cost_id' => $serviceCostDefinition->id,
-                                    'amount' => round($calculatedCostAmount, 2),
-                                    'created_at' => now(),
-                                    'updated_at' => now(),
-                                ];
-                            }
-                        }
-                        if (!empty($costEntriesData)) {
-                            RequestedServiceCost::insert($costEntriesData);
-                        }
-                    }
-                }
+                // $company_service = CompanyService::where('company_id', $patient->company_id)->where('service_id', $fav->fav_service)->first();
+                // Log::info('company_service', ['company_service' => $company_service]);
+                // if ($company_service && $company_service?->price != 0) {
+                    RequestedServiceHelper::createFromFavoriteService(
+                        $service,
+                        $doctorVisit,
+                        $patient,
+                        $userId,
+                        1 // count
+                    );
+                // }
             }
 
             DB::commit();
@@ -1060,6 +990,8 @@ class PatientController extends Controller
             'reason_for_visit' => 'nullable|string|max:1000',
         ]);
 
+
+        // return ['validated' => $validated['doctor_id']];
         // Check if shift is open before proceeding
         $shiftCheck = $this->checkShiftIsOpen();
         if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
@@ -1071,16 +1003,16 @@ class PatientController extends Controller
         }
         $user = Auth::user();
     
-        if(isset($validated['company_id']) && $validated['company_id'] != null){
-            if(!$user->can('تسجيل مريض تامين')){
-                return response()->json(['message' => 'المستخدم لا يمكنه تسجيل مريض تامين'], 400);
-            }
+        // if(isset($validated['company_id']) && $validated['company_id'] != null){
+        //     if(!$user->can('تسجيل مريض تامين')){
+        //         return response()->json(['message' => 'المستخدم لا يمكنه تسجيل مريض تامين'], 400);
+        //     }
 
-        }else{
-            if(!$user->can('تسجيل مريض كاش')){
-                return response()->json(['message' => 'المستخدم لا يمكنه تسجيل مريض كاش'], 400);
-            }
-        }
+        // }else{
+        //     if(!$user->can('تسجيل مريض كاش')){
+        //         return response()->json(['message' => 'المستخدم لا يمكنه تسجيل مريض كاش'], 400);
+        //     }
+        // }
       
         $currentGeneralShift = $shiftCheck;
         DB::beginTransaction();
