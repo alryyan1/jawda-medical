@@ -567,7 +567,6 @@ class LabRequestController extends Controller
             $query->where('doctorvisits.shift_id', $request->shift_id);
         }
         // NEW Filter for referring doctor
-        $query->where('patients.user_id', Auth::id());
         // --- APPLY FILTERS ON RELATED TABLES ---
         if ($request->filled('company_id')) {
             $query->where('patients.company_id', $request->company_id);
@@ -575,6 +574,9 @@ class LabRequestController extends Controller
 
         if ($request->filled('doctor_id')) {
             $query->where('patients.doctor_id', $request->doctor_id);
+        }else{
+            $query->where('patients.user_id', Auth::id());
+
         }
 
         if ($request->filled('specialist_id')) {

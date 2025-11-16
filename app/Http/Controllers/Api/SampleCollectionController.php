@@ -195,6 +195,7 @@ class SampleCollectionController extends Controller
 
         $patient->sample_collected = true;
         $patient->sample_collect_time = now();
+        $patient->sample_collected_by = Auth::id();
         $patient->save();
 
         return response()->json([

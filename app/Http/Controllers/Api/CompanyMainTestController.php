@@ -167,9 +167,9 @@ class CompanyMainTestController extends Controller
         }
 
         // Crucial Check: Target company must not have existing main test contracts
-        if ($targetCompany->contractedMainTests()->exists()) {
-            return response()->json(['message' => 'لا يمكن نسخ العقود. الشركة المستهدفة لديها عقود فحوصات موجودة بالفعل.'], 409); // 409 Conflict
-        }
+        // if ($targetCompany->contractedMainTests()->exists()) {
+        //     return response()->json(['message' => 'لا يمكن نسخ العقود. الشركة المستهدفة لديها عقود فحوصات موجودة بالفعل.'], 409); // 409 Conflict
+        // }
 
         $sourceContracts = $sourceCompany->contractedMainTests()->get();
 
@@ -177,24 +177,42 @@ class CompanyMainTestController extends Controller
             return response()->json(['message' => 'الشركة المصدر لا تحتوي على عقود فحوصات لنسخها.', 'copied_count' => 0], 404);
         }
 
+        // Get existing contract IDs in target company
+        $existingContractIds = $targetCompany->contractedMainTests()->pluck('main_tests.id')->toArray();
+
         $attachData = [];
+        $updateData = [];
         foreach ($sourceContracts as $sourceContractPivotedTest) {
             // $sourceContractPivotedTest is a MainTest model with ->pivot populated
             $pivotData = $sourceContractPivotedTest->pivot;
-            $attachData[$sourceContractPivotedTest->id] = [
+            $contractData = [
                 'status' => $pivotData->status,
                 'price' => $pivotData->price,
                 'approve' => $pivotData->approve,
                 'endurance_static' => $pivotData->endurance_static,
                 'endurance_percentage' => $pivotData->endurance_percentage,
                 'use_static' => $pivotData->use_static,
-                'created_at' => now(), // New timestamps for the new contract
                 'updated_at' => now(),
             ];
+
+            if (in_array($sourceContractPivotedTest->id, $existingContractIds)) {
+                // Contract exists, prepare for update
+                $updateData[$sourceContractPivotedTest->id] = $contractData;
+            } else {
+                // New contract, prepare for attach
+                $contractData['created_at'] = now(); // New timestamps for the new contract
+                $attachData[$sourceContractPivotedTest->id] = $contractData;
+            }
         }
 
         DB::beginTransaction();
         try {
+            // Update existing contracts
+            foreach ($updateData as $testId => $data) {
+                $targetCompany->contractedMainTests()->updateExistingPivot($testId, $data);
+            }
+            
+            // Attach new contracts
             if (!empty($attachData)) {
                 $targetCompany->contractedMainTests()->attach($attachData);
             }
@@ -205,9 +223,24 @@ class CompanyMainTestController extends Controller
             return response()->json(['message' => 'فشل نسخ عقود الفحوصات.', 'error' => $e->getMessage()], 500);
         }
 
+        $totalCount = count($attachData) + count($updateData);
+        $message = "تم ";
+        if (!empty($updateData)) {
+            $message .= "تحديث " . count($updateData) . " عقد فحص موجود ";
+        }
+        if (!empty($attachData)) {
+            if (!empty($updateData)) {
+                $message .= "و";
+            }
+            $message .= "إضافة " . count($attachData) . " عقد فحص جديد ";
+        }
+        $message .= "من {$sourceCompany->name} إلى {$targetCompany->name}.";
+
         return response()->json([
-            'message' => "تم نسخ " . count($attachData) . " عقد فحص بنجاح من {$sourceCompany->name} إلى {$targetCompany->name}.",
-            'copied_count' => count($attachData),
+            'message' => $message,
+            'copied_count' => $totalCount,
+            'updated_count' => count($updateData),
+            'added_count' => count($attachData),
         ]);
     }
 }

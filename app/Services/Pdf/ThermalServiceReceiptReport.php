@@ -5,6 +5,7 @@ namespace App\Services\Pdf;
 use App\Models\DoctorVisit;
 use App\Models\Service;
 use App\Models\Setting;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -291,9 +292,9 @@ class ThermalServiceReceiptReport extends TCPDF
             $this->MultiCell(0, $this->lineHeight - 0.5, "ر.ض: " . $this->appSettings->vatin, 0, $this->alignCenter, false, 1);
         }
 
-        $this->Ln(1);
-        $this->Cell(0, 0.1, '', 'T', 1, 'C');
-        $this->Ln(1);
+        // $this->Ln(1);
+        // $this->Cell(0, 0.1, '', 'T', 1, 'C');
+        // $this->Ln(1);
     }
 
     protected function generateReceiptInfo(): void
@@ -313,7 +314,7 @@ class ThermalServiceReceiptReport extends TCPDF
         $this->SetFont($this->fontName, '', 12);
         // $this->Cell(0, $this->lineHeight, 'الكاشير/ '.$this->cashierName, 0, 1, $this->alignStart);
         
-        $this->Ln(5);
+        // $this->Ln(5);
         
         // Visit number in the middle and date on the right
         $this->SetFont($this->fontName, 'B', 13);
@@ -334,6 +335,7 @@ class ThermalServiceReceiptReport extends TCPDF
         $this->SetFont($this->fontName, '', size: 7);
         // Position date on the right
         $this->Cell(0, $this->lineHeight, $date, 0, 1, 'L');
+        $this->Cell(0, 5, 'LAB NUMBER ' . ($this->visit->patient->visit_number ?? ''), 0, 1, 'L');
         
         $this->Ln(5);
 
@@ -372,13 +374,13 @@ class ThermalServiceReceiptReport extends TCPDF
 
     protected function generateBarcode(): void
     {
-        if ($this->appSettings?->barcode && !empty($this->requestedServicesToPrint[0]['id'])) {
+        // if ($this->appSettings?->barcode && !empty($this->requestedServicesToPrint[0]['id'])) {
             $barcodeValue = (string) $this->visit->id;
             $style = [
                 'position' => '',
                 'align' => 'C',
                 'stretch' => false,
-                'fitwidth' => true,
+                'fitwidth' => true, 
                 'cellfitalign' => '',
                 'border' => false,
                 'hpadding' => 'auto',
@@ -391,10 +393,10 @@ class ThermalServiceReceiptReport extends TCPDF
                 'stretchtext' => 4
             ];
             $this->write1DBarcode($barcodeValue, 'C128B', '50', '', '', (float)15, (float)0.3, $style, 'N');
-        }
+        // }
 
-        $this->Ln(5);
-        $this->Cell(0, 0.1, '', 'T', 1, 'C');
+        // $this->Ln(5);
+        // $this->Cell(0, 0.1, '', 'T', 1, 'C');
         $this->Ln(0.5);
     }
 
@@ -403,7 +405,7 @@ class ThermalServiceReceiptReport extends TCPDF
         // Title: "الخدمات المطلوبة"
         $this->SetFont($this->fontName, 'B', 15);
         $this->Cell(0, $this->lineHeight + 1, 'الخدمات المطلوبة', 0, 1, 'R');
-        $this->Ln(1);
+        // $this->Ln(1);
 
         // Collect all service names
         $serviceNames = [];
@@ -427,9 +429,9 @@ class ThermalServiceReceiptReport extends TCPDF
         $pageUsableWidth = $this->getPageWidth() - $this->getMargins()['right'];
         $this->MultiCell(0, $this->lineHeight, $allServicesText, 0, 'L', false, 1);
 
-        $this->Ln(2);
+        // $this->Ln(2);
         $this->Cell(0, 0.1, '', 'T', 1, 'C');
-        $this->Ln(5);
+        // $this->Ln(5);
     }
 
     protected function generateTotalsSection(): void
@@ -481,16 +483,27 @@ class ThermalServiceReceiptReport extends TCPDF
 
         $this->drawThermalTotalRow('المدفوع:', $totalActuallyPaidForTheseServices, $pageUsableWidth);
 
-        $this->Ln(5);
+        // $this->Ln(5);
     }
 
     protected function generateFooter(): void
     {
         $this->Ln(3);
-        $this->SetFont($this->fontName, 'I', 6);
-        $footerMessage = $this->appSettings?->receipt_footer_message ?: 'الكاشير: ' . $this->cashierName;
-        $this->MultiCell(0, $this->lineHeight - 1, $footerMessage, 0, $this->alignCenter, false, 1);
-        $this->Ln(3);
+        $condition1_count = count($this->requestedServicesToPrint);
+        $condition1_result = $condition1_count === 1;
+        if($condition1_result){
+            $user_requested = $this->requestedServicesToPrint[0]['user_id'];
+            $user_deposited = $this->requestedServicesToPrint[0]['user_deposited'];
+            $user = User::find($user_deposited);
+            $user_requested = User::find($user_requested);
+            $this->SetFont($this->fontName, 'I', 10);
+            $footerMessage = ' تحصل بواسطة: ' . $user->name;
+            $footerRequestedMessage = ' تم الطلب بواسطة: ' . $user_requested->name;
+            $this->MultiCell(0, $this->lineHeight - 1, $footerRequestedMessage, 0, 'L', false, 1);
+            $this->MultiCell(0, $this->lineHeight - 1, $footerMessage, 0, 'L', false, 1);
+            $this->Ln(3);
+        }
+  
     }
 
     protected function drawThermalTotalRow(string $label, float $amount, float $pageUsableWidth): void
