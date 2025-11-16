@@ -219,6 +219,7 @@ class RequestedServiceDepositController extends Controller
         // IMPORTANT: Adjusting the parent RequestedService's amount_paid is critical.
         $requestedService = $requestedServiceDeposit->requestedService;
         $amountBeingReversed = (float) $requestedServiceDeposit->amount;
+        
 
         DB::beginTransaction();
         try {

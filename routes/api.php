@@ -113,6 +113,7 @@ Route::get('/queue-worker/status', [\App\Http\Controllers\Api\QueueWorkerControl
 Route::post('/queue-worker/start', [\App\Http\Controllers\Api\QueueWorkerController::class, 'start']);
 Route::post('/queue-worker/stop', [\App\Http\Controllers\Api\QueueWorkerController::class, 'stop']);
 Route::post('/queue-worker/toggle', [\App\Http\Controllers\Api\QueueWorkerController::class, 'toggle']);
+Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
 
 Route::middleware('auth:sanctum')->group(function () {
   // SMS
@@ -304,7 +305,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/labrequests/{labrequest}/pay', [LabRequestController::class, 'recordPayment']);
   Route::post('/labrequests/{labrequest}/authorize', [LabRequestController::class, 'authorizeResults']);
 
-  Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
   Route::get('/lab/ready-for-print-queue', [LabRequestController::class, 'getLabReadyForPrintQueue']);
   Route::get('/lab/unfinished-results-queue', [LabRequestController::class, 'getLabUnfinishedResultsQueue']);
   Route::get('/lab/queue-item/{visitId}', [LabRequestController::class, 'getSinglePatientLabQueueItem']);

@@ -346,7 +346,7 @@ class DoctorShiftController extends Controller
             'visits.patient.company', // company_id for patient is enough for isCompany check
             'visits.requestedServices.service',
             'visits.patientLabRequests.mainTest',
-                 ]);
+                 ]) ->withCount('doctorVisits');
 
         // Filtering
         if ($request->filled('doctor_id')) {

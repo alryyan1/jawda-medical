@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
+use Illuminate\Support\Facades\Log;
 /**
  * 
  *
@@ -169,8 +169,8 @@ class Doctor extends Model
         //        $doctorvisit =  $doctorvisit->load(['services'=>function ($query) {
         //            return  $query->where('is_paid',1);
         //        }]);
-        $array_1 =                $this->specificServices()->pluck('service_id')->toArray();
-        $total =  0;
+        $array_1 = $this->specificServices()->pluck('service_id')->toArray();
+        $total = 0;
 
         // if ($only_company) {
         //     if ($doctorvisit->patient->company == null) return 0;
@@ -180,35 +180,43 @@ class Doctor extends Model
         // }
         foreach ($doctorvisit->requestedServices as $service) {
 
-            if ($service->doctor_id != $this->id) continue;
+            if ($service->doctor_id != $this->id)
+                continue;
             /**@var Setting $settings  */
             $settings = Setting::first();
             $disable_doctor_service_check = $settings->disable_doctor_service_check;
 
 
-            if (in_array($service->service->id, $array_1) || $settings->disable_doctor_service_check) {
+            if (in_array($service->service_id, $array_1) || $settings->disable_doctor_service_check) {
+
+
                 if ($doctorvisit->patient->company_id != null) {
                     //                    dd($service);                
                     $totalCost = $service->getTotalCostsForDoctor($this);
-                    $total_price  = ($service->price * $service->count);
+                    $total_price = ($service->price * $service->count);
                     $total_price -= $totalCost;
-                    $doctor_credit =   $total_price * $this->company_percentage / 100;
+                    $doctor_credit = $total_price * $this->company_percentage / 100;
                     $total += $doctor_credit;
                 } else {
-                    $doctor_service =  $this->specificServices->firstWhere(function ($item) use ($service) {
-                        return $item->service_id == $service->service->id;
+                    // return 5;
+                    $doctor_service = $this->specificServices->firstWhere(function ($item) use ($service) {
+                        return $item->pivot->service_id == $service->service_id;
                     });
+                    //log docotorservice
+                    //  Log::info('servcie', [$doctor_service->pivot]);
 
                     //                    dd($doctor_credit);
-                    if ($doctor_service?->percentage > 0) {
-                        $doctor_credit = $service->amount_paid * $doctor_service->percentage / 100;
-                    } elseif ($doctor_service?->fixed > 0 && $doctor_service->percentage == 0) {
-                        $doctor_credit = $doctor_service->fixed;
+                    if ($doctor_service?->pivot->percentage > 0) {
+
+                        $doctor_credit = $service->amount_paid * $doctor_service->pivot->percentage / 100;
+                    } elseif ($doctor_service?->pivot->fixed > 0 && $doctor_service->pivot->percentage == 0) {
+                        // return 5;
+                        $doctor_credit = $doctor_service->pivot->fixed;
                     } else {
 
                         //احتساب مصروفات الخدمه
                         $totalCost = $service->getTotalCostsForDoctor($this);
-                        $paid =  $service->amount_paid;
+                        $paid = $service->amount_paid;
                         $paid -= $totalCost;
                         $doctor_credit = $paid * $this->cash_percentage / 100;
                     }

@@ -73,9 +73,9 @@ class DoctorServiceController extends Controller
         if (empty($validated['percentage']) && empty($validated['fixed'])) {
              return response()->json(['message' => 'يجب توفير نسبة مئوية أو مبلغ ثابت للطبيب.'], 422);
         }
-        if (!empty($validated['percentage']) && !empty($validated['fixed'])) {
-             return response()->json(['message' => 'يرجى توفير إما نسبة مئوية أو مبلغ ثابت، وليس كلاهما.'], 422);
-        }
+        // if (!empty($validated['percentage']) && !empty($validated['fixed'])) {
+        //      return response()->json(['message' => 'يرجى توفير إما نسبة مئوية أو مبلغ ثابت، وليس كلاهما.'], 422);
+        // }
 
 
         // Attach the service with pivot data
@@ -112,9 +112,9 @@ class DoctorServiceController extends Controller
         if (empty($validated['percentage']) && empty($validated['fixed'])) {
              return response()->json(['message' => 'يجب توفير نسبة مئوية أو مبلغ ثابت.'], 422);
         }
-         if (!empty($validated['percentage']) && !empty($validated['fixed'])) {
-             return response()->json(['message' => 'يرجى توفير إما نسبة مئوية أو مبلغ ثابت، وليس كلاهما.'], 422);
-        }
+        //  if (!empty($validated['percentage']) && !empty($validated['fixed'])) {
+        //      return response()->json(['message' => 'يرجى توفير إما نسبة مئوية أو مبلغ ثابت، وليس كلاهما.'], 422);
+        // }
 
         $doctor->specificServices()->updateExistingPivot($service->id, [
             'percentage' => $validated['percentage'] ?? null,
