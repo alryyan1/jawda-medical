@@ -114,6 +114,8 @@ Route::post('/queue-worker/start', [\App\Http\Controllers\Api\QueueWorkerControl
 Route::post('/queue-worker/stop', [\App\Http\Controllers\Api\QueueWorkerController::class, 'stop']);
 Route::post('/queue-worker/toggle', [\App\Http\Controllers\Api\QueueWorkerController::class, 'toggle']);
 Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
+Route::apiResource('main-tests', MainTestController::class);
+Route::get('/visits/{visit}/lab-requests', [LabRequestController::class, 'indexForVisit']);
 
 Route::middleware('auth:sanctum')->group(function () {
   // SMS
@@ -258,7 +260,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('containers', [ContainerController::class, 'store']); // For quick add dialog
   // Route::apiResource('containers', ContainerController::class); // If full CRUD for containers
 
-  Route::apiResource('main-tests', MainTestController::class);
   Route::apiResource('offers', OfferController::class);
   Route::get('offers-main-tests', [OfferController::class, 'getMainTests']);
   Route::get('units-list', [UnitController::class, 'indexList']);
@@ -295,7 +296,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/company/{company}/test-contracts/pdf', [ReportController::class, 'generateCompanyMainTestContractPdf']);
 
   // Lab Requests
-  Route::get('/visits/{visit}/lab-requests', [LabRequestController::class, 'indexForVisit']);
   // Removed: container barcode and print-all-samples endpoints
   Route::get('/visits/{visit}/available-lab-tests', [LabRequestController::class, 'availableTestsForVisit']);
   Route::post('/visits/{visit}/lab-requests-batch', [LabRequestController::class, 'storeBatchForVisit']);

@@ -168,8 +168,16 @@ class VisitServiceController extends Controller
                                 $companyEnduranceAmount = $price - $companyServiceEndurance;
                             } else {
                                 // return $company;
-                                $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
-                                $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                //compnay relation
+                                if($patient->companyRelation != null){
+                                    $companyRelation = $patient->companyRelation;
+                                    $companyServiceEndurance = ($price * (float) ($companyRelation->service_endurance ?? 0)) / 100;
+                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                }else{
+
+                                    $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
+                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                }
                             }
                             //then use $company->service_endurance which is percentage
 

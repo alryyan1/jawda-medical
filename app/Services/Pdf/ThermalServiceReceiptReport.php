@@ -467,9 +467,12 @@ class ThermalServiceReceiptReport extends TCPDF
         }
 
         $totalActuallyPaidForTheseServices = array_sum(array_column($this->requestedServicesToPrint, 'amount_paid'));
+        if($this->visit->patient->company_id == null){
+
+            $this->drawThermalTotalRow('الإجمالي:', $subTotalServices, $pageUsableWidth);
+        }
 
         // Display totals - simplified version
-        $this->drawThermalTotalRow('الإجمالي:', $subTotalServices, $pageUsableWidth);
         
         // Only show discount if there's actually a discount
         if ($hasDiscount && $totalDiscountOnServices > 0) {
@@ -497,7 +500,7 @@ class ThermalServiceReceiptReport extends TCPDF
             $user = User::find($user_deposited);
             $user_requested = User::find($user_requested);
             $this->SetFont($this->fontName, 'I', 10);
-            $footerMessage = ' تحصل بواسطة: ' . $user->name;
+            $footerMessage = ' تحصل بواسطة: ' . $user?->name;
             $footerRequestedMessage = ' تم الطلب بواسطة: ' . $user_requested->name;
             $this->MultiCell(0, $this->lineHeight - 1, $footerRequestedMessage, 0, 'L', false, 1);
             $this->MultiCell(0, $this->lineHeight - 1, $footerMessage, 0, 'L', false, 1);

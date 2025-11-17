@@ -57,9 +57,9 @@ class CompanyServiceController extends Controller
         }
 
         // Crucial Check: Target company must not have existing service contracts
-        if ($targetCompany->contractedServices()->exists()) {
-            return response()->json(['message' => 'لا يمكن نسخ العقود. الشركة المستهدفة لديها عقود خدمات موجودة بالفعل.'], 409); // 409 Conflict
-        }
+        // if ($targetCompany->contractedServices()->exists()) {
+        //     return response()->json(['message' => 'لا يمكن نسخ العقود. الشركة المستهدفة لديها عقود خدمات موجودة بالفعل.'], 409); // 409 Conflict
+        // }
 
         $sourceContracts = $sourceCompany->contractedServices()->get();
 
@@ -67,11 +67,18 @@ class CompanyServiceController extends Controller
             return response()->json(['message' => 'الشركة المصدر لا تحتوي على عقود خدمات لنسخها.', 'copied_count' => 0], 404);
         }
 
+        // Get existing contracted service IDs for the target company
+        $existingServiceIds = $targetCompany->contractedServices()->pluck('services.id')->toArray();
+
         $attachData = [];
+        $updateData = [];
+        
         foreach ($sourceContracts as $sourceContractPivotedService) {
             // $sourceContractPivotedService is a Service model with ->pivot populated
             $pivotData = $sourceContractPivotedService->pivot;
-            $attachData[$sourceContractPivotedService->id] = [
+            $serviceId = $sourceContractPivotedService->id;
+            
+            $contractData = [
                 'price' => $pivotData->price,
                 'static_endurance' => $pivotData->static_endurance,
                 'percentage_endurance' => $pivotData->percentage_endurance,
@@ -79,16 +86,39 @@ class CompanyServiceController extends Controller
                 'percentage_wage' => $pivotData->percentage_wage,
                 'use_static' => $pivotData->use_static,
                 'approval' => $pivotData->approval, // Copy approval status as well
-                'created_at' => now(), // New timestamps for the new contract
                 'updated_at' => now(),
             ];
+
+            // Check if service already exists for target company
+            if (in_array($serviceId, $existingServiceIds)) {
+                // Service exists, prepare for update
+                $updateData[$serviceId] = $contractData;
+            } else {
+                // Service doesn't exist, prepare for attach
+                $contractData['created_at'] = now(); // New timestamps for the new contract
+                $attachData[$serviceId] = $contractData;
+            }
         }
 
         DB::beginTransaction();
         try {
+            $attachedCount = 0;
+            $updatedCount = 0;
+
+            // Attach new contracts
             if (!empty($attachData)) {
                 $targetCompany->contractedServices()->attach($attachData);
+                $attachedCount = count($attachData);
             }
+
+            // Update existing contracts
+            if (!empty($updateData)) {
+                foreach ($updateData as $serviceId => $data) {
+                    $targetCompany->contractedServices()->updateExistingPivot($serviceId, $data);
+                }
+                $updatedCount = count($updateData);
+            }
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
@@ -96,9 +126,22 @@ class CompanyServiceController extends Controller
             return response()->json(['message' => 'فشل نسخ عقود الخدمات.', 'error' => $e->getMessage()], 500);
         }
 
+        $totalCount = $attachedCount + $updatedCount;
+        $message = "تم ";
+        if ($attachedCount > 0 && $updatedCount > 0) {
+            $message .= "إضافة {$attachedCount} عقد جديد وتحديث {$updatedCount} عقد موجود";
+        } elseif ($attachedCount > 0) {
+            $message .= "إضافة {$attachedCount} عقد خدمة جديد";
+        } elseif ($updatedCount > 0) {
+            $message .= "تحديث {$updatedCount} عقد خدمة موجود";
+        }
+        $message .= " بنجاح من " . $sourceCompany->name . " إلى " . $targetCompany->name . ".";
+
         return response()->json([
-            'message' => "تم نسخ " . count($attachData) . " عقد خدمة بنجاح من " . $sourceCompany->name . " إلى " . $targetCompany->name . ".",
-            'copied_count' => count($attachData),
+            'message' => $message,
+            'copied_count' => $totalCount,
+            'attached_count' => $attachedCount,
+            'updated_count' => $updatedCount,
         ]);
     }
 
