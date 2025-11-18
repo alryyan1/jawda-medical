@@ -14,6 +14,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use App\Models\User;
+use Illuminate\Support\Facades\Http as HttpClient;
+use Illuminate\Support\Facades\Log;
 
 class DoctorShiftController extends Controller
 {
@@ -557,7 +559,32 @@ class DoctorShiftController extends Controller
             'is_company_reclaim_prooved' => 'sometimes|boolean',
         ]);
 
-        $doctorShift->update($validated);
+        // Check if is_cash_revenue_prooved is being set to true and close the shift
+        $shouldCloseShift = isset($validated['is_cash_reclaim_prooved']) ;
+        // return ['shouldCloseShift' => $shouldCloseShift];
+        if (isset($validated['is_cash_reclaim_prooved']) ) {
+            // return response()->json(['message' => 'لا يمكن تغيير الحالة الى مغلقة لان المناوبة مفتوحة.'], 400);
+            // Close the doctor shift
+            $doctorShift->update([
+                ...$validated,
+                'status' => false,
+                'end_time' => Carbon::now(),
+            ]);
+
+            // Emit realtime update event (fire-and-forget)
+            try {
+                $url = config('services.realtime.url') . '/emit/doctor-shift-closed';
+                HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                    ->post($url, [
+                        'doctor_shift' => (new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift'])))->resolve(),
+                    ]);
+            } catch (\Exception $e) {
+                Log::warning('Failed to emit doctor-shift-closed realtime event: ' . $e->getMessage());
+            }
+        } else {
+            $doctorShift->update($validated);
+        }
+
         return new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift']));
     }
     // You might add show, update, destroy for full CRUD management of DoctorShift records if needed.

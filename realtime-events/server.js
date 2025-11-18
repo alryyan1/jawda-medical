@@ -404,6 +404,20 @@ app.post('/emit/lab-queue-item-updated', verifyAuth, (req, res) => {
   }
 });
 
+// Emit doctor-shift-closed
+app.post('/emit/doctor-shift-closed', verifyAuth, (req, res) => {
+  try {
+    const payload = req.body; // Expecting { doctor_shift: DoctorShift }
+    console.log('doctor-shift-closed', payload);
+    io.emit('doctor-shift-closed', payload);
+    console.log('doctor-shift-closed emitted');
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error emitting doctor-shift-closed:', err?.message || err);
+    return res.status(500).json({ error: 'Failed to emit doctor-shift-closed' });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);
 });
