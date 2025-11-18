@@ -334,7 +334,7 @@ class DoctorShiftController extends Controller
             'user_id_opened' => 'nullable|integer|exists:users,id', // NEW (user_id on doctor_shifts table)
             'status' => 'nullable|string|in:0,1,all',
             'shift_id' => 'nullable|integer|exists:shifts,id',    // General clinic shift ID
-            'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status,total_entitlement', // Added total_entitlement
+            'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status,total_entitlement,id', // Added total_entitlement and id
             'sort_direction' => 'nullable|string|in:asc,desc',
         ]);
 
@@ -421,6 +421,23 @@ class DoctorShiftController extends Controller
         // The DoctorShiftResource will handle calculating the entitlement values
         return DoctorShiftResource::collection($doctorShifts);
     }
+    /**
+     * Display the specified doctor shift.
+     *
+     * @param  \App\Models\DoctorShift  $doctorShift
+     * @return \App\Http\Resources\DoctorShiftResource
+     */
+    public function show(DoctorShift $doctorShift)
+    {
+        // Permission check if needed
+        // if (!Auth::user()->can('view doctor_shift')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
+        $doctorShift->load(['doctor', 'user', 'generalShift']);
+        return new DoctorShiftResource($doctorShift);
+    }
+
     public function showFinancialSummary(Request $request, DoctorShift $doctorShift)
     {
         // Permission check: e.g., can('view doctor_shift_financial_summary')
