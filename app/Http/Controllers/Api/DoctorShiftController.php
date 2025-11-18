@@ -369,6 +369,9 @@ class DoctorShiftController extends Controller
         if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
+        if ($request->filled('today')) {
+            $query->whereDate('created_at', '>=', Carbon::today()->startOfDay());
+        }
         if ($request->filled('date_to')) {
             $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
