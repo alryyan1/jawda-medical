@@ -73,6 +73,11 @@ class VisitServiceController extends Controller
         //     return response()->json(['message' => 'لا يمكن تعديل/حذف خدمة مدفوعة أو مكتملة.'], 403);
         // }
 
+        if($requestedService && $requestedService->doctorVisit && $requestedService->doctorVisit->doctorShift && $requestedService->doctorVisit->doctorShift->status == 0){
+            return response()->json(['message' => 'لا يمكن حذف  لأن ورديه الطبيب غير مفتوحة.'], 403);
+        }
+        
+
         return null;
     }
 
@@ -116,7 +121,7 @@ class VisitServiceController extends Controller
             'service_ids.*' => 'required|integer|exists:services,id',
             'quantities' => 'nullable|array', // Optional: if frontend sends quantities for each service
             'quantities.*' => 'required_with:quantities|integer|min:1',
-            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            // 'doctor_id' => 'nullable|integer|exists:doctors,id',
         ]);
 
         $patient = $visit->patient()->firstOrFail();
@@ -194,7 +199,7 @@ class VisitServiceController extends Controller
                     'doctorvisits_id' => $visit->id,
                     'service_id' => $serviceId,
                     'user_id' => Auth::id(),
-                    'doctor_id' => $visit->patient->doctor_id,
+                    'doctor_id' => $visit->doctor_id,
                     'price' => $price,
                     'amount_paid' => 0,
                     'endurance' => $companyEnduranceAmount,

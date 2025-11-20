@@ -46,12 +46,18 @@ class RequestedServiceDepositController extends Controller
         // if(!Auth::user()->can('record visit_service_payment')) {
         //     return response()->json(['message' => 'لا يمكنك تسجيل دفعة للخدمة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
         // }
+
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'is_bank' => 'required|boolean',
             // 'shift_id' might be taken from AuthContext on frontend and passed, or determined here
             // For now, assuming frontend might pass it or we take current open shift
         ]);
+        //block the creation if the doctorshift is closed 
+        if($requestedService->doctorVisit->doctorShift->status == 0){
+            return response()->json(['message' => 'لا يمكن تسجيل دفعة لأن ورديه الطبيب غير مفتوحة.'], 403);
+        }
+        
         if($requestedService->doctorVisit->shift_id != Shift::max('id')) {
             Log::error("Requested service {$requestedService->id} is in a previous shift.",);
             return response()->json(['message' => 'لا يمكن تسجيل دفعة لخدمة في ورديه سابقه  .'], 403);
@@ -148,6 +154,12 @@ class RequestedServiceDepositController extends Controller
         //     return response()->json(['message' => 'لا يمكنك تحديث دفعة للخدمة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
         // }
 
+        //block the update if the doctorshift is closed 
+        $requestedService = $requestedServiceDeposit->requestedService;
+        if($requestedService->doctorVisit->doctorShift->status == 0){
+            return response()->json(['message' => 'لا يمكن التعديل  لأن ورديه الطبيب غير مفتوحة.'], 403);
+        }
+        
         $validated = $request->validate([
             'amount' => 'sometimes|required|numeric|min:0.01',
             'is_bank' => 'sometimes|required|boolean',
@@ -219,6 +231,12 @@ class RequestedServiceDepositController extends Controller
         // IMPORTANT: Adjusting the parent RequestedService's amount_paid is critical.
         $requestedService = $requestedServiceDeposit->requestedService;
         $amountBeingReversed = (float) $requestedServiceDeposit->amount;
+        
+
+        //block the deletion if the doctorshift is closed 
+        if($requestedService->doctorVisit->doctorShift->status == 0){
+            return response()->json(['message' => 'لا يمكن حذف  لأن ورديه الطبيب غير مفتوحة.'], 403);
+        }
         
 
         DB::beginTransaction();

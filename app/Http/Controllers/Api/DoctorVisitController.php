@@ -180,9 +180,12 @@ class DoctorVisitController extends Controller
         // }
 
         // Calculate the visit number before creating the visit
+        // Use pessimistic locking to prevent duplicate visitNumber in concurrent requests
         $visitNumber = $validatedData['number'] ?? (
             isset($validatedData['patient_id'])
-            ? (DoctorVisit::where('patient_id', $validatedData['patient_id'])->count() + 1)
+            ? (DoctorVisit::where('patient_id', $validatedData['patient_id'])
+                ->lockForUpdate()
+                ->count() + 1)
             : 1
         );
 
