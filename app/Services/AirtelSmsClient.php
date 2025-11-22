@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Services\Contracts\SmsClient;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AirtelSmsClient implements SmsClient
 {
@@ -27,24 +28,23 @@ class AirtelSmsClient implements SmsClient
     {
         $senderId = $sender ?: $this->defaultSender;
         
-        // Validate sender ID format (typically 3-11 alphanumeric characters)
-        if (!preg_match('/^[A-Z0-9]{3,11}$/', $senderId)) {
-            return [
-                'success' => false,
-                'error' => "Invalid sender ID format: '{$senderId}'. Must be 3-11 alphanumeric characters (uppercase).",
-                'raw' => null,
-            ];
+        // Note: Sender ID must be registered with Airtel SMS service
+        // If you get "Invalid sender" error, contact Airtel to register your sender ID
+        // Sender ID format: typically 3-11 alphanumeric characters
+    
+        $messageData = [
+            'to' => $to,
+            'message' => $message,
+        ];
+        
+        // Only include is_otp if it's true
+        if ($isOtp) {
+            $messageData['is_otp'] = true;
         }
-
+        
         $payload = [
             'sender' => $senderId,
-            'messages' => [
-                [
-                    'to' => $to,
-                    'message' => $message,
-                    'is_otp' => $isOtp,
-                ],
-            ],
+            'messages' => [$messageData],
         ];
 
         $response = $this->request($payload);
@@ -55,23 +55,20 @@ class AirtelSmsClient implements SmsClient
     {
         $senderId = $sender ?: $this->defaultSender;
         
-        // Validate sender ID format (typically 3-11 alphanumeric characters)
-        if (!preg_match('/^[A-Z0-9]{3,11}$/', $senderId)) {
-            return [
-                'success' => false,
-                'results' => [],
-                'error' => "Invalid sender ID format: '{$senderId}'. Must be 3-11 alphanumeric characters (uppercase).",
-                'raw' => null,
-            ];
-        }
-
+    
         $normalized = [];
         foreach ($messages as $msg) {
-            $normalized[] = [
+            $messageData = [
                 'to' => (string)$msg['to'],
                 'message' => (string)$msg['message'],
-                'is_otp' => (bool)($msg['is_otp'] ?? false),
             ];
+            
+            // Only include is_otp if it's true
+            if (!empty($msg['is_otp'])) {
+                $messageData['is_otp'] = true;
+            }
+            
+            $normalized[] = $messageData;
         }
 
         $payload = [
@@ -86,26 +83,52 @@ class AirtelSmsClient implements SmsClient
     private function request(array $payload)
     {
         $url = $this->baseUrl . $this->endpoint;
+        Log::debug('SMS Payload', $payload);
+        Log::debug('SMS URL', ['url' => $url, 'api_key' => $this->apiKey]);
+        
         $http = Http::timeout($this->timeoutSeconds)
             ->acceptJson()
             ->withHeaders([
                 'X-API-KEY' => $this->apiKey,
+                'Content-Type' => 'application/json',
             ]);
 
-        return $http->post($url, $payload);
+        $response = $http->post($url, $payload);
+        
+        // Log the response for debugging
+        Log::debug('SMS Response', [
+            'status' => $response->status(),
+            'successful' => $response->successful(),
+            'body' => $response->body(),
+            'json' => $response->json(),
+        ]);
+        
+        return $response;
     }
 
     private function normalizeSingleResponse(string $to, $response): array
     {
-        if (!$response->successful()) {
+        $json = $response->json();
+        
+        // Check if API returned an error response (even with 200 status)
+        if (is_array($json) && isset($json['status']) && strtolower($json['status']) === 'failed') {
+            $errorMessage = $json['detail'] ?? $json['message'] ?? $response->body();
             return [
                 'success' => false,
-                'error' => $response->body(),
-                'raw' => $response->json(),
+                'error' => $errorMessage,
+                'raw' => $json,
+            ];
+        }
+        
+        if (!$response->successful()) {
+            $errorMessage = $json['detail'] ?? $json['message'] ?? $response->body();
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+                'raw' => $json,
             ];
         }
 
-        $json = $response->json();
         $success = true;
         $providerId = null;
 
@@ -138,15 +161,29 @@ class AirtelSmsClient implements SmsClient
 
     private function normalizeBulkResponse($response): array
     {
-        if (!$response->successful()) {
+        $json = $response->json();
+        
+        // Check if API returned an error response (even with 200 status)
+        if (is_array($json) && isset($json['status']) && strtolower($json['status']) === 'failed') {
+            $errorMessage = $json['detail'] ?? $json['message'] ?? $response->body();
             return [
                 'success' => false,
+                'error' => $errorMessage,
                 'results' => [],
-                'raw' => $response->json(),
+                'raw' => $json,
+            ];
+        }
+        
+        if (!$response->successful()) {
+            $errorMessage = $json['detail'] ?? $json['message'] ?? $response->body();
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+                'results' => [],
+                'raw' => $json,
             ];
         }
 
-        $json = $response->json();
         $results = [];
         // Map provider results
         if (isset($json['results']) && is_array($json['results'])) {

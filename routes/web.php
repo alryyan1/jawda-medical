@@ -38,8 +38,7 @@ Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShifts
 // Insurance report (web)
 Route::get('/reports/insurance/pdf', [InsuranceReportController::class, 'insuranceReport']);
 Route::get('/', function () {
-    $shift = Shift::find(168);
-    return $shift->shiftClinicServiceCosts();
+    return view('welcome');
 });
 Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
 Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);

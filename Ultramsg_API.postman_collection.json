@@ -1,0 +1,114 @@
+{
+	"info": {
+		"_postman_id": "ultramsg-api-collection",
+		"name": "Ultramsg Send Document API",
+		"description": "Collection for testing Ultramsg send document with credentials endpoint",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Send Document with Base64",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"YOUR_TOKEN_HERE\",\n    \"instance_id\": \"YOUR_INSTANCE_ID_HERE\",\n    \"phone\": \"249991961111\",\n    \"base64\": \"JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwo+PgplbmRvYmoKeHJlZgoxIDAKdHJhaWxlcgo8PAovU2l6ZSAxCi9Sb290IDEgMCBSCj4+CnN0YXJ0eHJlZgo5CiUlRU9G\",\n    \"caption\": \"labresult\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost/jawda-medical/public/api/ultramsg/send-document-with-credentials",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"path": [
+						"jawda-medical",
+						"public",
+						"api",
+						"ultramsg",
+						"send-document-with-credentials"
+					]
+				},
+				"description": "Send a document using base64 encoded PDF. Replace YOUR_TOKEN_HERE and YOUR_INSTANCE_ID_HERE with actual values from your database settings."
+			},
+			"response": []
+		},
+		{
+			"name": "Send Document with File Upload",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "token",
+							"value": "YOUR_TOKEN_HERE",
+							"type": "text"
+						},
+						{
+							"key": "instance_id",
+							"value": "YOUR_INSTANCE_ID_HERE",
+							"type": "text"
+						},
+						{
+							"key": "phone",
+							"value": "249991961111",
+							"type": "text"
+						},
+						{
+							"key": "file",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "caption",
+							"value": "labresult",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost/jawda-medical/public/api/ultramsg/send-document-with-credentials",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"path": [
+						"jawda-medical",
+						"public",
+						"api",
+						"ultramsg",
+						"send-document-with-credentials"
+					]
+				},
+				"description": "Send a document by uploading a PDF file. Replace YOUR_TOKEN_HERE and YOUR_INSTANCE_ID_HERE with actual values. Select a PDF file in the 'file' field."
+			},
+			"response": []
+		}
+	]
+}
+
+

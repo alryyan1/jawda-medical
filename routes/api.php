@@ -692,6 +692,10 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
+// Ultramsg routes with custom credentials (no auth required since credentials are in request)
+Route::post('/ultramsg/send-text-message-with-credentials', [\App\Http\Controllers\UltramsgController::class, 'sendTextMessageWithCredentials']);
+Route::post('/ultramsg/send-document-with-credentials', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentWithCredentials']);
+
 // Image proxy for cross-origin images -> base64
 Route::get('/image-proxy/base64', [ImageProxyController::class, 'fetchBase64']);
 
