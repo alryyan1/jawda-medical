@@ -914,6 +914,28 @@ class ExcelController extends Controller
     }
 
     /**
+     * Export specialist shifts report to Excel (grouped by specialist).
+     */
+    public function specialistShiftsReportExcel(Request $request)
+    {
+        // if (!Auth::user()->can('print specialist_shift_reports')) { /* ... */ }
+
+        try {
+            $specialistShiftsReport = new \App\Services\Excel\SpecialistShiftsReport();
+            $includeBreakdown = $request->get('include_breakdown', 'true') === 'true';
+            $excelContent = $specialistShiftsReport->generate($request, $includeBreakdown);
+            
+            $fileNameSuffix = $includeBreakdown ? 'With_Breakdown' : 'Summary_Only';
+            $excelFileName = 'Specialist_Shifts_Report_' . $fileNameSuffix . '_' . date('Ymd_His') . '.xlsx';
+            return response($excelContent, 200)
+                ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                ->header('Content-Disposition', "attachment; filename=\"{$excelFileName}\"");
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 404);
+        }
+    }
+
+    /**
      * Export costs report to Excel.
      */
     public function exportCostsReportToExcel(Request $request)

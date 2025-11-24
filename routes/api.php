@@ -255,6 +255,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
   Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
   Route::get('/reports/doctor-shifts/excel', [ExcelController::class, 'doctorShiftsReportExcel']);
+  Route::get('/reports/specialist-shifts/excel', [ExcelController::class, 'specialistShiftsReportExcel']);
   Route::get('/reports/service-statistics', [ReportController::class, 'serviceStatistics']);
 
   Route::get('containers-list', [ContainerController::class, 'indexList']);
