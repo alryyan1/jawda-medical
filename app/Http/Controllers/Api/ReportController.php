@@ -22,6 +22,7 @@ use App\Models\DoctorShift;
 use App\Models\DoctorVisit;
 use App\Models\LabRequest;
 use App\Models\MainTest;
+use App\Models\RequestedResult;
 use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\User;
@@ -4332,6 +4333,79 @@ class ReportController extends Controller
         // The items in $statistics will now have main_test_id, main_test_name, and request_count.
         // We can still use LabTestStatisticResource, but it will only populate these fields.
         return \App\Http\Resources\LabTestStatisticResource::collection($statistics); // Ensure resource is imported
+    }
+
+    /**
+     * Test Result Statistics - Shows percentage of results for a selected test
+     */
+    public function testResultStatistics(Request $request)
+    {
+        // if (!Auth::user()->can('view test_result_statistics')) { /* ... */ }
+
+        $request->validate([
+            'main_test_id' => 'required|integer|exists:main_tests,id',
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+        ]);
+
+        $mainTestId = $request->input('main_test_id');
+        $mainTest = MainTest::findOrFail($mainTestId);
+
+        // Count total lab requests for this test
+        $labRequestsQuery = LabRequest::where('main_test_id', $mainTestId);
+        
+        if ($request->filled('date_from')) {
+            $labRequestsQuery->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $labRequestsQuery->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+
+        $totalRequests = $labRequestsQuery->count();
+
+        // Get lab request IDs for filtering requested_results
+        $labRequestIds = $labRequestsQuery->pluck('id');
+
+        // Group by result value and count
+        $resultsQuery = RequestedResult::where('main_test_id', $mainTestId)
+            ->whereIn('lab_request_id', $labRequestIds)
+            ->whereNotNull('result')
+            ->where('result', '!=', '');
+
+        // Apply date filter on requested_results if needed (using created_at or entered_at)
+        if ($request->filled('date_from')) {
+            $resultsQuery->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        }
+        if ($request->filled('date_to')) {
+            $resultsQuery->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+
+        $resultsGrouped = $resultsQuery
+            ->select('result', DB::raw('COUNT(*) as count'))
+            ->groupBy('result')
+            ->orderBy('count', 'desc')
+            ->get();
+
+        // Calculate percentages
+        $totalResults = $resultsGrouped->sum('count');
+        $statistics = $resultsGrouped->map(function ($item) use ($totalResults, $totalRequests) {
+            $percentage = $totalResults > 0 ? ($item->count / $totalResults) * 100 : 0;
+            return [
+                'result' => $item->result,
+                'count' => $item->count,
+                'percentage' => round($percentage, 2),
+            ];
+        });
+
+        return response()->json([
+            'main_test' => [
+                'id' => $mainTest->id,
+                'name' => $mainTest->main_test_name,
+            ],
+            'total_requests' => $totalRequests,
+            'total_results' => $totalResults,
+            'statistics' => $statistics,
+        ]);
     }
 
     /**

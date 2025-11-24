@@ -37,4 +37,9 @@ class Specialist extends Model
     {
         return $this->hasMany(Doctor::class);
     }
+
+    public function subSpecialists()
+    {
+        return $this->hasMany(SubSpecialist::class, 'specialists_id');
+    }
 }

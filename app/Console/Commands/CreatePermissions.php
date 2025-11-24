@@ -65,6 +65,33 @@ class CreatePermissions extends Command
         DB::beginTransaction();
         
         try {
+            // Delete all existing permissions and their relationships
+            $this->info('Deleting existing permissions...');
+            
+            // Delete from pivot tables first to avoid foreign key constraints
+            DB::table('model_has_permissions')->delete();
+            DB::table('role_has_permissions')->delete();
+            
+            // Disable foreign key checks temporarily to allow truncate
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            
+            // Then delete all permissions
+            Permission::truncate();
+            
+            // Re-enable foreign key checks
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            
+            $this->line("✓ All permissions deleted.");
+            $this->newLine();
+        } catch (\Exception $e) {
+            // Make sure to re-enable foreign key checks even if there's an error
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+            DB::rollBack();
+            $this->error('❌ Error deleting existing permissions: ' . $e->getMessage());
+            return Command::FAILURE;
+        }
+
+        try {
             foreach ($this->permissions as $permissionName) {
                 try {
                     $permission = Permission::firstOrCreate(
@@ -98,7 +125,10 @@ class CreatePermissions extends Command
             $this->newLine();
             $this->info("✅ Permissions creation completed!");
             $this->info("   Created: {$created}");
-            $this->info("   Already existed: {$existing}");
+            
+            if ($existing > 0) {
+                $this->info("   Already existed: {$existing}");
+            }
             
             if ($errors > 0) {
                 $this->warn("   Errors: {$errors}");

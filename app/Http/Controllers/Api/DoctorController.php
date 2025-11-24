@@ -27,7 +27,7 @@ class DoctorController extends Controller
         }
 
         // Eager load relationships for efficiency
-        $doctors = $query->with(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user'])->orderBy('id', 'desc')
+        $doctors = $query->with(['specialist', 'subSpecialist', 'financeAccount', 'insuranceFinanceAccount', 'user'])->orderBy('id', 'desc')
                         ->paginate(15);
                         
         return new DoctorCollection($doctors);
@@ -60,6 +60,7 @@ class DoctorController extends Controller
             'static_wage' => 'required|numeric|min:0',
             'lab_percentage' => 'required|numeric|min:0|max:100',
             'specialist_id' => 'required|exists:specialists,id',
+            'sub_specialist_id' => 'nullable|exists:sub_specialists,id',
             'start' => 'required|integer',
             'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // For file upload
             'finance_account_id' => 'nullable|exists:finance_accounts,id',
@@ -89,12 +90,12 @@ class DoctorController extends Controller
         // OR create a new user:
         // User::create(['name' => $doctor->name, 'username' => ..., 'password' => ..., 'doctor_id' => $doctor->id]);
 
-        return new DoctorResource($doctor->load(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user']));
+        return new DoctorResource($doctor->load(['specialist', 'subSpecialist', 'financeAccount', 'insuranceFinanceAccount', 'user']));
     }
 
     public function show(Doctor $doctor)
     {
-        return new DoctorResource($doctor->load(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user']));
+        return new DoctorResource($doctor->load(['specialist', 'subSpecialist', 'financeAccount', 'insuranceFinanceAccount', 'user']));
     }
 
     public function update(Request $request, Doctor $doctor)
@@ -107,6 +108,7 @@ class DoctorController extends Controller
             'static_wage' => 'sometimes|required|numeric|min:0',
             'lab_percentage' => 'sometimes|required|numeric|min:0|max:100',
             'specialist_id' => 'sometimes|required|exists:specialists,id',
+            'sub_specialist_id' => 'nullable|exists:sub_specialists,id',
             'start' => 'sometimes|required|integer',
             'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'finance_account_id' => 'nullable|exists:finance_accounts,id',
@@ -133,7 +135,7 @@ class DoctorController extends Controller
             }
         });
 
-        return new DoctorResource($doctor->load(['specialist', 'financeAccount', 'insuranceFinanceAccount', 'user']));
+        return new DoctorResource($doctor->load(['specialist', 'subSpecialist', 'financeAccount', 'insuranceFinanceAccount', 'user']));
     }
 
     public function destroy(Doctor $doctor)

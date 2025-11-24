@@ -47,6 +47,7 @@ use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\ShiftDefinitionController;
 use App\Http\Controllers\Api\SpecialistController;
+use App\Http\Controllers\Api\SubSpecialistController;
 use App\Http\Controllers\Api\SubcompanyController;
 use App\Http\Controllers\Api\SubServiceCostController;
 use App\Http\Controllers\Api\UnitController;
@@ -365,10 +366,12 @@ Route::middleware('auth:sanctum')->group(function () {
   // ...
   Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
   Route::get('/reports/costs/pdf', [ReportController::class, 'generateCostsReportPdf']);
+  Route::get('/reports/costs/excel', [ExcelController::class, 'exportCostsReportToExcel']);
   // Route for fetching costs for the list page (if not using a full apiResource for costs)
   Route::get('/costs-report-data', [CostController::class, 'index']); // Using CostController@index for data
   // Route::
   Route::get('/reports/lab-test-statistics', [ReportController::class, 'labTestStatistics']);
+  Route::get('/reports/test-result-statistics', [ReportController::class, 'testResultStatistics']);
   Route::get('/reports/lab-general', [ReportController::class, 'labGeneral']);
   Route::get('/reports/lab-general/pdf', [ReportController::class, 'generateLabGeneralReportPdf']);
 
@@ -649,6 +652,12 @@ Route::middleware('auth:sanctum')->group(function () {
   });
    Route::get('specialists-list', [SpecialistController::class, 'indexList']);
     Route::apiResource('specialists', SpecialistController::class);
+    
+    // Sub Specialists routes
+    Route::get('specialists/{specialist}/sub-specialists', [SubSpecialistController::class, 'index']);
+    Route::post('specialists/{specialist}/sub-specialists', [SubSpecialistController::class, 'store']);
+    Route::put('specialists/{specialist}/sub-specialists/{subSpecialist}', [SubSpecialistController::class, 'update']);
+    Route::delete('specialists/{specialist}/sub-specialists/{subSpecialist}', [SubSpecialistController::class, 'destroy']);
     Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel']);
      // NEW route for the services with cost details export
      Route::get('/reports/services-with-costs/excel', [ExcelController::class, 'exportServicesWithCostsToExcel']);

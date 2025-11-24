@@ -72,6 +72,7 @@ class Doctor extends Model
         'static_wage',
         'lab_percentage',
         'specialist_id',
+        'sub_specialist_id',
         'start', // This was an INT(11) in the schema, meaning? Patient capacity? Starting number?
         'image',
         'finance_account_id',
@@ -96,6 +97,14 @@ class Doctor extends Model
     public function specialist()
     {
         return $this->belongsTo(Specialist::class);
+    }
+
+    /**
+     * Get the sub specialist that belongs to the doctor.
+     */
+    public function subSpecialist()
+    {
+        return $this->belongsTo(SubSpecialist::class, 'sub_specialist_id');
     }
 
     /**

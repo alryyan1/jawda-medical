@@ -8,9 +8,12 @@ use App\Models\ServiceGroup;
 use App\Models\AuditedPatientRecord;
 use App\Models\AuditedRequestedService;
 use App\Models\Cost;
+use App\Models\CostCategory;
 use App\Models\RequestedServiceDeposit;
 use App\Models\Service;
 use App\Models\DoctorVisit;
+use App\Models\User;
+use App\Models\Shift;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -907,6 +910,226 @@ class ExcelController extends Controller
                 ->header('Content-Disposition', "attachment; filename=\"{$excelFileName}\"");
         } catch (\Exception $e) {
             return response()->json(['message' => $e->getMessage()], 404);
+        }
+    }
+
+    /**
+     * Export costs report to Excel.
+     */
+    public function exportCostsReportToExcel(Request $request)
+    {
+        // Permission Check: e.g., can('export cost_report')
+        // if (!Auth::user()->can('export cost_report')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
+
+        // Validation (same as CostController@index for filters)
+        $request->validate([
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
+            'cost_category_id' => 'nullable|integer|exists:cost_categories,id',
+            'user_cost_id' => 'nullable|integer|exists:users,id',
+            'shift_id' => 'nullable|integer|exists:shifts,id',
+            'payment_method' => 'nullable|string|in:cash,bank,mixed,all',
+            'search_description' => 'nullable|string|max:255',
+            'sort_by' => 'nullable|string|in:created_at,total_cost,description',
+            'sort_direction' => 'nullable|string|in:asc,desc',
+        ]);
+
+        // --- Fetch Data (same logic as ReportController@generateCostsReportPdf) ---
+        $query = Cost::with(['costCategory:id,name', 'userCost:id,name', 'shift:id']);
+
+        if ($request->filled('date_from')) {
+            $from = Carbon::parse($request->date_from)->startOfDay();
+            $query->whereDate('created_at', '>=', $from);
+        }
+        if ($request->filled('date_to')) {
+            $to = Carbon::parse($request->date_to)->endOfDay();
+            $query->whereDate('created_at', '<=', $to);
+        }
+        if ($request->filled('cost_category_id')) {
+            $query->where('cost_category_id', $request->cost_category_id);
+        }
+        if ($request->filled('user_cost_id')) {
+            $query->where('user_cost', $request->user_cost_id);
+        }
+        if ($request->filled('shift_id')) {
+            $query->where('shift_id', $request->shift_id);
+        }
+        if ($request->filled('payment_method') && $request->payment_method !== 'all') {
+            $method = $request->payment_method;
+            if ($method === 'cash') {
+                $query->where('amount', '>', 0)->where('amount_bankak', '=', 0);
+            } elseif ($method === 'bank') {
+                $query->where('amount_bankak', '>', 0)->where('amount', '=', 0);
+            } elseif ($method === 'mixed') {
+                $query->where('amount', '>', 0)->where('amount_bankak', '>', 0);
+            }
+        }
+        if ($request->filled('search_description')) {
+            $query->where('description', 'LIKE', '%' . $request->search_description . '%');
+        }
+
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortDirection = $request->input('sort_direction', 'desc');
+        if ($sortBy === 'total_cost') {
+            $query->orderByRaw('(amount + amount_bankak) ' . $sortDirection);
+        } else {
+            $query->orderBy($sortBy, $sortDirection);
+        }
+        $costs = $query->get();
+
+        if ($costs->isEmpty()) {
+            return response()->json(['message' => 'No cost data found for the selected filters to generate Excel.'], 404);
+        }
+
+        // Calculate Summary Totals
+        $totalCashPaid = $costs->sum('amount');
+        $totalBankPaid = $costs->sum('amount_bankak');
+        $grandTotalPaid = $costs->sum(fn($cost) => $cost->amount + $cost->amount_bankak);
+
+        try {
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $isRTL = app()->getLocale() === 'ar';
+            $sheet->setRightToLeft($isRTL);
+
+            // --- Header & Title ---
+            $sheet->mergeCells('A1:H1');
+            $sheet->setCellValue('A1', 'تقرير المصروفات');
+            $sheet->getStyle('A1')->getFont()->setSize(16)->setBold(true);
+            $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getRowDimension(1)->setRowHeight(25);
+
+            // --- Summary Section ---
+            $sheet->mergeCells('A2:H2');
+            $sheet->setCellValue('A2', 'ملخص المصروفات الإجمالي للفترة المحددة');
+            $sheet->getStyle('A2')->getFont()->setSize(12)->setBold(true);
+            $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getRowDimension(2)->setRowHeight(20);
+
+            // Summary row
+            $sheet->setCellValue('A3', 'إجمالي المصروفات النقدية:');
+            $sheet->setCellValue('B3', $totalCashPaid);
+            $sheet->setCellValue('C3', 'إجمالي المصروفات البنكية:');
+            $sheet->setCellValue('D3', $totalBankPaid);
+            $sheet->setCellValue('E3', 'إجمالي المصروفات الكلي:');
+            $sheet->setCellValue('F3', $grandTotalPaid);
+            $sheet->getStyle('B3')->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('D3')->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('F3')->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('A3:F3')->getFont()->setBold(true);
+            $sheet->getRowDimension(3)->setRowHeight(18);
+
+            // --- Column Headers ---
+            $headerStyle = [
+                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '4F46E5']],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E0E0E0']]],
+            ];
+
+            $headers = [
+                'التاريخ',
+                'الوصف',
+                'الفئة',
+                'المستخدم',
+                'طريقة الدفع',
+                'نقداً',
+                'بنك/شبكة',
+                'الإجمالي'
+            ];
+            
+            $sheet->fromArray($headers, null, 'A5');
+            $sheet->getStyle('A5:H5')->applyFromArray($headerStyle);
+            $sheet->getRowDimension(5)->setRowHeight(18);
+
+            // Set column widths
+            $sheet->getColumnDimension('A')->setWidth(20);  // التاريخ
+            $sheet->getColumnDimension('B')->setWidth(40);  // الوصف
+            $sheet->getColumnDimension('C')->setWidth(20);  // الفئة
+            $sheet->getColumnDimension('D')->setWidth(20);  // المستخدم
+            $sheet->getColumnDimension('E')->setWidth(15); // طريقة الدفع
+            $sheet->getColumnDimension('F')->setWidth(15); // نقداً
+            $sheet->getColumnDimension('G')->setWidth(15); // بنك/شبكة
+            $sheet->getColumnDimension('H')->setWidth(15); // الإجمالي
+
+            // --- Data Rows ---
+            $dataRowNumber = 6;
+            foreach ($costs as $cost) {
+                $totalCostForRow = $cost->amount + $cost->amount_bankak;
+                $paymentMethodDisplay = '-';
+                if ($cost->amount > 0 && $cost->amount_bankak > 0) {
+                    $paymentMethodDisplay = 'مختلط';
+                } elseif ($cost->amount > 0) {
+                    $paymentMethodDisplay = 'نقداً';
+                } elseif ($cost->amount_bankak > 0) {
+                    $paymentMethodDisplay = 'بنك';
+                }
+
+                $sheet->setCellValue('A' . $dataRowNumber, Carbon::parse($cost->created_at)->format('Y-m-d H:i'));
+                $sheet->setCellValue('B' . $dataRowNumber, $cost->description);
+                $sheet->setCellValue('C' . $dataRowNumber, $cost->costCategory?->name ?? '-');
+                $sheet->setCellValue('D' . $dataRowNumber, $cost->userCost?->name ?? '-');
+                $sheet->setCellValue('E' . $dataRowNumber, $paymentMethodDisplay);
+                $sheet->setCellValue('F' . $dataRowNumber, (float)$cost->amount);
+                $sheet->setCellValue('G' . $dataRowNumber, (float)$cost->amount_bankak);
+                $sheet->setCellValue('H' . $dataRowNumber, (float)$totalCostForRow);
+                $dataRowNumber++;
+            }
+
+            // Apply styles to data rows
+            $lastDataRow = $dataRowNumber - 1;
+            if ($lastDataRow >= 6) {
+                // Number format for currency columns
+                $sheet->getStyle('F6:H' . $lastDataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+                // Alignment
+                $sheet->getStyle('A6:A' . $lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('B6:D' . $lastDataRow)->getAlignment()->setHorizontal($isRTL ? Alignment::HORIZONTAL_RIGHT : Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle('E6:H' . $lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                // Borders
+                $sheet->getStyle('A6:H' . $lastDataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('E0E0E0'));
+            }
+
+            // Grand Total Row
+            $sheet->setCellValue('A' . $dataRowNumber, 'الإجمالي');
+            $sheet->setCellValue('F' . $dataRowNumber, $totalCashPaid);
+            $sheet->setCellValue('G' . $dataRowNumber, $totalBankPaid);
+            $sheet->setCellValue('H' . $dataRowNumber, $grandTotalPaid);
+            $sheet->getStyle('A' . $dataRowNumber . ':H' . $dataRowNumber)->getFont()->setBold(true);
+            $sheet->getStyle('F' . $dataRowNumber . ':H' . $dataRowNumber)->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('A' . $dataRowNumber . ':H' . $dataRowNumber)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E0E0E0');
+            $sheet->getStyle('A' . $dataRowNumber . ':H' . $dataRowNumber)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+
+            $writer = new Xlsx($spreadsheet);
+            $fileName = 'Costs_Report_' . ($request->date_from ?? 'all') . '_to_' . ($request->date_to ?? 'all') . '.xlsx';
+
+            // Clear any output buffers
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            // Create temporary file
+            $tempFile = tempnam(sys_get_temp_dir(), 'excel_');
+            $writer->save($tempFile);
+
+            // Dispose of the spreadsheet to free memory
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+
+            return response()->streamDownload(function () use ($tempFile) {
+                if (file_exists($tempFile)) {
+                    readfile($tempFile);
+                    unlink($tempFile);
+                }
+            }, $fileName, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Costs Report Excel Export Error: " . $e->getMessage());
+            return response()->json(['message' => 'An error occurred while generating the Excel file.'], 500);
         }
     }
 }
