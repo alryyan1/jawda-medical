@@ -44,3 +44,4 @@ file_put_contents($outputFile, $base64);
 echo "Base64 string also saved to: $outputFile\n";
 
 
+

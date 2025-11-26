@@ -391,17 +391,23 @@ class PatientController extends Controller
                 $doctorVisit->oldest_request_time = $doctorVisit->created_at;
             }
         }
+        $settings = Setting::first();
 
         // Dispatch job to upload lab result to Firebase
         try {
             if ($doctorVisit) {
-                \App\Jobs\UploadLabResultToFirebase::dispatch(
-                    $patient->id,
-                    $doctorVisit->id,
-                    'alroomy-shaglaban' // You can get this from settings
-                );
-                
-                Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
+                // Check if storage_name is set
+                if (empty($settings->storage_name)) {
+                    Log::warning("Firebase upload skipped: storage_name is not set in settings");
+                } else {
+                    \App\Jobs\UploadLabResultToFirebase::dispatch(
+                        $patient->id,
+                        $doctorVisit->id,
+                        $settings->storage_name
+                    );
+                    
+                    Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
+                }
             }
         } catch (\Exception $e) {
             Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
@@ -469,16 +475,29 @@ class PatientController extends Controller
             // Check if patient already has result_url (for logging purposes)
             $hadExistingUrl = !empty($patient->result_url);
             $oldResultUrl = $patient->result_url;
+            $settings = Setting::first();
 
-            // Always run the job to upload/overwrite the result
+            // Check if storage_name is set
+            if (empty($settings->storage_name)) {
+                Log::warning("Firebase upload failed: storage_name is not set in settings");
+                return response()->json([
+                    'success' => false,
+                    'message' => 'اسم التخزين (Storage Name) غير محدد في الإعدادات. يرجى تحديده من صفحة الإعدادات العامة.',
+                    'error' => 'storage_name_not_set',
+                    'patient_id' => $patient->id,
+                    'visit_id' => $doctorVisit->id,
+                ], 400);
+            }
+
+            // Run the job to upload/overwrite the result
             $job = new \App\Jobs\UploadLabResultToFirebase(
                 $patient->id,
                 $doctorVisit->id,
-                'alroomy-shaglaban' // You can get this from settings
+                $settings->storage_name
             );
             
             $job->handle();
-            
+
             // Refresh the patient to get the updated result_url
             $patient->refresh();
             
@@ -551,17 +570,23 @@ class PatientController extends Controller
             // If authenticating, set the auth user and date
             $patient->result_auth_user = Auth::id();
             $patient->auth_date = now();
+            $settings = Setting::first();
             
             // Dispatch job to upload to Firebase
             try {
                 $doctorVisit = $patient->doctorVisit;
                 if ($doctorVisit) {
-                    \App\Jobs\UploadLabResultToFirebase::dispatch(
-                        $patient->id,
-                        $doctorVisit->id,
-                        'alroomy-shaglaban'
-                    );
-                    \Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
+                    // Check if storage_name is set
+                    if (empty($settings->storage_name)) {
+                        \Log::warning("Firebase upload skipped: storage_name is not set in settings");
+                    } else {
+                        \App\Jobs\UploadLabResultToFirebase::dispatch(
+                            $patient->id,
+                            $doctorVisit->id,
+                            $settings->storage_name
+                        );
+                        \Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
+                    }
                 }
             } catch (\Exception $e) {
                 \Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());

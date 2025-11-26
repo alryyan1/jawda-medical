@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\RequestedService;
 use App\Models\RequestedServiceDeposit;
+use App\Models\RequestedServiceDepositDeletion;
 use App\Models\Shift; // To get current shift
+use App\Jobs\SendDeletedServiceDepositWhatsappMessage;
 use Illuminate\Http\Request;
 use App\Http\Resources\RequestedServiceDepositResource;
 use App\Http\Resources\RequestedServiceResource;
@@ -241,6 +243,23 @@ class RequestedServiceDepositController extends Controller
 
         DB::beginTransaction();
         try {
+            // Archive the deposit before deleting it
+            $deletion = RequestedServiceDepositDeletion::create([
+                'requested_service_deposit_id' => $requestedServiceDeposit->id,
+                'requested_service_id' => $requestedService->id,
+                'amount' => $requestedServiceDeposit->amount,
+                'user_id' => $requestedServiceDeposit->user_id,
+                'is_bank' => $requestedServiceDeposit->is_bank,
+                'is_claimed' => $requestedServiceDeposit->is_claimed,
+                'shift_id' => $requestedServiceDeposit->shift_id,
+                'original_created_at' => $requestedServiceDeposit->created_at,
+                'deleted_by' => Auth::id(),
+                'deleted_at' => now(),
+            ]);
+
+            // Dispatch WhatsApp notification job (outside of DB changes)
+            SendDeletedServiceDepositWhatsappMessage::dispatch($deletion->id);
+
             // Use getRawOriginal to get the actual DB value, not the accessor that sums deposits
             $currentAmountPaid = (float) $requestedService->getRawOriginal('amount_paid') ?? 0;
             $requestedService->amount_paid = $currentAmountPaid - $amountBeingReversed;

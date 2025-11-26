@@ -36,6 +36,9 @@ class UploadLabResultToFirebase implements ShouldQueue
         $this->patientId = $patientId;
         $this->visitId = $visitId;
         $this->hospitalName = $hospitalName;
+        
+        // Set the queue name for filtering in jobs management
+        $this->onQueue('resultsUpload');
     }
 
     /**
@@ -217,16 +220,16 @@ class UploadLabResultToFirebase implements ShouldQueue
                 'cacheControl' => 'public, max-age=31536000',
             ]
         ]);
-        
+        $object->acl()->add('allUsers', 'READER');
         // Get the download URL
-        $downloadUrl = $object->signedUrl(new \DateTime('+1 year'));
+        // $downloadUrl = $object->signedUrl(new \DateTime('+1 year'));
         
-        Log::info("Successfully uploaded to Firebase Storage", [
-            'firebase_path' => $firebasePath,
-            'download_url' => $downloadUrl
-        ]);
-        
-        return $downloadUrl;
+     
+        // Public URL
+$publicUrl = "https://storage.googleapis.com/" . $bucket->name() . "/" . $firebasePath;
+
+return $publicUrl;
+        // return $downloadUrl;
     }
     
     

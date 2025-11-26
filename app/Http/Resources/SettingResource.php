@@ -71,6 +71,7 @@ class SettingResource extends JsonResource
             'show_logo' => (bool) $this->show_logo,
             'show_logo_only_whatsapp' => (bool) $this->show_logo_only_whatsapp,
             'show_title_in_lab_result' => (bool) $this->show_title_in_lab_result,
+            'storage_name' => $this->storage_name,
             
 
             // Eager load related finance accounts if needed for display

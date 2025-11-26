@@ -144,6 +144,7 @@ class Setting extends Model
         'show_logo',
         'show_logo_only_whatsapp',
         'show_title_in_lab_result',
+        'storage_name',
     ];
 
     protected $casts = [

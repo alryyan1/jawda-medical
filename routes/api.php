@@ -416,14 +416,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'destroySingle']);
     
     // Deposits for a specific Requested Service
-    Route::get('/requested-services/{requested_service}/deposits', [RequestedServiceDepositController::class, 'indexForRequestedService']); // NEW or ensure exists
+    Route::get('/requested-services/{requested_service}/deposits', [RequestedServiceDepositController::class, 'indexForRequestedService']); // list deposits for one service
     // POST to '/requested-services/{requested_service}/deposits' is already handled by RequestedServiceDepositController@store
     
-    // If you want direct CRUD on the deposit records themselves by their own ID:
-    // Route::apiResource('requested-service-deposits', RequestedServiceDepositController::class)->except(['store']); 
-    // Or more specific routes for update/delete:
-    Route::put('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'update']); // NEW
-    Route::delete('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'destroy']); // NEW
+    // Direct CRUD on the deposit records themselves by their own ID
+    Route::put('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'update']);
+    Route::delete('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'destroy']);
+
+    // Listing deleted/voided deposits
+    Route::get('/requested-service-deposit-deletions', [\App\Http\Controllers\Api\RequestedServiceDepositDeletionController::class, 'index']);
+    
+    // Jobs Management Routes
+    Route::prefix('jobs-management')->group(function () {
+        Route::get('/failed', [\App\Http\Controllers\Api\JobsManagementController::class, 'getFailedJobs']);
+        Route::get('/pending', [\App\Http\Controllers\Api\JobsManagementController::class, 'getPendingJobs']);
+        Route::get('/statistics', [\App\Http\Controllers\Api\JobsManagementController::class, 'getStatistics']);
+        Route::get('/queues', [\App\Http\Controllers\Api\JobsManagementController::class, 'getQueues']);
+        Route::post('/retry/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'retryJob']);
+        Route::post('/retry-all', [\App\Http\Controllers\Api\JobsManagementController::class, 'retryAllJobs']);
+        // Failed jobs deletion
+        Route::delete('/failed/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJob']);
+        Route::delete('/failed', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteAllFailedJobs']);
+        Route::post('/failed/delete-by-queue', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJobsByQueue']);
+        Route::post('/failed/delete-by-ids', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJobsByIds']);
+        // Pending jobs deletion
+        Route::delete('/pending/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJob']);
+        Route::delete('/pending', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteAllPendingJobs']);
+        Route::post('/pending/delete-by-queue', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJobsByQueue']);
+        Route::post('/pending/delete-by-ids', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJobsByIds']);
+    });
+    
     Route::post('companies/{targetCompany}/copy-contracts-from/{sourceCompany}', [CompanyServiceController::class, 'copyContractsFrom']); // NEW ROUTE
      /*
     |--------------------------------------------------------------------------

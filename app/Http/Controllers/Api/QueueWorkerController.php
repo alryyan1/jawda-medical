@@ -7,17 +7,15 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
-use Symfony\Component\Process\Process;
+use Illuminate\Support\Facades\Artisan;
 
 class QueueWorkerController extends Controller
 {
     private $pidFile;
-    private $logFile;
 
     public function __construct()
     {
         $this->pidFile = storage_path('app/queue-worker.pid');
-        $this->logFile = storage_path('logs/queue-worker.log');
     }
 
     /**
@@ -26,19 +24,14 @@ class QueueWorkerController extends Controller
     public function status(): JsonResponse
     {
         try {
-            $isRunning = $this->isWorkerRunning();
             $pid = $this->getWorkerPid();
-            
-            // If no PID file but process is running, try to get the actual PID
-            if ($isRunning && !$pid) {
-                $pid = $this->getRunningQueueWorkerPid();
-            }
+            $isRunning = $pid && $this->isProcessRunning($pid);
             
             return response()->json([
                 'success' => true,
                 'data' => [
                     'is_running' => $isRunning,
-                    'pid' => $pid,
+                    'pid' => $isRunning ? $pid : null,
                     'status' => $isRunning ? 'running' : 'stopped'
                 ]
             ]);
@@ -62,83 +55,107 @@ class QueueWorkerController extends Controller
     {
         try {
             // Check if already running
-            if ($this->isWorkerRunning()) {
+            $existingPid = $this->getWorkerPid();
+            if ($existingPid && $this->isProcessRunning($existingPid)) {
                 return response()->json([
                     'success' => true,
                     'message' => 'Queue worker is already running',
                     'data' => [
                         'is_running' => true,
+                        'pid' => $existingPid,
                         'status' => 'running'
                     ]
                 ]);
             }
 
-            // Build the command
-            $command = "php artisan queue:work --queue=notifications --sleep=1 --tries=3 --timeout=120";
+            // Clean up old PID file if process is not running
+            if (File::exists($this->pidFile)) {
+                File::delete($this->pidFile);
+            }
+
+            $pid = null;
             
-            // Start the process in background using a more reliable method
             if (PHP_OS_FAMILY === 'Windows') {
-                // Use batch file to start the process in background
-                $batchFile = base_path('start-queue-worker.bat');
+                // On Windows, start the queue worker in background
+                $artisanPath = base_path('artisan');
+                $logPath = storage_path('logs/queue-worker.log');
+                $queues = 'resultsUpload,ServicePaymentCancel,notifications,whatsapp,default';
                 
-                // Start the batch file in background
-                $command = "start /B \"\" \"$batchFile\"";
-                shell_exec($command);
+                // Create a VBS script to run the command hidden and get PID
+                $vbsFile = storage_path('app/start-queue-worker.vbs');
+                $vbsContent = 'Set objShell = CreateObject("WScript.Shell")' . "\r\n";
+                $vbsContent .= 'Set objExec = objShell.Exec("php ""' . str_replace('\\', '\\\\', $artisanPath) . '"" queue:work --queue=' . $queues . ' --sleep=1 --tries=3 --timeout=300")' . "\r\n";
+                $vbsContent .= 'WScript.Echo objExec.ProcessID' . "\r\n";
+                file_put_contents($vbsFile, $vbsContent);
                 
-                // Wait a moment for the process to start
-                sleep(3);
+                // Run the VBS script and get PID
+                $output = shell_exec('cscript //nologo "' . $vbsFile . '" 2>&1');
+                $output = trim($output);
+                Log::info("VBS start output: " . $output);
                 
-                // Try to find the PID of the running queue worker
-                $pid = $this->getRunningQueueWorkerPid();
-                if ($pid) {
-                    $this->saveWorkerPid($pid);
-                } else {
-                    // If we can't find the PID, but the process might be running, 
-                    // let's check if any queue worker is running
-                    if ($this->isQueueWorkerProcessRunning()) {
-                        // Process is running but we can't get PID, that's okay
-                        Log::info("Queue worker is running but PID could not be determined");
-                        $pid = null; // We'll handle this case
-                    } else {
-                        throw new \Exception('Failed to start queue worker - process not found');
+                if ($output && is_numeric($output)) {
+                    $pid = (int)$output;
+                }
+                
+                // If VBS method failed, try popen method
+                if (!$pid) {
+                    // Use popen to start process in background
+                    $command = 'start /B php "' . $artisanPath . '" queue:work --queue=' . $queues . ' --sleep=1 --tries=3 --timeout=300 > "' . $logPath . '" 2>&1';
+                    pclose(popen($command, 'r'));
+                    
+                    Log::info("Started queue worker using popen, waiting to find PID...");
+                    
+                    // Wait and find the PHP process running queue:work
+                    sleep(3);
+                    
+                    // Use wmic to find the process
+                    $findCmd = 'wmic process where "commandline like \'%queue:work%\'" get processid /format:value 2>nul';
+                    $output = shell_exec($findCmd);
+                    Log::info("WMIC find output: " . $output);
+                    
+                    if (preg_match('/ProcessId=(\d+)/i', $output, $matches)) {
+                        $pid = (int)$matches[1];
                     }
                 }
             } else {
                 // On Linux/Unix, use nohup
-                $fullCommand = "nohup php artisan queue:work --queue=notifications --sleep=1 --tries=3 --timeout=120 > " . storage_path('logs/queue-worker.log') . " 2>&1 &";
-                shell_exec($fullCommand);
+                // Include all queues: resultsUpload, ServicePaymentCancel, notifications, whatsapp, default
+                $logPath = storage_path('logs/queue-worker.log');
+                $command = "nohup php " . base_path('artisan') . " queue:work --queue=resultsUpload,ServicePaymentCancel,notifications,whatsapp,default --sleep=1 --tries=3 --timeout=300 > $logPath 2>&1 & echo $!";
+                $output = shell_exec($command);
+                $pid = (int)trim($output);
+            }
+            
+            if ($pid && $pid > 0) {
+                // Wait a moment and verify the process is running
+                sleep(2);
                 
-                // Wait a moment for the process to start
-                sleep(3);
-                
-                // Try to find the PID of the running queue worker
-                $pid = $this->getRunningQueueWorkerPid();
-                if ($pid) {
+                if ($this->isProcessRunning($pid)) {
                     $this->saveWorkerPid($pid);
-                } else {
-                    // If we can't find the PID, but the process might be running, 
-                    // let's check if any queue worker is running
-                    if ($this->isQueueWorkerProcessRunning()) {
-                        // Process is running but we can't get PID, that's okay
-                        Log::info("Queue worker is running but PID could not be determined");
-                        $pid = null; // We'll handle this case
-                    } else {
-                        throw new \Exception('Failed to start queue worker - process not found');
-                    }
+                    Log::info("Queue worker started successfully with PID: {$pid}");
+                    
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Queue worker started successfully',
+                        'data' => [
+                            'is_running' => true,
+                            'pid' => $pid,
+                            'status' => 'running'
+                        ]
+                    ]);
                 }
             }
             
-            Log::info("Queue worker started with PID: {$pid}");
-            
+            // Could not start or verify
             return response()->json([
-                'success' => true,
-                'message' => 'Queue worker started successfully',
+                'success' => false,
+                'message' => 'Failed to start queue worker - process could not be verified',
                 'data' => [
-                    'is_running' => true,
-                    'pid' => $pid,
-                    'status' => 'running'
+                    'is_running' => false,
+                    'status' => 'stopped'
                 ]
-            ]);
+            ], 500);
+            
         } catch (\Exception $e) {
             Log::error('Error starting queue worker: ' . $e->getMessage());
             return response()->json([
@@ -158,7 +175,24 @@ class QueueWorkerController extends Controller
     public function stop(): JsonResponse
     {
         try {
-            if (!$this->isWorkerRunning()) {
+            $pid = $this->getWorkerPid();
+            
+            if (!$pid) {
+                // No PID file, assume stopped
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Queue worker is not running',
+                    'data' => [
+                        'is_running' => false,
+                        'status' => 'stopped'
+                    ]
+                ]);
+            }
+            
+            if (!$this->isProcessRunning($pid)) {
+                // Process not running, clean up PID file
+                File::delete($this->pidFile);
+                
                 return response()->json([
                     'success' => true,
                     'message' => 'Queue worker is not running',
@@ -169,25 +203,40 @@ class QueueWorkerController extends Controller
                 ]);
             }
 
-            $pid = $this->getWorkerPid();
-            if ($pid) {
-                // Kill the process
-                if (PHP_OS_FAMILY === 'Windows') {
-                    $killProcess = new Process(['taskkill', '/PID', (string)$pid, '/F']);
-                    $killProcess->run();
-                } else {
-                    $killProcess = new Process(['kill', (string)$pid]);
-                    $killProcess->run();
-                }
-                
-                // Remove PID file
-                if (File::exists($this->pidFile)) {
-                    File::delete($this->pidFile);
-                }
-                
-                Log::info("Queue worker stopped (PID: {$pid})");
+            // Kill the process
+            $killed = $this->killProcess($pid);
+            
+            // Clean up PID file
+            if (File::exists($this->pidFile)) {
+                File::delete($this->pidFile);
+            }
+            
+            // Verify it's stopped
+            sleep(1);
+            $stillRunning = $this->isProcessRunning($pid);
+            
+            if ($stillRunning) {
+                // Try force kill
+                $this->killProcess($pid, true);
+                sleep(1);
+                $stillRunning = $this->isProcessRunning($pid);
+            }
+            
+            if ($stillRunning) {
+                Log::warning("Failed to stop queue worker PID: {$pid}");
+                return response()->json([
+                    'success' => false,
+                    'message' => "Failed to stop queue worker (PID: {$pid}). Try stopping manually.",
+                    'data' => [
+                        'is_running' => true,
+                        'pid' => $pid,
+                        'status' => 'running'
+                    ]
+                ], 500);
             }
 
+            Log::info("Queue worker stopped successfully (PID: {$pid})");
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Queue worker stopped successfully',
@@ -214,65 +263,11 @@ class QueueWorkerController extends Controller
      */
     public function toggle(): JsonResponse
     {
-        if ($this->isWorkerRunning()) {
+        $pid = $this->getWorkerPid();
+        if ($pid && $this->isProcessRunning($pid)) {
             return $this->stop();
         } else {
             return $this->start();
-        }
-    }
-
-    /**
-     * Check if queue worker is running
-     */
-    private function isWorkerRunning(): bool
-    {
-        // First check if we have a PID file and the process is running
-        $pid = $this->getWorkerPid();
-        if ($pid && $this->isProcessRunning($pid)) {
-            return true;
-        }
-
-        // If no PID file or process not found, check for any running queue worker processes
-        return $this->isQueueWorkerProcessRunning();
-    }
-
-    /**
-     * Check if a specific process ID is running
-     */
-    private function isProcessRunning(int $pid): bool
-    {
-        if (PHP_OS_FAMILY === 'Windows') {
-            $result = new Process(['tasklist', '/FI', "PID eq {$pid}"]);
-            $result->run();
-            return str_contains($result->getOutput(), (string)$pid);
-        } else {
-            $result = new Process(['ps', '-p', (string)$pid]);
-            $result->run();
-            return $result->isSuccessful();
-        }
-    }
-
-    /**
-     * Check if any queue worker process is running
-     */
-    private function isQueueWorkerProcessRunning(): bool
-    {
-        if (PHP_OS_FAMILY === 'Windows') {
-            // On Windows, use wmic to check for queue worker processes
-            $result = new Process(['wmic', 'process', 'where', 'name="php.exe"', 'get', 'processid,commandline']);
-            $result->run();
-            $output = $result->getOutput();
-            
-            // Clean the output and check for queue:work
-            $cleanOutput = preg_replace('/[^\x20-\x7E]/', '', $output);
-            return str_contains($cleanOutput, 'queue:work');
-        } else {
-            // On Linux/Unix, use ps to find queue worker processes
-            $result = new Process(['ps', 'aux']);
-            $result->run();
-            $output = $result->getOutput();
-            
-            return str_contains($output, 'queue:work');
         }
     }
 
@@ -285,7 +280,7 @@ class QueueWorkerController extends Controller
             return null;
         }
 
-        $pid = (int) File::get($this->pidFile);
+        $pid = (int) trim(File::get($this->pidFile));
         return $pid > 0 ? $pid : null;
     }
 
@@ -298,47 +293,58 @@ class QueueWorkerController extends Controller
     }
 
     /**
-     * Get PID of running queue worker process
+     * Check if a specific process ID is running
      */
-    private function getRunningQueueWorkerPid(): ?int
+    private function isProcessRunning(int $pid): bool
     {
-        if (PHP_OS_FAMILY === 'Windows') {
-            // On Windows, use wmic to get process info
-            $result = new Process(['wmic', 'process', 'where', 'name="php.exe"', 'get', 'processid,commandline']);
-            $result->run();
-            $output = $result->getOutput();
-            
-            // Clean the output and parse
-            $cleanOutput = preg_replace('/[^\x20-\x7E]/', '', $output);
-            $lines = explode("\n", $cleanOutput);
-            
-            foreach ($lines as $line) {
-                if (str_contains($line, 'queue:work')) {
-                    // Extract PID from the line
-                    preg_match('/(\d+)/', $line, $matches);
-                    if (isset($matches[1]) && is_numeric($matches[1])) {
-                        return (int)$matches[1];
-                    }
-                }
-            }
-        } else {
-            // On Linux/Unix, use ps to get process info
-            $result = new Process(['ps', 'aux']);
-            $result->run();
-            $output = $result->getOutput();
-            
-            // Parse the output to find queue worker process
-            $lines = explode("\n", $output);
-            foreach ($lines as $line) {
-                if (str_contains($line, 'queue:work')) {
-                    $parts = preg_split('/\s+/', $line);
-                    if (count($parts) >= 2 && is_numeric($parts[1])) {
-                        return (int)$parts[1];
-                    }
-                }
-            }
+        if ($pid <= 0) {
+            return false;
         }
         
-        return null;
+        if (PHP_OS_FAMILY === 'Windows') {
+            // Use tasklist to check if process exists
+            $command = "tasklist /FI \"PID eq {$pid}\" /NH 2>NUL";
+            $output = shell_exec($command);
+            
+            // tasklist returns "INFO: No tasks are running..." if process not found
+            // or returns the process info if found
+            return $output && !str_contains($output, 'INFO:') && str_contains($output, (string)$pid);
+        } else {
+            // On Linux/Unix, use kill -0 to check if process exists
+            $command = "kill -0 {$pid} 2>/dev/null && echo 'running' || echo 'stopped'";
+            $output = trim(shell_exec($command));
+            return $output === 'running';
+        }
+    }
+
+    /**
+     * Kill a process by PID
+     */
+    private function killProcess(int $pid, bool $force = false): bool
+    {
+        if ($pid <= 0) {
+            return false;
+        }
+        
+        try {
+            if (PHP_OS_FAMILY === 'Windows') {
+                // Use taskkill
+                $forceFlag = $force ? '/F' : '';
+                $command = "taskkill /PID {$pid} {$forceFlag} 2>&1";
+                $output = shell_exec($command);
+                Log::info("Taskkill output for PID {$pid}: " . trim($output));
+                
+                return str_contains($output, 'SUCCESS') || str_contains($output, 'terminated');
+            } else {
+                // On Linux/Unix
+                $signal = $force ? '-9' : '-15';
+                $command = "kill {$signal} {$pid} 2>&1";
+                shell_exec($command);
+                return true;
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to kill process {$pid}: " . $e->getMessage());
+            return false;
+        }
     }
 }
