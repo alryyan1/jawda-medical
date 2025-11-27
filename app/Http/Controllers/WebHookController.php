@@ -77,134 +77,24 @@ class WebHookController extends Controller
 			if (is_numeric($msg)) {
 				try {
 					$id = (int) $msg;
-					$patient = Doctorvisit::find($id);
 
-					if (!$patient) {
-						Log::warning('Patient not found', ['id' => $id, 'from' => $from]);
-                        // reply to sender via Ultramsg
-                        $to = UltramsgService::formatPhoneNumber($from_sms);
-                        if ($to) {
-                            (new UltramsgService())->sendTextMessage($to, 'عذرا، لا يوجد مريض بهذا الكود');
-                        }
-						return response()->json(['ok' => true]);
-					}
-
-					$name = $patient->patient->name;
 					$txt = <<<EOD
 مرحبا بك عزيز الزائر
-{$name}
 سيتم ارسال النتيجه ...
 EOD;
 
-                    // Send welcome text via UltramsgService
-                    $to = UltramsgService::formatPhoneNumber($from_sms);
-                    if ($to) {
-                        (new UltramsgService())->sendTextMessage($to, $txt);
-                    }
+					// Send welcome message first
+					$to = UltramsgService::formatPhoneNumber($from_sms);
+					if ($to) {
+						(new UltramsgService())->sendTextMessage($to, $txt);
+					}
 
-                    // Check if results are ready before generating PDF
-                    $labRequestIds = $patient->patientLabRequests->pluck('id');
-                    $totalResultsCount = 0;
-                    $pendingResultsCount = 0;
-                    
-                    if ($labRequestIds->isNotEmpty()) {
-                        $totalResultsCount = \App\Models\RequestedResult::whereIn('lab_request_id', $labRequestIds)->count();
-                        $pendingResultsCount = \App\Models\RequestedResult::whereIn('lab_request_id', $labRequestIds)
-                            ->where(function ($query) {
-                                $query->whereNull('result')
-                                      ->orWhere('result', '=', '');
-                            })
-                            ->count();
-                    }
-                    
-                    // Check if results are ready
-                    $allResultsReady = ($totalResultsCount > 0 && $pendingResultsCount === 0);
-                    
-                    if (!$allResultsReady) {
-                        Log::info('Results not ready for patient', [
-                            'patient_id' => $id,
-                            'total_results' => $totalResultsCount,
-                            'pending_results' => $pendingResultsCount
-                        ]);
-                        
-                        // Send clarification message
-                        $clarificationMessage = <<<EOD
-عذراً، النتائج غير جاهزة بعد
-{$name}
-عدد النتائج المطلوبة: {$totalResultsCount}
-عدد النتائج المتبقية: {$pendingResultsCount}
-يرجى المحاولة مرة أخرى لاحقاً
-EOD;
-                        
-                        if ($to) {
-                            (new UltramsgService())->sendTextMessage($to, $clarificationMessage);
-                        }
-                        
-                        return response()->json(['ok' => true]);
-                    }
+					// Send document from Firebase
+					$request = new Request(['visit_id' => (string) $id, 'phone' => $from_sms]);
+					$ultramsgController = app(UltramsgController::class);
+					$result = $ultramsgController->sendDocumentFromFirebase($request);
 
-                    // Generate PDF using LabResultReport service
-                    $pdfContent = (new LabResultReport())->generate($patient, false, true);
-                    
-                    if (empty($pdfContent)) {
-                        Log::error('PDF generation failed - empty content', ['patient_id' => $id]);
-                        throw new \Exception('PDF generation failed');
-                    }
-
-                    // Store PDF to temporary file for sending
-                    $filename = 'lab_' . $id . '_' . Str::uuid() . '.pdf';
-                    $tempPath = storage_path('app/temp/' . $filename);
-                    
-                    // Ensure temp directory exists
-                    $tempDir = dirname($tempPath);
-                    if (!file_exists($tempDir)) {
-                        if (!mkdir($tempDir, 0755, true)) {
-                            Log::error('Failed to create temp directory', ['path' => $tempDir]);
-                            throw new \Exception('Failed to create temp directory');
-                        }
-                    }
-                    
-                    // Write PDF content to temporary file
-                    $bytesWritten = file_put_contents($tempPath, $pdfContent);
-                    if ($bytesWritten === false) {
-                        Log::error('Failed to write PDF to temp file', ['path' => $tempPath]);
-                        throw new \Exception('Failed to write PDF to temp file');
-                    }
-                    
-                    Log::info('PDF created successfully', [
-                        'patient_id' => $id,
-                        'filename' => $filename,
-                        'size' => $bytesWritten,
-                        'path' => $tempPath
-                    ]);
-                    
-                    // Send PDF via UltramsgService using file path
-                    if ($to) {
-                        $result = (new UltramsgService())->sendDocumentFromFile($to, $tempPath, 'Lab Result');
-                        
-                        // Clean up temporary file
-                        if (file_exists($tempPath)) {
-                            unlink($tempPath);
-                        }
-                        
-                        // Log the result
-                        if ($result['success']) {
-                            Log::info('PDF sent successfully via WhatsApp', [
-                                'patient_id' => $id,
-                                'to' => $to,
-                                'message_id' => $result['message_id'] ?? null
-                            ]);
-                        } else {
-                            Log::error('Failed to send PDF via WhatsApp', [
-                                'patient_id' => $id,
-                                'to' => $to,
-                                'error' => $result['error'] ?? 'Unknown error',
-                                'response' => $result['data'] ?? null
-                            ]);
-                        }
-                    }
-
-                    return response()->json(['ok' => true]);
+					return response()->json(['ok' => true]);
 
 				} catch (\Throwable $e) {
 					Log::error('Error processing numeric message', [

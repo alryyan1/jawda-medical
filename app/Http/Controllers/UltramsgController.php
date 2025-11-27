@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\UploadLabResultToFirebase;
+use App\Models\DoctorVisit;
 use App\Services\UltramsgService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -188,6 +190,39 @@ class UltramsgController extends Controller
         $result = $this->ultramsgService->sendDocumentFromUrl($to, $documentUrl, $filename, $caption);
 
         return response()->json($result, $result['success'] ? 200 : 400);
+    }
+
+    //send document from firebase storage using visit_id and settings.storage_name
+    public function sendDocumentFromFirebase(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'visit_id' => 'required|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $visitId = $request->input('visit_id');
+
+        $appSettings = \App\Models\Setting::first();
+        $storageName = $appSettings?->storage_name;
+
+        $publicUrl = UploadLabResultToFirebase::generatePublicUrl("results/{$storageName}/{$visitId}/result.pdf");
+        echo $publicUrl;
+
+
+        $filename = 'result.pdf';
+        $caption = 'labresult';
+        $phone = $request->input('phone');
+      
+        $result = $this->ultramsgService->sendDocument($phone, $publicUrl, $publicUrl, $caption);
+        return response()->json($result, $result['success'] ? 200 : 400);
+        
     }
 
     /**

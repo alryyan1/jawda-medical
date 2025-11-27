@@ -36,7 +36,7 @@ class UploadLabResultToFirebase implements ShouldQueue
         $this->patientId = $patientId;
         $this->visitId = $visitId;
         $this->hospitalName = $hospitalName;
-        
+
         // Set the queue name for filtering in jobs management
         $this->onQueue('resultsUpload');
     }
@@ -51,7 +51,7 @@ class UploadLabResultToFirebase implements ShouldQueue
 
             // Get patient data
             $patient = Patient::with(['doctorVisit.labRequests.mainTest'])->find($this->patientId);
-            
+
             if (!$patient) {
                 Log::error("Patient not found: {$this->patientId}");
                 $this->fail(new \Exception("Patient not found: {$this->patientId}"));
@@ -119,9 +119,9 @@ class UploadLabResultToFirebase implements ShouldQueue
                     // Send completion notification after successful Firestore update
                     try {
                         \App\Services\FirebaseService::sendTopicMessage(
-                            $patient->lab_to_lab_id ,
+                            $patient->lab_to_lab_id,
                             'النتائج مكتملة',
-                             "تم الانتهاء من  ادخال النتائج  
+                            "تم الانتهاء من  ادخال النتائج  
                              \n 
                              $patient->name"
                         );
@@ -152,7 +152,7 @@ class UploadLabResultToFirebase implements ShouldQueue
                 'patient_id' => $this->patientId,
                 'visit_id' => $this->visitId
             ]);
-            
+
             // Re-throw to trigger retry mechanism
             throw $e;
         }
@@ -165,17 +165,17 @@ class UploadLabResultToFirebase implements ShouldQueue
     {
         // Check if Firebase service account file exists
         $serviceAccountPath = config('firebase.service_account_path');
-        
+
         if (!file_exists($serviceAccountPath)) {
             throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}. Please configure Firebase properly.");
         }
-        
+
         // Initialize Firebase
         $firebase = $this->initializeFirebase();
         $storage = $firebase->createStorage();
         $bucketName = config('firebase.storage_bucket');
         $bucket = $storage->getBucket($bucketName);
-        
+
         // Check if file exists and delete it
         $object = $bucket->object($firebasePath);
         if ($object->exists()) {
@@ -197,21 +197,21 @@ class UploadLabResultToFirebase implements ShouldQueue
     {
         // Check if Firebase service account file exists
         $serviceAccountPath = config('firebase.service_account_path');
-        
+
         if (!file_exists($serviceAccountPath)) {
             throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}. Please configure Firebase properly.");
         }
-        
+
         // Initialize Firebase
         $firebase = $this->initializeFirebase();
         $storage = $firebase->createStorage();
-        
+
         // Debug: Log the bucket name being used
         $bucketName = config('firebase.storage_bucket');
         Log::info("Using Firebase bucket: " . $bucketName);
-        
+
         $bucket = $storage->getBucket($bucketName); // Use specific bucket
-        
+
         // Upload file to Firebase Storage
         $object = $bucket->upload($fileContent, [
             'name' => $firebasePath,
@@ -223,31 +223,58 @@ class UploadLabResultToFirebase implements ShouldQueue
         $object->acl()->add('allUsers', 'READER');
         // Get the download URL
         // $downloadUrl = $object->signedUrl(new \DateTime('+1 year'));
-        
-     
-        // Public URL
-$publicUrl = "https://storage.googleapis.com/" . $bucket->name() . "/" . $firebasePath;
 
-return $publicUrl;
+
+        // Public URL
+        $publicUrl = self::generatePublicUrl($firebasePath);
+
+        return $publicUrl;
         // return $downloadUrl;
     }
-    
-    
+
+
+    /**
+     * Generate public URL for Firebase Storage object
+     *
+     * @param string $firebasePath
+     * @return string
+     */
+    public static function generatePublicUrl(string $firebasePath): string
+    {
+        // Check if Firebase service account file exists
+        $serviceAccountPath = config('firebase.service_account_path');
+
+        if (!file_exists($serviceAccountPath)) {
+            throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}. Please configure Firebase properly.");
+        }
+
+        // Initialize Firebase
+        $factory = (new Factory)
+            ->withServiceAccount($serviceAccountPath)
+            ->withProjectId(config('firebase.project_id'));
+
+        $storage = $factory->createStorage();
+        $bucketName = config('firebase.storage_bucket');
+        $bucket = $storage->getBucket($bucketName);
+
+        return "https://storage.googleapis.com/" . $bucket->name() . "/" . $firebasePath;
+    }
+
     /**
      * Initialize Firebase Admin SDK
      */
     private function initializeFirebase()
     {
         $serviceAccountPath = config('firebase.service_account_path');
-        
+
         $factory = (new Factory)
             ->withServiceAccount($serviceAccountPath)
             ->withProjectId(config('firebase.project_id'));
-            
+
         return $factory;
     }
 
-    
+
 
     /**
      * Handle a job failure.

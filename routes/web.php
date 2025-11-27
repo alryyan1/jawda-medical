@@ -69,6 +69,9 @@ Route::post('/webhook', [WebHookController::class, 'webhook']);
 // Excel reclaim route for web access
 Route::get('/excel/reclaim', [\App\Http\Controllers\Api\ExcelController::class, 'reclaim']);
 
+//send from firebase storage using visit_id and settings.storage_name
+Route::get('/ultramsg/send-document-from-firebase', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFirebase']);
+
 //phpinfo
 Route::get('/phpinfo', function () {
     phpinfo();

@@ -751,8 +751,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/bankak-images', [BankakImageController::class, 'index']);
     Route::get('/bankak-images/dates', [BankakImageController::class, 'getAvailableDates']);
     Route::get('/bankak-images/stats', [BankakImageController::class, 'getStats']);
+
+
 });
 
+//send from firebase storage using visit_id and settings.storage_name
+Route::post('/ultramsg/send-document-from-firebase', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFirebase']);
 // Webhook endpoints (no CSRF protection needed)
 Route::get('/webhook', [WebHookController::class, 'webhook']);
 Route::post('/webhook', [WebHookController::class, 'webhook']);
