@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Jobs\UploadLabResultToFirebase;
 use App\Models\DoctorVisit;
 use App\Services\UltramsgService;
+use App\Services\FirebaseService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class UltramsgController extends Controller
 {
@@ -197,6 +199,8 @@ class UltramsgController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'visit_id' => 'required|string|max:255',
+            'url' => 'nullable|url',
+
         ]);
 
         if ($validator->fails()) {
@@ -208,21 +212,102 @@ class UltramsgController extends Controller
         }
 
         $visitId = $request->input('visit_id');
-
+        $url = $request->input('url');
+        
+        // If URL is not provided, fetch it from Firestore
+        if (!$url) {
+            $url = $this->getResultUrlFromFirestore($visitId);
+            if (!$url) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'URL not found in request and could not be retrieved from Firestore'
+                ], 404);
+            }
+        }
+        
         $appSettings = \App\Models\Setting::first();
-        $storageName = $appSettings?->storage_name;
-
-        $publicUrl = UploadLabResultToFirebase::generatePublicUrl("results/{$storageName}/{$visitId}/result.pdf");
-        echo $publicUrl;
-
 
         $filename = 'result.pdf';
         $caption = 'labresult';
         $phone = $request->input('phone');
       
-        $result = $this->ultramsgService->sendDocument($phone, $publicUrl, $publicUrl, $caption);
+        $result = $this->ultramsgService->sendDocument($phone, 'result.pdf', $url, $caption);
         return response()->json($result, $result['success'] ? 200 : 400);
         
+    }
+
+    /**
+     * Get result URL from Firestore using visit ID
+     *
+     * @param string $visitId
+     * @return string|null
+     */
+    public function getResultUrlFromFirestore(string $visitId): ?string
+    {
+        try {
+            $projectId = config('firebase.project_id');
+            if (!$projectId) {
+                Log::warning('Firebase project ID not configured for Firestore read');
+                return null;
+            }
+
+            $accessToken = FirebaseService::getAccessToken();
+            if (!$accessToken) {
+                Log::warning('FCM access token unavailable for Firestore read');
+                return null;
+            }
+
+            $collection = 'altamayoz_branch_2';
+            $documentId = (string) $visitId;
+            $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}/{$documentId}";
+
+            $response = Http::withToken($accessToken)->get($url);
+
+            if ($response->successful()) {
+                $document = $response->json();
+                $fields = $document['fields'] ?? [];
+                
+                // Extract result_url from Firestore document
+                if (isset($fields['result_url']['stringValue'])) {
+                    $resultUrl = $fields['result_url']['stringValue'];
+                    Log::info("Retrieved result URL from Firestore", [
+                        'collection' => $collection,
+                        'document_id' => $documentId,
+                        'result_url' => $resultUrl
+                    ]);
+                    return $resultUrl;
+                } else {
+                    Log::warning("Result URL not found in Firestore document", [
+                        'collection' => $collection,
+                        'document_id' => $documentId,
+                        'available_fields' => array_keys($fields)
+                    ]);
+                    return null;
+                }
+            } else if ($response->status() === 404) {
+                Log::warning("Firestore document not found", [
+                    'collection' => $collection,
+                    'document_id' => $documentId
+                ]);
+                return null;
+            } else {
+                Log::warning("Failed to get Firestore document", [
+                    'collection' => $collection,
+                    'document_id' => $documentId,
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                return null;
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Failed to get result URL from Firestore", [
+                'visit_id' => $visitId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
     }
 
     /**

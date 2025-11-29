@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\UltramsgController;
 use App\Models\Patient;
 use App\Models\DoctorVisit;
 use App\Models\Shift; // To get current shift for visit
@@ -18,6 +19,7 @@ use App\Models\Doctor;
 use App\Models\MainTest;
 use App\Models\LabRequest;
 // use App\Http\Resources\PatientCollection; // If you have custom pagination
+use Http;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -39,8 +41,10 @@ use App\Jobs\SendWelcomeSmsJob;
 use App\Models\Setting;
 use App\Services\UltramsgService;
 use App\Jobs\SendAuthWhatsappMessage;
+use App\Jobs\SmsResultAuth;
 use App\Models\CompanyService;
 use App\Models\Mindray;
+use App\Services\Pdf\LabResultReport;
 
 class PatientController extends Controller
 {
@@ -249,7 +253,7 @@ class PatientController extends Controller
             DB::commit();
 
             // Queue non-blocking actions after successful commit
-            \DB::afterCommit(function () use ($patient) {
+            DB::afterCommit(function () use ($patient) {
                 $settings = Setting::first();
             
                 $hasPhone = is_string($patient->phone) ? trim($patient->phone) !== '' : !empty($patient->phone);
@@ -403,7 +407,8 @@ class PatientController extends Controller
                     \App\Jobs\UploadLabResultToFirebase::dispatch(
                         $patient->id,
                         $doctorVisit->id,
-                        $settings->storage_name
+                        $settings->storage_name,
+                        true
                     );
                     
                     Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
@@ -434,8 +439,13 @@ class PatientController extends Controller
             'data' => $queueItemResource
         ];
 
-        // Queue WhatsApp message job (respects settings flag internally)
-        SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
+        // Queue SMS message job (respects settings flag internally)
+        try {
+            SmsResultAuth::dispatch($patient->id);
+            Log::info("SMS result auth job dispatched for patient {$patient->id}");
+        } catch (\Exception $e) {
+            Log::error('Error dispatching SMS result auth job: ' . $e->getMessage());
+        }
 
         return response()->json($responseData);
     }
@@ -460,7 +470,7 @@ class PatientController extends Controller
      * @param  \App\Models\Patient  $patient
      * @return \Illuminate\Http\JsonResponse
      */
-    public function uploadToFirebase(Patient $patient)
+    public function uploadToFirebase(Patient $patient, bool $sendWhatsappMessage = false)
     {
         try {
             // Get doctor visit
@@ -500,8 +510,11 @@ class PatientController extends Controller
 
             // Refresh the patient to get the updated result_url
             $patient->refresh();
-            
-            \Log::info("Firebase upload completed for patient {$patient->id}, visit {$doctorVisit->id}", [
+             // Only dispatch WhatsApp message after successful upload and URL generation
+        if ($sendWhatsappMessage ) {
+            SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
+        }
+            Log::info("Firebase upload completed for patient {$patient->id}, visit {$doctorVisit->id}", [
                 'had_existing_url' => $hadExistingUrl,
                 'old_url' => $oldResultUrl,
                 'new_url' => $patient->result_url
@@ -522,7 +535,7 @@ class PatientController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error uploading to Firebase: ' . $e->getMessage(), [
+            Log::error('Error uploading to Firebase: ' . $e->getMessage(), [
                 'patient_id' => $patient->id,
                 'exception' => $e
             ]);
@@ -578,18 +591,18 @@ class PatientController extends Controller
                 if ($doctorVisit) {
                     // Check if storage_name is set
                     if (empty($settings->storage_name)) {
-                        \Log::warning("Firebase upload skipped: storage_name is not set in settings");
+                        Log::warning("Firebase upload skipped: storage_name is not set in settings");
                     } else {
                         \App\Jobs\UploadLabResultToFirebase::dispatch(
                             $patient->id,
                             $doctorVisit->id,
                             $settings->storage_name
                         );
-                        \Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
+                        Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
                     }
                 }
             } catch (\Exception $e) {
-                \Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
+                Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
             }
         } else {
             // If de-authenticating, clear the auth user and date
@@ -1559,7 +1572,7 @@ class PatientController extends Controller
             DB::commit();
 
             // Queue non-blocking actions after successful commit
-            \DB::afterCommit(function () use ($newPatient) {
+            DB::afterCommit(function () use ($newPatient) {
                 EmitPatientRegisteredJob::dispatch($newPatient->id);
                 if (!empty($newPatient->phone)) {
                     SendWelcomeSmsJob::dispatch($newPatient->id, $newPatient->phone, $newPatient->name);
@@ -1869,6 +1882,35 @@ class PatientController extends Controller
         }
 
         return ['status' => true, 'data' => new DoctorVisitResource($doctorvisit->load(['patient.subcompany', 'patient.doctor'])), 'chemistryObj' => $object];
+    }
+    public function sendWhatsappDirectPdfReport(Request $request)
+    {
+        $doctorVisitId = $request->get('visit_id');
+        $doctorvisit = Doctorvisit::find($doctorVisitId);
+        if ($doctorvisit == null) {
+            return ['status' => false, 'message' => 'no data found'];
+        }
+
+        $this->uploadToFirebase($doctorvisit->patient);
+
+
+
+        $response = HttpClient::asForm()->post(
+            'https://intaj-starstechnology.com/whatsapp/altamayoz/jawda-medical/public/api/ultramsg/send-document-from-firebase',
+            [
+                'visit_id' => $doctorvisit->id,
+                'phone' => $doctorvisit->patient->phone,
+                'url' => $doctorvisit->patient->result_url,
+            ]
+        );
+
+        return response()->json([
+            'status' => $response->successful(),
+            'status_code' => $response->status(),
+            'data' => $response->json() ?? $response->body(),
+            'message' => $response->successful() ? 'report sent successfully' : 'failed to send report'
+        ], $response->status());
+
     }
 
 }

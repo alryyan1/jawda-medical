@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Doctorvisit;
 use App\Models\BankakImage;
 use App\Jobs\EmitBankakImageInsertedJob;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -88,9 +89,10 @@ EOD;
 					if ($to) {
 						(new UltramsgService())->sendTextMessage($to, $txt);
 					}
+					$settings = Setting::first();
 
 					// Send document from Firebase
-					$request = new Request(['visit_id' => (string) $id, 'phone' => $from_sms]);
+					$request = new Request(['visit_id' => (string) $id, 'phone' => $from_sms, ]);
 					$ultramsgController = app(UltramsgController::class);
 					$result = $ultramsgController->sendDocumentFromFirebase($request);
 

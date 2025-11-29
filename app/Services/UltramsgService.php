@@ -414,4 +414,15 @@ class UltramsgService
         return $status === 'authenticated' && $substatus === 'connected';
     }
 
+    public function sendTextMessageOnline(string $instanceId, string $token, string $to, string $body): Response
+    {
+        $endpoint = "https://intaj-starstechnology.com/jawda-medical/public/api/ultramsg/send-text-message-with-credentials";
+
+        return Http::asForm()->post($endpoint, [
+                'token' => $token,
+                'instance_id' => $instanceId,
+                'phone' => $to,
+                'body' => $body,
+            ]);
+        }
 }

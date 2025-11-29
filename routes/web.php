@@ -77,6 +77,24 @@ Route::get('/phpinfo', function () {
     phpinfo();
 });
 
+// Test send text message online
+Route::get('/ultramsg/send-text-message-online', function () {
+    $service = new \App\Services\UltramsgService();
+    $settings = \App\Models\Setting::first();
+
+    $response = $service->sendTextMessageOnline(
+        $settings->ultramsg_instance_id,
+        $settings->ultramsg_token,
+        '249991961111',
+        'Hello, this is a test message'
+    );
+
+    // Return the actual JSON/body from Ultramsg instead of the Response object metadata
+    return response()->json([
+        'status' => $response->status(),
+        'body'   => $response->json() ?? $response->body(),
+    ]);
+});
 
 Route::get('/hl7', function () {
     // return 123;

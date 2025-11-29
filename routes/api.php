@@ -344,6 +344,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // The `except(['index', 'store'])` means GET /labrequests/{labrequest} (for show) SHOULD be defined by apiResource.
   Route::get('/reports/monthly-lab-income/pdf', [ReportController::class, 'generateMonthlyLabIncomePdf']);
   Route::get('/dashboard/summary', [DashboardController::class, 'getSummary'])->middleware('auth:sanctum');
+  Route::get('/dashboard/financial-summary', [DashboardController::class, 'getFinancialSummary'])->middleware('auth:sanctum');
   Route::get('/shifts/{shift}/financial-summary', [ShiftController::class, 'getFinancialSummary'])->middleware('auth:sanctum');
   Route::get('/subcompanies-list', [SubcompanyController::class, 'indexList'])->middleware('auth:sanctum');
   Route::post('/subcompanies', [SubcompanyController::class, 'store'])->middleware('auth:sanctum');
@@ -761,3 +762,6 @@ Route::post('/ultramsg/send-document-from-firebase', [\App\Http\Controllers\Ultr
 Route::get('/webhook', [WebHookController::class, 'webhook']);
 Route::post('/webhook', [WebHookController::class, 'webhook']);
 Route::post('populatePatientChemistryData/{doctorvisit}',[PatientController::class,'populatePatientChemistryData']);
+
+
+Route::post('/sendWhatsappDirectPdfReport', [PatientController::class, 'sendWhatsappDirectPdfReport']);

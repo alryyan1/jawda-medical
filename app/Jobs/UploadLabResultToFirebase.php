@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\ServiceAccount;
-use Kreait\Firebase\Firestore;
+use App\Services\FirebaseService;
 
 class UploadLabResultToFirebase implements ShouldQueue
 {
@@ -27,16 +27,16 @@ class UploadLabResultToFirebase implements ShouldQueue
     protected $patientId;
     protected $visitId;
     protected $hospitalName;
-
+    protected $sendWhatsappMessage;
     /**
      * Create a new job instance.
      */
-    public function __construct(int $patientId, int $visitId, string $hospitalName = 'Jawda Medical')
+    public function __construct(int $patientId, int $visitId, string $hospitalName = 'Jawda Medical', bool $sendWhatsappMessage = false)
     {
         $this->patientId = $patientId;
         $this->visitId = $visitId;
         $this->hospitalName = $hospitalName;
-
+        $this->sendWhatsappMessage = $sendWhatsappMessage;
         // Set the queue name for filtering in jobs management
         $this->onQueue('resultsUpload');
     }
@@ -73,7 +73,7 @@ class UploadLabResultToFirebase implements ShouldQueue
 
             // Generate PDF content
             $labResultReport = new LabResultReport();
-            $pdfContent = $labResultReport->generate($doctorVisit);
+            $pdfContent = $labResultReport->generate($doctorVisit, false, true);
 
             if (!$pdfContent) {
                 Log::error("Failed to generate PDF for patient {$this->patientId}");
@@ -90,6 +90,9 @@ class UploadLabResultToFirebase implements ShouldQueue
 
             // Upload to Firebase using HTTP API
             $downloadUrl = $this->uploadToFirebase($pdfContent, $firebasePath);
+
+            // Store download URL in Firestore
+            $this->storeResultUrlInFirestore($this->visitId, $downloadUrl, $patient->name);
 
             // Update patient with result_url
             $patient->update(['result_url' => $downloadUrl]);
@@ -138,6 +141,9 @@ class UploadLabResultToFirebase implements ShouldQueue
                         'lab_to_lab_object_id' => $patient->lab_to_lab_object_id,
                     ]);
                 }
+            }
+            if ($this->sendWhatsappMessage) {
+                SendAuthWhatsappMessage::dispatch($this->patientId)->onQueue('notifications');
             }
 
             Log::info("Successfully uploaded lab result to Firebase for patient {$this->patientId}", [
@@ -222,14 +228,15 @@ class UploadLabResultToFirebase implements ShouldQueue
         ]);
         $object->acl()->add('allUsers', 'READER');
         // Get the download URL
-        // $downloadUrl = $object->signedUrl(new \DateTime('+1 year'));
-
+        $downloadUrl = $object->signedUrl(new \DateTime('+1 year'));
 
         // Public URL
-        $publicUrl = self::generatePublicUrl($firebasePath);
+        // $publicUrl = self::generatePublicUrl($firebasePath);
 
-        return $publicUrl;
-        // return $downloadUrl;
+       
+
+        // return $publicUrl;
+        return $downloadUrl;
     }
 
 
@@ -272,6 +279,161 @@ class UploadLabResultToFirebase implements ShouldQueue
             ->withProjectId(config('firebase.project_id'));
 
         return $factory;
+    }
+
+    /**
+     * Store the download URL in Firestore at /altamayoz_branch_2 collection
+     * Document ID is the doctor visit ID, with result_url and patient_name properties
+     * Creates the document if it doesn't exist, updates it if it does
+     * Uses REST API approach to avoid Firestore SDK dependency
+     *
+     * @param int $doctorVisitId
+     * @param string $resultUrl
+     * @param string $patientName
+     * @return void
+     */
+    private function storeResultUrlInFirestore(int $doctorVisitId, string $resultUrl, string $patientName): void
+    {
+        try {
+            $projectId = config('firebase.project_id');
+            if (!$projectId) {
+                Log::warning('Firebase project ID not configured for Firestore update');
+                return;
+            }
+
+            $accessToken = FirebaseService::getAccessToken();
+            if (!$accessToken) {
+                Log::warning('FCM access token unavailable for Firestore update');
+                return;
+            }
+
+            $collection = 'altamayoz_branch_2';
+            $documentId = (string) $doctorVisitId;
+            $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}/{$documentId}";
+
+            // Try to get current document first to merge with existing fields
+            $getResponse = Http::withToken($accessToken)->get($url);
+            
+            $fields = [
+                'result_url' => ['stringValue' => $resultUrl],
+                'patient_name' => ['stringValue' => $patientName]
+            ];
+
+            if ($getResponse->successful()) {
+                // Document exists - merge with existing fields
+                $currentDoc = $getResponse->json();
+                $currentFields = $currentDoc['fields'] ?? [];
+                
+                // Merge new fields with existing fields (preserve other fields)
+                $currentFields['result_url'] = $fields['result_url'];
+                $currentFields['patient_name'] = $fields['patient_name'];
+                $fields = $currentFields;
+
+                // Update existing document using PATCH (merge)
+                $updatePayload = ['fields' => $fields];
+                $response = Http::withToken($accessToken)->patch($url, $updatePayload);
+                
+                if ($response->successful()) {
+                    Log::info("Updated result URL in Firestore", [
+                        'collection' => $collection,
+                        'document_id' => $documentId,
+                        'result_url' => $resultUrl,
+                        'patient_name' => $patientName
+                    ]);
+                } else {
+                    Log::warning("Failed to update Firestore document", [
+                        'collection' => $collection,
+                        'document_id' => $documentId,
+                        'status' => $response->status(),
+                        'body' => $response->body()
+                    ]);
+                }
+            } else if ($getResponse->status() === 404) {
+                // Document doesn't exist - create it using PATCH with updateMask
+                // PATCH with updateMask allows creating the document if it doesn't exist
+                $createPayload = [
+                    'fields' => $fields
+                ];
+                $response = Http::withToken($accessToken)->patch($url . '?updateMask.fieldPaths=result_url&updateMask.fieldPaths=patient_name', $createPayload);
+                
+                if ($response->successful()) {
+                    Log::info("Created result URL in Firestore", [
+                        'collection' => $collection,
+                        'document_id' => $documentId,
+                        'result_url' => $resultUrl,
+                        'patient_name' => $patientName
+                    ]);
+                } else {
+                    // If PATCH fails, try POST to collection (but this won't set specific ID)
+                    // Actually, let's try a different approach - use the batch write API
+                    // For now, log the error and try alternative
+                    Log::warning("Failed to create Firestore document with PATCH, trying alternative", [
+                        'collection' => $collection,
+                        'document_id' => $documentId,
+                        'status' => $response->status(),
+                        'body' => $response->body()
+                    ]);
+                    
+                    // Alternative: Use POST to create document (Firestore will auto-generate ID)
+                    // But we need specific ID, so let's use a workaround: POST then update
+                    // Actually, the simplest is to just use PATCH without updateMask for creation
+                    $simpleCreatePayload = ['fields' => $fields];
+                    $altResponse = Http::withToken($accessToken)->patch($url, $simpleCreatePayload);
+                    
+                    if ($altResponse->successful()) {
+                        Log::info("Created result URL in Firestore (alternative method)", [
+                            'collection' => $collection,
+                            'document_id' => $documentId,
+                            'result_url' => $resultUrl,
+                            'patient_name' => $patientName
+                        ]);
+                    } else {
+                        Log::error("Failed to create Firestore document with all methods", [
+                            'collection' => $collection,
+                            'document_id' => $documentId,
+                            'status' => $altResponse->status(),
+                            'body' => $altResponse->body()
+                        ]);
+                    }
+                }
+            } else {
+                // Other error - log and try to create/update anyway
+                Log::warning("Failed to get Firestore document, attempting to create/update", [
+                    'collection' => $collection,
+                    'document_id' => $documentId,
+                    'status' => $getResponse->status(),
+                    'body' => $getResponse->body()
+                ]);
+                
+                // Try PATCH which should work for both create and update
+                $upsertPayload = ['fields' => $fields];
+                $response = Http::withToken($accessToken)->patch($url, $upsertPayload);
+                
+                if ($response->successful()) {
+                    Log::info("Created/updated result URL in Firestore (after get failed)", [
+                        'collection' => $collection,
+                        'document_id' => $documentId,
+                        'result_url' => $resultUrl,
+                        'patient_name' => $patientName
+                    ]);
+                } else {
+                    Log::warning("Failed to create/update Firestore document", [
+                        'collection' => $collection,
+                        'document_id' => $documentId,
+                        'status' => $response->status(),
+                        'body' => $response->body()
+                    ]);
+                }
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Failed to store result URL in Firestore", [
+                'doctor_visit_id' => $doctorVisitId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            // Don't throw exception - allow job to continue even if Firestore update fails
+        }
     }
 
 

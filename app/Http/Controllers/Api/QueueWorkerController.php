@@ -98,7 +98,7 @@ class QueueWorkerController extends Controller
             $pid = null;
             $artisanPath = base_path('artisan');
             $logPath = storage_path('logs/queue-worker.log');
-            $queues = 'resultsUpload,ServicePaymentCancel,notifications,whatsapp,default';
+            $queues = 'resultsUpload,ServicePaymentCancel,notifications,whatsapp,default,sms';
             
             if (PHP_OS_FAMILY === 'Windows') {
                 // Use popen - fastest method, doesn't block

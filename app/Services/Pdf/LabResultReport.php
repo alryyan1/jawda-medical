@@ -108,7 +108,9 @@ class LabResultReport
         // Add logo
         $this->addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64, $isWhatsappContext);
 
-        $patient->update(['result_print_date' => now()]);
+        if(!$isWhatsappContext){
+            $patient->update(['result_print_date' => now()]);
+        }
         
         // Render lab results
         $this->renderLabResults($pdf, $patient, $settings, $page_width);
