@@ -22,3 +22,4 @@ yarn-error.log
 /service workers/pinggy/daemon/
 realtime-events/daemon
 /config
+/storage
