@@ -1912,5 +1912,33 @@ class PatientController extends Controller
         ], $response->status());
 
     }
+    public function sendWhatsappDirectWithoutUpload(Request $request)
+    {
+        $doctorVisitId = $request->get('visit_id');
+        $doctorvisit = Doctorvisit::find($doctorVisitId);
+        if ($doctorvisit == null) {
+            return ['status' => false, 'message' => 'no data found'];
+        }
+
+
+
+
+        $response = HttpClient::asForm()->post(
+            'https://intaj-starstechnology.com/whatsapp/altamayoz/jawda-medical/public/api/ultramsg/send-document-from-firebase',
+            [
+                'visit_id' => $doctorvisit->id,
+                'phone' => $doctorvisit->patient->phone,
+                'url' => $doctorvisit->patient->result_url,
+            ]
+        );
+
+        return response()->json([
+            'status' => $response->successful(),
+            'status_code' => $response->status(),
+            'data' => $response->json() ?? $response->body(),
+            'message' => $response->successful() ? 'report sent successfully' : 'failed to send report'
+        ], $response->status());
+
+    }
 
 }

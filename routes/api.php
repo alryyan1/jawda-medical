@@ -765,3 +765,4 @@ Route::post('populatePatientChemistryData/{doctorvisit}',[PatientController::cla
 
 
 Route::post('/sendWhatsappDirectPdfReport', [PatientController::class, 'sendWhatsappDirectPdfReport']);
+Route::post('/sendWhatsappDirectWithoutUpload', [PatientController::class, 'sendWhatsappDirectWithoutUpload']);
