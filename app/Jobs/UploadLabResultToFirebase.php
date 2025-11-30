@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Patient;
+use App\Models\Setting;
 use App\Services\Pdf\LabResultReport;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -92,7 +93,7 @@ class UploadLabResultToFirebase implements ShouldQueue
             $downloadUrl = $this->uploadToFirebase($pdfContent, $firebasePath);
 
             // Store download URL in Firestore
-            $this->storeResultUrlInFirestore($this->visitId, $downloadUrl, $patient->name);
+            $this->storeResultUrlInFirestore($this->visitId, $downloadUrl, $patient->name, $patient->phone ?? '');
 
             // Update patient with result_url
             $patient->update(['result_url' => $downloadUrl]);
@@ -283,16 +284,17 @@ class UploadLabResultToFirebase implements ShouldQueue
 
     /**
      * Store the download URL in Firestore at /altamayoz_branch_2 collection
-     * Document ID is the doctor visit ID, with result_url and patient_name properties
+     * Document ID is the doctor visit ID, with result_url, patient_name, and patient_phone properties
      * Creates the document if it doesn't exist, updates it if it does
      * Uses REST API approach to avoid Firestore SDK dependency
      *
      * @param int $doctorVisitId
      * @param string $resultUrl
      * @param string $patientName
+     * @param string $patientPhone
      * @return void
      */
-    private function storeResultUrlInFirestore(int $doctorVisitId, string $resultUrl, string $patientName): void
+    private function storeResultUrlInFirestore(int $doctorVisitId, string $resultUrl, string $patientName, string $patientPhone): void
     {
         try {
             $projectId = config('firebase.project_id');
@@ -307,16 +309,22 @@ class UploadLabResultToFirebase implements ShouldQueue
                 return;
             }
 
-            $collection = 'altamayoz_branch_2';
+            $settings = Setting::first();
+            $collection = $settings->firestore_result_collection;
             $documentId = (string) $doctorVisitId;
             $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}/{$documentId}";
 
             // Try to get current document first to merge with existing fields
             $getResponse = Http::withToken($accessToken)->get($url);
             
+            // Get current timestamp in RFC3339 format for Firestore
+            $currentTimestamp = now()->toRfc3339String();
+            
             $fields = [
                 'result_url' => ['stringValue' => $resultUrl],
-                'patient_name' => ['stringValue' => $patientName]
+                'patient_name' => ['stringValue' => $patientName],
+                'patient_phone' => ['stringValue' => $patientPhone],
+                'updated_at' => ['timestampValue' => $currentTimestamp]
             ];
 
             if ($getResponse->successful()) {
@@ -325,8 +333,11 @@ class UploadLabResultToFirebase implements ShouldQueue
                 $currentFields = $currentDoc['fields'] ?? [];
                 
                 // Merge new fields with existing fields (preserve other fields)
+                // Preserve created_at if it exists, otherwise don't add it (document already exists)
                 $currentFields['result_url'] = $fields['result_url'];
                 $currentFields['patient_name'] = $fields['patient_name'];
+                $currentFields['patient_phone'] = $fields['patient_phone'];
+                $currentFields['updated_at'] = $fields['updated_at'];
                 $fields = $currentFields;
 
                 // Update existing document using PATCH (merge)
@@ -338,7 +349,8 @@ class UploadLabResultToFirebase implements ShouldQueue
                         'collection' => $collection,
                         'document_id' => $documentId,
                         'result_url' => $resultUrl,
-                        'patient_name' => $patientName
+                        'patient_name' => $patientName,
+                        'patient_phone' => $patientPhone
                     ]);
                 } else {
                     Log::warning("Failed to update Firestore document", [
@@ -351,17 +363,21 @@ class UploadLabResultToFirebase implements ShouldQueue
             } else if ($getResponse->status() === 404) {
                 // Document doesn't exist - create it using PATCH with updateMask
                 // PATCH with updateMask allows creating the document if it doesn't exist
+                // Add created_at only when creating new document
+                $fields['created_at'] = ['timestampValue' => $currentTimestamp];
+                
                 $createPayload = [
                     'fields' => $fields
                 ];
-                $response = Http::withToken($accessToken)->patch($url . '?updateMask.fieldPaths=result_url&updateMask.fieldPaths=patient_name', $createPayload);
+                $response = Http::withToken($accessToken)->patch($url . '?updateMask.fieldPaths=result_url&updateMask.fieldPaths=patient_name&updateMask.fieldPaths=patient_phone&updateMask.fieldPaths=created_at&updateMask.fieldPaths=updated_at', $createPayload);
                 
                 if ($response->successful()) {
                     Log::info("Created result URL in Firestore", [
                         'collection' => $collection,
                         'document_id' => $documentId,
                         'result_url' => $resultUrl,
-                        'patient_name' => $patientName
+                        'patient_name' => $patientName,
+                        'patient_phone' => $patientPhone
                     ]);
                 } else {
                     // If PATCH fails, try POST to collection (but this won't set specific ID)
@@ -377,6 +393,10 @@ class UploadLabResultToFirebase implements ShouldQueue
                     // Alternative: Use POST to create document (Firestore will auto-generate ID)
                     // But we need specific ID, so let's use a workaround: POST then update
                     // Actually, the simplest is to just use PATCH without updateMask for creation
+                    // Ensure created_at is set for new document
+                    if (!isset($fields['created_at'])) {
+                        $fields['created_at'] = ['timestampValue' => $currentTimestamp];
+                    }
                     $simpleCreatePayload = ['fields' => $fields];
                     $altResponse = Http::withToken($accessToken)->patch($url, $simpleCreatePayload);
                     
@@ -385,7 +405,8 @@ class UploadLabResultToFirebase implements ShouldQueue
                             'collection' => $collection,
                             'document_id' => $documentId,
                             'result_url' => $resultUrl,
-                            'patient_name' => $patientName
+                            'patient_name' => $patientName,
+                            'patient_phone' => $patientPhone
                         ]);
                     } else {
                         Log::error("Failed to create Firestore document with all methods", [
@@ -406,6 +427,11 @@ class UploadLabResultToFirebase implements ShouldQueue
                 ]);
                 
                 // Try PATCH which should work for both create and update
+                // Check if document exists by checking if created_at is missing (means it's a new document)
+                // Since we can't reliably know, we'll check if created_at exists in current fields
+                // For safety, if we're not sure, we'll add created_at only if it doesn't exist
+                // But since we don't have the document, we'll assume it's an update and preserve existing created_at
+                // Actually, let's be safe and not add created_at here since we're not sure if it's create or update
                 $upsertPayload = ['fields' => $fields];
                 $response = Http::withToken($accessToken)->patch($url, $upsertPayload);
                 
@@ -414,7 +440,8 @@ class UploadLabResultToFirebase implements ShouldQueue
                         'collection' => $collection,
                         'document_id' => $documentId,
                         'result_url' => $resultUrl,
-                        'patient_name' => $patientName
+                        'patient_name' => $patientName,
+                        'patient_phone' => $patientPhone
                     ]);
                 } else {
                     Log::warning("Failed to create/update Firestore document", [

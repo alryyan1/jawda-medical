@@ -263,6 +263,7 @@ class LabRequestController extends Controller
 
         // This will fetch DoctorVisit records. The PatientLabQueueItemResource will need to correctly
         // extract/derive lab_request_ids, sample_id, and all_requests_paid based on the DoctorVisit and its Patient.
+        $query->with(['patient.sampleCollectedBy:id,name']); // Load patient with sampleCollectedBy relationship
         $pendingVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
 
         return PatientLabQueueItemResource::collection($pendingVisits);
@@ -285,6 +286,7 @@ class LabRequestController extends Controller
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
             ->where('doctorvisits.id', $visitId)
             ->whereHas('patientLabRequests') // Ensure the visit has lab requests
+            ->with(['patient.sampleCollectedBy:id,name']) // Load patient with sampleCollectedBy relationship
             ->first();
 
         if (!$visit) {
@@ -406,7 +408,7 @@ class LabRequestController extends Controller
         $query->withMin('patientLabRequests', 'created_at', 'oldest_request_time');
 
         // Eager load relations needed by the resource
-        $query->with(['patient', 'patientLabRequests.mainTest', 'patientLabRequests.results']);
+        $query->with(['patient.sampleCollectedBy:id,name', 'patientLabRequests.mainTest', 'patientLabRequests.results']);
 
         // Order by visit ID descending
         $readyForPrintVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
@@ -522,7 +524,7 @@ class LabRequestController extends Controller
         $query->withMin('patientLabRequests', 'created_at', 'oldest_request_time');
 
         // Eager load relations needed by the resource
-        $query->with(['patient', 'patientLabRequests.mainTest', 'patientLabRequests.results']);
+        $query->with(['patient.sampleCollectedBy:id,name', 'patientLabRequests.mainTest', 'patientLabRequests.results']);
 
         // Order by visit ID descending
         $unfinishedVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
@@ -598,7 +600,10 @@ class LabRequestController extends Controller
         // Eager load details needed for the PatientLabQueueItemResource
         $query->withCount(['patientLabRequests as test_count']) // Count all lab requests
             // ->withMin('patientLabRequests', 'labrequests.created_at', 'oldest_request_time') // Get time of first request
-            ->with(['patientLabRequests:labrequests.id,doctor_visit_id,is_paid']); // Eager load for status check
+            ->with([
+                'patientLabRequests:labrequests.id,doctor_visit_id,is_paid', // Eager load for status check
+                'patient.sampleCollectedBy:id,name' // Load patient with sampleCollectedBy relationship
+            ]);
 
         // Log the raw SQL query
         // \Log::info('Lab Reception Queue SQL Query:', [

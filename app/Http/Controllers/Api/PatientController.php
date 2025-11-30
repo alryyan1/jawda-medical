@@ -62,7 +62,7 @@ class PatientController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Patient::with(['company', 'primaryDoctor:id,name', 'doctor','doctorVisit']); // Eager load common relations
+        $query = Patient::with(['company', 'primaryDoctor:id,name', 'doctor','doctorVisit', 'sampleCollectedBy:id,name']); // Eager load common relations
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
@@ -271,7 +271,7 @@ class PatientController extends Controller
                 ));
             });
 
-            return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file']));
+            return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file', 'sampleCollectedBy']));
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("New patient registration failed: " . $e->getMessage(), ['exception' => $e]);
@@ -301,7 +301,7 @@ class PatientController extends Controller
             $status = $request->boolean('lock') ? 'locked' : 'unlocked';
             return response()->json([
                 'message' => "Results are already {$status}.",
-                'data' => new PatientResource($patient->fresh()) // Return current state
+                'data' => new PatientResource($patient->fresh()->loadMissing(['sampleCollectedBy'])) // Return current state
             ], 200); // Or 409 Conflict if preferred
         }
 
@@ -322,7 +322,7 @@ class PatientController extends Controller
         $action = $request->boolean('lock') ? 'locked' : 'unlocked';
         return response()->json([
             'message' => "Patient results have been successfully {$action}.",
-            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor'])) // Reload relations for consistency
+            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor', 'sampleCollectedBy'])) // Reload relations for consistency
         ]);
     }
 
@@ -812,6 +812,7 @@ class PatientController extends Controller
             'companyRelation',
             'primaryDoctor:id,name',
             'user:id,name', // User who registered
+            'sampleCollectedBy:id,name', // User who collected the sample
 
         ]);
         return new PatientResource($patient);
@@ -834,7 +835,7 @@ class PatientController extends Controller
         // Emit realtime update event (fire-and-forget)
         try {
             $payload = [
-                'patient' => (new PatientResource($patient->loadMissing(['company', 'primaryDoctor'])))->resolve(),
+                'patient' => (new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'sampleCollectedBy'])))->resolve(),
             ];
             $url = config('services.realtime.url') . '/emit/patient-updated';
             HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
@@ -843,7 +844,7 @@ class PatientController extends Controller
             Log::warning('Failed to emit patient-updated realtime event: ' . $e->getMessage());
         }
 
-        return new PatientResource($patient->loadMissing(['company', 'primaryDoctor']));
+        return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'sampleCollectedBy']));
     }
 
     /**
@@ -985,7 +986,7 @@ class PatientController extends Controller
 
             // Return the patient resource, ensuring it includes the new doctorVisit relation
             // The PatientResource should be configured to conditionally include this.
-            $patient->load('doctorVisit');
+            $patient->load(['doctorVisit', 'sampleCollectedBy']);
             
             return new PatientResource($patient);
 
@@ -1580,7 +1581,7 @@ class PatientController extends Controller
             });
 
             // Load the doctorVisit relationship for the new patient
-            $newPatient->load(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file']);
+            $newPatient->load(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file', 'sampleCollectedBy']);
 
             return new PatientResource($newPatient);
 
@@ -1803,7 +1804,7 @@ class PatientController extends Controller
             DB::commit();
 
             // Load the patient with relationships
-            $patient->load(['doctorVisit', 'company', 'primaryDoctor']);
+            $patient->load(['doctorVisit', 'company', 'primaryDoctor', 'sampleCollectedBy']);
 
             // Update Firestore document to mark as delivered (non-blocking best-effort)
             try {

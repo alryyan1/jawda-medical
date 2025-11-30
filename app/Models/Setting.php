@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $logo_base64
  * @property string|null $lab_name
  * @property string|null $hospital_name
- * @property bool|null $print_direct
+ * @property string|null $firestore_result_collection
  * @property string|null $inventory_notification_number
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -93,7 +93,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePharmacyCash($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePharmacyIncome($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePhone($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePrintDirect($value)
+ * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFirestoreResultCollection($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereSendResultAfterAuth($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereSendResultAfterResult($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereSendWelcomeMessage($value)
@@ -115,7 +115,7 @@ class Setting extends Model
         'is_header', 'is_footer', 'is_logo',
         'header_base64', 'footer_base64', 'logo_base64',
         'header_content', 'footer_content',
-        'lab_name', 'hospital_name', 'print_direct',
+        'lab_name', 'hospital_name', 'firestore_result_collection',
         'inventory_notification_number',
         'disable_doctor_service_check',
         'currency', 'phone', 'gov', 'country', // These gov/country might be booleans or IDs
@@ -151,7 +151,7 @@ class Setting extends Model
         'is_header' => 'boolean',
         'is_footer' => 'boolean',
         'is_logo' => 'boolean',
-        'print_direct' => 'boolean',
+        'firestore_result_collection' => 'string',
         'disable_doctor_service_check' => 'boolean',
         'gov' => 'boolean', // Or 'integer' if it's an ID to a govs table
         'country' => 'boolean', // Or 'integer' if it's an ID to a countries table

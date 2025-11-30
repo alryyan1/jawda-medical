@@ -195,7 +195,7 @@ class LabResultReport
         $col = $page_width / 6;
         $user = auth()->user();
         $pdf->cell(20, 5, "Sign: ", 0, 1, 'L');
-        $pdf->cell($col, 5, $user?->name ?? 'System', 0, 0, 'L');
+        $pdf->cell($col, 5, $patient->resultAuthUser->name ?? 'System', 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
         $pdf->cell($col, 5, " ", 0, 0, 'L');
@@ -209,7 +209,7 @@ class LabResultReport
         
         $y = $pdf->getY();
         if ($settings?->is_footer) {
-            // $pdf->Image($logo_path . '/' . $footer_name, 10, $y + 10, $page_width + 10, 10);
+            $pdf->Image($logo_path . '/' . $footer_name, 10, $y + 10, $page_width + 10, 10);
         }
     }
 

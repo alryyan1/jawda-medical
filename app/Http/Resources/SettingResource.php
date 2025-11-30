@@ -22,7 +22,7 @@ class SettingResource extends JsonResource
             'footer_content' => $this->footer_content,
             'lab_name' => $this->lab_name,
             'hospital_name' => $this->hospital_name,
-            'print_direct' => (bool) $this->print_direct,
+            'firestore_result_collection' => $this->firestore_result_collection,
             'inventory_notification_number' => $this->inventory_notification_number,
             'disable_doctor_service_check' => (bool) $this->disable_doctor_service_check,
             'currency' => $this->currency,

@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('settings', function (Blueprint $table) {
-            $table->boolean('show_title_in_lab_result')->default(false)->nullable();
+            if (!Schema::hasColumn('settings', 'show_title_in_lab_result')) {    
+                $table->boolean('show_title_in_lab_result')->default(false)->nullable();
+            }
         });
     }
 

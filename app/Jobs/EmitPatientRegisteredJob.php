@@ -23,7 +23,7 @@ class EmitPatientRegisteredJob implements ShouldQueue
     public function handle(): void
     {
         Log::info('EmitPatientRegisteredJob: started', ['patient_id' => $this->patientId]);
-        $patient = Patient::with(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file'])
+        $patient = Patient::with(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file', 'sampleCollectedBy'])
             ->find($this->patientId);
 
         if (!$patient) {

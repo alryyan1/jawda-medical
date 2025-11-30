@@ -83,6 +83,7 @@ class PatientLabQueueItemResource extends JsonResource
             'is_ready_for_print' => ($pendingResultsCount == 0 && !$isPrinted),
             'sample_collected' => $this->patient?->sample_collect_time != null,
             'sample_collection_time' => $this->patient?->sample_collect_time,
+            'sample_collected_by' => $this->patient?->sampleCollectedBy?->name,
             'result_url' => $this->patient?->result_url,
             'registered_by' => $this->patient?->user?->name,
             'auth_date' => $this->patient?->auth_date,

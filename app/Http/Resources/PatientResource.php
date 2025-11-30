@@ -49,6 +49,7 @@ class PatientResource extends JsonResource
             'result_is_locked' => (bool) $this->result_is_locked,
             'sample_collected' => (bool) $this->sample_collected,
             'sample_collect_time' => $this->sample_collect_time, // Consider formatting if time only
+            'sample_collected_by' => new UserStrippedResource($this->whenLoaded('sampleCollectedBy')),
             'result_print_date' => $this->result_print_date?->toIso8601String(),
             'sample_print_date' => $this->sample_print_date?->toIso8601String(),
             'visit_number' => (int) $this->visit_number,

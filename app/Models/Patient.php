@@ -238,6 +238,14 @@ class Patient extends Model
     }
 
     /**
+     * Get the user who collected the sample.
+     */
+    public function sampleCollectedBy()
+    {
+        return $this->belongsTo(User::class, 'sample_collected_by');
+    }
+
+    /**
      * Get the shift during which this patient was registered.
      */
     public function shift()

@@ -11,13 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
+    
         Schema::table('patients', function (Blueprint $table) {
-            $table->unsignedBigInteger('sample_collected_by')->nullable();
-            $table->foreign('sample_collected_by')
-                  ->references('id')
-                  ->on('users')
-                  ->onDelete('set null')
-                  ->onUpdate('cascade');
+            if (!Schema::hasColumn('patients', 'sample_collected_by')) {    
+                $table->unsignedBigInteger('sample_collected_by')->nullable();
+            }
+            if (!Schema::hasColumn('patients', 'sample_collected_by')) {    
+                $table->foreign('sample_collected_by')
+                    ->references('id')
+                    ->on('users')
+                    ->onDelete('set null')
+                    ->onUpdate('cascade');
+            }
         });
     }
 
