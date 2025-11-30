@@ -21,6 +21,5 @@ yarn-error.log
 /service workers/realtime/daemon/
 /service workers/pinggy/daemon/
 realtime-events/daemon
-/database
 /config
 .env
