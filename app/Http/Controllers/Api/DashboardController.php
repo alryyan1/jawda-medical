@@ -224,13 +224,9 @@ class DashboardController extends Controller
         $labRevenueCash = (float) (clone $labRevenueBaseQuery)
             ->where('labrequests.is_bankak', 0)
             ->selectRaw('SUM(
-                labrequests.price 
-                - (labrequests.price * labrequests.discount_per / 100)
-                - CASE 
-                    WHEN patients.company_id IS NOT NULL 
-                    THEN labrequests.endurance 
-                    ELSE 0 
-                END
+                labrequests.amount_paid 
+                
+                
             ) as total_revenue')
             ->value('total_revenue') ?? 0;
 
@@ -238,12 +234,7 @@ class DashboardController extends Controller
             ->where('labrequests.is_bankak', 1)
             ->selectRaw('SUM(
                 labrequests.price 
-                - (labrequests.price * labrequests.discount_per / 100)
-                - CASE 
-                    WHEN patients.company_id IS NOT NULL 
-                    THEN labrequests.endurance 
-                    ELSE 0 
-                END
+               
             ) as total_revenue')
             ->value('total_revenue') ?? 0;
 

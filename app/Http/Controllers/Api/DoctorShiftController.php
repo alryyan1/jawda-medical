@@ -283,7 +283,7 @@ class DoctorShiftController extends Controller
             'shift_id' => 'nullable|integer|exists:shifts,id',
             'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status,total_entitlement,id',
             'sort_direction' => 'nullable|string|in:asc,desc',
-            'include_financials' => 'nullable|boolean',
+            // include_financials is handled by $request->boolean() - no strict validation needed
         ]);
 
         // Base eager loading - lightweight relations only
