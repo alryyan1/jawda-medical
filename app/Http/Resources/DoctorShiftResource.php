@@ -19,23 +19,36 @@ class DoctorShiftResource extends JsonResource
             $duration = $startTime->diffForHumans(now(), true) . ' (open)';
         }
 
-        // Calculate entitlements here (using methods from DoctorShift model)
-        $cashEntitlement = $this->doctor_credit_cash(); // Assumes this method exists on DoctorShift
-        $insuranceEntitlement = $this->doctor_credit_company(); // Assumes this method exists
-        $staticWageApplied = ($this->status == false && $this->doctor) ? (float)$this->doctor->static_wage : 0; // Apply static wage only if shift is closed and doctor exists
+        // Only calculate expensive financials when explicitly requested via query param
+        // or when visits relation is already loaded
+        $includeFinancials = $request->boolean('include_financials') || $this->relationLoaded('visits');
+        
+        $cashEntitlement = 0;
+        $insuranceEntitlement = 0;
+        $totalIncome = 0;
+        $clinicInsurance = 0;
+        
+        if ($includeFinancials) {
+            $cashEntitlement = $this->doctor_credit_cash();
+            $insuranceEntitlement = $this->doctor_credit_company();
+            $totalIncome = $this->total_paid_services();
+            $clinicInsurance = $this->clinic_enurance();
+        }
+        
+        $staticWageApplied = ($this->status == false && $this->doctor) ? (float)$this->doctor->static_wage : 0;
         $totalDoctorEntitlement = $cashEntitlement + $insuranceEntitlement + $staticWageApplied;
-    //    Log::info($this->doctor?->name,['doctor'=>$this->doctor]);
+
         return [
             'id' => $this->id,
             'doctor_id' => $this->doctor_id,
-            'total_income' => $this->total_paid_services(),
-            'clinic_enurance' => $this->clinic_enurance(),
+            'total_income' => $totalIncome,
+            'clinic_enurance' => $clinicInsurance,
             'doctor_name' => $this->whenLoaded('doctor', $this->doctor?->name),
             'doctor_specialist_name' => $this->whenLoaded('doctor', $this->doctor?->specialist?->name),
             'user_id_opened' => $this->user_id,
             'user_name_opened' => $this->whenLoaded('user', $this->user?->name),
             'patients_count' => $this->patients_count,
-            'shift_id' => $this->shift_id, // General clinic shift_id
+            'shift_id' => $this->shift_id,
             'general_shift_name' => $this->whenLoaded('generalShift', $this->generalShift?->name ?? ('Shift #'.$this->generalShift?->id)),
             'firebase_id' => $this->doctor?->firebase_id,
             'specialist_firestore_id' => $this->doctor?->specialist?->firestore_id,
@@ -47,7 +60,7 @@ class DoctorShiftResource extends JsonResource
             'formatted_end_time' => $endTime ? $endTime->format('Y-m-d h:i A') : ($this->status ? 'Still Open' : 'N/A'),
             'duration' => $duration,
 
-            // Financials
+            // Financials (only populated when requested)
             'total_doctor_entitlement' => round($totalDoctorEntitlement, 2),
             'cash_entitlement' => round($cashEntitlement, 2),
             'insurance_entitlement' => round($insuranceEntitlement, 2),
@@ -61,8 +74,7 @@ class DoctorShiftResource extends JsonResource
 
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-            'doctor_visits_count' => $this->doctor_visits_count,
-
+            'doctor_visits_count' => $this->doctor_visits_count ?? $this->patients_count,
         ];
     }
 }

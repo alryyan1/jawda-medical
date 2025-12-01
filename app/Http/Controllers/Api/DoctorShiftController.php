@@ -45,60 +45,17 @@ class DoctorShiftController extends Controller
     public function getActiveShifts(Request $request)
     {
         $query = DoctorShift::with([
-            'doctor', // Get specialist_id
-            'doctor.specialist', // Eager load specialist name from doctor
-        ]);
-            // ->activeToday(); // Your scope for active shifts today
-            
-        // Additional withCount examples:
-        // Count doctor visits with specific conditions:
-        // ])->withCount([
-        //     'doctorVisits as total_visits_count',
-        //     'doctorVisits as waiting_visits_count' => function ($query) {
-        //         $query->where('status', 'waiting');
-        //     },
-        //     'doctorVisits as completed_visits_count' => function ($query) {
-        //         $query->where('status', 'completed');
-        //     }
-        // ]);
+            'doctor',
+            'doctor.specialist:id,name,firestore_id',
+        ])
+        ->withCount('doctorVisits as patients_count') // Use withCount instead of N+1 queries
+        ->where('status', 1);
 
         if ($request->has('clinic_shift_id')) {
             $query->where('shift_id', $request->clinic_shift_id);
         }
-        $query->where('status',1);
 
-        $activeDoctorShifts = $query->get()->map(function ($doctorShift) {
-            // Determine current patient status for the doctor
-            // This is a simplified example. You might have more complex logic or a dedicated 'current_patient_visit_id' on DoctorShift
-            $currentVisit = DoctorVisit::
-                where('doctor_shift_id', $doctorShift->id) // Link to this specific doctor shift session
-                ->where('status', 'with_doctor') // Check if any patient is currently 'with_doctor'
-                ->orderBy('updated_at', 'desc') // Get the most recent one
-                ->first();
-
-            // Count patients assigned to this doctor in this shift (e.g., 'waiting' or 'with_doctor')
-            $patientCount = DoctorVisit::
-                where('doctor_shift_id', $doctorShift->id)
-                // ->whereIn('status', ['waiting', 'with_doctor']) // Count relevant statuses
-                ->count();
-
-            // Add these computed properties to the DoctorShift object before it goes to the resource
-            // $doctorShift->current_patient_visit_id = $currentVisit?->id;
-            // $doctorShift->is_examining = !!$currentVisit;
-            $doctorShift->patients_count = $patientCount;
-
-            return $doctorShift;
-        });
-
-        // Order after mapping custom attributes if sorting by them
-        // For now, let's assume Doctor model has user_id linking to a user, and we sort by user's name for Doctor.
-        // Or simply order by doctor's name directly from the 'doctors' table.
-        // The join and select('doctor_shifts.*') from previous version was good for direct DB ordering.
-        // If ordering after map:
-        // $activeDoctorShifts = $activeDoctorShifts->sortBy(function($ds) {
-        //     return $ds->doctor->name ?? '';
-        // });
-
+        $activeDoctorShifts = $query->get();
 
         return DoctorShiftResource::collection($activeDoctorShifts);
     }
@@ -314,53 +271,52 @@ class DoctorShiftController extends Controller
      */
     public function index(Request $request)
     {
-        // Permission check: e.g., can('list all_doctor_shifts') or 'view doctor_shift_reports'
-        // if (!Auth::user()->can('list all_doctor_shifts')) { // Example
-        //     if (!Auth::user()->can('list_own_doctor_shifts')) {
-        //          return response()->json(['message' => 'Unauthorized'], 403);
-        //     }
-        //     // If user can only list their own (as opener), add this condition by default
-        //     $request->merge(['user_id_opened' => Auth::id()]);
-        // }
-
-
         $request->validate([
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:5|max:100',
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
             'doctor_id' => 'nullable|integer|exists:doctors,id',
-            'doctor_name_search' => 'nullable|string|max:255',    // NEW
-            'user_id_opened' => 'nullable|integer|exists:users,id', // NEW (user_id on doctor_shifts table)
+            'doctor_name_search' => 'nullable|string|max:255',
+            'user_id_opened' => 'nullable|integer|exists:users,id',
             'status' => 'nullable|string|in:0,1,all',
-            'shift_id' => 'nullable|integer|exists:shifts,id',    // General clinic shift ID
-            'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status,total_entitlement,id', // Added total_entitlement and id
+            'shift_id' => 'nullable|integer|exists:shifts,id',
+            'sort_by' => 'nullable|string|in:start_time,end_time,doctor_name,user_name,status,total_entitlement,id',
             'sort_direction' => 'nullable|string|in:asc,desc',
+            'include_financials' => 'nullable|boolean',
         ]);
 
-        $query = DoctorShift::with([
-            'doctor:id,name,specialist_id,static_wage,cash_percentage,company_percentage,lab_percentage', // Crucial for entitlement calculation
+        // Base eager loading - lightweight relations only
+        $eagerLoad = [
+            'doctor',
             'doctor.specialist:id,name',
-            'user:id,name,username', // User who opened/managed the DoctorShift (aliased as 'user' in model)
-            'generalShift:id,created_at,closed_at', // The main clinic shift
-            // Eager load relations needed for entitlement calculations if done in PHP/Resource
-            // These are needed by the doctor_credit_cash/company methods in DoctorShift model
-            'visits.patient.company', // company_id for patient is enough for isCompany check
-            'visits.requestedServices.service',
-            'visits.patientLabRequests.mainTest',
-                 ]) ->withCount('doctorVisits');
+            'user:id,name,username',
+            'generalShift:id,created_at,closed_at',
+        ];
+
+        // Only load heavy relations when financials are explicitly requested
+        if ($request->boolean('include_financials')) {
+            $eagerLoad = array_merge($eagerLoad, [
+                'visits.patient.company',
+                'visits.requestedServices.service',
+                'visits.patientLabRequests.mainTest',
+            ]);
+        }
+
+        $query = DoctorShift::with($eagerLoad)
+            ->withCount('doctorVisits as patients_count');
 
         // Filtering
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
         }
-        if ($request->filled('doctor_name_search')) { // NEW
+        if ($request->filled('doctor_name_search')) {
             $searchTerm = $request->doctor_name_search;
             $query->whereHas('doctor', function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%");
             });
         }
-        if ($request->filled('user_id_opened')) { // NEW (filters by the user_id on doctor_shifts table)
+        if ($request->filled('user_id_opened')) {
             $query->where('user_id', $request->user_id_opened);
         }
         if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
@@ -375,7 +331,7 @@ class DoctorShiftController extends Controller
         if ($request->filled('date_to')) {
             $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
-        if ($request->filled('shift_id')) { // Filter by general clinic shift ID
+        if ($request->filled('shift_id')) {
             $query->where('shift_id', $request->shift_id);
         }
 
@@ -387,38 +343,23 @@ class DoctorShiftController extends Controller
             $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
                   ->orderBy('doctors.name', $sortDirection)
                   ->select('doctor_shifts.*');
-        } elseif ($sortBy === 'user_name') { // User who opened the shift
+        } elseif ($sortBy === 'user_name') {
             $query->join('users', 'doctor_shifts.user_id', '=', 'users.id')
                   ->orderBy('users.name', $sortDirection)
                   ->select('doctor_shifts.*');
-        } elseif ($sortBy === 'total_entitlement') {
-            // Sorting by calculated field requires either calculating in DB (complex)
-            // or fetching all then sorting in PHP (inefficient for large datasets).
-            // For pagination, it's best if the DB can handle it.
-            // This is a placeholder; a raw expression or a stored generated column would be better for performance.
-            // For now, this will sort by ID as a fallback if 'total_entitlement' is not a direct column.
-            // $query->orderBy($sortBy, $sortDirection); // This will fail if not a DB column
-            // To make this work, you'd typically sort on the collection AFTER pagination,
-            // or add a raw select for the calculated entitlement and sort by that alias.
-            // For simplicity of this response, we'll rely on the Resource to calculate it for display.
-            // Sorting will be on DB columns for now. If you need to sort by calculated,
-            // you'll need a more complex query or sort the collection after fetching.
-            // $query->orderBy('id', $sortDirection); // Fallback sort
-        }
-        else {
+        } elseif ($sortBy !== 'total_entitlement') {
             $query->orderBy($sortBy, $sortDirection);
         }
-        // Add secondary sort for consistency if primary sort isn't unique enough
+
+        // Add secondary sort for consistency
         if ($sortBy !== 'start_time' && $sortBy !== 'id') {
             $query->orderBy('start_time', 'desc');
         }
-        $query->orderBy('doctor_shifts.id', 'desc'); // Final tie-breaker
-
+        $query->orderBy('doctor_shifts.id', 'desc');
 
         $perPage = $request->input('per_page', 15);
         $doctorShifts = $query->paginate($perPage);
 
-        // The DoctorShiftResource will handle calculating the entitlement values
         return DoctorShiftResource::collection($doctorShifts);
     }
     /**
