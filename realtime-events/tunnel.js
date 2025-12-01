@@ -1,6 +1,6 @@
 import { pinggy } from "@pinggy/pinggy";
 
-const PINGGY_TOKEN = "PMLHOiWX5ES";
+const PINGGY_TOKEN = "NTMtyrQdwT7";
 const LOCAL_PORT = 80
 const LOCAL_HOST = "localhost";
 

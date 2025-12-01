@@ -1903,7 +1903,7 @@ class PatientController extends Controller
         // return $doctorvisit->patient->result_url;
 
         $response = HttpClient::asForm()->post(
-            'https://intaj-starstechnology.com/whatsapp/alroomy-shaglaban/jawda-medical/public/api/ultramsg/send-document-from-firebase',
+            'https://intaj-starstechnology.com/whatsapp/alroomy/jawda-medical/public/api/ultramsg/send-document-from-firebase',
             [
                 'visit_id' => $doctorvisit->id,
                 'phone' => $doctorvisit->patient->phone,
@@ -1947,7 +1947,7 @@ class PatientController extends Controller
         $instanceId = $settings?->ultramsg_instance_id ?? '';    
         $collection = $settings?->firestore_result_collection ?? '';
         $response = HttpClient::asForm()->post(
-            'https://intaj-starstechnology.com/whatsapp/alroomy-shaglaban/jawda-medical/public/api/ultramsg/send-document-from-firebase',
+            'https://intaj-starstechnology.com/whatsapp/alroomy/jawda-medical/public/api/ultramsg/send-document-from-firebase',
             [
                 'visit_id' => $doctorvisit->id,
                 'phone' => $doctorvisit->patient->phone,

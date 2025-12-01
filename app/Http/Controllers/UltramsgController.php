@@ -213,10 +213,10 @@ class UltramsgController extends Controller
 
         $visitId = $request->input('visit_id');
         $url = $request->input('url');
-        $collection = $request->input('collection' ) ?? 'alroomy-shaglaban';
+        $collection = $request->input('collection' ) ?? 'alroomy_results';
         $phone = $request->input('phone');
-        $token = $request->get('token') ?? 'mh3flw9ka6wm8dkw';
-        $instanceId = $request->get('instance_id') ?? 'instance145504';
+        $token = $request->get('token') ?? 'wjav78swzp7u87uk';
+        $instanceId = $request->get('instance_id') ?? 'instance140372';
         // If URL is not provided, fetch it from Firestore
         if (!$url) {
             $url = $this->getResultUrlFromFirestore($visitId,$collection);

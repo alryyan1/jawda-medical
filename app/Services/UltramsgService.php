@@ -59,12 +59,12 @@ class UltramsgService
     {
        
 
-        $endpoint = "{$this->baseUrl}/instance145504/messages/chat";
+        $endpoint = "{$this->baseUrl}/instance140372/messages/chat";
 
         try {
             $response = Http::asForm()
                 ->post($endpoint, [
-                    'token' => 'mh3flw9ka6wm8dkw',
+                    'token' => 'wjav78swzp7u87uk',
                     'to' => $to,
                     'body' => $body,
                 ]);
