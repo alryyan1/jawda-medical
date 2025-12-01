@@ -213,25 +213,32 @@ class UltramsgController extends Controller
 
         $visitId = $request->input('visit_id');
         $url = $request->input('url');
-        
+        $collection = $request->input('collection' ) ?? 'alroomy-shaglaban';
+        $phone = $request->input('phone');
+        $token = $request->get('token') ?? 'mh3flw9ka6wm8dkw';
+        $instanceId = $request->get('instance_id') ?? 'instance145504';
         // If URL is not provided, fetch it from Firestore
         if (!$url) {
-            $url = $this->getResultUrlFromFirestore($visitId);
+            $url = $this->getResultUrlFromFirestore($visitId,$collection);
             if (!$url) {
                 return response()->json([
                     'success' => false,
+                    'url'=>$url,
+                    'collection'=>$collection,
+                    'visit_id'=>$visitId,
+                    'token'=>$token,
+                    'instance_id'=>$instanceId,
                     'error' => 'URL not found in request and could not be retrieved from Firestore'
                 ], 404);
             }
         }
         
-        $appSettings = \App\Models\Setting::first();
 
         $filename = 'result.pdf';
         $caption = 'labresult';
-        $phone = $request->input('phone');
       
-        $result = $this->ultramsgService->sendDocument($phone, 'result.pdf', $url, $caption);
+      
+        $result = $this->ultramsgService->sendDocument($phone, 'result.pdf', $url, $caption, $token, $instanceId);
         return response()->json($result, $result['success'] ? 200 : 400);
         
     }
@@ -242,7 +249,7 @@ class UltramsgController extends Controller
      * @param string $visitId
      * @return string|null
      */
-    public function getResultUrlFromFirestore(string $visitId): ?string
+    public function getResultUrlFromFirestore(string $visitId,$collection): ?string
     {
         try {
             $projectId = config('firebase.project_id');
@@ -257,7 +264,6 @@ class UltramsgController extends Controller
                 return null;
             }
 
-            $collection = 'altamayoz_branch_2';
             $documentId = (string) $visitId;
             $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}/{$documentId}";
 

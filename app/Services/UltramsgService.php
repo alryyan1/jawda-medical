@@ -57,23 +57,14 @@ class UltramsgService
      */
     public function sendTextMessage(string $to, string $body): array
     {
-        if (!$this->isConfigured()) {
-            Log::error('UltramsgService: Service not configured (Instance ID or Token missing).');
-            return ['success' => false, 'error' => 'Ultramsg service not configured.', 'data' => null];
-        }
+       
 
-        // Validate message length
-        if (strlen($body) > 4096) {
-            Log::error('UltramsgService: Message too long. Max length is 4096 characters.');
-            return ['success' => false, 'error' => 'Message too long. Maximum 4096 characters allowed.', 'data' => null];
-        }
-
-        $endpoint = "{$this->baseUrl}/{$this->instanceId}/messages/chat";
+        $endpoint = "{$this->baseUrl}/instance145504/messages/chat";
 
         try {
             $response = Http::asForm()
                 ->post($endpoint, [
-                    'token' => $this->token,
+                    'token' => 'mh3flw9ka6wm8dkw',
                     'to' => $to,
                     'body' => $body,
                 ]);
@@ -95,31 +86,16 @@ class UltramsgService
      * @param string $caption Caption text under the file (max 1024 characters)
      * @return array{success: bool, data: mixed, error?: string}
      */
-    public function sendDocument(string $to, string $filename, string $document, string $caption = ''): array
+    public function sendDocument(string $to, string $filename, string $document, string $caption = '',$token,$instanceId): array
     {
-        if (!$this->isConfigured()) {
-            Log::error('UltramsgService: Service not configured.');
-            return ['success' => false, 'error' => 'Ultramsg service not configured.', 'data' => null];
-        }
 
-        // Validate filename length
-        if (strlen($filename) > 255) {
-            Log::error('UltramsgService: Filename too long. Max length is 255 characters.');
-            return ['success' => false, 'error' => 'Filename too long. Maximum 255 characters allowed.', 'data' => null];
-        }
 
-        // Validate caption length
-        if (strlen($caption) > 1024) {
-            Log::error('UltramsgService: Caption too long. Max length is 1024 characters.');
-            return ['success' => false, 'error' => 'Caption too long. Maximum 1024 characters allowed.', 'data' => null];
-        }
-
-        $endpoint = "{$this->baseUrl}/{$this->instanceId}/messages/document";
+        $endpoint = "{$this->baseUrl}/{$instanceId}/messages/document";
 
         try {
             $response = Http::asForm()
                 ->post($endpoint, [
-                    'token' => $this->token,
+                    'token' => $token,
                     'to' => $to,
                     'filename' => 'LAB RESULT',
                     'document' => $document,

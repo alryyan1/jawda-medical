@@ -1891,25 +1891,44 @@ class PatientController extends Controller
         if ($doctorvisit == null) {
             return ['status' => false, 'message' => 'no data found'];
         }
+        
 
         $this->uploadToFirebase($doctorvisit->patient);
 
+        $settings = Setting::first();
+        $token = $settings?->ultramsg_token ?? '';
+        $instanceId = $settings?->ultramsg_instance_id ?? '';    
+        $collection = $settings?->firestore_result_collection ?? '';
 
+        // return $doctorvisit->patient->result_url;
 
         $response = HttpClient::asForm()->post(
-            'https://intaj-starstechnology.com/whatsapp/altamayoz/jawda-medical/public/api/ultramsg/send-document-from-firebase',
+            'https://intaj-starstechnology.com/whatsapp/alroomy-shaglaban/jawda-medical/public/api/ultramsg/send-document-from-firebase',
             [
                 'visit_id' => $doctorvisit->id,
                 'phone' => $doctorvisit->patient->phone,
                 'url' => $doctorvisit->patient->result_url,
+                'token'=>$token,
+                'instance_id'=>$instanceId,
+                'collection'=>$collection
+
             ]
         );
 
+        $responseData = $response->json() ?? [];
+        
+        // Extract the nested WhatsApp API message if it exists
+        $whatsappMessage = $responseData['data']['message'] ?? null;
+        
+        // Use WhatsApp API message as main message if available, otherwise use default
+        $message = $whatsappMessage ?? ($response->successful() ? 'report sent successfully' : 'failed to send report');
+
         return response()->json([
+            'success' => $response->successful(),
             'status' => $response->successful(),
             'status_code' => $response->status(),
-            'data' => $response->json() ?? $response->body(),
-            'message' => $response->successful() ? 'report sent successfully' : 'failed to send report'
+            'data' => $responseData,
+            'message' => $message,
         ], $response->status());
 
     }
@@ -1923,21 +1942,36 @@ class PatientController extends Controller
 
 
 
-
+        $settings = Setting::first();
+        $token = $settings?->ultramsg_token ?? '';
+        $instanceId = $settings?->ultramsg_instance_id ?? '';    
+        $collection = $settings?->firestore_result_collection ?? '';
         $response = HttpClient::asForm()->post(
-            'https://intaj-starstechnology.com/whatsapp/altamayoz/jawda-medical/public/api/ultramsg/send-document-from-firebase',
+            'https://intaj-starstechnology.com/whatsapp/alroomy-shaglaban/jawda-medical/public/api/ultramsg/send-document-from-firebase',
             [
                 'visit_id' => $doctorvisit->id,
                 'phone' => $doctorvisit->patient->phone,
                 'url' => $doctorvisit->patient->result_url,
+                'token' => $token,
+                'instance_id'=>$instanceId,
+                'collection'=>$collection
             ]
         );
 
+        $responseData = $response->json() ?? [];
+        
+        // Extract the nested WhatsApp API message if it exists
+        $whatsappMessage = $responseData['data']['message'] ?? null;
+        
+        // Use WhatsApp API message as main message if available, otherwise use default
+        $message = $whatsappMessage ?? ($response->successful() ? 'report sent successfully' : 'failed to send report');
+
         return response()->json([
+            'success' => $response->successful(),
             'status' => $response->successful(),
             'status_code' => $response->status(),
-            'data' => $response->json() ?? $response->body(),
-            'message' => $response->successful() ? 'report sent successfully' : 'failed to send report'
+            'data' => $responseData,
+            'message' => $message,
         ], $response->status());
 
     }
