@@ -121,10 +121,10 @@ class LabRequestController extends Controller
     public function getLabPendingQueue(Request $request)
     {
         $request->validate([
-            // 'shift_id' => 'nullable|integer|exists:shifts,id',
+            'shift_id' => 'nullable|integer|exists:shifts,id',
             'date_from' => 'nullable|date_format:Y-m-d',
             'date_to' => 'nullable|date_format:Y-m-d|after_or_equal:date_from',
-            'search' => 'nullable|string|max:100', // Patient name/ID, Visit ID, Sample ID, Lab Request ID
+            'search' => 'nullable|string|max:100',
             'page' => 'nullable|integer|min:1',
             'per_page' => 'nullable|integer|min:5|max:100',
             'package_id' => 'nullable|integer|exists:packages,package_id',
@@ -132,138 +132,69 @@ class LabRequestController extends Controller
             'main_test_id' => 'nullable|integer|exists:main_tests,id',
         ]);
 
-        $perPage = $request->input('per_page', 30);
+        // Determine shift_id early to use in indexed queries
+        $shiftId = $request->filled('shift_id') 
+            ? $request->shift_id 
+            : Shift::max('id');
 
-        // The core of the queue is still a "DoctorVisit" because it represents an encounter.
-        // We then filter these visits to only include those where the patient has relevant lab requests.
+        // Build optimized query using direct labRequests relation (uses doctor_visit_id index)
         $query = DoctorVisit::query()
-            ->select(
-                'doctorvisits.id as visit_id', // This is the ID of the DoctorVisit encounter
+            ->select([
+                'doctorvisits.id',
+                'doctorvisits.id as visit_id',
                 'doctorvisits.created_at as visit_creation_time',
-                'doctorvisits.visit_date', // Keep for context
-                'patients.id as patient_id',
-                'patients.name as patient_name',
-                'doctorvisits.id as id'
-                // Add other patient fields if needed by PatientLabQueueItemResource
-            )
-            ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
-            // Ensure this visit's patient has lab requests that match the criteria
-            ->whereHas('patientLabRequests', function ($lrQuery) use ($request) {
+                'doctorvisits.visit_date',
+                'doctorvisits.patient_id',
+            ])
+            ->where('doctorvisits.shift_id', $shiftId)
+            ->whereHas('labRequests'); // Use direct relation with doctor_visit_id
 
-
-
-
-                // Apply NEW FILTERS to the lab requests
-                if ($request->filled('package_id')) {
-                    $lrQuery->whereHas('mainTest', function ($mtQuery) use ($request) {
-                        $mtQuery->where('pack_id', $request->package_id);
-                    });
-                }
-
-                if ($request->boolean('has_unfinished_results')) {
-                    $lrQuery->whereHas('results', function ($resQuery) {
-                        $resQuery->where(function ($q_empty_res) {
-                            $q_empty_res->where('result', '=', '')->orWhereNull('result');
-                        });
-                    });
-                }
-
-                if ($request->filled('main_test_id')) {
-                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
-                }
-            });
-
-        // Context for DoctorVisit itself (shift or date range)
-        // $query->where('doctorvisits.shift_id', $request->shift_id);
-
-
-        if ($request->filled('shift_id')) {
-            $query->where('doctorvisits.shift_id', $request->shift_id);
-        } else {
-            $max_shift_id = Shift::max('id');
-            $query->where('doctorvisits.shift_id', $max_shift_id);
-        }
-
-
-        // Filter by Main Test
+        // Apply filters using the direct labRequests relation
         if ($request->filled('main_test_id')) {
-            $query->whereHas('patientLabRequests', function ($q_lr) use ($request) {
-                $q_lr->where('main_test_id', $request->main_test_id);
-            });
+            $query->whereHas('labRequests', fn($q) => $q->where('main_test_id', $request->main_test_id));
         }
 
-        // Filter by Package
         if ($request->filled('package_id')) {
-            $query->whereHas('patientLabRequests.mainTest', function ($q_mt) use ($request) {
-                $q_mt->where('pack_id', $request->package_id);
+            $query->whereHas('labRequests.mainTest', fn($q) => $q->where('pack_id', $request->package_id));
+        }
+
+        if ($request->boolean('has_unfinished_results')) {
+            $query->whereHas('labRequests.results', function ($q) {
+                $q->where(fn($sq) => $sq->whereNull('result')->orWhere('result', ''));
             });
         }
 
-        // Filter by Company
         if ($request->filled('company_id')) {
-            $query->whereHas('patient', function ($q_pat) use ($request) {
-                $q_pat->where('company_id', $request->company_id);
-            });
+            $query->whereHas('patient', fn($q) => $q->where('company_id', $request->company_id));
         }
 
-        // Filter by Doctor (referring doctor of the visit)
         if ($request->filled('doctor_id')) {
             $query->where('doctorvisits.doctor_id', $request->doctor_id);
         }
 
-        // Filter by Result Status (this is complex for a visit with multiple lab requests)
-// You might need an aggregated status on the visit or a more complex subquery.
-// Simple example: Show visit if *any* lab request matches the status.
+        // Search functionality
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->whereHas('patient', fn($pq) => $pq->where('name', 'LIKE', "%{$searchTerm}%"))
+                  ->orWhere('doctorvisits.id', $searchTerm);
+            });
+        }
 
+        // Count using direct relation
+        $query->withCount(['labRequests as test_count']);
 
-
-        // Eager load data needed for PatientLabQueueItemResource after filtering
-        // This uses the hypothetical 'patientLabRequests' relation on DoctorVisit model.
-        // If it doesn't exist, we have to construct this data manually or adjust the resource.
-        // The resource will effectively re-query lab requests for the patient within context.
-        // For now, let's assume the resource can handle getting the specific LRs.
-
-        // Aggregates for display in the queue item (these define the "work unit" for the patient in context)
-        // We need to count lab requests for *this specific visit's patient* that match the filters.
-        $query->withCount([
-            'patientLabRequests as test_count' => function ($lrQuery) use ($request) {
-
-                // Re-apply filters to the count
-                if ($request->filled('package_id')) {
-                    $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
-                }
-                if ($request->boolean('has_unfinished_results')) {
-                    $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));
-                }
-                if ($request->filled('main_test_id')) {
-                    $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
-                }
-                // Contextual filter for count based on how lab requests are tied to this visit's context
-                // (e.g., created on same day as visit_date)
-    
-            }
+        // Optimized eager loading - use labRequests (direct) instead of patientLabRequests (hasManyThrough)
+        $query->with([
+            'patient:id,name,phone,company_id,shift_id,visit_number,result_is_locked,result_print_date,sample_collect_time,result_url,auth_date,result_auth,age_year,age_month,age_day,doctor_id,user_id,lab_to_lab_object_id',
+            'patient.company:id,name',
+            'patient.doctor:id,name',
+            'patient.user:id,name',
+            'patient.sampleCollectedBy:id,name',
+            'labRequests:id,pid,doctor_visit_id,main_test_id,is_paid',
+            'labRequests.results:id,lab_request_id,result',
         ]);
-
-        // $query->withMin([
-        //     'patientLabRequests as oldest_request_time_for_patient_in_context' => function ($lrQuery) use ($request) {
-
-        //         // Re-apply filters for oldest time context
-        //         if ($request->filled('package_id')) {
-        //             $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
-        //         }
-        //         if ($request->boolean('has_unfinished_results')) {
-        //             $lrQuery->whereHas('results', fn($r) => $r->where('result', '=', '')->orWhereNull('result'));
-        //         }
-        //         if ($request->filled('main_test_id')) {
-        //             $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
-        //         }
-        //         $lrQuery->whereDate('labrequests.created_at', DB::raw('DATE(doctorvisits.visit_date)'));
-        //     }
-        // ], 'labrequests.created_at');
-
-        // This will fetch DoctorVisit records. The PatientLabQueueItemResource will need to correctly
-        // extract/derive lab_request_ids, sample_id, and all_requests_paid based on the DoctorVisit and its Patient.
-        $query->with(['patient.sampleCollectedBy:id,name']); // Load patient with sampleCollectedBy relationship
+        
         $pendingVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
 
         return PatientLabQueueItemResource::collection($pendingVisits);
