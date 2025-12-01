@@ -73,9 +73,7 @@ class UserController extends Controller
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'username' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
-            // Password validation is removed here; use updatePassword for that.
-            // If you want to allow password change here, add it back with 'nullable'
-            // 'password' => ['nullable', 'confirmed', Password::defaults()],
+            'password' => ['nullable', 'confirmed', Password::defaults()],
             'doctor_id' => 'nullable|integer|exists:doctors,id',
             'is_nurse' => 'sometimes|boolean',
             'is_supervisor' => 'sometimes|boolean', // ADDED
@@ -86,8 +84,13 @@ class UserController extends Controller
             'user_type' => 'nullable|string|max:255',
         ]);
 
-        // Prepare data for update, excluding password fields (handled by dedicated endpoint)
-        $updateData = collect($validatedData)->except(['roles'])->toArray();
+        // Prepare data for update, excluding password and roles (handled separately)
+        $updateData = collect($validatedData)->except(['roles', 'password', 'password_confirmation'])->toArray();
+
+        // Handle password change if provided
+        if (!empty($validatedData['password'])) {
+            $updateData['password'] = Hash::make($validatedData['password']);
+        }
 
         // Handle boolean flags explicitly if they are not present in the request but field exists
         if ($request->has('is_nurse')) $updateData['is_nurse'] = $request->boolean('is_nurse');
