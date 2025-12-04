@@ -131,4 +131,225 @@ class CostController extends Controller
         return response()->json(['message' => 'Cost deleted successfully'], 200);
     }
 
+    /**
+     * Get costs grouped by day for a given month/year.
+     */
+    public function costsByDay(Request $request)
+    {
+        $data = $this->getCostsByDayData($request);
+        return response()->json($data);
+    }
+
+    /**
+     * Helper method to get costs by day data.
+     */
+    private function getCostsByDayData(Request $request)
+    {
+        $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2020|max:2100',
+        ]);
+
+        $month = $request->input('month');
+        $year = $request->input('year');
+
+        // Get start and end dates for the month
+        $startDate = Carbon::create($year, $month, 1)->startOfDay();
+        $endDate = $startDate->copy()->endOfMonth()->endOfDay();
+
+        // Get costs grouped by day
+        $dailyCosts = Cost::selectRaw('
+                DATE(created_at) as date,
+                SUM(amount) as total_cash,
+                SUM(amount_bankak) as total_bank,
+                SUM(amount + amount_bankak) as total_cost,
+                COUNT(*) as transactions_count
+            ')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->groupBy('date')
+            ->orderBy('date', 'asc')
+            ->get();
+
+        // Calculate month totals
+        $monthTotals = [
+            'total_cash' => $dailyCosts->sum('total_cash'),
+            'total_bank' => $dailyCosts->sum('total_bank'),
+            'total_cost' => $dailyCosts->sum('total_cost'),
+            'transactions_count' => $dailyCosts->sum('transactions_count'),
+        ];
+
+        return [
+            'data' => $dailyCosts,
+            'summary' => $monthTotals,
+            'report_period' => [
+                'month' => $month,
+                'year' => $year,
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ],
+        ];
+    }
+
+    /**
+     * Generate PDF for daily costs report.
+     */
+    public function costsByDayPdf(Request $request)
+    {
+        $data = $this->getCostsByDayData($request);
+        
+        $arabicMonths = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+        $monthName = $arabicMonths[$data['report_period']['month'] - 1];
+        $year = $data['report_period']['year'];
+
+        $pdf = new \App\Services\Pdf\Pdf('P', 'mm', 'A4', true, 'UTF-8', false);
+        $pdf->SetCreator('Jawda Medical System');
+        $pdf->SetAuthor('Jawda');
+        $pdf->SetTitle("تقرير المصروفات اليومية - {$monthName} {$year}");
+        $pdf->SetMargins(10, 10, 10);
+        $pdf->SetAutoPageBreak(true, 10);
+        $pdf->AddPage();
+
+        // Title
+        $pdf->SetFont('dejavusans', 'B', 16);
+        $pdf->Cell(0, 10, "تقرير المصروفات اليومية", 0, 1, 'C');
+        $pdf->SetFont('dejavusans', '', 12);
+        $pdf->Cell(0, 8, "{$monthName} {$year}", 0, 1, 'C');
+        $pdf->Ln(5);
+
+        // Table header
+        $pdf->SetFont('dejavusans', 'B', 10);
+        $pdf->SetFillColor(41, 128, 185);
+        $pdf->SetTextColor(255, 255, 255);
+        
+        $colWidths = [25, 50, 35, 35, 35];
+        $headers = ['اليوم', 'التاريخ', 'إجمالي المصروفات', 'كاش', 'بنك'];
+        
+        foreach ($headers as $i => $header) {
+            $pdf->Cell($colWidths[$i], 8, $header, 1, 0, 'C', true);
+        }
+        $pdf->Ln();
+
+        // Table body
+        $pdf->SetFont('dejavusans', '', 9);
+        $pdf->SetTextColor(0, 0, 0);
+        $fill = false;
+        
+        foreach ($data['data'] as $row) {
+            $pdf->SetFillColor($fill ? 245 : 255, $fill ? 245 : 255, $fill ? 245 : 255);
+            $dayNum = Carbon::parse($row->date)->day;
+            $dateFormatted = Carbon::parse($row->date)->format('Y-m-d');
+            
+            $pdf->Cell($colWidths[0], 7, $dayNum, 1, 0, 'C', true);
+            $pdf->Cell($colWidths[1], 7, $dateFormatted, 1, 0, 'C', true);
+            $pdf->Cell($colWidths[2], 7, number_format($row->total_cost, 2), 1, 0, 'C', true);
+            $pdf->Cell($colWidths[3], 7, number_format($row->total_cash, 2), 1, 0, 'C', true);
+            $pdf->Cell($colWidths[4], 7, number_format($row->total_bank, 2), 1, 0, 'C', true);
+            $pdf->Ln();
+            $fill = !$fill;
+        }
+
+        // Table footer (totals)
+        $pdf->SetFont('dejavusans', 'B', 10);
+        $pdf->SetFillColor(200, 200, 200);
+        $pdf->Cell($colWidths[0] + $colWidths[1], 8, 'الإجمالي', 1, 0, 'C', true);
+        $pdf->Cell($colWidths[2], 8, number_format($data['summary']['total_cost'], 2), 1, 0, 'C', true);
+        $pdf->Cell($colWidths[3], 8, number_format($data['summary']['total_cash'], 2), 1, 0, 'C', true);
+        $pdf->Cell($colWidths[4], 8, number_format($data['summary']['total_bank'], 2), 1, 0, 'C', true);
+
+        return response($pdf->Output('S'), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"Daily_Costs_{$year}_{$data['report_period']['month']}.pdf\"");
+    }
+
+    /**
+     * Generate Excel for daily costs report.
+     */
+    public function costsByDayExcel(Request $request)
+    {
+        $data = $this->getCostsByDayData($request);
+        
+        $arabicMonths = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+        $monthName = $arabicMonths[$data['report_period']['month'] - 1];
+        $year = $data['report_period']['year'];
+        $month = $data['report_period']['month'];
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setRightToLeft(true);
+
+        // Title
+        $sheet->setCellValue('A1', "تقرير المصروفات اليومية - {$monthName} {$year}");
+        $sheet->mergeCells('A1:E1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+        // Headers
+        $headers = ['اليوم', 'التاريخ', 'إجمالي المصروفات', 'كاش', 'بنك'];
+        $col = 'A';
+        foreach ($headers as $header) {
+            $sheet->setCellValue($col . '3', $header);
+            $sheet->getStyle($col . '3')->getFont()->setBold(true);
+            $sheet->getStyle($col . '3')->getFill()
+                ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+                ->getStartColor()->setARGB('FF2980B9');
+            $sheet->getStyle($col . '3')->getFont()->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle($col . '3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $col++;
+        }
+
+        // Data rows
+        $row = 4;
+        foreach ($data['data'] as $item) {
+            $dayNum = Carbon::parse($item->date)->day;
+            $dateFormatted = Carbon::parse($item->date)->format('Y-m-d');
+            
+            $sheet->setCellValue('A' . $row, $dayNum);
+            $sheet->setCellValue('B' . $row, $dateFormatted);
+            $sheet->setCellValue('C' . $row, $item->total_cost);
+            $sheet->setCellValue('D' . $row, $item->total_cash);
+            $sheet->setCellValue('E' . $row, $item->total_bank);
+            
+            // Center align all cells
+            $sheet->getStyle("A{$row}:E{$row}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $row++;
+        }
+
+        // Totals row
+        $sheet->setCellValue('A' . $row, 'الإجمالي');
+        $sheet->mergeCells("A{$row}:B{$row}");
+        $sheet->setCellValue('C' . $row, $data['summary']['total_cost']);
+        $sheet->setCellValue('D' . $row, $data['summary']['total_cash']);
+        $sheet->setCellValue('E' . $row, $data['summary']['total_bank']);
+        $sheet->getStyle("A{$row}:E{$row}")->getFont()->setBold(true);
+        $sheet->getStyle("A{$row}:E{$row}")->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setARGB('FFC8C8C8');
+        $sheet->getStyle("A{$row}:E{$row}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+        // Auto-size columns
+        foreach (range('A', 'E') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        // Add borders
+        $lastRow = $row;
+        $sheet->getStyle("A3:E{$lastRow}")->getBorders()->getAllBorders()
+            ->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN);
+
+        // Format number columns
+        $sheet->getStyle("C4:E{$lastRow}")->getNumberFormat()
+            ->setFormatCode('#,##0.00');
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $filename = "Daily_Costs_{$year}_{$month}.xlsx";
+
+        ob_start();
+        $writer->save('php://output');
+        $content = ob_get_clean();
+
+        return response($content, 200)
+            ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
+    }
+
 }

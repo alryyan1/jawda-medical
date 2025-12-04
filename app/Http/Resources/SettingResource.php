@@ -23,9 +23,9 @@ class SettingResource extends JsonResource
             'lab_name' => $this->lab_name,
             'hospital_name' => $this->hospital_name,
             'firestore_result_collection' => $this->firestore_result_collection,
-            'inventory_notification_number' => $this->inventory_notification_number,
+            'cloud_api_token' => $this->cloud_api_token,
             'disable_doctor_service_check' => (bool) $this->disable_doctor_service_check,
-            'currency' => $this->currency,
+            'phone_number_id' => $this->phone_number_id,
             'phone' => $this->phone,
             'gov' => $this->gov, // bool or int
             'country' => $this->country, // bool or int

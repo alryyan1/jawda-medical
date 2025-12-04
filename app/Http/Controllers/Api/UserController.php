@@ -349,4 +349,179 @@ class UserController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Get users who have transactions (received money) in a specific shift.
+     * This matches the logic used in ReportController@allclinicsReportNew
+     */
+    public function getUsersWithShiftTransactions(Request $request)
+    {
+        $request->validate([
+            'shift_id' => 'required|integer|exists:shifts,id',
+        ]);
+
+        $shift = Shift::find($request->input('shift_id'));
+        if (!$shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
+
+        $users = User::all();
+        $usersWithTransactions = [];
+
+        foreach ($users as $user) {
+            $totalPaid = $shift->paidLab($user->id) + $shift->totalPaidService($user->id);
+            $totalBank = $shift->bankakLab($user->id) + $shift->totalPaidServiceBank($user->id);
+            // Costs specific to this user within this shift (if applicable)
+            $totalCost = $shift->totalCost($user->id);
+            $totalCostBank = $shift->totalCostBank($user->id);
+            $totalCash = $totalPaid - $totalBank;
+            $totalCostCash = $totalCost - $totalCostBank;
+            $netCash = $totalCash - $totalCostCash;
+
+            // Only include users who have transactions (same logic as ReportController)
+            if ($totalPaid > 0 || $totalBank > 0) {
+                $usersWithTransactions[] = [
+                    'id' => $user->id,
+                    'name' => $user->name ?: $user->username,
+                    'username' => $user->username,
+                    'total_paid' => $totalPaid,
+                    'total_bank' => $totalBank,
+                    'total_cash' => $totalCash,
+                    'total_cost' => $totalCost,
+                    'total_cost_bank' => $totalCostBank,
+                    'net_bank' => $totalBank - $totalCostBank,
+                    'net_cash' => $netCash,
+                ];
+            }
+        }
+
+        return response()->json([
+            'data' => $usersWithTransactions
+        ]);
+    }
+
+    /**
+     * Get patient transaction details for a specific user and shift
+     */
+    public function getUserShiftPatientTransactions(Request $request)
+    {
+        $request->validate([
+            'shift_id' => 'required|integer|exists:shifts,id',
+            'user_id' => 'required|integer|exists:users,id',
+        ]);
+
+        $shift = Shift::find($request->input('shift_id'));
+        $userId = $request->input('user_id');
+
+        if (!$shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
+
+        $doctorVisits = [];
+        
+        // Get lab transactions - LabRequest has doctor_visit_id, and DoctorVisit has shift_id
+        $labRequests = \App\Models\LabRequest::whereHas('doctorVisit', function($query) use ($shift) {
+            $query->where('shift_id', $shift->id);
+        })
+        ->where('user_deposited', $userId)
+        ->where('is_paid', true)
+        ->with(['doctorVisit.patient:id,name', 'doctorVisit.doctor:id,name', 'mainTest:id,main_test_name'])
+        ->get();
+
+        foreach ($labRequests as $labRequest) {
+            $doctorVisit = $labRequest->doctorVisit;
+            if (!$doctorVisit) continue;
+            
+            $visitId = $doctorVisit->id;
+            if (!isset($doctorVisits[$visitId])) {
+                $doctorVisits[$visitId] = [
+                    'doctor_visit_id' => $visitId,
+                    'patient_id' => $doctorVisit->patient->id ?? null,
+                    'patient_name' => $doctorVisit->patient->name ?? 'غير محدد',
+                    'doctor_id' => $doctorVisit->doctor_id ?? null,
+                    'doctor_name' => $doctorVisit->doctor->name ?? 'غير محدد',
+                    'lab_transactions' => [],
+                    'service_transactions' => [],
+                    'total_lab_paid' => 0,
+                    'total_lab_bank' => 0,
+                    'total_lab_cash' => 0,
+                    'total_service_paid' => 0,
+                    'total_service_bank' => 0,
+                    'total_service_cash' => 0,
+                ];
+            }
+            
+            $amount = (float) $labRequest->amount_paid;
+            $isBank = (bool) $labRequest->is_bankak;
+            
+            $doctorVisits[$visitId]['lab_transactions'][] = [
+                'test_name' => $labRequest->mainTest->main_test_name ?? 'غير محدد',
+                'amount' => $amount,
+                'is_bank' => $isBank,
+                'date' => $labRequest->created_at?->format('Y-m-d H:i:s'),
+            ];
+            
+            $doctorVisits[$visitId]['total_lab_paid'] += $amount;
+            if ($isBank) {
+                $doctorVisits[$visitId]['total_lab_bank'] += $amount;
+            } else {
+                $doctorVisits[$visitId]['total_lab_cash'] += $amount;
+            }
+        }
+
+        // Get service transactions
+        $serviceDeposits = \App\Models\RequestedServiceDeposit::where('shift_id', $shift->id)
+            ->where('user_id', $userId)
+            ->with(['requestedService.doctorVisit.patient:id,name', 'requestedService.doctorVisit.doctor:id,name', 'requestedService.service:id,name'])
+            ->get();
+
+        foreach ($serviceDeposits as $deposit) {
+            $requestedService = $deposit->requestedService;
+            if (!$requestedService) continue;
+            
+            $doctorVisit = $requestedService->doctorVisit;
+            if (!$doctorVisit) continue;
+            
+            $visitId = $doctorVisit->id;
+            if (!isset($doctorVisits[$visitId])) {
+                $doctorVisits[$visitId] = [
+                    'doctor_visit_id' => $visitId,
+                    'patient_id' => $doctorVisit->patient->id ?? null,
+                    'patient_name' => $doctorVisit->patient->name ?? 'غير محدد',
+                    'doctor_id' => $doctorVisit->doctor_id ?? null,
+                    'doctor_name' => $doctorVisit->doctor->name ?? 'غير محدد',
+                    'lab_transactions' => [],
+                    'service_transactions' => [],
+                    'total_lab_paid' => 0,
+                    'total_lab_bank' => 0,
+                    'total_lab_cash' => 0,
+                    'total_service_paid' => 0,
+                    'total_service_bank' => 0,
+                    'total_service_cash' => 0,
+                ];
+            }
+            
+            $amount = (float) $deposit->amount;
+            $isBank = (bool) $deposit->is_bank;
+            $serviceName = $requestedService->service->name ?? 'غير محدد';
+            
+            $doctorVisits[$visitId]['service_transactions'][] = [
+                'service_name' => $serviceName,
+                'amount' => $amount,
+                'is_bank' => $isBank,
+                'date' => $deposit->created_at?->format('Y-m-d H:i:s'),
+            ];
+            
+            $doctorVisits[$visitId]['total_service_paid'] += $amount;
+            if ($isBank) {
+                $doctorVisits[$visitId]['total_service_bank'] += $amount;
+            } else {
+                $doctorVisits[$visitId]['total_service_cash'] += $amount;
+            }
+        }
+
+        return response()->json([
+            'data' => array_values($doctorVisits)
+        ]);
+    }
 }

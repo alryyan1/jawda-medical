@@ -19,11 +19,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $lab_name
  * @property string|null $hospital_name
  * @property string|null $firestore_result_collection
- * @property string|null $inventory_notification_number
+ * @property string|null $cloud_api_token
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property bool $disable_doctor_service_check
- * @property string $currency
+ * @property string|null $phone_number_id
  * @property string $phone
  * @property bool $gov
  * @property bool $country
@@ -116,9 +116,9 @@ class Setting extends Model
         'header_base64', 'footer_base64', 'logo_base64',
         'header_content', 'footer_content',
         'lab_name', 'hospital_name', 'firestore_result_collection',
-        'inventory_notification_number',
+        'cloud_api_token',
         'disable_doctor_service_check',
-        'currency', 'phone', 'gov', 'country', // These gov/country might be booleans or IDs
+        'phone_number_id', 'phone', 'gov', 'country', // These gov/country might be booleans or IDs
         'barcode', 'show_water_mark',
         'vatin', 'cr', 'email', 'address',
         'ultramsg_instance_id', 'ultramsg_token', 'ultramsg_base_url', 'ultramsg_default_country_code', // For Ultramsg WhatsApp API

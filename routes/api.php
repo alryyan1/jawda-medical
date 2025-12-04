@@ -137,6 +137,9 @@ Route::middleware('auth:sanctum')->group(function () {
     */
   Route::get('roles-list', [UserController::class, 'getRolesList']);
   Route::get('permissions-list', [RoleController::class, 'getPermissionsList']);
+  // Specific routes must come before apiResource to avoid route model binding conflicts
+  Route::get('/users/with-shift-transactions', [UserController::class, 'getUsersWithShiftTransactions']);
+  Route::get('/users/shift-patient-transactions', [UserController::class, 'getUserShiftPatientTransactions']);
   Route::apiResource('users', UserController::class);
   Route::apiResource('roles', RoleController::class);
   Route::post('/users/{user}/update-password', [UserController::class, 'updatePassword']);
@@ -371,6 +374,9 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/costs/excel', [ExcelController::class, 'exportCostsReportToExcel']);
   // Route for fetching costs for the list page (if not using a full apiResource for costs)
   Route::get('/costs-report-data', [CostController::class, 'index']); // Using CostController@index for data
+  Route::get('/reports/costs-by-day', [CostController::class, 'costsByDay']); // Daily costs report
+  Route::get('/reports/costs-by-day/pdf', [CostController::class, 'costsByDayPdf']); // Daily costs PDF
+  Route::get('/reports/costs-by-day/excel', [CostController::class, 'costsByDayExcel']); // Daily costs Excel
   // Route::
   Route::get('/reports/lab-test-statistics', [ReportController::class, 'labTestStatistics']);
   Route::get('/reports/test-result-statistics', [ReportController::class, 'testResultStatistics']);
@@ -723,6 +729,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/instance-status', [\App\Http\Controllers\UltramsgController::class, 'getInstanceStatus']);
         Route::get('/configured', [\App\Http\Controllers\UltramsgController::class, 'isConfigured']);
     });
+
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp Cloud API Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('whatsapp-cloud')->group(function () {
+        Route::post('/send-text', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendTextMessage']);
+        Route::post('/send-template', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendTemplateMessage']);
+        Route::post('/send-document', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendDocument']);
+        Route::post('/send-image', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendImage']);
+        Route::get('/phone-numbers', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'getPhoneNumbers']);
+        Route::get('/configured', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'isConfigured']);
+    });
 });
 
 // Ultramsg routes with custom credentials (no auth required since credentials are in request)
@@ -758,6 +778,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
 //send from firebase storage using visit_id and settings.storage_name
 Route::post('/ultramsg/send-document-from-firebase', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFirebase']);
+
+// WhatsApp Cloud API Webhook endpoints (no CSRF protection needed)
+Route::get('/whatsapp-cloud/webhook', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'verifyWebhook']);
+Route::post('/whatsapp-cloud/webhook', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'webhook']);
+
 // Webhook endpoints (no CSRF protection needed)
 Route::get('/webhook', [WebHookController::class, 'webhook']);
 Route::post('/webhook', [WebHookController::class, 'webhook']);
