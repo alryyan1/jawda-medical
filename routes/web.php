@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\WhatsAppCloudApiController;
 use App\Http\Controllers\LabResultController;
 use App\Http\Controllers\WebHookController;
 use App\Models\DoctorShift;
@@ -53,6 +54,7 @@ Route::get('/reports/cash-reconciliation/shifts', function() {
     $shifts = \App\Models\Shift::orderBy('id', 'desc')->limit(10)->get(['id', 'name', 'created_at']);
     return response()->json(['shifts' => $shifts]);
 });
+Route::get('/test/{phoneNumber?}', [WhatsAppCloudApiController::class, 'testGetResultUrlByPhone'])->defaults('phoneNumber', '249991961111');
 ///api/visits/10664/lab-report/pdf
 Route::get('/visits/{visit}/lab-report/pdf', [ReportController::class, 'result']);
 // Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf']);

@@ -320,10 +320,13 @@ class UploadLabResultToFirebase implements ShouldQueue
             // Get current timestamp in RFC3339 format for Firestore
             $currentTimestamp = now()->toRfc3339String();
             
+            // Format phone number with country code 249 (Sudan)
+            $formattedPhone = $this->formatPhoneWithCountryCode($patientPhone, '249');
+            
             $fields = [
                 'result_url' => ['stringValue' => $resultUrl],
                 'patient_name' => ['stringValue' => $patientName],
-                'patient_phone' => ['stringValue' => $patientPhone],
+                'patient_phone' => ['stringValue' => $formattedPhone],
                 'updated_at' => ['timestampValue' => $currentTimestamp]
             ];
 
@@ -350,7 +353,7 @@ class UploadLabResultToFirebase implements ShouldQueue
                         'document_id' => $documentId,
                         'result_url' => $resultUrl,
                         'patient_name' => $patientName,
-                        'patient_phone' => $patientPhone
+                        'patient_phone' => $formattedPhone
                     ]);
                 } else {
                     Log::warning("Failed to update Firestore document", [
@@ -377,7 +380,7 @@ class UploadLabResultToFirebase implements ShouldQueue
                         'document_id' => $documentId,
                         'result_url' => $resultUrl,
                         'patient_name' => $patientName,
-                        'patient_phone' => $patientPhone
+                        'patient_phone' => $formattedPhone
                     ]);
                 } else {
                     // If PATCH fails, try POST to collection (but this won't set specific ID)
@@ -406,7 +409,7 @@ class UploadLabResultToFirebase implements ShouldQueue
                             'document_id' => $documentId,
                             'result_url' => $resultUrl,
                             'patient_name' => $patientName,
-                            'patient_phone' => $patientPhone
+                            'patient_phone' => $formattedPhone
                         ]);
                     } else {
                         Log::error("Failed to create Firestore document with all methods", [
@@ -441,7 +444,7 @@ class UploadLabResultToFirebase implements ShouldQueue
                         'document_id' => $documentId,
                         'result_url' => $resultUrl,
                         'patient_name' => $patientName,
-                        'patient_phone' => $patientPhone
+                        'patient_phone' => $formattedPhone
                     ]);
                 } else {
                     Log::warning("Failed to create/update Firestore document", [
@@ -491,5 +494,36 @@ class UploadLabResultToFirebase implements ShouldQueue
             'patient:' . $this->patientId,
             'visit:' . $this->visitId,
         ];
+    }
+
+    /**
+     * Format phone number with country code.
+     * Adds country code prefix if not already present.
+     *
+     * @param string $phone The phone number to format
+     * @param string $countryCode The country code to add (e.g., '249' for Sudan)
+     * @return string The formatted phone number with country code
+     */
+    private function formatPhoneWithCountryCode(string $phone, string $countryCode): string
+    {
+        if (empty($phone)) {
+            return '';
+        }
+
+        // Remove any non-digit characters
+        $normalizedPhone = preg_replace('/[^0-9]/', '', $phone);
+
+        // If phone already starts with country code, return as is
+        if (strpos($normalizedPhone, $countryCode) === 0) {
+            return $normalizedPhone;
+        }
+
+        // Remove leading zero if present (common in local format)
+        if (strpos($normalizedPhone, '0') === 0) {
+            $normalizedPhone = substr($normalizedPhone, 1);
+        }
+
+        // Add country code prefix
+        return $countryCode . $normalizedPhone;
     }
 }

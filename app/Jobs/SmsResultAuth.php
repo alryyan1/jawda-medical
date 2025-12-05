@@ -51,9 +51,22 @@ class SmsResultAuth implements ShouldQueue
 شكرا لزيارتك
 EOD;
 
+        // Create WhatsApp click-to-chat link
+        // Format: https://wa.me/<number>?text=<encoded_message>
+        // Number should be in international format without +, zeros, brackets, or dashes
+        $whatsappNumber = '96878622990'; // WhatsApp number in international format
+        $whatsappMessage = urlencode($message . "\n" . $visitId);
+        $whatsappLink = "https://wa.me/{$whatsappNumber}?text={$visitId}";
+        
+        // Add WhatsApp link to the SMS message
+        $messageWithLink = $message . "\n"  . "\n\n" . "للحصول على النتيجة واتساب  اضغط علي الرابط:  \n" . $whatsappLink;
+
         try {
-            $sms->send($patient->phone, $message, false, config('services.airtel_sms.default_sender'));
-            Log::info('SmsResultAuth: SMS sent successfully to patient ' . $this->patientId);
+            $sms->send($patient->phone, $messageWithLink, false, config('services.airtel_sms.default_sender'));
+            Log::info('SmsResultAuth: SMS sent successfully to patient ' . $this->patientId, [
+                'visit_id' => $visitId,
+                'whatsapp_link' => $whatsappLink
+            ]);
         } catch (\Throwable $e) {
             Log::error('SmsResultAuth failed: ' . $e->getMessage(), [
                 'patient_id' => $this->patientId,

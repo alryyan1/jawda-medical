@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Patient;
 use App\Models\Setting;
-use App\Services\UltramsgService;
+use App\Services\WhatsAppCloudApiService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -35,22 +35,39 @@ class SendAuthWhatsappMessage implements ShouldQueue
             return;
         }
 
-        $formattedPhone = UltramsgService::formatPhoneNumber($patient->phone ?? '');
+        $formattedPhone = WhatsAppCloudApiService::formatPhoneNumber($patient->phone ?? '');
         if (!$formattedPhone) {
             Log::warning('SendAuthWhatsappMessage: No valid phone for patient '.$this->patientId);
             return;
         }
 
         $visitId = $patient->doctorVisit->id;
-        $msg = <<<EOD
-عزيزي الزائر نفيدك بانتهاء التحاليل الطبيه
-شكرا لزيارتك
-لاستلام النتيجه ارسل الكود {$visitId}
-EOD;
+        
+        // Prepare template components with visit ID as parameter
+        $components = [
+            [
+                'type' => 'body',
+                'parameters' => [
+                    [
+                        'type' => 'text',
+                        'text' => (string) $visitId
+                    ]
+                ]
+            ]
+        ];
 
         try {
-            $service = new UltramsgService();
-            $service->sendTextMessageOnline($settings->ultramsg_instance_id, $settings->ultramsg_token, $patient->phone, $msg);
+            $service = new WhatsAppCloudApiService();
+            $result = $service->sendTemplateMessage(
+                $formattedPhone,
+                'lab_results_complete',
+                'ar',
+                // $components
+            );
+            
+            if (!$result['success']) {
+                Log::error('SendAuthWhatsappMessage failed: '.($result['error'] ?? 'Unknown error'));
+            }
         } catch (\Throwable $e) {
             Log::error('SendAuthWhatsappMessage failed: '.$e->getMessage());
         }
