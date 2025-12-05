@@ -1,0 +1,31 @@
+<?php
+
+use App\Models\User;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('finance_entries', function (Blueprint $table) {
+            $table->foreignIdFor(User::class,'user_created')->nullable()->constrained()->references('id')->on('users');
+            $table->boolean('is_net');
+            $table->foreignIdFor(User::class,'user_net')->nullable()->constrained()->references('id')->on('users');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('finance_entries', function (Blueprint $table) {
+            //
+        });
+    }
+};

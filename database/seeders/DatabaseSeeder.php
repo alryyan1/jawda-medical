@@ -19,12 +19,11 @@ class DatabaseSeeder extends Seeder
             [
                 RolesAndPermissionsSeeder::class,
                 AdminSeeder::class,
-                DummyDataSeeder::class,
-                ContainersTableSeeder::class,
-                MainTestsTableSeeder::class,
-                PackageTableSeeder::class,
-                UnitsTableSeeder::class,
-                ChildTestsTableSeeder::class,
+                // ContainersTableSeeder::class,
+                // MainTestsTableSeeder::class,
+                // PackageTableSeeder::class,
+                // UnitsTableSeeder::class,
+                // ChildTestsTableSeeder::class,
                 SuggestedOrganismSeeder::class,
                 // Add other seeders here as needed
                 // For example, if you have a seeder for companies, doctors, etc.

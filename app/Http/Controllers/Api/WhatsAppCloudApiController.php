@@ -514,6 +514,7 @@ class WhatsAppCloudApiController extends Controller
         // Handle text messages that may contain a code/visit ID
         elseif ($type === 'text' && isset($message['text']['body'])) {
             $messageText = trim($message['text']['body']);
+            $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات");
             
             // Extract code/visit ID from message (assuming it's a numeric code)
             // You can modify this regex pattern based on your code format
