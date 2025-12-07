@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class PackageTableSeeder extends Seeder
 {
@@ -17,9 +16,9 @@ class PackageTableSeeder extends Seeder
     {
 
 
-        DB::table('packages')->delete();
+        \DB::table('packages')->delete();
 
-        DB::table('packages')->insert(array (
+        \DB::table('packages')->insert(array (
             0 =>
             array (
                 'package_id' => 1,

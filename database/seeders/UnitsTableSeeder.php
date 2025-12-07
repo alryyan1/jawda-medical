@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class UnitsTableSeeder extends Seeder
 {
@@ -17,9 +16,9 @@ class UnitsTableSeeder extends Seeder
     {
 
 
-        DB::table('units')->delete();
+        \DB::table('units')->delete();
 
-        DB::table('units')->insert(array (
+        \DB::table('units')->insert(array (
             0 =>
             array (
                 'id' => 1,

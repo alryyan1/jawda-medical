@@ -16,7 +16,6 @@ class ChemistryBindingsTableSeeder extends Seeder
     {
         
 
-
         \DB::table('chemistry_bindings')->delete();
         
         \DB::table('chemistry_bindings')->insert(array (
@@ -139,5 +138,3 @@ class ChemistryBindingsTableSeeder extends Seeder
         
     }
 }
-
-

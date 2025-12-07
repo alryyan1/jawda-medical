@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class MainTestsTableSeeder extends Seeder
 {
@@ -17,9 +16,9 @@ class MainTestsTableSeeder extends Seeder
     {
         
 
-        DB::table('main_tests')->delete();
+        \DB::table('main_tests')->delete();
         
-        DB::table('main_tests')->insert(array (
+        \DB::table('main_tests')->insert(array (
             0 => 
             array (
                 'id' => 1,

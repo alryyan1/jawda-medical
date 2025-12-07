@@ -4,9 +4,19 @@ namespace Database\Seeders;
 
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
-use App\Models\ChildTest;
-use App\Models\Unit;
+use App\Models\Deno;
+use App\Models\Deposit;
+use App\Models\Doctor;
+use App\Models\DrugCategory;
+use App\Models\Patient;
+use App\Models\PaymentType;
+use App\Models\PharmacyType;
+use App\Models\Shift;
+use App\Models\Specialist;
+use App\Models\User;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,27 +25,44 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(
-            [
-                RolesAndPermissionsSeeder::class,
-                AdminSeeder::class,
-                // ContainersTableSeeder::class,
-                // MainTestsTableSeeder::class,
-                // PackageTableSeeder::class,
-                // UnitsTableSeeder::class,
-                // ChildTestsTableSeeder::class,
-                SuggestedOrganismSeeder::class,
-                // Add other seeders here as needed
-                // For example, if you have a seeder for companies, doctors, etc.
-                // CompanySeeder::class,
-                // DoctorSeeder::class,
-            ]
-        );
         // \App\Models\User::factory(10)->create();
+        //Specialist::truncate();
+        //Doctor::truncate();
 
-        // \App\Models\User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
+
+
+
+
+
+       $specialist =  Specialist::create(['name'=>'الباطنيه']);
+//       $doctor = Doctor::factory(10)->create();
+//       Patient::factory(10)->create();
+        $this->call(UnitsTableSeeder::class);
+        $this->call(PackageTableSeeder::class);
+        $this->call(ContainersTableSeeder::class);
+        $this->call(MainTestsTableSeeder::class);
+        $this->call(ChildTestsTableSeeder::class);
+//        $this->call(ItemsTableSeeder::class);
+        $this->call(ServiceGroupsTableSeeder::class);
+//        $this->call(ServicesTableSeeder::class);
+//        $this->call(DepositItemsTableSeeder::class);
+        $this->call(PermissionsTableSeeder::class);
+        $this->call(RolesTableSeeder::class);
+        $this->call(ChildTestOptionsTableSeeder::class);
+        $this->call(CbcBindingsTableSeeder::class);
+        $this->call(ChemistryBindingsTableSeeder::class);
+        $this->call(RoutesTableSeeder::class);
+        $this->call(RoleHasPermissionsTableSeeder::class);
+        // $this->call(UserRoutesTableSeeder::class);
+        $this->call(SubRoutesTableSeeder::class);
+        $this->call(ChiefComplainTableSeeder::class);
+        $this->call(DrugsTableSeeder::class);
+        $this->call(Sysmex550TableSeeder::class);
+        $this->call(DiagnosisTableSeeder::class);
+//        $this->call(NewDrugsTableSeeder::class);
+
+        // $this->call(UserSubRoutesTableSeeder::class);
+        $this->call(SpecialistsTableSeeder::class);
+        // $this->call(AccountHierarchyTableSeeder::class);
     }
 }

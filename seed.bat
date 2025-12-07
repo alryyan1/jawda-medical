@@ -45,3 +45,4 @@ php artisan db:seed --class=Database\Seeders\UserSubRoutesTableSeeder
 echo.
 echo All seeders completed!
 pause
+

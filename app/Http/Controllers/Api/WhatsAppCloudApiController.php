@@ -496,7 +496,7 @@ class WhatsAppCloudApiController extends Controller
         if ($isButtonMessage && $buttonData !== null) {
             // Get collection from settings
             $settings = Setting::first();
-            $collection = $settings?->firestore_result_collection ?? 'alroomy_results';
+            $collection = $settings?->firestore_result_collection ?? 'altamayoz_branch2';
 
             // Fetch PDF URL from Firestore using the sender's phone number
             $pdfUrl = $this->getResultUrlFromFirestoreByPhone($from, $collection);
