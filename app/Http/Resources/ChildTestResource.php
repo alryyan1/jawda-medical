@@ -10,6 +10,7 @@ class ChildTestResource extends JsonResource
         return [
             'id' => $this->id,
             'main_test_id' => $this->main_test_id,
+            'main_test_name' => $this->whenLoaded('mainTest', optional($this->mainTest)->main_test_name),
             'child_test_name' => $this->child_test_name,
             'low' => $this->low,
             'upper' => $this->upper,

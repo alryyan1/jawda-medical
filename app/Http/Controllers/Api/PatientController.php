@@ -44,6 +44,8 @@ use App\Jobs\SendAuthWhatsappMessage;
 use App\Jobs\SmsResultAuth;
 use App\Models\CompanyService;
 use App\Models\Mindray;
+use App\Models\HormoneResult;
+use App\Models\HormoneBinding;
 use App\Services\Pdf\LabResultReport;
 
 class PatientController extends Controller
@@ -410,6 +412,7 @@ class PatientController extends Controller
                         $settings->storage_name,
                         true
                     );
+                    // SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
                     
                     Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
                 }
@@ -510,6 +513,8 @@ class PatientController extends Controller
 
             // Refresh the patient to get the updated result_url
             $patient->refresh();
+
+            Log::info("SendWhatsappMessage: $sendWhatsappMessage");
              // Only dispatch WhatsApp message after successful upload and URL generation
         if ($sendWhatsappMessage ) {
             SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
@@ -1884,6 +1889,35 @@ class PatientController extends Controller
 
         return ['status' => true, 'data' => new DoctorVisitResource($doctorvisit->load(['patient.subcompany', 'patient.doctor'])), 'chemistryObj' => $object];
     }
+
+    public function populatePatientHormoneData(Request $request, Doctorvisit $doctorvisit)
+    {
+        $main_test_id = $request->get('main_test_id');
+        $hormone = HormoneResult::where('doctorvisit_id', '=', $doctorvisit->id)->first();
+        if ($hormone == null) {
+            return  ['status' => false, 'message' => 'no data found'];
+        }
+        $bindings = HormoneBinding::all();
+        /** @var \App\Models\HormoneBinding $binding */
+        $object = null;
+        foreach ($bindings as $binding) {
+            $object[$binding->name_in_hormone_table] = [
+                'child_id' => [$binding->child_id_array],
+                'result' => $hormone[$binding->name_in_hormone_table]
+            ];
+            $child_array =  explode(',', $binding->child_id_array);
+            foreach ($child_array as $child_id) {
+                $requested_result = RequestedResult::whereChildTestId($child_id)->where('main_test_id', '=', $main_test_id)->where('patient_id', '=', $doctorvisit->patient->id)->first();
+                if ($requested_result != null) {
+
+                    $requested_result->update(['result' => $hormone[$binding->name_in_hormone_table]]);
+                }
+            }
+        }
+
+        return ['status' => true, 'data' => new DoctorVisitResource($doctorvisit->load(['patient.subcompany', 'patient.doctor'])), 'hormoneObj' => $object];
+    }
+
     public function sendWhatsappDirectPdfReport(Request $request)
     {
         $doctorVisitId = $request->get('visit_id');

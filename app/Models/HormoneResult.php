@@ -16,4 +16,6 @@ use Illuminate\Database\Eloquent\Model;
 class HormoneResult extends Model
 {
     use HasFactory;
+    
+    protected $table = 'hormone';
 }

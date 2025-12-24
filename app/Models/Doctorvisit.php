@@ -422,6 +422,10 @@ class DoctorVisit extends Model
     {
         return Mindray::where('doctorvisit_id', '=', $this->id)->get()->count() > 0;
     }
+    public function hasHormone()
+    {
+        return HormoneResult::where('doctorvisit_id', '=', $this->id)->exists();
+    }
     public function getHasChemistryAttribute()
     {
         return $this->hasChemistry();
@@ -429,6 +433,10 @@ class DoctorVisit extends Model
     public function getHascbcAttribute()
     {
         return $this->hasCbc();
+    }
+    public function getHasHormoneAttribute()
+    {
+        return $this->hasHormone();
     }
 
       /**

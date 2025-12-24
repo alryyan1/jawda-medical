@@ -1,6 +1,9 @@
 <?php
 namespace App\Http\Resources;
 
+use App\Models\HormoneResult;
+use App\Models\Mindray;
+use App\Models\SysmexResult;
 use App\Services\UltramsgService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -39,9 +42,10 @@ class PatientLabQueueItemResource extends JsonResource
         $isPrinted = $patient->result_print_date != null;
         $areAllPaid = $labRequests->isNotEmpty() && $unpaidCount === 0;
         
-        // Check for CBC/Chemistry from eager-loaded lab requests (avoid extra queries)
-        $hasCbc = $labRequests->contains(fn($lr) => in_array($lr->main_test_id, [1, 2, 3])); // Adjust IDs as needed
-        $hasChemistry = $labRequests->contains(fn($lr) => in_array($lr->main_test_id, [4, 5, 6])); // Adjust IDs as needed
+        // Check for CBC/Chemistry/Hormone by checking actual database tables
+        $hasCbc = SysmexResult::where('doctorvisit_id', '=', $this->id)->exists();
+        $hasChemistry = Mindray::where('doctorvisit_id', '=', $this->id)->exists();
+        $hasHormone = HormoneResult::where('doctorvisit_id', '=', $this->id)->exists();
         
         return [
             'total_result_count' => $totalResultsCount,
@@ -54,6 +58,7 @@ class PatientLabQueueItemResource extends JsonResource
             'lab_to_lab_object_id' => $patient->lab_to_lab_object_id ?? null,
             'has_cbc' => $hasCbc,
             'has_chemistry' => $hasChemistry,
+            'has_hormone' => $hasHormone,
             'patient_phone_for_whatsapp' => $patient ? UltramsgService::formatPhoneNumber($patient->phone) : null,
             'is_result_locked' => (bool) ($patient->result_is_locked ?? false),
             'is_printed' => $isPrinted,

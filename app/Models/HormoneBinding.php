@@ -22,4 +22,11 @@ use Illuminate\Database\Eloquent\Model;
 class HormoneBinding extends Model
 {
     use HasFactory;
+    
+    public $timestamps = false;
+    
+    protected $fillable = [
+        'child_id_array',
+        'name_in_hormone_table',
+    ];
 }

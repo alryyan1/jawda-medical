@@ -32,7 +32,7 @@ class UploadLabResultToFirebase implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(int $patientId, int $visitId, string $hospitalName = 'Jawda Medical', bool $sendWhatsappMessage = false)
+    public function __construct(int $patientId, int $visitId, string $hospitalName = 'Jawda Medical', bool $sendWhatsappMessage = true)
     {
         $this->patientId = $patientId;
         $this->visitId = $visitId;
@@ -143,9 +143,9 @@ class UploadLabResultToFirebase implements ShouldQueue
                     ]);
                 }
             }
-            if ($this->sendWhatsappMessage) {
+            // if ($this->sendWhatsappMessage) {
                 SendAuthWhatsappMessage::dispatch($this->patientId)->onQueue('notifications');
-            }
+            // }
 
             Log::info("Successfully uploaded lab result to Firebase for patient {$this->patientId}", [
                 'firebase_path' => $firebasePath,

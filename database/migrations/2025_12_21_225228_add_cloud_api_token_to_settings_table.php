@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('settings', function (Blueprint $table) {
-            $table->text('cloud_api_token')->nullable()->change();
+            $table->string('cloud_api_token')->nullable();
         });
     }
 
@@ -22,8 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('settings', function (Blueprint $table) {
-            $table->string('cloud_api_token')->nullable()->change();
+            $table->dropColumn('cloud_api_token');
         });
     }
 };
-

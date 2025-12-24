@@ -59,6 +59,7 @@ use App\Http\Controllers\Api\SettingUploadController;
 use App\Http\Controllers\Api\HL7MessageController;
 use App\Http\Controllers\Api\HL7MessageInsertController;
 use App\Http\Controllers\Api\ImageProxyController;
+use App\Http\Controllers\Api\BindingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\SmsController;
@@ -255,6 +256,15 @@ Route::middleware('auth:sanctum')->group(function () {
   // Settings
   Route::get('/settings', [SettingsController::class, 'show']);
   Route::post('/settings', [SettingsController::class, 'update']);
+  
+  // Bindings Management (CBC, Chemistry, Hormone)
+  Route::get('/bindings', [BindingController::class, 'index']);
+  Route::get('/bindings/table-columns', [BindingController::class, 'getTableColumns']);
+  Route::get('/bindings/table-data', [BindingController::class, 'getTableData']);
+  Route::post('/bindings', [BindingController::class, 'store']);
+  Route::put('/bindings/{id}', [BindingController::class, 'update']);
+  Route::delete('/bindings/{id}', [BindingController::class, 'destroy']);
+  Route::delete('/bindings/table-record/{id}', [BindingController::class, 'deleteTableRecord']);
 
   Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
   Route::get('/reports/doctor-shifts/excel', [ExcelController::class, 'doctorShiftsReportExcel']);
@@ -274,6 +284,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
   // Nested resource for child tests under a main test
   Route::apiResource('main-tests.child-tests', ChildTestController::class)->shallow();
+  // Get all child tests (for autocomplete)
+  Route::get('/child-tests', [ChildTestController::class, 'getAll']);
   // JSON params dedicated endpoints for child tests
   Route::get('/child-tests/{child_test}/json-params', [\App\Http\Controllers\Api\ChildTestController::class, 'getJsonParams']);
   Route::put('/child-tests/{child_test}/json-params', [\App\Http\Controllers\Api\ChildTestController::class, 'updateJsonParams']);
@@ -787,6 +799,7 @@ Route::post('/whatsapp-cloud/webhook', [\App\Http\Controllers\Api\WhatsAppCloudA
 Route::get('/webhook', [WebHookController::class, 'webhook']);
 Route::post('/webhook', [WebHookController::class, 'webhook']);
 Route::post('populatePatientChemistryData/{doctorvisit}',[PatientController::class,'populatePatientChemistryData']);
+Route::post('populatePatientHormoneData/{doctorvisit}',[PatientController::class,'populatePatientHormoneData']);
 
 
 Route::post('/sendWhatsappDirectPdfReport', [PatientController::class, 'sendWhatsappDirectPdfReport']);

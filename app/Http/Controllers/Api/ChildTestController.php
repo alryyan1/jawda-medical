@@ -142,6 +142,26 @@ class ChildTestController extends Controller
     }
 
     /**
+     * Get all child tests (for autocomplete/search)
+     */
+    public function getAll(Request $request)
+    {
+        $search = $request->query('search', '');
+        $limit = $request->query('limit', 100);
+        
+        $query = ChildTest::with(['unit', 'childGroup', 'mainTest'])
+            ->orderBy('child_test_name');
+        
+        if ($search) {
+            $query->where('child_test_name', 'like', "%{$search}%");
+        }
+        
+        $childTests = $query->limit($limit)->get();
+        
+        return ChildTestResource::collection($childTests);
+    }
+
+    /**
      * Get only the JSON params for a child test.
      */
     public function getJsonParams(ChildTest $childTest)

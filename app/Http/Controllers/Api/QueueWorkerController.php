@@ -336,6 +336,11 @@ class QueueWorkerController extends Controller
      */
     private function saveWorkerPid(int $pid): void
     {
+        // Ensure the directory exists before writing
+        $directory = dirname($this->pidFile);
+        if (!File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
+        }
         File::put($this->pidFile, (string)$pid);
     }
 

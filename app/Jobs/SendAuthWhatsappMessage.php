@@ -25,6 +25,10 @@ class SendAuthWhatsappMessage implements ShouldQueue
 
     public function handle(): void
     {
+
+        //log start of job
+        Log::info('SendAuthWhatsappMessage started for patient '.$this->patientId);
+
         $settings = Setting::first();
         if (!$settings || !($settings->send_whatsapp_after_auth ?? false)) {
             return; // feature disabled
@@ -57,11 +61,12 @@ class SendAuthWhatsappMessage implements ShouldQueue
         ];
 
         try {
+            Log::info('SendAuthWhatsappMessage sending message to patient '.$this->patientId);
             $service = new WhatsAppCloudApiService();
             $result = $service->sendTemplateMessage(
                 $formattedPhone,
-                'lab_results_complete',
-                'ar',
+                'finsh_result',
+                'en',
                 // $components
             );
             
