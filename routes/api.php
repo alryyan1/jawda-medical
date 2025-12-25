@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AdmissionController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
 use App\Http\Controllers\Api\AttendanceController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\Api\AttendanceReportController;
 use App\Http\Controllers\Api\AttendanceSettingController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankakImageController;
+use App\Http\Controllers\Api\BedController;
 use App\Http\Controllers\Api\CashDenominationController;
 use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
@@ -50,9 +52,11 @@ use App\Http\Controllers\Api\SpecialistController;
 use App\Http\Controllers\Api\SubSpecialistController;
 use App\Http\Controllers\Api\SubcompanyController;
 use App\Http\Controllers\Api\SubServiceCostController;
+use App\Http\Controllers\Api\RoomController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
+use App\Http\Controllers\Api\WardController;
 use App\Http\Controllers\Api\VisitServiceController;
 use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\SettingUploadController;
@@ -242,6 +246,30 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']);
   Route::get('/service-groups-with-services', [ServiceGroupController::class, 'getGroupsWithServices']);
   Route::apiResource('services', ServiceController::class);
+
+  /*
+    |--------------------------------------------------------------------------
+    | Admissions Management Routes
+    |--------------------------------------------------------------------------
+    */
+  // Wards
+  Route::get('wards-list', [WardController::class, 'indexList']);
+  Route::apiResource('wards', WardController::class);
+  Route::get('wards/{ward}/rooms', [WardController::class, 'getRooms']);
+
+  // Rooms
+  Route::apiResource('rooms', RoomController::class);
+  Route::get('rooms/{room}/beds', [RoomController::class, 'getBeds']);
+
+  // Beds
+  Route::apiResource('beds', BedController::class);
+  Route::get('beds/available', [BedController::class, 'getAvailable']);
+
+  // Admissions
+  Route::apiResource('admissions', AdmissionController::class);
+  Route::put('admissions/{admission}/discharge', [AdmissionController::class, 'discharge']);
+  Route::put('admissions/{admission}/transfer', [AdmissionController::class, 'transfer']);
+  Route::get('admissions/active', [AdmissionController::class, 'getActive']);
 
   /*
     |--------------------------------------------------------------------------

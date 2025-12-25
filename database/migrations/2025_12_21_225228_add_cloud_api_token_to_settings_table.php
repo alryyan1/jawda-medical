@@ -11,9 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('settings', function (Blueprint $table) {
-            $table->string('cloud_api_token')->nullable();
-        });
+        if (!Schema::hasColumn('settings', 'cloud_api_token')) {    
+            Schema::table('settings', function (Blueprint $table) {
+                $table->string('cloud_api_token')->nullable();
+            });
+        } else {
+            Schema::table('settings', function (Blueprint $table) {
+                $table->string('cloud_api_token')->nullable()->change();
+            });
+        }
     }
 
     /**
