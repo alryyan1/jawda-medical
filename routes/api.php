@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AdmissionController;
+use App\Http\Controllers\Api\AdmissionRequestedServiceController;
+use App\Http\Controllers\Api\AdmissionRequestedServiceDepositController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
 use App\Http\Controllers\Api\AttendanceController;
@@ -262,14 +264,32 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('rooms/{room}/beds', [RoomController::class, 'getBeds']);
 
   // Beds
-  Route::apiResource('beds', BedController::class);
+  // Specific routes must come BEFORE apiResource to avoid route conflicts
   Route::get('beds/available', [BedController::class, 'getAvailable']);
+  Route::apiResource('beds', BedController::class);
 
   // Admissions
+  // Specific routes must come BEFORE apiResource to avoid route conflicts
+  Route::get('admissions/active', [AdmissionController::class, 'getActive']);
   Route::apiResource('admissions', AdmissionController::class);
   Route::put('admissions/{admission}/discharge', [AdmissionController::class, 'discharge']);
   Route::put('admissions/{admission}/transfer', [AdmissionController::class, 'transfer']);
-  Route::get('admissions/active', [AdmissionController::class, 'getActive']);
+
+  // Admission Services
+  Route::get('admissions/{admission}/requested-services', [AdmissionRequestedServiceController::class, 'index']);
+  Route::post('admissions/{admission}/request-services', [AdmissionRequestedServiceController::class, 'store']);
+  Route::put('admission-requested-services/{requestedService}', [AdmissionRequestedServiceController::class, 'update']);
+  Route::delete('admissions/{admission}/requested-services/{requestedService}', [AdmissionRequestedServiceController::class, 'destroy']);
+
+  // Admission Service Cost Breakdown
+  Route::get('admission-requested-services/{requestedService}/cost-breakdown', [AdmissionRequestedServiceController::class, 'getServiceCosts']);
+  Route::post('admission-requested-services/{requestedService}/costs', [AdmissionRequestedServiceController::class, 'addServiceCosts']);
+
+  // Admission Service Deposits
+  Route::get('admission-requested-services/{requestedService}/deposits', [AdmissionRequestedServiceDepositController::class, 'indexForRequestedService']);
+  Route::post('admission-requested-services/{requestedService}/deposits', [AdmissionRequestedServiceDepositController::class, 'store']);
+  Route::put('admission-requested-service-deposits/{deposit}', [AdmissionRequestedServiceDepositController::class, 'update']);
+  Route::delete('admission-requested-service-deposits/{deposit}', [AdmissionRequestedServiceDepositController::class, 'destroy']);
 
   /*
     |--------------------------------------------------------------------------

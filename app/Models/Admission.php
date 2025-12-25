@@ -97,4 +97,12 @@ class Admission extends Model
     {
         return $query->where('status', 'discharged');
     }
+
+    /**
+     * Get the requested services for the admission.
+     */
+    public function requestedServices()
+    {
+        return $this->hasMany(AdmissionRequestedService::class);
+    }
 }

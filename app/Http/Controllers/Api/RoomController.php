@@ -50,7 +50,7 @@ class RoomController extends Controller
         $validatedData = $request->validate([
             'ward_id' => 'required|exists:wards,id',
             'room_number' => 'required|string|max:255',
-            'room_type' => 'nullable|string|max:255',
+            'room_type' => ['nullable', Rule::in(['normal', 'vip'])],
             'capacity' => 'required|integer|min:1',
             'status' => 'required|boolean',
         ]);
@@ -76,7 +76,7 @@ class RoomController extends Controller
         $validatedData = $request->validate([
             'ward_id' => 'sometimes|required|exists:wards,id',
             'room_number' => ['sometimes', 'required', 'string', 'max:255'],
-            'room_type' => 'nullable|string|max:255',
+            'room_type' => ['nullable', Rule::in(['normal', 'vip'])],
             'capacity' => 'sometimes|required|integer|min:1',
             'status' => 'sometimes|required|boolean',
         ]);
