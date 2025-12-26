@@ -145,6 +145,18 @@ class AdmissionController extends Controller
             return response()->json(['message' => 'المريض غير مقيم حالياً.'], 400);
         }
 
+        // Check if balance is zero (credits - debits = 0)
+        $totalCredits = (float) $admission->transactions()->where('type', 'credit')->sum('amount');
+        $totalDebits = (float) $admission->transactions()->where('type', 'debit')->sum('amount');
+        $balance = $totalCredits - $totalDebits;
+        
+        if (abs($balance) > 0.01) { // Allow small floating point differences
+            return response()->json([
+                'message' => 'لا يمكن إخراج المريض. الرصيد يجب أن يكون صفراً.',
+                'balance' => $balance
+            ], 400);
+        }
+
         $validatedData = $request->validate([
             'discharge_date' => 'nullable|date',
             'discharge_time' => 'nullable|date_format:H:i:s',
@@ -261,4 +273,5 @@ class AdmissionController extends Controller
 
         return AdmissionResource::collection($admissions);
     }
+
 }

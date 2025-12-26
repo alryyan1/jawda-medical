@@ -9,6 +9,7 @@ use App\Models\Service;
 use App\Models\Company;
 use App\Models\ServiceCost;
 use App\Models\AdmissionRequestedServiceCost;
+use App\Models\AdmissionTransaction;
 use App\Http\Resources\AdmissionRequestedServiceResource;
 use App\Http\Resources\AdmissionRequestedServiceCostResource;
 use Illuminate\Http\Request;
@@ -123,12 +124,9 @@ class AdmissionRequestedServiceController extends Controller
                     'user_id' => Auth::id(),
                     'doctor_id' => $doctorId,
                     'price' => $price,
-                    'amount_paid' => 0,
                     'endurance' => $companyEnduranceAmount,
-                    'is_paid' => false,
                     'discount' => 0,
                     'discount_per' => 0,
-                    'bank' => false,
                     'count' => $count,
                     'approval' => $contractApproval,
                     'done' => false,
@@ -169,6 +167,21 @@ class AdmissionRequestedServiceController extends Controller
                     if (!empty($costEntriesData)) {
                         AdmissionRequestedServiceCost::insert($costEntriesData);
                     }
+                }
+
+                // Create debit transaction for the service
+                $netPayable = $requestedService->net_payable_by_patient;
+                if ($netPayable > 0) {
+                    AdmissionTransaction::create([
+                        'admission_id' => $admission->id,
+                        'type' => 'debit',
+                        'amount' => $netPayable,
+                        'description' => $service->name . ($count > 1 ? " ({$count})" : ''),
+                        'reference_type' => 'service',
+                        'reference_id' => $requestedService->id,
+                        'is_bank' => false,
+                        'user_id' => Auth::id(),
+                    ]);
                 }
 
                 $createdItems[] = new AdmissionRequestedServiceResource(

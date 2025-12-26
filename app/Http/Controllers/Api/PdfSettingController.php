@@ -17,6 +17,27 @@ class PdfSettingController extends Controller
     public function index()
     {
         $settings = PdfSetting::getSettings();
+
+        // Populate base64 logo if exists
+        if ($settings->logo_path && Storage::disk('public')->exists($settings->logo_path)) {
+            $path = Storage::disk('public')->path($settings->logo_path);
+            if (file_exists($path)) {
+                $type = pathinfo($path, PATHINFO_EXTENSION);
+                $data = file_get_contents($path);
+                $settings->logo_base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
+            }
+        }
+
+        // Populate base64 header image if exists
+        if ($settings->header_image_path && Storage::disk('public')->exists($settings->header_image_path)) {
+            $path = Storage::disk('public')->path($settings->header_image_path);
+            if (file_exists($path)) {
+                $type = pathinfo($path, PATHINFO_EXTENSION);
+                $data = file_get_contents($path);
+                $settings->header_image_base64 = 'data:image/' . $type . ';base64,' . base64_encode($data);
+            }
+        }
+
         return new PdfSettingResource($settings);
     }
 

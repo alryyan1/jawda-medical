@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\AdmissionController;
 use App\Http\Controllers\Api\AdmissionRequestedServiceController;
 use App\Http\Controllers\Api\AdmissionVitalSignController;
 use App\Http\Controllers\Api\AdmissionRequestedServiceDepositController;
+use App\Http\Controllers\Api\AdmissionDepositController;
+use App\Http\Controllers\Api\AdmissionTransactionController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
 use App\Http\Controllers\Api\AttendanceController;
@@ -276,6 +278,16 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::apiResource('admissions', AdmissionController::class);
   Route::put('admissions/{admission}/discharge', [AdmissionController::class, 'discharge']);
   Route::put('admissions/{admission}/transfer', [AdmissionController::class, 'transfer']);
+  Route::get('admissions/{admission}/balance', [AdmissionTransactionController::class, 'balance']);
+  
+  // Admission Transactions
+  Route::get('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'index']);
+  Route::post('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'store']);
+  Route::get('admissions/{admission}/ledger', [AdmissionTransactionController::class, 'ledger']);
+  
+  // Admission Deposits (deprecated - kept for backward compatibility, will redirect to transactions)
+  Route::get('admissions/{admission}/deposits', [AdmissionDepositController::class, 'index']);
+  Route::post('admissions/{admission}/deposits', [AdmissionDepositController::class, 'store']);
 
   // Admission Services
   Route::get('admissions/{admission}/requested-services', [AdmissionRequestedServiceController::class, 'index']);

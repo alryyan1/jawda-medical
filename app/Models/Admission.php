@@ -115,6 +115,14 @@ class Admission extends Model
     }
 
     /**
+     * Get all transactions for the admission.
+     */
+    public function transactions()
+    {
+        return $this->hasMany(AdmissionTransaction::class);
+    }
+
+    /**
      * Calculate the number of days the patient has been admitted.
      * If discharged, calculate from admission_date to discharge_date.
      * If still admitted, calculate from admission_date to current date.
@@ -125,5 +133,17 @@ class Admission extends Model
         $endDate = $this->discharge_date ?? now()->toDateString();
         
         return $startDate->diffInDays($endDate);
+    }
+
+    /**
+     * Calculate the total balance for the admission.
+     * Balance = Total Credits - Total Debits
+     */
+    public function getBalanceAttribute()
+    {
+        $totalCredits = (float) $this->transactions()->where('type', 'credit')->sum('amount');
+        $totalDebits = (float) $this->transactions()->where('type', 'debit')->sum('amount');
+        
+        return $totalCredits - $totalDebits;
     }
 }

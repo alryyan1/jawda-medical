@@ -18,12 +18,9 @@ class AdmissionRequestedService extends Model
         'user_deposited',
         'doctor_id',
         'price',
-        'amount_paid',
         'endurance',
-        'is_paid',
         'discount',
         'discount_per',
-        'bank',
         'count',
         'doctor_note',
         'nurse_note',
@@ -33,12 +30,9 @@ class AdmissionRequestedService extends Model
 
     protected $casts = [
         'price' => 'decimal:2',
-        'amount_paid' => 'decimal:2',
         'endurance' => 'decimal:2',
-        'is_paid' => 'boolean',
         'discount' => 'decimal:2',
         'discount_per' => 'integer',
-        'bank' => 'boolean',
         'count' => 'integer',
         'done' => 'boolean',
         'approval' => 'boolean',
@@ -131,14 +125,15 @@ class AdmissionRequestedService extends Model
 
     public function getBalanceAttribute(): float
     {
-        // Net payable by patient (after their discounts and company endurance)
-        $netPatientOwes = $this->net_payable_by_patient; // Uses accessor
-        return $netPatientOwes - (float) $this->amount_paid;
+        // Balance is now calculated at admission level, not service level
+        // This method is kept for backward compatibility but returns net_payable_by_patient
+        return $this->net_payable_by_patient;
     }
 
     public function addRequestedServiceCosts()
     {
-        $amount_paid = $this->admission->patient->company ? $this->price : $this->amount_paid;
+        // Use price for cost calculation (no payment logic at service level)
+        $amount_paid = $this->price;
         //**@var ServiceCost $cost  */
         foreach ($this->service->service_costs as $cost) {
             $amount = 0;
@@ -204,7 +199,8 @@ class AdmissionRequestedService extends Model
 
     public function updateRequestedServiceCosts()
     {
-        $amount_paid = $this->admission->patient->company ? $this->price : $this->amount_paid;
+        // Use price for cost calculation (no payment logic at service level)
+        $amount_paid = $this->price;
         //**@var requestedServiceCosts $requestedServiceCost  */
         foreach ($this->requestedServiceCosts as $requestedServiceCost) {
             $amount = 0;
@@ -225,17 +221,4 @@ class AdmissionRequestedService extends Model
         }
     }
 
-    public function totalDeposits()
-    {
-        return $this->deposits()->sum('amount');
-    }
-
-    public function getAttributeValue($key)
-    {
-        if ($key === 'amount_paid') {
-            return $this->totalDeposits();
-        }
-
-        return parent::getAttributeValue($key);
-    }
 }

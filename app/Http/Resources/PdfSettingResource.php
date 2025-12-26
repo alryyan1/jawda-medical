@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class PdfSettingResource extends JsonResource
 {
@@ -19,13 +20,15 @@ class PdfSettingResource extends JsonResource
             'font_family' => $this->font_family,
             'font_size' => $this->font_size,
             'logo_path' => $this->logo_path,
-            'logo_url' => $this->logo_path ? asset('storage/' . $this->logo_path) : null,
+            'logo_url' => $this->logo_path ? str_replace('/public', '', rtrim(config('app.url'), '/')) . '/storage/app/public/' . $this->logo_path : null,
+            'logo_base64' => $this->logo_base64 ?? null,
             'logo_width' => $this->logo_width ? (float) $this->logo_width : null,
             'logo_height' => $this->logo_height ? (float) $this->logo_height : null,
             'logo_position' => $this->logo_position,
             'hospital_name' => $this->hospital_name,
             'header_image_path' => $this->header_image_path,
-            'header_image_url' => $this->header_image_path ? asset('storage/' . $this->header_image_path) : null,
+            'header_image_url' => $this->header_image_path ? str_replace('/public', '', rtrim(config('app.url'), '/')) . '/storage/app/public/' . $this->header_image_path : null,
+            'header_image_base64' => $this->header_image_base64 ?? null,
             'footer_phone' => $this->footer_phone,
             'footer_address' => $this->footer_address,
             'footer_email' => $this->footer_email,
