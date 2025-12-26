@@ -82,7 +82,7 @@ class AdmissionController extends Controller
         $bed = Bed::findOrFail($validatedData['bed_id']);
         if (!$bed->isAvailable()) {
             return response()->json(['message' => 'السرير غير متاح حالياً.'], 400);
-        }
+    }
 
         // Verify bed belongs to room and room belongs to ward
         if ($bed->room_id != $validatedData['room_id']) {

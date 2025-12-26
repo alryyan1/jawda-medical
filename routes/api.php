@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdmissionController;
 use App\Http\Controllers\Api\AdmissionRequestedServiceController;
+use App\Http\Controllers\Api\AdmissionVitalSignController;
 use App\Http\Controllers\Api\AdmissionRequestedServiceDepositController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
@@ -39,6 +40,7 @@ use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PatientController;
+use App\Http\Controllers\Api\PdfSettingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RequestedServiceCostController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
@@ -290,6 +292,20 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('admission-requested-services/{requestedService}/deposits', [AdmissionRequestedServiceDepositController::class, 'store']);
   Route::put('admission-requested-service-deposits/{deposit}', [AdmissionRequestedServiceDepositController::class, 'update']);
   Route::delete('admission-requested-service-deposits/{deposit}', [AdmissionRequestedServiceDepositController::class, 'destroy']);
+
+  // Admission Vital Signs
+  Route::get('admissions/{admission}/vital-signs', [AdmissionVitalSignController::class, 'index']);
+  Route::post('admissions/{admission}/vital-signs', [AdmissionVitalSignController::class, 'store']);
+  Route::put('admission-vital-signs/{vitalSign}', [AdmissionVitalSignController::class, 'update']);
+  Route::delete('admission-vital-signs/{vitalSign}', [AdmissionVitalSignController::class, 'destroy']);
+
+  // PDF Settings
+  Route::get('pdf-settings', [PdfSettingController::class, 'index']);
+  Route::put('pdf-settings', [PdfSettingController::class, 'update']);
+  Route::post('pdf-settings/upload-logo', [PdfSettingController::class, 'uploadLogo']);
+  Route::post('pdf-settings/upload-header', [PdfSettingController::class, 'uploadHeader']);
+  Route::delete('pdf-settings/logo', [PdfSettingController::class, 'deleteLogo']);
+  Route::delete('pdf-settings/header', [PdfSettingController::class, 'deleteHeader']);
 
   /*
     |--------------------------------------------------------------------------

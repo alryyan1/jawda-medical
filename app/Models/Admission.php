@@ -105,4 +105,25 @@ class Admission extends Model
     {
         return $this->hasMany(AdmissionRequestedService::class);
     }
+
+    /**
+     * Get the vital signs for the admission.
+     */
+    public function vitalSigns()
+    {
+        return $this->hasMany(AdmissionVitalSign::class);
+    }
+
+    /**
+     * Calculate the number of days the patient has been admitted.
+     * If discharged, calculate from admission_date to discharge_date.
+     * If still admitted, calculate from admission_date to current date.
+     */
+    public function getDaysAdmittedAttribute()
+    {
+        $startDate = $this->admission_date;
+        $endDate = $this->discharge_date ?? now()->toDateString();
+        
+        return $startDate->diffInDays($endDate);
+    }
 }

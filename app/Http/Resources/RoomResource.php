@@ -22,6 +22,7 @@ class RoomResource extends JsonResource
             'room_type' => $this->room_type,
             'capacity' => (int) $this->capacity,
             'status' => (bool) $this->status,
+            'price_per_day' => $this->price_per_day ? (float) $this->price_per_day : 0.00,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'beds' => BedResource::collection($this->whenLoaded('beds')),

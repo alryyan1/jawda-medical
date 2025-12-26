@@ -37,6 +37,7 @@ class AdmissionResource extends JsonResource
             'user_id' => $this->user_id,
             'user' => new UserStrippedResource($this->whenLoaded('user')),
             'notes' => $this->notes,
+            'days_admitted' => $this->days_admitted,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

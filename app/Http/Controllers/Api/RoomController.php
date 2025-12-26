@@ -53,6 +53,7 @@ class RoomController extends Controller
             'room_type' => ['nullable', Rule::in(['normal', 'vip'])],
             'capacity' => 'required|integer|min:1',
             'status' => 'required|boolean',
+            'price_per_day' => 'nullable|numeric|min:0',
         ]);
 
         $room = Room::create($validatedData);
@@ -79,6 +80,7 @@ class RoomController extends Controller
             'room_type' => ['nullable', Rule::in(['normal', 'vip'])],
             'capacity' => 'sometimes|required|integer|min:1',
             'status' => 'sometimes|required|boolean',
+            'price_per_day' => 'nullable|numeric|min:0',
         ]);
 
         $room->update($validatedData);

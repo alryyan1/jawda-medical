@@ -15,11 +15,13 @@ class Room extends Model
         'room_type',
         'capacity',
         'status',
+        'price_per_day',
     ];
 
     protected $casts = [
         'capacity' => 'integer',
         'status' => 'boolean',
+        'price_per_day' => 'decimal:2',
     ];
 
     /**
