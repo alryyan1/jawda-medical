@@ -29,6 +29,8 @@ class PatientResource extends JsonResource
             'result_is_locked' => (bool) $this->result_is_locked,
             'address' => $this->address,
             'gov_id' => $this->gov_id, // Governorate ID or name
+            'social_status' => $this->social_status,
+            'income_source' => $this->income_source,
             // 'country_id' => $this->country_id, // If you have country management
 
             // Insurance & Company Information

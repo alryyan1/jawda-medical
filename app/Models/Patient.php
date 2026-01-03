@@ -163,6 +163,8 @@ class Patient extends Model
         'discount_comment', // If general patient discount comment
         'lab_to_lab_object_id',
         'lab_to_lab_id',
+        'social_status',
+        'income_source',
     ];
 
     /**

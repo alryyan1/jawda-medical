@@ -25,6 +25,8 @@ class Admission extends Model
         'doctor_id',
         'user_id',
         'notes',
+        'provisional_diagnosis',
+        'operations',
     ];
 
     protected $casts = [

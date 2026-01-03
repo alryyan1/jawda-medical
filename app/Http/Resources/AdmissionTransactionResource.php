@@ -32,3 +32,4 @@ class AdmissionTransactionResource extends JsonResource
     }
 }
 
+

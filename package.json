@@ -14,6 +14,7 @@
     "view-logs-ps": "powershell -ExecutionPolicy Bypass -File view-event-logs.ps1"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
     "node-windows": "^1.0.0-beta.8"
   },
   "keywords": [

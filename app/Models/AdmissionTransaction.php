@@ -67,3 +67,4 @@ class AdmissionTransaction extends Model
     }
 }
 
+
