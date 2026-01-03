@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdmissionController;
 use App\Http\Controllers\Api\AdmissionRequestedServiceController;
+use App\Http\Controllers\Api\AdmissionRequestedLabTestController;
 use App\Http\Controllers\Api\AdmissionVitalSignController;
 use App\Http\Controllers\Api\AdmissionRequestedServiceDepositController;
 use App\Http\Controllers\Api\AdmissionDepositController;
@@ -302,6 +303,12 @@ Route::middleware('auth:sanctum')->group(function () {
   // Admission Service Deposits
   Route::get('admission-requested-services/{requestedService}/deposits', [AdmissionRequestedServiceDepositController::class, 'indexForRequestedService']);
   Route::post('admission-requested-services/{requestedService}/deposits', [AdmissionRequestedServiceDepositController::class, 'store']);
+
+  // Admission Lab Tests
+  Route::get('admissions/{admission}/requested-lab-tests', [AdmissionRequestedLabTestController::class, 'index']);
+  Route::post('admissions/{admission}/request-lab-tests', [AdmissionRequestedLabTestController::class, 'store']);
+  Route::put('admission-requested-lab-tests/{requestedLabTest}', [AdmissionRequestedLabTestController::class, 'update']);
+  Route::delete('admissions/{admission}/requested-lab-tests/{requestedLabTest}', [AdmissionRequestedLabTestController::class, 'destroy']);
   Route::put('admission-requested-service-deposits/{deposit}', [AdmissionRequestedServiceDepositController::class, 'update']);
   Route::delete('admission-requested-service-deposits/{deposit}', [AdmissionRequestedServiceDepositController::class, 'destroy']);
 

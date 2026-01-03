@@ -23,6 +23,7 @@ class Admission extends Model
         'diagnosis',
         'status',
         'doctor_id',
+        'specialist_doctor_id',
         'user_id',
         'notes',
         'provisional_diagnosis',
@@ -77,6 +78,14 @@ class Admission extends Model
     }
 
     /**
+     * Get the specialist doctor for the admission.
+     */
+    public function specialistDoctor()
+    {
+        return $this->belongsTo(Doctor::class, 'specialist_doctor_id');
+    }
+
+    /**
      * Get the user who created the admission.
      */
     public function user()
@@ -106,6 +115,14 @@ class Admission extends Model
     public function requestedServices()
     {
         return $this->hasMany(AdmissionRequestedService::class);
+    }
+
+    /**
+     * Get the requested lab tests for the admission.
+     */
+    public function requestedLabTests()
+    {
+        return $this->hasMany(AdmissionRequestedLabTest::class);
     }
 
     /**

@@ -36,6 +36,8 @@ class AdmissionResource extends JsonResource
             'status' => $this->status,
             'doctor_id' => $this->doctor_id,
             'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor')),
+            'specialist_doctor_id' => $this->specialist_doctor_id,
+            'specialist_doctor' => new DoctorStrippedResource($this->whenLoaded('specialistDoctor')),
             'user_id' => $this->user_id,
             'user' => new UserStrippedResource($this->whenLoaded('user')),
             'notes' => $this->notes,

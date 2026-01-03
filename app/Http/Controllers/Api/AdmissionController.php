@@ -22,7 +22,7 @@ class AdmissionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Admission::with(['patient', 'ward', 'room', 'bed', 'doctor', 'user']);
+        $query = Admission::with(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']);
 
         // Search filter
         if ($request->has('search') && !empty($request->search)) {
@@ -79,6 +79,7 @@ class AdmissionController extends Controller
             'admission_reason' => 'nullable|string',
             'diagnosis' => 'nullable|string',
             'doctor_id' => 'nullable|exists:doctors,id',
+            'specialist_doctor_id' => 'nullable|exists:doctors,id',
             'notes' => 'nullable|string',
             'provisional_diagnosis' => 'nullable|string',
             'operations' => 'nullable|string',
@@ -167,7 +168,7 @@ class AdmissionController extends Controller
             }
         });
 
-        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'user']));
+        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
     }
 
     /**
@@ -175,7 +176,7 @@ class AdmissionController extends Controller
      */
     public function show(Admission $admission)
     {
-        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'user']));
+        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
     }
 
     /**
@@ -187,6 +188,7 @@ class AdmissionController extends Controller
             'admission_reason' => 'nullable|string',
             'diagnosis' => 'nullable|string',
             'doctor_id' => 'nullable|exists:doctors,id',
+            'specialist_doctor_id' => 'nullable|exists:doctors,id',
             'notes' => 'nullable|string',
             'provisional_diagnosis' => 'nullable|string',
             'operations' => 'nullable|string',
@@ -194,7 +196,7 @@ class AdmissionController extends Controller
 
         $admission->update($validatedData);
 
-        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'user']));
+        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
     }
 
     /**
@@ -245,7 +247,7 @@ class AdmissionController extends Controller
             $admission->bed->update(['status' => 'available']);
         });
 
-        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'user']));
+        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
     }
 
     /**
