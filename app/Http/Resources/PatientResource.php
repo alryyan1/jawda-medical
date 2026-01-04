@@ -25,7 +25,9 @@ class PatientResource extends JsonResource
             'age_day' => $this->age_day,
             // 'user_name' => $this->user?->username,
             'full_age' => $this->getFullAgeAttribute(), // Accessor for display
-            'doctor'=> new DoctorStrippedResource($this->whenLoaded('doctor')), 
+            'doctor'=> new DoctorStrippedResource($this->whenLoaded('doctor')),
+            'specialist_doctor_id' => $this->specialist_doctor_id,
+            'specialist_doctor' => new DoctorStrippedResource($this->whenLoaded('specialistDoctor')),
             'result_is_locked' => (bool) $this->result_is_locked,
             'address' => $this->address,
             'gov_id' => $this->gov_id, // Governorate ID or name

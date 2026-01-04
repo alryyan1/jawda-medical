@@ -165,6 +165,7 @@ class Patient extends Model
         'lab_to_lab_id',
         'social_status',
         'income_source',
+        'specialist_doctor_id',
     ];
 
     /**
@@ -297,6 +298,12 @@ class Patient extends Model
     {
         return $this->belongsTo(Doctor::class);
     }
+    
+    public function specialistDoctor()
+    {
+        return $this->belongsTo(Doctor::class, 'specialist_doctor_id');
+    }
+    
     public function doctorVisit()
     {
         return $this->hasOne(DoctorVisit::class);

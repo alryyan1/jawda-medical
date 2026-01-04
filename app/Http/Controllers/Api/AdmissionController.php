@@ -166,6 +166,11 @@ class AdmissionController extends Controller
                     'user_id' => Auth::id(),
                 ]);
             }
+            
+            // Sync specialist_doctor_id to patient if provided
+            if (isset($validatedData['specialist_doctor_id']) && $validatedData['specialist_doctor_id']) {
+                $admission->patient->update(['specialist_doctor_id' => $validatedData['specialist_doctor_id']]);
+            }
         });
 
         return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
