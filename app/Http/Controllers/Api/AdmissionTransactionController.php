@@ -38,7 +38,7 @@ class AdmissionTransactionController extends Controller
             'type' => 'required|in:debit,credit',
             'amount' => 'required|numeric|min:0.01',
             'description' => 'required|string|max:255',
-            'reference_type' => 'nullable|in:service,deposit,manual',
+            'reference_type' => 'nullable|in:service,deposit,manual,lab_test',
             'reference_id' => 'nullable|integer',
             'is_bank' => 'boolean',
             'notes' => 'nullable|string',
@@ -139,6 +139,30 @@ class AdmissionTransactionController extends Controller
             'total_credits' => $totalCredits,
             'total_debits' => $totalDebits,
         ]);
+    }
+
+    /**
+     * Remove the specified transaction.
+     */
+    public function destroy(Admission $admission, AdmissionTransaction $transaction)
+    {
+        // Verify transaction belongs to admission
+        if ($transaction->admission_id !== $admission->id) {
+            return response()->json(['message' => 'المعاملة لا تنتمي لهذا التنويم.'], 400);
+        }
+
+        // Check if admission is still active (can only delete transactions for active admissions)
+        if ($admission->status !== 'admitted') {
+            return response()->json(['message' => 'لا يمكن حذف معاملة للمريض غير المقيم.'], 400);
+        }
+
+        try {
+            $transaction->delete();
+            
+            return response()->json(['message' => 'تم حذف المعاملة بنجاح.'], 200);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'فشل حذف المعاملة: ' . $e->getMessage()], 500);
+        }
     }
 }
 

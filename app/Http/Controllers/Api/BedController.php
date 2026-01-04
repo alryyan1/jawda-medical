@@ -15,7 +15,8 @@ class BedController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Bed::with(['room.ward'])->with('currentAdmission');
+        $query = Bed::with(['room.ward'])
+                    ->with(['currentAdmission.patient', 'currentAdmission.doctor', 'currentAdmission.specialistDoctor']);
 
         // Search filter
         if ($request->has('search') && !empty($request->search)) {

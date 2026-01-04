@@ -284,6 +284,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Admission Transactions
   Route::get('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'index']);
   Route::post('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'store']);
+  Route::delete('admissions/{admission}/transactions/{transaction}', [AdmissionTransactionController::class, 'destroy']);
   Route::get('admissions/{admission}/ledger', [AdmissionTransactionController::class, 'ledger']);
   
   // Admission Deposits (deprecated - kept for backward compatibility, will redirect to transactions)

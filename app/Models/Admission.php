@@ -145,13 +145,18 @@ class Admission extends Model
      * Calculate the number of days the patient has been admitted.
      * If discharged, calculate from admission_date to discharge_date.
      * If still admitted, calculate from admission_date to current date.
+     * Minimum is 1 day (if admitted today, it counts as 1 day).
      */
     public function getDaysAdmittedAttribute()
     {
         $startDate = $this->admission_date;
         $endDate = $this->discharge_date ?? now()->toDateString();
         
-        return $startDate->diffInDays($endDate);
+        $days = $startDate->diffInDays($endDate);
+        
+        // If same day or difference is 0, return 1 (minimum 1 day)
+        // Otherwise add 1 to include both start and end days
+        return max(1, $days + 1);
     }
 
     /**
