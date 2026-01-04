@@ -125,6 +125,7 @@ class AdmissionController extends Controller
                     // Create a default service group if none exists
                     $serviceGroup = ServiceGroup::create([
                         'name' => 'رسوم عامة',
+                        
                     ]);
                 }
                 
@@ -132,7 +133,7 @@ class AdmissionController extends Controller
                 $fileOpeningService = Service::create([
                     'name' => $fileOpeningServiceName,
                     'service_group_id' => $serviceGroup->id,
-                    'price' => 0, // Default price, can be configured later
+                    'price' => 25000, // Default price, can be configured later
                     'activate' => true,
                     'variable' => false,
                 ]);
