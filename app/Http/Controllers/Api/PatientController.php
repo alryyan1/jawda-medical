@@ -575,11 +575,11 @@ class PatientController extends Controller
     public function toggleAuthentication(Request $request, Patient $patient)
     {
         // Check if user has admin role
-        if (!Auth::user()->hasRole('admin')) {
-            return response()->json([
-                'message' => 'Unauthorized. Admin role required.',
-            ], 403);
-        }
+        // if (!Auth::user()->hasRole('admin')) {
+        //     return response()->json([
+        //         'message' => 'Unauthorized. Admin role required.',
+        //     ], 403);
+        // }
 
         // Toggle the authentication status
         $patient->result_auth = !$patient->result_auth;

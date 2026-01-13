@@ -13,6 +13,7 @@ class UserResource extends JsonResource {
             'is_supervisor' => (bool) $this->is_supervisor,
             'is_active' => (bool) $this->is_active,
             'user_type' => $this->user_type,
+            'nav_items' => $this->nav_items ? json_decode($this->nav_items, true) : null,
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
             'roles' => RoleResource::collection($this->whenLoaded('roles')),

@@ -133,15 +133,24 @@ class LabResultReport
         Log::info('$settings->lab_name',['settigns'=>$settings]);
 
         if ($settings?->show_title_in_lab_result) {
-        $pdf->Ln(20);
+        // $pdf->Ln(3);
         }else{
             $pdf->Ln(25);
         }
         if ($settings?->show_title_in_lab_result) {
-            $pdf->Cell($page_width, 5, $settings?->lab_name ?? 'Lab Name' , 0, 1, 'C');
+                    $pdf->SetFont('arial', '', 25, '', true);
+                    $pdf->Cell($page_width, 5, $settings?->lab_name ?? 'Lab Name' , 0, 1, 'C');
+                    $pdf->SetFont('arial', '', 17, '', true);
+        $pdf->Ln(5);
+
+                    $pdf->Cell($page_width, 5, 'قسم المختبر' , 0, 1, 'C');
+        $pdf->Ln(10);
+
+                    $pdf->Cell($page_width, 5, 'khojal Medical Center' , 0, 1, 'C');
+
         }
 
-        $pdf->Ln(20);
+        $pdf->Ln(5);
 
         $y = $pdf->GetY();
         $pdf->SetFont('arial', '', 13, '', true);
@@ -230,19 +239,23 @@ class LabResultReport
         }
 
         if ($shouldShowLogo) {
-            // if ($settings->is_logo) {
-            //     $pdf->Image(
-            //         $logo_path . '/' . $logo_name,
-            //         5, 5, 40, 40, '', '', '', true, 150, '', false, false, 0, false, false, false
-            //     );
-            // }else{
-                // if (!$settings?->show_logo_only_whatsapp) {
+            if ($settings->is_logo) {
+                $pdf->Image(
+                    $logo_path . '/' . $logo_name,
+                    5, 5, 40, 40, '', '', '', true, 150, '', false, false, 0, false, false, false
+                );
+                  $pdf->Image(
+                    $logo_path . '/' . $logo_name,
+                    165, 5, 40, 40, '', '', '', true, 150, '', false, false, 0, false, false, false
+                );
+            }else{
+                if (!$settings?->show_logo_only_whatsapp) {
                     $pdf->Image(
                         $logo_path . '/' . $logo_name,
                         10, 10, $page_width + 10, 30, '', '', '', true, 150, '', false, false, 0, false, false, false
                     );
-                // }
-            // }
+                }
+            }
         } else {
             //is_header الترويصه
             // if ($settings?->is_header == '1') {

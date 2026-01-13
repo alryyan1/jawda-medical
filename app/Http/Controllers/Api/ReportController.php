@@ -3689,20 +3689,23 @@ class ReportController extends Controller
                     'stretchtext' => 4
                 );
 
-                $pdf->SetFont('helvetica', '', 7, '', true);
+                $pdf->SetFont('helvetica', '', 10, '', true);
                 $col = $page_width / 2;
                 $pdf->Cell(5, 3, '', 0, 0, 'C');
+                $pdf->Ln(5);
 
                 $pdf->Cell(15, 3, 'PID ' . $doctorvisit->id, 0, 0, '');
-                $pdf->Cell(0, 3, $patient->created_at->format('Y-m-d H:i A'), 0, 1, 'R');
+                $pdf->SetFont('helvetica', '', 7, '', true);
+
+                // $pdf->Cell(0, 3, $patient->created_at->format('Y-m-d H:i A'), 0, 1, 'R');
 
                 $pdf->Cell(5, 3, '', 0, 0, 'C');
                 $y = $pdf->getY();
                 $pdf->Cell(10, 3, 'No ' . $patient->visit_number, 1, 0, 'C');
                 $pdf->SetFont($arial, '', 9, '', true);
                 $pdf->Cell(5, 3, '', 0, 0, 'C');
-
-                $pdf->Cell(0, 3, $patient->name, 0, 1, 'C');
+                $pdf->Ln(5);
+                // $pdf->Cell(0, 3, $patient->name, 0, 1, 'C');
 
                 $pdf->write1DBarcode("$doctorvisit->id", 'C128', 30, '', 25, 10, 0.4, $style, 'N');
 

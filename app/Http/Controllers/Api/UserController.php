@@ -44,6 +44,8 @@ class UserController extends Controller
             'is_active' => 'sometimes|boolean',     // ADDED
             'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
             'user_type' => 'nullable|string|max:255',
+            'nav_items' => 'nullable|array',
+            'nav_items.*' => 'string|max:255',
         ]);
 
         $createData = collect($validatedData)->except(['password_confirmation', 'roles'])->toArray();
@@ -54,6 +56,11 @@ class UserController extends Controller
         $createData['is_supervisor'] = $validatedData['is_supervisor'] ?? false;
         $createData['is_active'] = $validatedData['is_active'] ?? true; // Default to active
         $createData['user_money_collector_type'] = $validatedData['user_money_collector_type'] ?? 'all';
+        
+        // Handle nav_items - encode as JSON if provided
+        if (isset($createData['nav_items'])) {
+            $createData['nav_items'] = json_encode($createData['nav_items']);
+        }
 
 
         $user = User::create($createData);
@@ -82,10 +89,17 @@ class UserController extends Controller
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,name,guard_name,web', // Ensure guard_name is web
             'user_type' => 'nullable|string|max:255',
+            'nav_items' => 'nullable|array',
+            'nav_items.*' => 'string|max:255',
         ]);
 
         // Prepare data for update, excluding password and roles (handled separately)
         $updateData = collect($validatedData)->except(['roles', 'password', 'password_confirmation'])->toArray();
+        
+        // Handle nav_items - encode as JSON if provided
+        if (isset($updateData['nav_items'])) {
+            $updateData['nav_items'] = json_encode($updateData['nav_items']);
+        }
 
         // Handle password change if provided
         if (!empty($validatedData['password'])) {
