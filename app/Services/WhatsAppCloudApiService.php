@@ -17,12 +17,10 @@ class WhatsAppCloudApiService
 
     public function __construct()
     {
-        $appSettings = Setting::first();
-        
-        $this->accessToken = $appSettings?->cloud_api_token ?? null;
-        $this->phoneNumberId = $appSettings?->phone_number_id ?? null;
-        $this->wabaId = $appSettings?->whatsapp_cloud_waba_id ?? null;
-        $this->apiVersion = $appSettings?->whatsapp_cloud_api_version ?? 'v22.0';
+        $this->accessToken = config('services.whatsapp_cloud.token');
+        $this->phoneNumberId = config('services.whatsapp_cloud.phone_number_id');
+        $this->wabaId = config('services.whatsapp_cloud.waba_id');
+        $this->apiVersion = config('services.whatsapp_cloud.api_version', 'v22.0');
     }
 
     /**
@@ -94,7 +92,6 @@ class WhatsAppCloudApiService
                 ]);
 
             return $this->handleResponse($response, 'Text message');
-
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendTextMessage Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -156,7 +153,6 @@ class WhatsAppCloudApiService
                 ->post($endpoint, $payload);
 
             return $this->handleResponse($response, 'Template message');
-
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendTemplateMessage Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -218,7 +214,6 @@ class WhatsAppCloudApiService
                 ->post($endpoint, $payload);
 
             return $this->handleResponse($response, 'Document');
-
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendDocument Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -274,9 +269,172 @@ class WhatsAppCloudApiService
                 ->post($endpoint, $payload);
 
             return $this->handleResponse($response, 'Image');
-
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService sendImage Exception: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
+        }
+    }
+
+    /**
+     * Send an audio message via WhatsApp Cloud API.
+     */
+    public function sendAudio(string $to, string $audioUrl, ?string $accessToken = null, ?string $phoneNumberId = null): array
+    {
+        $accessToken = $accessToken ?? $this->accessToken;
+        $phoneNumberId = $phoneNumberId ?? $this->phoneNumberId;
+
+        if (!$accessToken || !$phoneNumberId) {
+            Log::error('WhatsAppCloudApiService: Service not configured.');
+            return ['success' => false, 'error' => 'WhatsApp Cloud API service not configured.', 'data' => null];
+        }
+
+        $to = ltrim($to, '+');
+        $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$phoneNumberId}/messages";
+
+        try {
+            $response = Http::withToken($accessToken)
+                ->asJson()
+                ->post($endpoint, [
+                    'messaging_product' => 'whatsapp',
+                    'to' => $to,
+                    'type' => 'audio',
+                    'audio' => [
+                        'link' => $audioUrl
+                    ]
+                ]);
+
+            return $this->handleResponse($response, 'Audio message');
+        } catch (\Exception $e) {
+            Log::error("WhatsAppCloudApiService sendAudio Exception: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
+        }
+    }
+
+    /**
+     * Send a video message via WhatsApp Cloud API.
+     */
+    public function sendVideo(string $to, string $videoUrl, ?string $caption = null, ?string $accessToken = null, ?string $phoneNumberId = null): array
+    {
+        $accessToken = $accessToken ?? $this->accessToken;
+        $phoneNumberId = $phoneNumberId ?? $this->phoneNumberId;
+
+        if (!$accessToken || !$phoneNumberId) {
+            Log::error('WhatsAppCloudApiService: Service not configured.');
+            return ['success' => false, 'error' => 'WhatsApp Cloud API service not configured.', 'data' => null];
+        }
+
+        $to = ltrim($to, '+');
+        $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$phoneNumberId}/messages";
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $to,
+            'type' => 'video',
+            'video' => [
+                'link' => $videoUrl
+            ]
+        ];
+
+        if ($caption) {
+            $payload['video']['caption'] = $caption;
+        }
+
+        try {
+            $response = Http::withToken($accessToken)
+                ->asJson()
+                ->post($endpoint, $payload);
+
+            return $this->handleResponse($response, 'Video message');
+        } catch (\Exception $e) {
+            Log::error("WhatsAppCloudApiService sendVideo Exception: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
+        }
+    }
+
+    /**
+     * Send a location message via WhatsApp Cloud API.
+     */
+    public function sendLocation(
+        string $to,
+        float $latitude,
+        float $longitude,
+        ?string $name = null,
+        ?string $address = null,
+        ?string $accessToken = null,
+        ?string $phoneNumberId = null
+    ): array {
+        $accessToken = $accessToken ?? $this->accessToken;
+        $phoneNumberId = $phoneNumberId ?? $this->phoneNumberId;
+
+        if (!$accessToken || !$phoneNumberId) {
+            Log::error('WhatsAppCloudApiService: Service not configured.');
+            return ['success' => false, 'error' => 'WhatsApp Cloud API service not configured.', 'data' => null];
+        }
+
+        $to = ltrim($to, '+');
+        $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$phoneNumberId}/messages";
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'to' => $to,
+            'type' => 'location',
+            'location' => [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+            ]
+        ];
+
+        if ($name) {
+            $payload['location']['name'] = $name;
+        }
+
+        if ($address) {
+            $payload['location']['address'] = $address;
+        }
+
+        try {
+            $response = Http::withToken($accessToken)
+                ->asJson()
+                ->post($endpoint, $payload);
+
+            return $this->handleResponse($response, 'Location message');
+        } catch (\Exception $e) {
+            Log::error("WhatsAppCloudApiService sendLocation Exception: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
+        }
+    }
+
+    /**
+     * Get templates for a WABA.
+     */
+    public function getTemplates(?string $wabaId = null, ?string $accessToken = null): array
+    {
+        $accessToken = $accessToken ?? $this->accessToken;
+        $wabaId = $wabaId ?? $this->wabaId;
+
+        if (!$accessToken || !$wabaId) {
+            Log::error('WhatsAppCloudApiService: Access token or WABA ID not configured.');
+            return ['success' => false, 'error' => 'WhatsApp Cloud API service not configured. Missing access token or WABA ID.', 'data' => null];
+        }
+
+        $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$wabaId}/message_templates";
+
+        try {
+            $response = Http::withToken($accessToken)
+                ->get($endpoint);
+
+            $responseData = $response->json();
+
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'data' => $responseData
+                ];
+            }
+
+            return ['success' => false, 'error' => $responseData['error']['message'] ?? 'Failed to get templates.', 'data' => $responseData];
+        } catch (\Exception $e) {
+            Log::error("WhatsAppCloudApiService getTemplates Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
         }
     }
@@ -303,7 +461,7 @@ class WhatsAppCloudApiService
         if (!$wabaId && $phoneNumberId) {
             // Get phone number details directly
             $endpoint = "{$this->baseUrl}/{$this->apiVersion}/{$phoneNumberId}";
-            
+
             try {
                 $response = Http::withToken($accessToken)
                     ->get($endpoint, [
@@ -317,7 +475,7 @@ class WhatsAppCloudApiService
                     Log::info("WhatsAppCloudApiService: Phone number retrieved successfully using phone number ID.", [
                         'response' => $responseData
                     ]);
-                    
+
                     return [
                         'success' => true,
                         'data' => [
@@ -387,7 +545,6 @@ class WhatsAppCloudApiService
             ]);
 
             return ['success' => false, 'error' => $errorMessage, 'data' => $responseData];
-
         } catch (\Exception $e) {
             Log::error("WhatsAppCloudApiService getPhoneNumbers Exception: " . $e->getMessage());
             return ['success' => false, 'error' => $e->getMessage(), 'data' => null];
@@ -407,12 +564,12 @@ class WhatsAppCloudApiService
 
         if ($response->successful() && isset($responseData['messages']) && !empty($responseData['messages'])) {
             $messageId = $responseData['messages'][0]['id'] ?? null;
-            
+
             Log::info("WhatsAppCloudApiService: {$actionDescription} sent successfully.", [
                 'response' => $responseData,
                 'message_id' => $messageId
             ]);
-            
+
             return [
                 'success' => true,
                 'data' => $responseData,
@@ -421,7 +578,7 @@ class WhatsAppCloudApiService
         }
 
         $errorMessage = "Failed to send {$actionDescription}.";
-        
+
         if (isset($responseData['error']['message'])) {
             $errorMessage .= " Error: " . $responseData['error']['message'];
         } elseif (!$response->successful()) {
@@ -432,7 +589,7 @@ class WhatsAppCloudApiService
             'response' => $responseData,
             'status_code' => $response->status()
         ]);
-        
+
         return ['success' => false, 'error' => $errorMessage, 'data' => $responseData];
     }
 
@@ -472,4 +629,3 @@ class WhatsAppCloudApiService
         return $cleanedNumber;
     }
 }
-

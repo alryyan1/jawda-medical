@@ -65,8 +65,8 @@ class SendAuthWhatsappMessage implements ShouldQueue
             $service = new WhatsAppCloudApiService();
             $result = $service->sendTemplateMessage(
                 $formattedPhone,
-                'finsh_result',
-                'en',
+                'complete_ar',
+                'ar',
                 // $components
             );
             

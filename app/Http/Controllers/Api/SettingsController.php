@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -25,7 +26,7 @@ class SettingsController extends Controller
     {
         // Eager load any finance accounts needed for display by name in the form
         $settings = Setting::with([
-             // 'defaultFinanceAccount', 'defaultBank', /* ... other finance account relations */
+            // 'defaultFinanceAccount', 'defaultBank', /* ... other finance account relations */
         ])->first();
 
         if (!$settings) {
@@ -38,8 +39,6 @@ class SettingsController extends Controller
                 'footer_content' => '',
                 'lab_name' => 'المختبر',
                 'hospital_name' => 'المستشفى',
-                'cloud_api_token' => null,
-                'phone_number_id' => null,
                 'disable_doctor_service_check' => false,
                 'phone' => '',
                 'gov' => false,
@@ -60,7 +59,7 @@ class SettingsController extends Controller
                 'financial_year_start' => now()->startOfYear()->format('Y-m-d'),
                 'financial_year_end' => now()->endOfYear()->format('Y-m-d'),
             ]);
-            
+
             // For now, return empty or an error if setup is expected
             return response()->json(['message' => 'الإعدادات غير مهيأة بعد.'], 404);
         }
@@ -97,8 +96,6 @@ class SettingsController extends Controller
             'footer_content' => 'nullable|string|max:255',
             'lab_name' => 'nullable|string|max:255',
             'hospital_name' => 'nullable|string|max:255',
-            'cloud_api_token' => 'nullable|string',
-            'phone_number_id' => 'nullable|string|max:50',
             'disable_doctor_service_check' => 'sometimes|boolean',
             'phone' => 'sometimes|max:20|nullable',
             'gov' => 'sometimes|boolean', // Or 'nullable|exists:govs,id'
@@ -114,7 +111,7 @@ class SettingsController extends Controller
             'send_result_after_auth' => 'sometimes|boolean',
             'send_result_after_result' => 'sometimes|boolean',
             'edit_result_after_auth' => 'sometimes|boolean',
-            
+
             'finance_account_id' => 'nullable|exists:finance_accounts,id',
             'bank_id' => 'nullable|exists:finance_accounts,id',
             'company_account_id' => 'nullable|exists:finance_accounts,id',
@@ -141,8 +138,27 @@ class SettingsController extends Controller
             'watermark_image' => 'nullable|string',
             'show_logo' => 'sometimes|boolean',
             'show_logo_only_whatsapp' => 'sometimes|boolean',
+            'settings_enable_Sms_front' => 'sometimes|boolean',
+            'prevent_backdated_entry' => 'sometimes|boolean',
+            'whatsapp_number' => 'nullable|string|max:20',
+            'pdf_header_type' => 'nullable|string|in:logo,full_width,none',
+            'pdf_header_logo_position' => 'nullable|string|in:left,right',
+            'pdf_header_logo_width' => 'nullable|integer',
+            'pdf_header_logo_height' => 'nullable|integer',
+            'pdf_header_logo_x_offset' => 'nullable|integer',
+            'pdf_header_logo_y_offset' => 'nullable|integer',
+            'pdf_header_image_width' => 'nullable|integer',
+            'pdf_header_image_height' => 'nullable|integer',
+            'pdf_header_image_x_offset' => 'nullable|integer',
+            'pdf_header_image_y_offset' => 'nullable|integer',
+            'pdf_header_title' => 'nullable|string|max:255',
+            'pdf_header_subtitle' => 'nullable|string|max:255',
+            'pdf_header_title_font_size' => 'nullable|integer',
+            'pdf_header_subtitle_font_size' => 'nullable|integer',
+            'pdf_header_title_y_offset' => 'nullable|integer',
+            'pdf_header_subtitle_y_offset' => 'nullable|integer',
         ]);
-        
+
         $updateData = $request->except(['logo_file', 'header_image_file', 'footer_image_file', 'auditor_stamp_file', 'manager_stamp_file',  'report_header_logo_file']);
 
         // Handle file uploads (example for logo)
@@ -155,7 +171,7 @@ class SettingsController extends Controller
             'watermark_image' => 'watermark_image',
         ];
 
-        foreach($fileFields as $requestField => $dbField) {
+        foreach ($fileFields as $requestField => $dbField) {
             if ($request->hasFile($requestField)) {
                 // Delete old file if storing paths and one exists
                 if ($settings->$dbField && !str_starts_with($settings->$dbField, 'data:image')) { // Basic check if it's not base64 already
@@ -164,10 +180,10 @@ class SettingsController extends Controller
                 // Store new file and get path
                 // $path = $request->file($requestField)->store('settings_uploads', 'public');
                 // $updateData[$dbField] = $path; 
-                
+
                 // OR if storing as base64 (as per your schema for logo/header/footer)
                 $updateData[$dbField] = 'data:' . $request->file($requestField)->getMimeType() . ';base64,' . base64_encode(file_get_contents($request->file($requestField)->getRealPath()));
-            } elseif ($request->input("clear_".$dbField)) { // Add input like clear_logo_base64
+            } elseif ($request->input("clear_" . $dbField)) { // Add input like clear_logo_base64
                 if ($settings->$dbField && !str_starts_with($settings->$dbField, 'data:image')) {
                     Storage::disk('public')->delete($settings->$dbField);
                 }
@@ -175,18 +191,18 @@ class SettingsController extends Controller
             }
         }
 
-  // Handle Report Header Logo Upload (if storing as base64)
-  if ($request->hasFile('report_header_logo_file')) {
-    $updateData['report_header_logo_base64'] = 'data:' . 
-        $request->file('report_header_logo_file')->getMimeType() . ';base64,' . 
-        base64_encode(file_get_contents($request->file('report_header_logo_file')->getRealPath()));
-} elseif ($request->input("clear_report_header_logo_base64")) { // Check for clear flag
-    $updateData['report_header_logo_base64'] = null;
-    // If storing path and need to delete old file:
-    // if ($settings->report_header_logo_path) {
-    //     Storage::disk('public')->delete($settings->report_header_logo_path);
-    // }
-}
+        // Handle Report Header Logo Upload (if storing as base64)
+        if ($request->hasFile('report_header_logo_file')) {
+            $updateData['report_header_logo_base64'] = 'data:' .
+                $request->file('report_header_logo_file')->getMimeType() . ';base64,' .
+                base64_encode(file_get_contents($request->file('report_header_logo_file')->getRealPath()));
+        } elseif ($request->input("clear_report_header_logo_base64")) { // Check for clear flag
+            $updateData['report_header_logo_base64'] = null;
+            // If storing path and need to delete old file:
+            // if ($settings->report_header_logo_path) {
+            //     Storage::disk('public')->delete($settings->report_header_logo_path);
+            // }
+        }
 
         // If token needs to be encrypted:
         // if ($request->filled('token')) {

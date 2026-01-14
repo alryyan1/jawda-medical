@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -112,24 +113,49 @@ class Setting extends Model
     // protected $table = 'settings'; 
 
     protected $fillable = [
-        'is_header', 'is_footer', 'is_logo',
-        'header_base64', 'footer_base64', 'logo_base64',
-        'header_content', 'footer_content',
-        'lab_name', 'hospital_name', 'firestore_result_collection',
-        'cloud_api_token',
+        'is_header',
+        'is_footer',
+        'is_logo',
+        'header_base64',
+        'footer_base64',
+        'logo_base64',
+        'header_content',
+        'footer_content',
+        'lab_name',
+        'hospital_name',
+        'firestore_result_collection',
         'disable_doctor_service_check',
-        'phone_number_id', 'phone', 'gov', 'country', // These gov/country might be booleans or IDs
-        'barcode', 'show_water_mark',
-        'vatin', 'cr', 'email', 'address',
-        'ultramsg_instance_id', 'ultramsg_token', 'ultramsg_base_url', 'ultramsg_default_country_code', // For Ultramsg WhatsApp API
-        'send_result_after_auth', 'send_result_after_result',
+        'phone',
+        'gov',
+        'country', // These gov/country might be booleans or IDs
+        'barcode',
+        'show_water_mark',
+        'vatin',
+        'cr',
+        'email',
+        'address',
+        'ultramsg_instance_id',
+        'ultramsg_token',
+        'ultramsg_base_url',
+        'ultramsg_default_country_code', // For Ultramsg WhatsApp API
+        'send_result_after_auth',
+        'send_result_after_result',
         'edit_result_after_auth',
-        'auditor_stamp', 'manager_stamp', // Paths or base64 for stamps
-        'finance_account_id', 'bank_id', 'company_account_id', 'endurance_account_id',
-        'main_cash', 'main_bank',
-        'financial_year_start', 'financial_year_end',
-        'pharmacy_bank', 'pharmacy_cash', 'pharmacy_income',
-        'welcome_message', 'send_welcome_message',
+        'auditor_stamp',
+        'manager_stamp', // Paths or base64 for stamps
+        'finance_account_id',
+        'bank_id',
+        'company_account_id',
+        'endurance_account_id',
+        'main_cash',
+        'main_bank',
+        'financial_year_start',
+        'financial_year_end',
+        'pharmacy_bank',
+        'pharmacy_cash',
+        'pharmacy_income',
+        'welcome_message',
+        'send_welcome_message',
         'report_header_company_name',
         'report_header_address_line1',
         'report_header_address_line2',
@@ -145,6 +171,25 @@ class Setting extends Model
         'show_logo_only_whatsapp',
         'show_title_in_lab_result',
         'storage_name',
+        'settings_enable_Sms_front',
+        'prevent_backdated_entry',
+        'whatsapp_number',
+        'pdf_header_type',
+        'pdf_header_logo_position',
+        'pdf_header_logo_width',
+        'pdf_header_logo_height',
+        'pdf_header_logo_x_offset',
+        'pdf_header_logo_y_offset',
+        'pdf_header_image_width',
+        'pdf_header_image_height',
+        'pdf_header_image_x_offset',
+        'pdf_header_image_y_offset',
+        'pdf_header_title',
+        'pdf_header_subtitle',
+        'pdf_header_title_font_size',
+        'pdf_header_subtitle_font_size',
+        'pdf_header_title_y_offset',
+        'pdf_header_subtitle_y_offset',
     ];
 
     protected $casts = [
@@ -171,6 +216,19 @@ class Setting extends Model
         'show_logo' => 'boolean',
         'show_logo_only_whatsapp' => 'boolean',
         'show_title_in_lab_result' => 'boolean',
+        'prevent_backdated_entry' => 'boolean',
+        'pdf_header_logo_width' => 'integer',
+        'pdf_header_logo_height' => 'integer',
+        'pdf_header_logo_x_offset' => 'integer',
+        'pdf_header_logo_y_offset' => 'integer',
+        'pdf_header_image_width' => 'integer',
+        'pdf_header_image_height' => 'integer',
+        'pdf_header_image_x_offset' => 'integer',
+        'pdf_header_image_y_offset' => 'integer',
+        'pdf_header_title_font_size' => 'integer',
+        'pdf_header_subtitle_font_size' => 'integer',
+        'pdf_header_title_y_offset' => 'integer',
+        'pdf_header_subtitle_y_offset' => 'integer',
     ];
 
     // Helper to always get the first (and only) settings record
@@ -180,7 +238,13 @@ class Setting extends Model
     }
 
     // You might have relationships to FinanceAccount for the various account IDs
-    public function defaultFinanceAccount() { return $this->belongsTo(FinanceAccount::class, 'finance_account_id'); }
-    public function defaultBank() { return $this->belongsTo(FinanceAccount::class, 'bank_id'); }
+    public function defaultFinanceAccount()
+    {
+        return $this->belongsTo(FinanceAccount::class, 'finance_account_id');
+    }
+    public function defaultBank()
+    {
+        return $this->belongsTo(FinanceAccount::class, 'bank_id');
+    }
     // ... and so on for other finance_account_id fields
 }

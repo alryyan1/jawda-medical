@@ -54,10 +54,9 @@ EOD;
         // Create WhatsApp click-to-chat link
         // Format: https://wa.me/<number>?text=<encoded_message>
         // Number should be in international format without +, zeros, brackets, or dashes
-        $whatsappNumber = '96878622990'; // WhatsApp number in international format
-        $whatsappMessage = urlencode($message . "\n" . $visitId);
+        $whatsappNumber = $settings->whatsapp_number ?? '96878622990';
         $whatsappLink = "https://wa.me/{$whatsappNumber}?text={$visitId}";
-        
+
         // Add WhatsApp link to the SMS message
         $messageWithLink = $message . "\n"  . "\n\n" . "للحصول على النتيجة واتساب  اضغط علي الرابط:  \n" . $whatsappLink;
 
@@ -76,4 +75,3 @@ EOD;
         }
     }
 }
-

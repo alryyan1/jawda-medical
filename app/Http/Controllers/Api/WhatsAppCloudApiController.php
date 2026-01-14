@@ -220,6 +220,152 @@ class WhatsAppCloudApiController extends Controller
     }
 
     /**
+     * Send an audio message via WhatsApp Cloud API.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function sendAudio(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'to' => 'required|string|max:20',
+            'audio_url' => 'required|url',
+            'access_token' => 'nullable|string',
+            'phone_number_id' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $to = $request->input('to');
+        $audioUrl = $request->input('audio_url');
+        $accessToken = $request->input('access_token') ?? $this->whatsappService->getAccessToken();
+        $phoneNumberId = $request->input('phone_number_id') ?? $this->whatsappService->getPhoneNumberId();
+
+        $to = WhatsAppCloudApiService::formatPhoneNumber($to);
+        if (!$to) {
+            return response()->json(['success' => false, 'error' => 'Invalid phone number format'], 400);
+        }
+
+        $result = $this->whatsappService->sendAudio($to, $audioUrl, $accessToken, $phoneNumberId);
+
+        return response()->json($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Send a video message via WhatsApp Cloud API.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function sendVideo(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'to' => 'required|string|max:20',
+            'video_url' => 'required|url',
+            'caption' => 'nullable|string|max:1024',
+            'access_token' => 'nullable|string',
+            'phone_number_id' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $to = $request->input('to');
+        $videoUrl = $request->input('video_url');
+        $caption = $request->input('caption');
+        $accessToken = $request->input('access_token') ?? $this->whatsappService->getAccessToken();
+        $phoneNumberId = $request->input('phone_number_id') ?? $this->whatsappService->getPhoneNumberId();
+
+        $to = WhatsAppCloudApiService::formatPhoneNumber($to);
+        if (!$to) {
+            return response()->json(['success' => false, 'error' => 'Invalid phone number format'], 400);
+        }
+
+        $result = $this->whatsappService->sendVideo($to, $videoUrl, $caption, $accessToken, $phoneNumberId);
+
+        return response()->json($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Send a location via WhatsApp Cloud API.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function sendLocation(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'to' => 'required|string|max:20',
+            'latitude' => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'name' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:255',
+            'access_token' => 'nullable|string',
+            'phone_number_id' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $to = $request->input('to');
+        $latitude = $request->input('latitude');
+        $longitude = $request->input('longitude');
+        $name = $request->input('name');
+        $address = $request->input('address');
+        $accessToken = $request->input('access_token') ?? $this->whatsappService->getAccessToken();
+        $phoneNumberId = $request->input('phone_number_id') ?? $this->whatsappService->getPhoneNumberId();
+
+        $to = WhatsAppCloudApiService::formatPhoneNumber($to);
+        if (!$to) {
+            return response()->json(['success' => false, 'error' => 'Invalid phone number format'], 400);
+        }
+
+        $result = $this->whatsappService->sendLocation(
+            $to,
+            $latitude,
+            $longitude,
+            $name,
+            $address,
+            $accessToken,
+            $phoneNumberId
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
+     * Get templates for a WABA.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function getTemplates(Request $request): JsonResponse
+    {
+        $wabaId = $request->input('waba_id') ?? $this->whatsappService->getWabaId();
+        $accessToken = $request->input('access_token') ?? $this->whatsappService->getAccessToken();
+
+        $result = $this->whatsappService->getTemplates($wabaId, $accessToken);
+
+        return response()->json($result, $result['success'] ? 200 : 400);
+    }
+
+    /**
      * Get phone numbers for a WABA.
      *
      * @param Request $request
@@ -284,7 +430,7 @@ class WhatsAppCloudApiController extends Controller
         $challenge = $request->query('hub_challenge');
 
         // Get verify token from settings
-        $appSettings = \App\Models\Setting::first();
+        // $appSettings = \App\Models\Setting::first();
         $verifyToken = 'alryyan';
 
         // Validate verification request according to Meta's documentation
@@ -293,7 +439,7 @@ class WhatsAppCloudApiController extends Controller
                 'mode' => $mode,
                 'challenge' => $challenge
             ]);
-            
+
             // Respond with the challenge value as plain text (200 OK)
             return response($challenge, 200)->header('Content-Type', 'text/plain');
         }
@@ -332,7 +478,7 @@ class WhatsAppCloudApiController extends Controller
                 'signature_header' => $request->header('X-Hub-Signature-256'),
                 'ip' => $request->ip()
             ]);
-            
+
             // Still return 200 OK to prevent retries, but log the issue
             return response()->json(['success' => false, 'error' => 'Invalid signature'], 200);
         }
@@ -347,10 +493,31 @@ class WhatsAppCloudApiController extends Controller
             foreach ($data['entry'] as $entry) {
                 if (isset($entry['changes'])) {
                     foreach ($entry['changes'] as $change) {
+                        // Get the ID of YOUR phone number that received the message
+                        // 1. Correct the variable name to $change['value']
+                        $value = $change['value'] ?? [];
+
+                        // 2. Extract the ID correctly from the metadata
+                        $recipientPhoneNumberId = $value['metadata']['phone_number_id'] ?? null;
+
+                        Log::info('WhatsApp Cloud API: Recipient phone number ID: ' . $recipientPhoneNumberId);                //LOG RECIPIENT PHONE NUMBER ID
+                        Log::info('WhatsApp Cloud API: Recipient phone number ID: ' . $recipientPhoneNumberId);
+
+
                         // Handle incoming messages
                         if (isset($change['value']['messages'])) {
                             foreach ($change['value']['messages'] as $message) {
-                                $this->handleIncomingMessage($message, $change['value']);
+                                //953041111231804 altamayoz
+                                if($recipientPhoneNumberId == '953041111231804'){
+                                    $collection = 'altamayoz';
+
+                                    $this->handleIncomingMessage($message, $change['value'],$collection);
+                                }
+                                if($recipientPhoneNumberId == '982254518296345'){
+                                    $collection = 'alryyan';
+
+                                    $this->handleIncomingMessage($message, $change['value'],$collection);
+                                }
                             }
                         }
 
@@ -383,7 +550,7 @@ class WhatsAppCloudApiController extends Controller
     protected function validateWebhookSignature(Request $request, string $payload): bool
     {
         $signatureHeader = $request->header('X-Hub-Signature-256');
-        
+
         if (!$signatureHeader) {
             Log::warning('WhatsApp Cloud API: Missing X-Hub-Signature-256 header.');
             return false;
@@ -391,15 +558,15 @@ class WhatsAppCloudApiController extends Controller
 
         // Extract signature (everything after "sha256=")
         $signature = str_replace('sha256=', '', $signatureHeader);
-        
+
         if (empty($signature)) {
             return false;
         }
 
         // Get App Secret from settings or config
-        $appSettings = \App\Models\Setting::first();
+        // $appSettings = \App\Models\Setting::first();
         $appSecret = $appSettings?->whatsapp_cloud_app_secret ?? config('services.whatsapp.app_secret');
-        
+
         if (!$appSecret) {
             Log::warning('WhatsApp Cloud API: App Secret not configured. Skipping signature validation.');
             // If App Secret is not configured, we can't validate, but allow the request
@@ -430,8 +597,10 @@ class WhatsAppCloudApiController extends Controller
      * @param array $value
      * @return void
      */
-    protected function handleIncomingMessage(array $message, array $value): void
+    protected function handleIncomingMessage(array $message, array $value,$collection): void
     {
+        // $collection =  'alryyan';
+
         $messageId = $message['id'] ?? null;
         $from = $message['from'] ?? null;
         $type = $message['type'] ?? null;
@@ -448,11 +617,11 @@ class WhatsAppCloudApiController extends Controller
         // Check for button/interactive messages in multiple possible formats
         $isButtonMessage = false;
         $buttonData = null;
-        
+
         if ($type === 'interactive' && isset($message['interactive'])) {
             $interactive = $message['interactive'];
             $interactiveType = $interactive['type'] ?? null;
-            
+
             Log::info('WhatsApp Cloud API: Interactive message received.', [
                 'interactive_type' => $interactiveType,
                 'from' => $from,
@@ -463,7 +632,7 @@ class WhatsAppCloudApiController extends Controller
             if ($interactiveType === 'button_reply' && isset($interactive['button_reply'])) {
                 $isButtonMessage = true;
                 $buttonData = $interactive['button_reply'];
-                
+
                 Log::info('WhatsApp Cloud API: Button reply received (interactive format).', [
                     'button_id' => $buttonData['id'] ?? null,
                     'button_title' => $buttonData['title'] ?? null,
@@ -481,7 +650,7 @@ class WhatsAppCloudApiController extends Controller
                 $isButtonMessage = true;
                 $buttonData = $message['interactive']['button_reply'];
             }
-            
+
             if ($isButtonMessage) {
                 Log::info('WhatsApp Cloud API: Button message received (button type).', [
                     'button_id' => $buttonData['id'] ?? null,
@@ -491,16 +660,17 @@ class WhatsAppCloudApiController extends Controller
                 ]);
             }
         }
-        
+
         // Process button message if detected
         if ($isButtonMessage && $buttonData !== null) {
             // Get collection from settings
-            
-            $collection =  'alryyan';
+
 
             // Fetch PDF URL from Firestore using the sender's phone number
             $pdfUrl = $this->getResultUrlFromFirestoreByPhone($from, $collection);
-            
+            //log pdfurl
+            Log::info('PDF URL: ' . $pdfUrl);
+
             if ($pdfUrl) {
                 // Send notification message before sending the PDF document
                 $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات");
@@ -515,12 +685,12 @@ class WhatsAppCloudApiController extends Controller
         elseif ($type === 'text' && isset($message['text']['body'])) {
             $messageText = trim($message['text']['body']);
             $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات");
-            
+
             // Extract code/visit ID from message (assuming it's a numeric code)
             // You can modify this regex pattern based on your code format
             if (preg_match('/\b(\d+)\b/', $messageText, $matches)) {
                 $code = $matches[1];
-                
+
                 Log::info('WhatsApp Cloud API: Code extracted from message.', [
                     'code' => $code,
                     'from' => $from,
@@ -528,8 +698,8 @@ class WhatsAppCloudApiController extends Controller
                 ]);
 
                 // Fetch PDF URL from Firestore using the code
-                $pdfUrl = $this->getResultUrlFromFirestore($code);
-                
+                $pdfUrl = $this->getResultUrlFromFirestore($code, $collection);
+
                 if ($pdfUrl) {
                     // Send the PDF document back to the sender
                     $this->sendDocumentToUser($from, $pdfUrl, $code);
@@ -569,12 +739,7 @@ class WhatsAppCloudApiController extends Controller
                 return null;
             }
 
-            // Get collection name from settings if not provided
-            if (!$collection) {
-                $settings = Setting::first();
-                $collection = $settings?->firestore_result_collection ?? 'lab_results';
-            }
-
+        
             $documentId = (string) $visitId;
             $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}/{$documentId}";
 
@@ -583,7 +748,7 @@ class WhatsAppCloudApiController extends Controller
             if ($response->successful()) {
                 $document = $response->json();
                 $fields = $document['fields'] ?? [];
-                
+
                 // Extract result_url from Firestore document
                 if (isset($fields['result_url']['stringValue'])) {
                     $resultUrl = $fields['result_url']['stringValue'];
@@ -616,7 +781,6 @@ class WhatsAppCloudApiController extends Controller
                 ]);
                 return null;
             }
-
         } catch (\Exception $e) {
             Log::error("Failed to get result URL from Firestore", [
                 'visit_id' => $visitId,
@@ -635,7 +799,7 @@ class WhatsAppCloudApiController extends Controller
      * @param string|null $collection Optional collection name (defaults to settings.firestore_result_collection)
      * @return string|null The most recent result URL or null if not found
      */
-    protected function getResultUrlFromFirestoreByPhone(string $phoneNumber, ?string $collection = null): ?string
+    protected function getResultUrlFromFirestoreByPhone(string $phoneNumber, ?string $collection ): ?string
     {
         try {
             $projectId = config('firebase.project_id');
@@ -650,28 +814,24 @@ class WhatsAppCloudApiController extends Controller
                 return null;
             }
 
-            // Get collection name from settings if not provided
-            if (!$collection) {
-                $settings = Setting::first();
-                $collection = $settings?->firestore_result_collection ?? 'lab_results';
-            }
+          
 
             // Normalize phone number (remove +, spaces, dashes, etc.)
             $normalizedPhone = preg_replace('/[^0-9]/', '', $phoneNumber);
-            
+
             // Build phone variants to try
             // Start with original (in case it's stored exactly as provided, e.g., "0117613099")
             $phoneVariants = [$phoneNumber];
-            
+
             // Add normalized version if different
             if ($phoneNumber !== $normalizedPhone) {
                 $phoneVariants[] = $normalizedPhone;
             }
-            
+
             // Since phone numbers are stored WITHOUT country code, try removing common country codes
             // Common country codes: 249 (Sudan), 968 (Oman), 966 (Saudi), 971 (UAE), 974 (Qatar), etc.
             $countryCodes = ['249', '968', '966', '971', '974', '965', '973', '961', '962', '964', '963', '961'];
-            
+
             foreach ($countryCodes as $code) {
                 if (strlen($normalizedPhone) > strlen($code) && substr($normalizedPhone, 0, strlen($code)) === $code) {
                     $phoneWithoutCountryCode = substr($normalizedPhone, strlen($code));
@@ -699,7 +859,7 @@ class WhatsAppCloudApiController extends Controller
             // Try each phone variant until we find a match
             $foundDocument = null;
             $phoneVariantUsed = null;
-            
+
             foreach ($phoneVariants as $phoneToSearch) {
                 // Build structured query: filter by patient_phone, limit 10
                 // Note: Removed orderBy to avoid index requirement - we'll sort results in PHP if needed
@@ -738,7 +898,7 @@ class WhatsAppCloudApiController extends Controller
 
                 if ($response->successful()) {
                     $results = $response->json();
-                    
+
                     Log::debug("Firestore query response", [
                         'collection' => $collection,
                         'phone_variant' => $phoneToSearch,
@@ -746,23 +906,23 @@ class WhatsAppCloudApiController extends Controller
                         'results_count' => is_array($results) ? count($results) : 0,
                         'results' => $results
                     ]);
-                    
+
                     // Check if we have any results
                     // Firestore returns an array, and each result has a 'document' key if found
                     if (is_array($results) && !empty($results)) {
                         // Filter to only documents (not empty results)
-                        $documents = array_filter($results, function($result) {
+                        $documents = array_filter($results, function ($result) {
                             return isset($result['document']);
                         });
-                        
+
                         if (!empty($documents)) {
                             // Sort by updated_at descending if available
-                            usort($documents, function($a, $b) {
+                            usort($documents, function ($a, $b) {
                                 $aTime = $a['document']['fields']['updated_at']['timestampValue'] ?? '';
                                 $bTime = $b['document']['fields']['updated_at']['timestampValue'] ?? '';
                                 return strcmp($bTime, $aTime); // Descending
                             });
-                            
+
                             // Get the most recent document
                             $foundDocument = $documents[0]['document'];
                             $phoneVariantUsed = $phoneToSearch;
@@ -805,12 +965,12 @@ class WhatsAppCloudApiController extends Controller
             // Get the first (most recent) document
             $document = $foundDocument;
             $fields = $document['fields'] ?? [];
-            
+
             // Extract result_url from Firestore document
             if (isset($fields['result_url']['stringValue'])) {
                 $resultUrl = $fields['result_url']['stringValue'];
                 $documentId = $document['name'] ?? 'unknown';
-                
+
                 Log::info("Retrieved result URL from Firestore by phone", [
                     'collection' => $collection,
                     'phone_number' => $phoneNumber,
@@ -828,7 +988,6 @@ class WhatsAppCloudApiController extends Controller
                 ]);
                 return null;
             }
-
         } catch (\Exception $e) {
             Log::error("Failed to get result URL from Firestore by phone", [
                 'phone_number' => $phoneNumber,
@@ -851,7 +1010,7 @@ class WhatsAppCloudApiController extends Controller
     {
         try {
             $filename = $code ? "result_{$code}.pdf" : 'result.pdf';
-            
+
             $result = $this->whatsappService->sendDocument(
                 $to,
                 $documentUrl,
@@ -941,13 +1100,13 @@ class WhatsAppCloudApiController extends Controller
     public function testGetResultUrlByPhone(Request $request, ?string $phoneNumber = null): JsonResponse
     {
         // Get phone number from route parameter or query parameter, with default fallback
-        $phoneNumber = $phoneNumber ?? $request->query('phone', '0117613099');
-        
+        $phoneNumber = $phoneNumber ?? $request->query('phone', '');
+
         // Get collection from query parameter or use default
-        $collection = $request->query('collection', 'alroomy_results');
-        
+        $collection = $request->query('collection');
+
         $resultUrl = $this->getResultUrlFromFirestoreByPhone($phoneNumber, $collection);
-        
+
         return response()->json([
             'success' => $resultUrl !== null,
             'phone_number' => $phoneNumber,
@@ -956,4 +1115,3 @@ class WhatsAppCloudApiController extends Controller
         ]);
     }
 }
-

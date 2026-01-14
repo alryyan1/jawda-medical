@@ -30,7 +30,7 @@ return [
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
-    
+
     'ultramsg' => [
         'base_url' => env('ULTRAMSG_BASE_URL', 'https://api.ultramsg.com'),
         'instance_id' => env('ULTRAMSG_INSTANCE_ID'),
@@ -39,8 +39,15 @@ return [
     ],
 
     'realtime' => [
-        'url' => env('REALTIME_URL', 'http://127.0.0.1:4000'),
-        'token' => env('REALTIME_INTERNAL_TOKEN', ''),
+        'url' => env('REALTIME_SERVER_URL', 'http://localhost:3001'),
+        'token' => env('REALTIME_SERVER_TOKEN'),
+    ],
+
+    'whatsapp_cloud' => [
+        'token' => env('WHATSAPP_CLOUD_API_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_CLOUD_PHONE_NUMBER_ID'),
+        'waba_id' => env('WHATSAPP_CLOUD_WABA_ID'),
+        'api_version' => env('WHATSAPP_CLOUD_API_VERSION', 'v22.0'),
     ],
 
     'airtel_sms' => [

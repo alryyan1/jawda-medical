@@ -64,7 +64,7 @@ class PatientController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Patient::with(['company', 'primaryDoctor:id,name', 'doctor','doctorVisit', 'sampleCollectedBy:id,name']); // Eager load common relations
+        $query = Patient::with(['company', 'primaryDoctor:id,name', 'doctor', 'doctorVisit', 'sampleCollectedBy:id,name']); // Eager load common relations
 
         if ($request->filled('search')) {
             $searchTerm = $request->search;
@@ -99,8 +99,8 @@ class PatientController extends Controller
     private function checkShiftIsOpen()
     {
         $currentGeneralShift = Shift::orderBy('id', 'desc')->first();
-        
-     
+
+
         // Check if shift is closed by either is_closed flag or closed_at timestamp
         if ($currentGeneralShift->is_closed || $currentGeneralShift->closed_at !== null) {
             return response()->json(['message' => 'لا يمكن تسجيل مريض جديد. الوردية مغلقة حالياً.'], 400);
@@ -124,7 +124,10 @@ class PatientController extends Controller
         $today = Carbon::today()->toDateString();
 
         if ($latestShiftDate !== $today) {
-            return response()->json(['message' => 'لا يمكن تسجيل مريض جديد. آخر وردية ليست بتاريخ اليوم.'], 400);
+            $settings = Setting::first();
+            if ($settings && ($settings->prevent_backdated_entry ?? true)) {
+                return response()->json(['message' => 'لا يمكن تسجيل مريض جديد. آخر وردية ليست بتاريخ اليوم.'], 400);
+            }
         }
 
         return $latestShift;
@@ -133,7 +136,7 @@ class PatientController extends Controller
     public function store(StorePatientRequest $request)
     {
 
-        
+
         $validatedPatientData = $request->validated(); // Use validated() directly
 
         $visitDoctorId = $validatedPatientData['doctor_id'];
@@ -153,14 +156,14 @@ class PatientController extends Controller
         $activeDoctorShiftId = $request->input('doctor_shift_id');
         $user = Auth::user();
         if ($request->filled('company_id')) {
-            if(!$user->user_type == 'تامين') {
+            if (!$user->user_type == 'تامين') {
                 // return response()->json(['message' => '   المستخدم ليس من نوع تامين .'], 400);
-            }else{
+            } else {
                 // if(!$user->hasRole('admin')) return response()->json(['message' => '  المستخدم من نوع نقدي لا يمكنه تسجيل مريض من نوع تامين .'], 400);
             }
             // $this->authorize('register insurance_patient');
         } else {
-            if(!$user->can('تسجيل مريض كاش')) return response()->json(['message' => '  المستخدم ليس لديه صلاحية تسجيل مريض كاش .'], 400);
+            if (!$user->can('تسجيل مريض كاش')) return response()->json(['message' => '  المستخدم ليس لديه صلاحية تسجيل مريض كاش .'], 400);
         }
         DB::beginTransaction();
         try {
@@ -197,7 +200,7 @@ class PatientController extends Controller
             $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)
                 ->lockForUpdate()
                 ->count() + 1;
-            
+
             // Use pessimistic locking to prevent duplicate queueNumber in concurrent requests
             $queueNumber = DoctorVisit::where('doctor_shift_id', $activeDoctorShiftId)
                 ->lockForUpdate()
@@ -242,13 +245,13 @@ class PatientController extends Controller
                 // $company_service = CompanyService::where('company_id', $patient->company_id)->where('service_id', $fav->fav_service)->first();
                 // Log::info('company_service', ['company_service' => $company_service]);
                 // if ($company_service && $company_service?->price != 0) {
-                    RequestedServiceHelper::createFromFavoriteService(
-                        $service,
-                        $doctorVisit,
-                        $patient,
-                        $userId,
-                        1 // count
-                    );
+                RequestedServiceHelper::createFromFavoriteService(
+                    $service,
+                    $doctorVisit,
+                    $patient,
+                    $userId,
+                    1 // count
+                );
                 // }
             }
 
@@ -257,10 +260,10 @@ class PatientController extends Controller
             // Queue non-blocking actions after successful commit
             DB::afterCommit(function () use ($patient) {
                 $settings = Setting::first();
-            
+
                 $hasPhone = is_string($patient->phone) ? trim($patient->phone) !== '' : !empty($patient->phone);
                 $welcomeOn = (bool) ($settings?->send_welcome_message ?? false);
-            
+
                 if ($hasPhone && $welcomeOn) {
                     SendWelcomeSmsJob::dispatch($patient->id, (string)$patient->phone, (string)$patient->name);
                 }
@@ -308,7 +311,7 @@ class PatientController extends Controller
         }
 
         $patient->result_is_locked = $request->boolean('lock');
-        
+
         // If locking, you might want to log who locked it and when,
         // potentially in an audit trail or separate fields on the patient model.
         // if ($request->boolean('lock')) {
@@ -318,7 +321,7 @@ class PatientController extends Controller
         //     $patient->result_locked_by = null;
         //     $patient->result_locked_at = null;
         // }
-        
+
         $patient->save();
 
         $action = $request->boolean('lock') ? 'locked' : 'unlocked';
@@ -352,10 +355,10 @@ class PatientController extends Controller
                     'patientLabRequests.mainTest',
                     'patientLabRequests.results'
                 ]);
-                
+
                 // Set test_count attribute (expected by PatientLabQueueItemResource)
                 $doctorVisit->test_count = $doctorVisit->patientLabRequests->count();
-                
+
                 // Calculate oldest_request_time manually from loaded relationship
                 if ($doctorVisit->patientLabRequests->isNotEmpty()) {
                     $oldestRequest = $doctorVisit->patientLabRequests->min('created_at');
@@ -364,7 +367,7 @@ class PatientController extends Controller
                     $doctorVisit->oldest_request_time = $doctorVisit->created_at;
                 }
             }
-            
+
             return response()->json([
                 'message' => "Results are already authenticated.",
                 'data' => $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null
@@ -385,10 +388,10 @@ class PatientController extends Controller
                 'patientLabRequests.mainTest',
                 'patientLabRequests.results'
             ]);
-            
+
             // Set test_count attribute (expected by PatientLabQueueItemResource)
             $doctorVisit->test_count = $doctorVisit->patientLabRequests->count();
-            
+
             // Calculate oldest_request_time manually from loaded relationship
             if ($doctorVisit->patientLabRequests->isNotEmpty()) {
                 $oldestRequest = $doctorVisit->patientLabRequests->min('created_at');
@@ -413,7 +416,7 @@ class PatientController extends Controller
                         true
                     );
                     // SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
-                    
+
                     Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
                 }
             }
@@ -422,7 +425,8 @@ class PatientController extends Controller
         }
 
         $queueItemResource = $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null;
-        
+           SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
+
         // Emit realtime update event (fire-and-forget)
         if ($queueItemResource) {
             try {
@@ -444,8 +448,10 @@ class PatientController extends Controller
 
         // Queue SMS message job (respects settings flag internally)
         try {
-            SmsResultAuth::dispatch($patient->id);
-            Log::info("SMS result auth job dispatched for patient {$patient->id}");
+            if ($settings->send_sms_after_auth && $patient->phone) {
+                SmsResultAuth::dispatch($patient->id);
+                Log::info("SMS result auth job dispatched for patient {$patient->id}");
+            }
         } catch (\Exception $e) {
             Log::error('Error dispatching SMS result auth job: ' . $e->getMessage());
         }
@@ -508,25 +514,25 @@ class PatientController extends Controller
                 $doctorVisit->id,
                 $settings->storage_name
             );
-            
+
             $job->handle();
 
             // Refresh the patient to get the updated result_url
             $patient->refresh();
 
             Log::info("SendWhatsappMessage: $sendWhatsappMessage");
-             // Only dispatch WhatsApp message after successful upload and URL generation
-        if ($sendWhatsappMessage ) {
-            SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
-        }
+            // Only dispatch WhatsApp message after successful upload and URL generation
+            if ($sendWhatsappMessage) {
+                SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
+            }
             Log::info("Firebase upload completed for patient {$patient->id}, visit {$doctorVisit->id}", [
                 'had_existing_url' => $hadExistingUrl,
                 'old_url' => $oldResultUrl,
                 'new_url' => $patient->result_url
             ]);
 
-            $message = $hadExistingUrl 
-                ? 'Lab result replaced in Firebase successfully' 
+            $message = $hadExistingUrl
+                ? 'Lab result replaced in Firebase successfully'
                 : 'Lab result uploaded to Firebase successfully';
 
             return response()->json([
@@ -538,13 +544,12 @@ class PatientController extends Controller
                 'visit_id' => $doctorVisit->id,
                 'was_updated' => $hadExistingUrl
             ]);
-
         } catch (\Exception $e) {
             Log::error('Error uploading to Firebase: ' . $e->getMessage(), [
                 'patient_id' => $patient->id,
                 'exception' => $e
             ]);
-            
+
             // Return detailed error message to help with debugging
             $errorMessage = 'Failed to upload to Firebase';
             if (strpos($e->getMessage(), 'service account file not found') !== false) {
@@ -556,7 +561,7 @@ class PatientController extends Controller
             } else {
                 $errorMessage = 'Firebase upload failed: ' . $e->getMessage();
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => $errorMessage,
@@ -583,13 +588,13 @@ class PatientController extends Controller
 
         // Toggle the authentication status
         $patient->result_auth = !$patient->result_auth;
-        
+
         if ($patient->result_auth) {
             // If authenticating, set the auth user and date
             $patient->result_auth_user = Auth::id();
             $patient->auth_date = now();
             $settings = Setting::first();
-            
+
             // Dispatch job to upload to Firebase
             try {
                 $doctorVisit = $patient->doctorVisit;
@@ -612,11 +617,11 @@ class PatientController extends Controller
         } else {
             // If de-authenticating, clear the auth user and date
             $patient->result_auth_user = null;
-            $patient->auth_date = null;
+            $patient->auth_date = null; // @phpstan-ignore-line
             // Optionally clear the result_url as well
             $patient->result_url = null;
         }
-        
+
         $patient->save();
 
         // Get the doctor visit and load necessary relationships for PatientLabQueueItemResource
@@ -628,10 +633,10 @@ class PatientController extends Controller
                 'patientLabRequests.mainTest',
                 'patientLabRequests.results'
             ]);
-            
+
             // Set test_count attribute (expected by PatientLabQueueItemResource)
             $doctorVisit->test_count = $doctorVisit->patientLabRequests->count();
-            
+
             // Calculate oldest_request_time manually from loaded relationship
             if ($doctorVisit->patientLabRequests->isNotEmpty()) {
                 $oldestRequest = $doctorVisit->patientLabRequests->min('created_at');
@@ -642,7 +647,7 @@ class PatientController extends Controller
         }
 
         $queueItemResource = $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null;
-        
+
         // Emit realtime update event (fire-and-forget)
         if ($queueItemResource) {
             try {
@@ -688,7 +693,7 @@ class PatientController extends Controller
         //  'تسجيل مريض كاش',
         // 'تسجيل مريض تامين',
         // if($user->can('تسجيل مريض كاش')){
-            // return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+        // return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
         // }
         // if($user->can('تسجيل مريض تامين')){
         //     return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
@@ -696,7 +701,7 @@ class PatientController extends Controller
 
         // $user = Auth::user();
         // if($doctorVisit->patient->company_id == null && $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
-       
+
 
         $fileToUseId = null;
         $previousVisit = null;
@@ -722,14 +727,14 @@ class PatientController extends Controller
                 $file = File::create();
                 $fileToUseId = $file->id;
             }
-            
+
             // Use pessimistic locking to prevent duplicate visitLabNumber in concurrent requests
             // Lock rows to prevent race conditions when multiple users save simultaneously
             // This ensures only one transaction can read the count at a time
             $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)
                 ->lockForUpdate()
                 ->count() + 1;
-            
+
             // Use pessimistic locking for queue number as well
             $queueNumber = DoctorVisit::where('doctor_shift_id', $validatedVisitData['active_doctor_shift_id'])
                 ->lockForUpdate()
@@ -749,8 +754,8 @@ class PatientController extends Controller
                 'lab_paid' => 0,
                 'result_is_locked' => false,
                 'sample_collected' => false,
-                'lab_to_lab_object_id'=>null,
-                'last_visit_doctor_id'=>null,
+                'lab_to_lab_object_id' => null,
+                'last_visit_doctor_id' => null,
                 // Potentially update some demographics if the form was partially filled for this "new" visit using old data as base
                 // 'phone' => $request->input('new_phone', $existingPatient->phone), // Example
             ])->toArray();
@@ -788,22 +793,22 @@ class PatientController extends Controller
         $searchTerm = $request->validate([
             'term' => 'required|string|min:2',
         ])['term'];
-    
+
         $visits = DoctorVisit::query()
             ->whereHas('patient', function ($query) use ($searchTerm) {
                 $query->where(function ($q) use ($searchTerm) {
                     $q->where('name', 'LIKE', "%{$searchTerm}%")
-                      ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+                        ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
                 });
             })
             ->with(['patient', 'doctor'])
             ->orderBy('created_at', 'desc')
             ->limit(20)
             ->get();
-    
+
         return PatientSearchResultResource::collection($visits);
     }
-    
+
 
     /**
      * Display the specified patient.
@@ -829,7 +834,7 @@ class PatientController extends Controller
     public function update(UpdatePatientRequest $request, Patient $patient)
     {
         $validatedData = $request->validated();
-        if($patient->user_id != Auth::id()){
+        if ($patient->user_id != Auth::id()) {
             return response()->json(['message' => 'لا يمكنك تحديث بيانات هذا المريض.'], 403);
         }
         Log::info('Updating patient:  ' . $patient->id . ' with data: ' . json_encode($request->all()));
@@ -881,14 +886,14 @@ class PatientController extends Controller
 
         return DoctorVisitResource::collection($patients);
     }
-     /**
+    /**
      * Store a new patient and create a lab-centric visit from the Lab Reception page.
      * This method does not require an active doctor shift but links to a general clinic shift.
      *
      * @param  \Illuminate\Http\Request  $request
      * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
      */
-        public function storeFromLab(Request $request)
+    public function storeFromLab(Request $request)
     {
         // Add a specific permission check for this action
         // if (!Auth::user()->can('register lab_patient')) {
@@ -919,20 +924,19 @@ class PatientController extends Controller
         // Find the latest active shift for the selected referring doctor.
         // This is important for correctly assigning any doctor-related credit later.
         $activeDoctorShift = DoctorShift::where('doctor_id', $validatedData['doctor_id'])
-                                        ->latest('id')
-                                        ->first();
+            ->latest('id')
+            ->first();
 
-                                        if($activeDoctorShift){
-                                           
-                                        }else{
-                                            //create a new shift
-                                            $activeDoctorShift = DoctorShift::create([
-                                                'doctor_id' => $validatedData['doctor_id'],
-                                                'start_time' => Carbon::now(),
-                                                'end_time' => Carbon::now()->addHours(1),
-                                                'status' => true,
-                                            ]);
-                                        }
+        if ($activeDoctorShift) {
+        } else {
+            //create a new shift
+            $activeDoctorShift = DoctorShift::create([
+                'doctor_id' => $validatedData['doctor_id'],
+                'start_time' => Carbon::now(),
+                'end_time' => Carbon::now()->addHours(1),
+                'status' => true,
+            ]);
+        }
 
         DB::beginTransaction();
         try {
@@ -946,7 +950,7 @@ class PatientController extends Controller
                 'name' => $validatedData['name'],
                 'phone' => $validatedData['phone'],
                 'gender' => $validatedData['gender'] ?? 'male',
-                'age_year' => $validatedData['age_year'] ?? 0   ,
+                'age_year' => $validatedData['age_year'] ?? 0,
                 'age_month' => $validatedData['age_month'] ?? 0,
                 'age_day' => $validatedData['age_day'] ?? 0,
                 'address' => $validatedData['address'] ?? '',
@@ -962,7 +966,7 @@ class PatientController extends Controller
                 'referred' => Doctor::find($validatedData['doctor_id'])->name,
                 'discount_comment' => '',
                 'visit_number' => $visitLabNumber,
-                
+
 
             ]);
 
@@ -992,9 +996,8 @@ class PatientController extends Controller
             // Return the patient resource, ensuring it includes the new doctorVisit relation
             // The PatientResource should be configured to conditionally include this.
             $patient->load(['doctorVisit', 'sampleCollectedBy']);
-            
-            return new PatientResource($patient);
 
+            return new PatientResource($patient);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Lab patient registration failed: " . $e->getMessage(), ['exception' => $e]);
@@ -1017,8 +1020,8 @@ class PatientController extends Controller
         $visits = DoctorVisit::with('patient:id,name,phone')
             ->whereHas('patient', function ($query) use ($searchTerm) {
                 $query->where('name', 'LIKE', "%{$searchTerm}%")
-                      ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
-                      ->orWhere('id', $searchTerm);
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('id', $searchTerm);
             })
             ->select('id', 'patient_id', 'visit_date') // Select only what's needed
             ->latest('visit_date') // Order by most recent visits first
@@ -1037,7 +1040,7 @@ class PatientController extends Controller
 
         return response()->json(['data' => $formattedResults]);
     }
-     /**
+    /**
      * Create a new lab-only visit for an existing patient.
      */
     public function createLabVisitForExistingPatient(Request $request, DoctorVisit $doctorVisit)
@@ -1062,7 +1065,7 @@ class PatientController extends Controller
             return $dateCheck; // Ensure latest shift is from today
         }
         $user = Auth::user();
-    
+
         // if(isset($validated['company_id']) && $validated['company_id'] != null){
         //     if(!$user->can('تسجيل مريض تامين')){
         //         return response()->json(['message' => 'المستخدم لا يمكنه تسجيل مريض تامين'], 400);
@@ -1073,13 +1076,13 @@ class PatientController extends Controller
         //         return response()->json(['message' => 'المستخدم لا يمكنه تسجيل مريض كاش'], 400);
         //     }
         // }
-      
+
         $currentGeneralShift = $shiftCheck;
         DB::beginTransaction();
         try {
             // Get file_id from the patient's current doctorVisit or create a new file
             $fileToUseId = $patient->doctorVisit?->file_id;
-            
+
             // If for some reason no previous visit had a file, create a new one
             if (!$fileToUseId) {
                 $file = File::create();
@@ -1132,14 +1135,13 @@ class PatientController extends Controller
                 'number' => $visitLabNumber,
                 'only_lab' => true, // CRUCIAL: This marks it as a direct lab visit
             ]);
-            
+
             DB::commit();
 
             // Load the doctorVisit relationship for the new patient
             $newPatient->load('doctorVisit');
 
             return new \App\Http\Resources\PatientResource($newPatient);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to create lab visit for existing patient {$patient->id}: " . $e->getMessage(), ['exception' => $e]);
@@ -1157,19 +1159,19 @@ class PatientController extends Controller
         // Simpler approach: Patients with most recent visits that included lab requests.
         $patients = DoctorVisit::whereHas('patientLabRequests', function ($query) {
             $query->where('valid', true);
-        })->with(['patient'=>function($query){
-            $query->select('id','name','phone');
+        })->with(['patient' => function ($query) {
+            $query->select('id', 'name', 'phone');
         }])
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();
-            
+
         // The resource needs to handle 'latest_visit_id' if it's not a direct attribute
         return PatientStrippedResource::collection($patients)->additional([
             'meta' => ['note' => 'latest_visit_id refers to the DoctorVisit ID']
         ]);
     }
-      /**
+    /**
      * Search for DoctorVisits by patient name for Autocomplete.
      * Returns recent visits matching the patient name.
      */
@@ -1188,9 +1190,9 @@ class PatientController extends Controller
         // Check if search term is numeric (visit ID search)
         if (is_numeric($searchTerm)) {
             $visits = DoctorVisit::with([
-                    'patient:id,name,phone', // Eager load basic patient info
-                    'doctor:id,name'         // Eager load basic doctor info
-                ])
+                'patient:id,name,phone', // Eager load basic patient info
+                'doctor:id,name'         // Eager load basic doctor info
+            ])
                 ->where('id', $searchTerm)
                 ->take($limit)
                 // ->orderBy('id', 'desc')
@@ -1202,18 +1204,18 @@ class PatientController extends Controller
             }
 
             $visits = DoctorVisit::with([
-                    'patient:id,name,phone', // Eager load basic patient info
-                    'doctor:id,name'         // Eager load basic doctor info
-                ])
+                'patient:id,name,phone', // Eager load basic patient info
+                'doctor:id,name'         // Eager load basic doctor info
+            ])
                 ->whereHas('patient', function ($query) use ($searchTerm) {
                     $query->where('name', 'LIKE', "%{$searchTerm}%")
-                          ->orWhere('phone', 'LIKE', "%{$searchTerm}%"); // Optionally search by phone too
+                        ->orWhere('phone', 'LIKE', "%{$searchTerm}%"); // Optionally search by phone too
                 })
                 ->orderBy('id', 'asc')
                 ->take($limit)
                 ->get();
         }
-            
+
         // Filter out visits that do not have lab requests (if strictly for lab workstation)
         // Or do this in the initial whereHas if more performant for your DB
         $visitsWithLabs = $visits->filter(function ($visit) {
@@ -1229,13 +1231,13 @@ class PatientController extends Controller
             // If the visit itself implies lab work, then no extra check needed.
             // For now, let's assume any visit returned could be relevant.
             // Frontend can later check if it has lab requests when loading full details.
-            return true; 
+            return true;
         });
 
 
         return RecentDoctorVisitSearchResource::collection($visitsWithLabs);
     }
-  
+
     public function printBarcode(Request $request, Doctorvisit $doctorvisit)
     {
 
@@ -1272,7 +1274,7 @@ class PatientController extends Controller
             //                $z->setLabelCopies(1);
             $z->setBarcode(1, 270, 110, $doctorvisit->id); #1 -> cod128//barcode
             // $z->writeLabel($patient->visit_number, 340, 155, 4); //patient id
-            $z->writeLabelBig($patient->visit_number,335,155,4);//patient id
+            $z->writeLabelBig($patient->visit_number, 335, 155, 4); //patient id
 
             $z->writeLabel("$tests", 330, 10, 1);
             //            $z->writeLabel("$package_name",210,150,1);
@@ -1285,7 +1287,7 @@ class PatientController extends Controller
         return ['status' => true];
     }
 
-    
+
     /**
      * Print barcode labels for lab containers based on doctor visit
      * 
@@ -1302,7 +1304,7 @@ class PatientController extends Controller
     //         }
 
     //         $patient = $doctorvisit->patient;
-            
+
     //         if (!$patient->labrequests || $patient->labrequests->isEmpty()) {
     //             return ['status' => false, 'message' => 'No lab requests found for this patient'];
     //         }
@@ -1332,16 +1334,16 @@ class PatientController extends Controller
 
     //         // Print all labels
     //         $zebra->print2zebra();
-            
+
     //         return ['status' => true, 'message' => 'Barcode labels printed successfully'];
-            
+
     //     } catch (\Exception $e) {
     //         Log::error('Barcode printing failed: ' . $e->getMessage(), [
     //             'doctor_visit_id' => $doctorvisit->id,
     //             'patient_id' => $doctorvisit->patient?->id,
     //             'error' => $e->getTraceAsString()
     //         ]);
-            
+
     //         return ['status' => false, 'message' => 'Failed to print barcode labels: ' . $e->getMessage()];
     //     }
     // }
@@ -1404,9 +1406,9 @@ class PatientController extends Controller
         $currentGeneralShift = $shiftCheck;
 
         $user = Auth::user();
-    
+
         // if($user->can('تسجيل مريض كاش')){
-            // return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
+        // return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
         // }
         // if($user->can('تسجيل مريض تامين')){
         //     return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
@@ -1423,7 +1425,7 @@ class PatientController extends Controller
 
         $patient = $doctorVisit->patient;
         $company_id =   $validated['company_id'] ?? $patient->company_id;
-        if($company_id != null && !$user->can('تسجيل مريض تامين')){
+        if ($company_id != null && !$user->can('تسجيل مريض تامين')) {
             return response()->json(['message' => 'المستخدم ليس لديه صلاحية تسجيل مريض تامين.'], 400);
         }
 
@@ -1431,7 +1433,7 @@ class PatientController extends Controller
         try {
             // Get file_id from the current doctorVisit or create a new file
             $fileToUseId = $doctorVisit->file_id;
-            
+
             // If for some reason no previous visit had a file, create a new one
             if (!$fileToUseId) {
                 $file = File::create();
@@ -1574,7 +1576,7 @@ class PatientController extends Controller
                     }
                 }
             }
-            
+
             DB::commit();
 
             // Queue non-blocking actions after successful commit
@@ -1589,7 +1591,6 @@ class PatientController extends Controller
             $newPatient->load(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file', 'sampleCollectedBy']);
 
             return new PatientResource($newPatient);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to create clinic visit from history for doctor visit {$doctorVisit->id}: " . $e->getMessage(), ['exception' => $e]);
@@ -1652,7 +1653,7 @@ class PatientController extends Controller
         $formattedResults = $patientsWithLabHistory->map(function ($patient) {
             $latestVisit = $patient->doctorVisit;
             $labRequestCount = $latestVisit ? ($latestVisit->lab_request_count ?? 0) : 0;
-            
+
             return [
                 'patient_id' => $patient->id,
                 'visit_id' => $latestVisit ? $latestVisit->id : null,
@@ -1661,8 +1662,8 @@ class PatientController extends Controller
                 'visit_date' => $latestVisit ? $latestVisit->visit_date : null,
                 'lab_request_count' => $labRequestCount,
                 'company_name' => $patient->company ? $patient->company->name : null,
-                'autocomplete_label' => $patient->name . 
-                    ($latestVisit && $latestVisit->visit_date ? " - " . $latestVisit->visit_date->format('d/M/Y') : '') . 
+                'autocomplete_label' => $patient->name .
+                    ($latestVisit && $latestVisit->visit_date ? " - " . $latestVisit->visit_date->format('d/M/Y') : '') .
                     " (" . $labRequestCount . " tests)",
             ];
         });
@@ -1714,7 +1715,7 @@ class PatientController extends Controller
         try {
             // Create a new file
             $file = File::create();
-            
+
             // Use pessimistic locking to prevent duplicate visitLabNumber in concurrent requests
             // Lock rows to prevent race conditions when multiple users save simultaneously
             // This ensures only one transaction can read the count at a time
@@ -1763,9 +1764,9 @@ class PatientController extends Controller
             // Create lab requests for each test
             foreach ($validated['lab_requests'] as $labRequestData) {
                 // Find or create a main test based on the test name
-          
+
                 // Create the lab request
-              $labRequest = LabRequest::create([
+                $labRequest = LabRequest::create([
                     'main_test_id' => $labRequestData['testId'],
                     'pid' => $patient->id,
                     'doctor_visit_id' => $doctorVisit->id,
@@ -1800,7 +1801,7 @@ class PatientController extends Controller
                             // 'entered_by_user_id' => null, // Will be set upon result entry
                         ];
                     }
-                    
+
                     // Insert the requested results data
                     RequestedResult::insert($requestedResultsData);
                 }
@@ -1840,7 +1841,7 @@ class PatientController extends Controller
                 $testsList = implode(' و ', $testsNames);
                 $title = 'تم توصيل العينات الي المختبر';
                 $body = 'تم توصيل العينات للمريض ' . $validated['name'] . ' صاحب التحاليل التاليه ' . $testsList;
-                
+
                 \App\Services\FirebaseService::sendTopicMessage($safeTopic, $title, $body);
             } catch (\Throwable $e) {
                 Log::warning('Failed to send lab topic notification', [
@@ -1852,7 +1853,6 @@ class PatientController extends Controller
                 'message' => 'تم حفظ المريض بنجاح',
                 'data' => new PatientResource($patient)
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to save online lab patient: " . $e->getMessage(), ['exception' => $e]);
@@ -1925,13 +1925,13 @@ class PatientController extends Controller
         if ($doctorvisit == null) {
             return ['status' => false, 'message' => 'no data found'];
         }
-        
+
 
         $this->uploadToFirebase($doctorvisit->patient);
 
         $settings = Setting::first();
         $token = $settings?->ultramsg_token ?? '';
-        $instanceId = $settings?->ultramsg_instance_id ?? '';    
+        $instanceId = $settings?->ultramsg_instance_id ?? '';
         $collection = $settings?->firestore_result_collection ?? '';
 
         // return $doctorvisit->patient->result_url;
@@ -1942,18 +1942,18 @@ class PatientController extends Controller
                 'visit_id' => $doctorvisit->id,
                 'phone' => $doctorvisit->patient->phone,
                 'url' => $doctorvisit->patient->result_url,
-                'token'=>$token,
-                'instance_id'=>$instanceId,
-                'collection'=>$collection
+                'token' => $token,
+                'instance_id' => $instanceId,
+                'collection' => $collection
 
             ]
         );
 
         $responseData = $response->json() ?? [];
-        
+
         // Extract the nested WhatsApp API message if it exists
         $whatsappMessage = $responseData['data']['message'] ?? null;
-        
+
         // Use WhatsApp API message as main message if available, otherwise use default
         $message = $whatsappMessage ?? ($response->successful() ? 'report sent successfully' : 'failed to send report');
 
@@ -1964,7 +1964,6 @@ class PatientController extends Controller
             'data' => $responseData,
             'message' => $message,
         ], $response->status());
-
     }
     public function sendWhatsappDirectWithoutUpload(Request $request)
     {
@@ -1978,7 +1977,7 @@ class PatientController extends Controller
 
         $settings = Setting::first();
         $token = $settings?->ultramsg_token ?? '';
-        $instanceId = $settings?->ultramsg_instance_id ?? '';    
+        $instanceId = $settings?->ultramsg_instance_id ?? '';
         $collection = $settings?->firestore_result_collection ?? '';
         $response = HttpClient::asForm()->post(
             'https://intaj-starstechnology.com/whatsapp/alroomy/jawda-medical/public/api/ultramsg/send-document-from-firebase',
@@ -1987,16 +1986,16 @@ class PatientController extends Controller
                 'phone' => $doctorvisit->patient->phone,
                 'url' => $doctorvisit->patient->result_url,
                 'token' => $token,
-                'instance_id'=>$instanceId,
-                'collection'=>$collection
+                'instance_id' => $instanceId,
+                'collection' => $collection
             ]
         );
 
         $responseData = $response->json() ?? [];
-        
+
         // Extract the nested WhatsApp API message if it exists
         $whatsappMessage = $responseData['data']['message'] ?? null;
-        
+
         // Use WhatsApp API message as main message if available, otherwise use default
         $message = $whatsappMessage ?? ($response->successful() ? 'report sent successfully' : 'failed to send report');
 
@@ -2007,7 +2006,5 @@ class PatientController extends Controller
             'data' => $responseData,
             'message' => $message,
         ], $response->status());
-
     }
-
 }

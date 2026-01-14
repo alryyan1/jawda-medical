@@ -144,7 +144,6 @@ class UploadLabResultToFirebase implements ShouldQueue
                 }
             }
             // if ($this->sendWhatsappMessage) {
-                SendAuthWhatsappMessage::dispatch($this->patientId)->onQueue('notifications');
             // }
 
             Log::info("Successfully uploaded lab result to Firebase for patient {$this->patientId}", [

@@ -85,16 +85,17 @@ use App\Http\Controllers\Api\SmsController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
-     /*
+/*
     |--------------------------------------------------------------------------
     | Doctor Specific Service Configuration Routes
     |--------------------------------------------------------------------------
     */
-    Route::get('/doctors/{doctor}/configured-services', [DoctorServiceController::class, 'index']);
-    Route::get('/doctors/{doctor}/available-services-for-config', [DoctorServiceController::class, 'availableServices']);
-    Route::post('/doctors/{doctor}/configure-service', [DoctorServiceController::class, 'store']);
-    Route::put('/doctors/{doctor}/configure-service/{service}', [DoctorServiceController::class, 'update']);
-    Route::delete('/doctors/{doctor}/configure-service/{service}', [DoctorServiceController::class, 'destroy']);
+
+Route::get('/doctors/{doctor}/configured-services', [DoctorServiceController::class, 'index']);
+Route::get('/doctors/{doctor}/available-services-for-config', [DoctorServiceController::class, 'availableServices']);
+Route::post('/doctors/{doctor}/configure-service', [DoctorServiceController::class, 'store']);
+Route::put('/doctors/{doctor}/configure-service/{service}', [DoctorServiceController::class, 'update']);
+Route::delete('/doctors/{doctor}/configure-service/{service}', [DoctorServiceController::class, 'destroy']);
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes
@@ -207,10 +208,10 @@ Route::middleware('auth:sanctum')->group(function () {
     | Patient & Visit Management Routes
     |--------------------------------------------------------------------------
     */
-    
-    // New route for searching visits by patient name for autocomplete:
-      Route::get('/doctor-visits/search-by-patient', [PatientController::class, 'searchRecentDoctorVisitsByPatientName']);
-    Route::get('/patients/recent-lab-activity', [PatientController::class, 'getRecentLabActivityPatients']);
+
+  // New route for searching visits by patient name for autocomplete:
+  Route::get('/doctor-visits/search-by-patient', [PatientController::class, 'searchRecentDoctorVisitsByPatientName']);
+  Route::get('/patients/recent-lab-activity', [PatientController::class, 'getRecentLabActivityPatients']);
 
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
   Route::post('/patients/{doctorVisit}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
@@ -280,13 +281,13 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('admissions/{admission}/discharge', [AdmissionController::class, 'discharge']);
   Route::put('admissions/{admission}/transfer', [AdmissionController::class, 'transfer']);
   Route::get('admissions/{admission}/balance', [AdmissionTransactionController::class, 'balance']);
-  
+
   // Admission Transactions
   Route::get('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'index']);
   Route::post('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'store']);
   Route::delete('admissions/{admission}/transactions/{transaction}', [AdmissionTransactionController::class, 'destroy']);
   Route::get('admissions/{admission}/ledger', [AdmissionTransactionController::class, 'ledger']);
-  
+
   // Admission Deposits (deprecated - kept for backward compatibility, will redirect to transactions)
   Route::get('admissions/{admission}/deposits', [AdmissionDepositController::class, 'index']);
   Route::post('admissions/{admission}/deposits', [AdmissionDepositController::class, 'store']);
@@ -340,7 +341,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Settings
   Route::get('/settings', [SettingsController::class, 'show']);
   Route::post('/settings', [SettingsController::class, 'update']);
-  
+
   // Bindings Management (CBC, Chemistry, Hormone)
   Route::get('/bindings', [BindingController::class, 'index']);
   Route::get('/bindings/table-columns', [BindingController::class, 'getTableColumns']);
@@ -417,14 +418,14 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::patch('/labrequests/{labrequest}/childtests/{child_test}/result', [LabRequestController::class, 'saveSingleResult']);
   Route::patch('/labrequests/{labrequest}/childtests/{child_test}/normal-range', [LabRequestController::class, 'updateNormalRange']);
   Route::patch('/labrequests/{labrequest}/comment', [LabRequestController::class, 'updateComment']);
-  
+
   // Comment suggestions endpoints
   Route::get('/lab/comment-suggestions', [LabRequestController::class, 'getCommentSuggestions']);
   Route::post('/lab/comment-suggestions', [LabRequestController::class, 'addCommentSuggestion']);
-  
+
   // Organism suggestions endpoints
-        Route::get('/lab/suggestions', [LabRequestController::class, 'getSuggestions']);
-        Route::post('/lab/suggestions', [LabRequestController::class, 'addSuggestion']);
+  Route::get('/lab/suggestions', [LabRequestController::class, 'getSuggestions']);
+  Route::post('/lab/suggestions', [LabRequestController::class, 'addSuggestion']);
 
   // Generic LabRequest CRUD (if needed separately from visit context for some actions)
   Route::apiResource('labrequests', LabRequestController::class)->except(['index', 'store']);
@@ -479,257 +480,245 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/lab-general', [ReportController::class, 'labGeneral']);
   Route::get('/reports/lab-general/pdf', [ReportController::class, 'generateLabGeneralReportPdf']);
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | Service Costing Routes
     |--------------------------------------------------------------------------
     */
 
-    // SubServiceCost (Cost Components/Types)
-    Route::get('/sub-service-costs-list', [SubServiceCostController::class, 'indexList']);
-    Route::apiResource('sub-service-costs', SubServiceCostController::class);
-    // Route::post('/doctors/{doctor}/sub-service-costs', [DoctorSubServiceCostController::class, 'store']); // If managing pivot
-    // Route::delete('/doctors/{doctor}/sub-service-costs/{subServiceCost}', [DoctorSubServiceCostController::class, 'destroy']); // If managing pivot
+  // SubServiceCost (Cost Components/Types)
+  Route::get('/sub-service-costs-list', [SubServiceCostController::class, 'indexList']);
+  Route::apiResource('sub-service-costs', SubServiceCostController::class);
+  // Route::post('/doctors/{doctor}/sub-service-costs', [DoctorSubServiceCostController::class, 'store']); // If managing pivot
+  // Route::delete('/doctors/{doctor}/sub-service-costs/{subServiceCost}', [DoctorSubServiceCostController::class, 'destroy']); // If managing pivot
 
 
-    // ServiceCost (Defines costs for a specific Service)
-    Route::apiResource('services.service-costs', ServiceCostController::class)->shallow();
-    // This will create routes like:
-    // GET    /api/services/{service}/service-costs        (index)
-    // POST   /api/services/{service}/service-costs        (store)
-    // GET    /api/service-costs/{service_cost}          (show) - shallow
-    // PUT    /api/service-costs/{service_cost}          (update) - shallow
-    // DELETE /api/service-costs/{service_cost}          (destroy) - shallow
+  // ServiceCost (Defines costs for a specific Service)
+  Route::apiResource('services.service-costs', ServiceCostController::class)->shallow();
+  // This will create routes like:
+  // GET    /api/services/{service}/service-costs        (index)
+  // POST   /api/services/{service}/service-costs        (store)
+  // GET    /api/service-costs/{service_cost}          (show) - shallow
+  // PUT    /api/service-costs/{service_cost}          (update) - shallow
+  // DELETE /api/service-costs/{service_cost}          (destroy) - shallow
 
 
-    // RequestedServiceCost (Actual cost breakdown for a requested service)
-    // These are often created programmatically, direct CRUD might be less common.
-    // Example: Route to view cost breakdown for a specific requested service
-    // Route::apiResource('requested-service-costs', RequestedServiceCostController::class); // If full CRUD needed
-    
-    // For RequestedServiceCost entries linked to a specific RequestedService
-    Route::get('/requested-services/{requested_service}/cost-breakdown', [RequestedServiceCostController::class, 'indexForRequestedService']);
-    Route::post('/requested-services/{requested_service}/costs', [RequestedServiceCostController::class, 'storeOrUpdateBatch']); // For creating/updating multiple costs for a RequestedService
-    
-    // If you need individual CRUD for RequestedServiceCost items directly by their own ID
-    // Route::apiResource('requested-service-costs', RequestedServiceCostController::class)->only(['show', 'update', 'destroy']);
-    // OR if you want to allow creating one by one via its own resource controller, less common if always tied to requested service
-    Route::post('/requested-service-costs', [RequestedServiceCostController::class, 'storeSingle']);
-    Route::put('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'updateSingle']);
-    Route::delete('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'destroySingle']);
-    
-    // Deposits for a specific Requested Service
-    Route::get('/requested-services/{requested_service}/deposits', [RequestedServiceDepositController::class, 'indexForRequestedService']); // list deposits for one service
-    // POST to '/requested-services/{requested_service}/deposits' is already handled by RequestedServiceDepositController@store
-    
-    // Direct CRUD on the deposit records themselves by their own ID
-    Route::put('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'update']);
-    Route::delete('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'destroy']);
+  // RequestedServiceCost (Actual cost breakdown for a requested service)
+  // These are often created programmatically, direct CRUD might be less common.
+  // Example: Route to view cost breakdown for a specific requested service
+  // Route::apiResource('requested-service-costs', RequestedServiceCostController::class); // If full CRUD needed
 
-    // Listing deleted/voided deposits
-    Route::get('/requested-service-deposit-deletions', [\App\Http\Controllers\Api\RequestedServiceDepositDeletionController::class, 'index']);
-    
-    // Jobs Management Routes
-    Route::prefix('jobs-management')->group(function () {
-        Route::get('/failed', [\App\Http\Controllers\Api\JobsManagementController::class, 'getFailedJobs']);
-        Route::get('/pending', [\App\Http\Controllers\Api\JobsManagementController::class, 'getPendingJobs']);
-        Route::get('/statistics', [\App\Http\Controllers\Api\JobsManagementController::class, 'getStatistics']);
-        Route::get('/queues', [\App\Http\Controllers\Api\JobsManagementController::class, 'getQueues']);
-        Route::post('/retry/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'retryJob']);
-        Route::post('/retry-all', [\App\Http\Controllers\Api\JobsManagementController::class, 'retryAllJobs']);
-        // Failed jobs deletion
-        Route::delete('/failed/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJob']);
-        Route::delete('/failed', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteAllFailedJobs']);
-        Route::post('/failed/delete-by-queue', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJobsByQueue']);
-        Route::post('/failed/delete-by-ids', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJobsByIds']);
-        // Pending jobs deletion
-        Route::delete('/pending/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJob']);
-        Route::delete('/pending', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteAllPendingJobs']);
-        Route::post('/pending/delete-by-queue', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJobsByQueue']);
-        Route::post('/pending/delete-by-ids', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJobsByIds']);
-    });
-    
-    Route::post('companies/{targetCompany}/copy-contracts-from/{sourceCompany}', [CompanyServiceController::class, 'copyContractsFrom']); // NEW ROUTE
-     /*
+  // For RequestedServiceCost entries linked to a specific RequestedService
+  Route::get('/requested-services/{requested_service}/cost-breakdown', [RequestedServiceCostController::class, 'indexForRequestedService']);
+  Route::post('/requested-services/{requested_service}/costs', [RequestedServiceCostController::class, 'storeOrUpdateBatch']); // For creating/updating multiple costs for a RequestedService
+
+  // If you need individual CRUD for RequestedServiceCost items directly by their own ID
+  // Route::apiResource('requested-service-costs', RequestedServiceCostController::class)->only(['show', 'update', 'destroy']);
+  // OR if you want to allow creating one by one via its own resource controller, less common if always tied to requested service
+  Route::post('/requested-service-costs', [RequestedServiceCostController::class, 'storeSingle']);
+  Route::put('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'updateSingle']);
+  Route::delete('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'destroySingle']);
+
+  // Deposits for a specific Requested Service
+  Route::get('/requested-services/{requested_service}/deposits', [RequestedServiceDepositController::class, 'indexForRequestedService']); // list deposits for one service
+  // POST to '/requested-services/{requested_service}/deposits' is already handled by RequestedServiceDepositController@store
+
+  // Direct CRUD on the deposit records themselves by their own ID
+  Route::put('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'update']);
+  Route::delete('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'destroy']);
+
+  // Listing deleted/voided deposits
+  Route::get('/requested-service-deposit-deletions', [\App\Http\Controllers\Api\RequestedServiceDepositDeletionController::class, 'index']);
+
+  // Jobs Management Routes
+  Route::prefix('jobs-management')->group(function () {
+    Route::get('/failed', [\App\Http\Controllers\Api\JobsManagementController::class, 'getFailedJobs']);
+    Route::get('/pending', [\App\Http\Controllers\Api\JobsManagementController::class, 'getPendingJobs']);
+    Route::get('/statistics', [\App\Http\Controllers\Api\JobsManagementController::class, 'getStatistics']);
+    Route::get('/queues', [\App\Http\Controllers\Api\JobsManagementController::class, 'getQueues']);
+    Route::post('/retry/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'retryJob']);
+    Route::post('/retry-all', [\App\Http\Controllers\Api\JobsManagementController::class, 'retryAllJobs']);
+    // Failed jobs deletion
+    Route::delete('/failed/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJob']);
+    Route::delete('/failed', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteAllFailedJobs']);
+    Route::post('/failed/delete-by-queue', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJobsByQueue']);
+    Route::post('/failed/delete-by-ids', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteFailedJobsByIds']);
+    // Pending jobs deletion
+    Route::delete('/pending/{id}', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJob']);
+    Route::delete('/pending', [\App\Http\Controllers\Api\JobsManagementController::class, 'deleteAllPendingJobs']);
+    Route::post('/pending/delete-by-queue', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJobsByQueue']);
+    Route::post('/pending/delete-by-ids', [\App\Http\Controllers\Api\JobsManagementController::class, 'deletePendingJobsByIds']);
+  });
+
+  Route::post('companies/{targetCompany}/copy-contracts-from/{sourceCompany}', [CompanyServiceController::class, 'copyContractsFrom']); // NEW ROUTE
+  /*
     |--------------------------------------------------------------------------
     | Insurance Auditing Routes
     |--------------------------------------------------------------------------
     */
-    Route::get('/insurance-audit/patients', [InsuranceAuditController::class, 'listAuditableVisits']);
-    Route::get('/insurance-audit/visits/{doctorVisit}/audit-record', [InsuranceAuditController::class, 'getOrCreateAuditRecordForVisit']);
-    Route::put('/insurance-audit/records/{auditedPatientRecord}', [InsuranceAuditController::class, 'updateAuditedPatientInfo']);
-    Route::post('/insurance-audit/records/{auditedPatientRecord}/copy-services', [InsuranceAuditController::class, 'copyServicesToAudit']);
-    Route::post('/insurance-audit/audited-services', [InsuranceAuditController::class, 'storeAuditedService']);
-    Route::put('/insurance-audit/audited-services/{auditedRequestedService}', [InsuranceAuditController::class, 'updateAuditedService']);
-    Route::delete('/insurance-audit/audited-services/{auditedRequestedService}', [InsuranceAuditController::class, 'deleteAuditedService']);
-    Route::post('/insurance-audit/records/{auditedPatientRecord}/verify', [InsuranceAuditController::class, 'verifyAuditRecord']);
+  Route::get('/insurance-audit/patients', [InsuranceAuditController::class, 'listAuditableVisits']);
+  Route::get('/insurance-audit/visits/{doctorVisit}/audit-record', [InsuranceAuditController::class, 'getOrCreateAuditRecordForVisit']);
+  Route::put('/insurance-audit/records/{auditedPatientRecord}', [InsuranceAuditController::class, 'updateAuditedPatientInfo']);
+  Route::post('/insurance-audit/records/{auditedPatientRecord}/copy-services', [InsuranceAuditController::class, 'copyServicesToAudit']);
+  Route::post('/insurance-audit/audited-services', [InsuranceAuditController::class, 'storeAuditedService']);
+  Route::put('/insurance-audit/audited-services/{auditedRequestedService}', [InsuranceAuditController::class, 'updateAuditedService']);
+  Route::delete('/insurance-audit/audited-services/{auditedRequestedService}', [InsuranceAuditController::class, 'deleteAuditedService']);
+  Route::post('/insurance-audit/records/{auditedPatientRecord}/verify', [InsuranceAuditController::class, 'verifyAuditRecord']);
 
-    // PDF/Excel Export Routes
-    Route::get('/insurance-audit/export/pdf', [InsuranceAuditController::class, 'exportPdf']);
-    // http://127.0.0.1/jawda-medical/public/api/insurance-audit/export/excel?company_id=1&date_from=2025-05-01&date_to=2025-05-31&service_group_ids[]=9&service_group_ids[]=1&service_group_ids[]=2&service_group_ids[]=3&service_group_ids[]=4&service_group_ids[]=7&service_group_ids[]=5
-    Route::get('/insurance-audit/export/excel', [ExcelController::class, 'exportInsuranceClaim']);
-    Route::get('/excel/reclaim', [ExcelController::class, 'reclaim']);
-    Route::get('/reports/monthly-service-deposits-income', [ReportController::class, 'monthlyServiceDepositsIncome']);
-     /*
+  // PDF/Excel Export Routes
+  Route::get('/insurance-audit/export/pdf', [InsuranceAuditController::class, 'exportPdf']);
+  // http://127.0.0.1/jawda-medical/public/api/insurance-audit/export/excel?company_id=1&date_from=2025-05-01&date_to=2025-05-31&service_group_ids[]=9&service_group_ids[]=1&service_group_ids[]=2&service_group_ids[]=3&service_group_ids[]=4&service_group_ids[]=7&service_group_ids[]=5
+  Route::get('/insurance-audit/export/excel', [ExcelController::class, 'exportInsuranceClaim']);
+  Route::get('/excel/reclaim', [ExcelController::class, 'reclaim']);
+  Route::get('/reports/monthly-service-deposits-income', [ReportController::class, 'monthlyServiceDepositsIncome']);
+  /*
     |--------------------------------------------------------------------------
     | Patient Specific Actions (ensure these are within the auth:sanctum group)
     |--------------------------------------------------------------------------
     */
-    // Existing search and store-from-history routes for patients
-    Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
-    Route::post('/patients/{patient}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
-    
-    // NEW: Route for patient visit history
-    Route::get('/patients/{patient}/visit-history', [PatientController::class, 'visitHistory']);
-    
-    // NEW: Route for patient lab history by phone number
-    Route::get('/patients/{patient}/lab-history', [PatientController::class, 'getLabHistory']);
-    
-    // NEW: Route for creating clinic visit from history
-    Route::post('/doctor-visits/{doctorVisit}/create-clinic-visit-from-history', [PatientController::class, 'createClinicVisitFromHistory']);
-    
-    Route::apiResource('patients', PatientController::class); // This should already be there
+  // Existing search and store-from-history routes for patients
+  Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
+  Route::post('/patients/{patient}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
 
-    /*
+  // NEW: Route for patient visit history
+  Route::get('/patients/{patient}/visit-history', [PatientController::class, 'visitHistory']);
+
+  // NEW: Route for patient lab history by phone number
+  Route::get('/patients/{patient}/lab-history', [PatientController::class, 'getLabHistory']);
+
+  // NEW: Route for creating clinic visit from history
+  Route::post('/doctor-visits/{doctorVisit}/create-clinic-visit-from-history', [PatientController::class, 'createClinicVisitFromHistory']);
+
+  Route::apiResource('patients', PatientController::class); // This should already be there
+
+  /*
     |--------------------------------------------------------------------------
     | Doctor Visit Specific Actions (ensure these are within the auth:sanctum group)
     |--------------------------------------------------------------------------
     */
-    // Existing status update and apiResource for doctor visits
-    Route::put('/doctor-visits/{doctorVisit}/status', [DoctorVisitController::class, 'updateStatus']);
-    Route::apiResource('doctor-visits', DoctorVisitController::class);
+  // Existing status update and apiResource for doctor visits
+  Route::put('/doctor-visits/{doctorVisit}/status', [DoctorVisitController::class, 'updateStatus']);
+  Route::apiResource('doctor-visits', DoctorVisitController::class);
 
-    // NEW: Route for reassigning a doctor visit to a different shift
-    Route::post('/doctor-visits/{doctorVisit}/reassign-shift', [DoctorVisitController::class, 'reassignToShift']);
-    
-    // NEW: Route for creating a new visit for a patient by copying their data to a new shift
-    Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift']);
-    Route::post('/labrequests/{labrequest}/set-default-results', [LabRequestController::class, 'setDefaultResults']);
-    Route::post('/labrequests/{labrequest}/populate-cbc-from-sysmex', [LabRequestController::class, 'populateCbcResultsFromSysmex']);
+  // NEW: Route for reassigning a doctor visit to a different shift
+  Route::post('/doctor-visits/{doctorVisit}/reassign-shift', [DoctorVisitController::class, 'reassignToShift']);
+
+  // NEW: Route for creating a new visit for a patient by copying their data to a new shift
+  Route::post('/patients/{sourcePatient}/copy-to-new-visit', [DoctorVisitController::class, 'createCopiedVisitForNewShift']);
+  Route::post('/labrequests/{labrequest}/set-default-results', [LabRequestController::class, 'setDefaultResults']);
+  Route::post('/labrequests/{labrequest}/populate-cbc-from-sysmex', [LabRequestController::class, 'populateCbcResultsFromSysmex']);
   Route::post('/labrequests/{labrequest}/add-organism', [LabRequestController::class, 'addOrganism']);
   Route::get('/labrequests/{labrequest}/organisms', [LabRequestController::class, 'getOrganisms']);
   Route::patch('/requested-organisms/{organism}', [LabRequestController::class, 'updateOrganism']);
   Route::delete('/requested-organisms/{organism}', [LabRequestController::class, 'deleteOrganism']);
-        Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
-        Route::patch('/patients/{patient}/authenticate-results', [PatientController::class, 'authenticateResults']);
-        Route::get('/patients/{patient}/result-url', [PatientController::class, 'getResultUrl']);
-        Route::post('/patients/{patient}/upload-to-firebase', [PatientController::class, 'uploadToFirebase']);
-        Route::patch('/patients/{patient}/toggle-authentication', [PatientController::class, 'toggleAuthentication']);
+  Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
+  Route::patch('/patients/{patient}/authenticate-results', [PatientController::class, 'authenticateResults']);
+  Route::get('/patients/{patient}/result-url', [PatientController::class, 'getResultUrl']);
+  Route::post('/patients/{patient}/upload-to-firebase', [PatientController::class, 'uploadToFirebase']);
+  Route::patch('/patients/{patient}/toggle-authentication', [PatientController::class, 'toggleAuthentication']);
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | WhatsApp Communication Routes
     |--------------------------------------------------------------------------
     */
-    Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
-    Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
-    Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
+  Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
+  Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
+  Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
 
-    Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
+  Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
 
-    Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
-    // "The route api/reports/service-cost-breakdown could not be found."
-    Route::get('/reports/service-cost-breakdown', [ReportController::class, 'serviceCostBreakdownReport']);
-    // {message: "The route api/reports/service-cost-breakdown/pdf could not be found.",…}
-    Route::get('/reports/service-cost-breakdown/pdf', [ReportController::class, 'exportServiceCostBreakdownPdf']);
-    Route::get('/reports/doctor-statistics', [ReportController::class, 'doctorStatisticsReport']);
-    Route::get('/reports/doctor-statistics/pdf', [ReportController::class, 'exportDoctorStatisticsPdf']);
-    Route::get('/reports/company-performance', [ReportController::class, 'companyPerformanceReport']);
-    Route::get('/reports/company-performance/pdf', [ReportController::class, 'exportCompanyPerformancePdf']);
-    Route::get('/reports/doctor-company-entitlement', [ReportController::class, 'doctorCompanyEntitlementReport']);
-    Route::get('/reports/doctor-company-entitlement/pdf', [ReportController::class, 'exportDoctorCompanyEntitlementPdf']);
+  Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
+  // "The route api/reports/service-cost-breakdown could not be found."
+  Route::get('/reports/service-cost-breakdown', [ReportController::class, 'serviceCostBreakdownReport']);
+  // {message: "The route api/reports/service-cost-breakdown/pdf could not be found.",…}
+  Route::get('/reports/service-cost-breakdown/pdf', [ReportController::class, 'exportServiceCostBreakdownPdf']);
+  Route::get('/reports/doctor-statistics', [ReportController::class, 'doctorStatisticsReport']);
+  Route::get('/reports/doctor-statistics/pdf', [ReportController::class, 'exportDoctorStatisticsPdf']);
+  Route::get('/reports/company-performance', [ReportController::class, 'companyPerformanceReport']);
+  Route::get('/reports/company-performance/pdf', [ReportController::class, 'exportCompanyPerformancePdf']);
+  Route::get('/reports/doctor-company-entitlement', [ReportController::class, 'doctorCompanyEntitlementReport']);
+  Route::get('/reports/doctor-company-entitlement/pdf', [ReportController::class, 'exportDoctorCompanyEntitlementPdf']);
   // Companies PDF
   Route::get('/reports/companies/pdf', [CompanyReportController::class, 'exportAllCompaniesPdf']);
-    Route::get('/reports/yearly-income-comparison', [ReportController::class, 'yearlyIncomeComparisonByMonth']);
-    Route::get('/reports/yearly-patient-frequency', [ReportController::class, 'yearlyPatientFrequencyByMonth']);
-    // Route::get('/reports/yearly-patient-frequency/pdf', [ReportController::class, 'exportYearlyPatientFrequencyPdf']); // For future PDF
-   /*
+  Route::get('/reports/yearly-income-comparison', [ReportController::class, 'yearlyIncomeComparisonByMonth']);
+  Route::get('/reports/yearly-patient-frequency', [ReportController::class, 'yearlyPatientFrequencyByMonth']);
+  // Route::get('/reports/yearly-patient-frequency/pdf', [ReportController::class, 'exportYearlyPatientFrequencyPdf']); // For future PDF
+  /*
     |--------------------------------------------------------------------------
     | ATTENDANCE MODULE - CONFIGURATION ROUTES
     |--------------------------------------------------------------------------
     */
 
-    // 1. Global Attendance Settings
-    // Fetches the single global attendance settings record
-    Route::get('/attendance-settings', [AttendanceSettingController::class, 'show'])
-        ;
-    // Updates the single global attendance settings record
-    Route::put('/attendance-settings', [AttendanceSettingController::class, 'update'])
-        ;
+  // 1. Global Attendance Settings
+  // Fetches the single global attendance settings record
+  Route::get('/attendance-settings', [AttendanceSettingController::class, 'show']);
+  // Updates the single global attendance settings record
+  Route::put('/attendance-settings', [AttendanceSettingController::class, 'update']);
 
-    // 2. Shift Definitions (e.g., Morning, Evening Shift timings)
-    // Provides a simplified list, often for dropdowns (e.g., only active shifts)
-    Route::get('/shifts-definitions/list', [ShiftDefinitionController::class, 'indexList'])
-        ;
-    // Standard CRUD for shift definitions
-    
-
-    // 3. Holiday Management
-    // Provides a simplified list, often for calendar highlighting or dropdowns
-    Route::get('/holidays/list', [HolidayController::class, 'indexList'])
-        ;
-    // Standard CRUD for holidays
-    
-
-    // 4. User-Specific Attendance Settings
-    // (Integrated into existing UserController or a dedicated UserAttendanceSettingController)
-
-    // Endpoint to update a user's supervisor status and their default shift assignments
-    Route::put('/users/{user}/attendance-settings', [UserController::class, 'updateAttendanceSettings'])
-        ;
-    // Endpoint to get a user's currently assigned default shifts
-    Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts'])
-        ;
+  // 2. Shift Definitions (e.g., Morning, Evening Shift timings)
+  // Provides a simplified list, often for dropdowns (e.g., only active shifts)
+  Route::get('/shifts-definitions/list', [ShiftDefinitionController::class, 'indexList']);
+  // Standard CRUD for shift definitions
 
 
-    /*
+  // 3. Holiday Management
+  // Provides a simplified list, often for calendar highlighting or dropdowns
+  Route::get('/holidays/list', [HolidayController::class, 'indexList']);
+  // Standard CRUD for holidays
+
+
+  // 4. User-Specific Attendance Settings
+  // (Integrated into existing UserController or a dedicated UserAttendanceSettingController)
+
+  // Endpoint to update a user's supervisor status and their default shift assignments
+  Route::put('/users/{user}/attendance-settings', [UserController::class, 'updateAttendanceSettings']);
+  // Endpoint to get a user's currently assigned default shifts
+  Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts']);
+
+
+  /*
     |--------------------------------------------------------------------------
     | ATTENDANCE MODULE - RECORDING & VIEWING (from previous steps, for context)
     |--------------------------------------------------------------------------
     */
-    Route::get('/attendances/monthly-sheet', [AttendanceController::class, 'getMonthlySheet'])
-        ;
-    Route::post('/attendances/record', [AttendanceController::class, 'recordOrUpdateAttendance'])
-        ;
-    Route::delete('/attendances/{attendance}', [AttendanceController::class, 'destroyAttendance'])
-        ;
+  Route::get('/attendances/monthly-sheet', [AttendanceController::class, 'getMonthlySheet']);
+  Route::post('/attendances/record', [AttendanceController::class, 'recordOrUpdateAttendance']);
+  Route::delete('/attendances/{attendance}', [AttendanceController::class, 'destroyAttendance']);
 
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | ATTENDANCE MODULE - REPORTING (from previous steps, for context)
     |--------------------------------------------------------------------------
     */
-    Route::get('/attendance/reports/monthly-employee-summary', [AttendanceReportController::class, 'monthlyEmployeeSummary'])
-        ;
-    Route::get('/attendance/reports/daily-detail', [AttendanceReportController::class, 'dailyAttendanceDetail'])
-        ;
-    Route::get('/attendance/reports/payroll', [AttendanceReportController::class, 'payrollAttendanceReport'])
-        ;
-        Route::prefix('attendance/reports')->group(function () {
-          Route::get('/monthly-summary', [ReportController::class, 'getMonthlyAttendanceSummary']);
-          Route::get('/monthly-summary/pdf', [ReportController::class, 'generateMonthlyAttendancePdf']);
-      });
-         /*
+  Route::get('/attendance/reports/monthly-employee-summary', [AttendanceReportController::class, 'monthlyEmployeeSummary']);
+  Route::get('/attendance/reports/daily-detail', [AttendanceReportController::class, 'dailyAttendanceDetail']);
+  Route::get('/attendance/reports/payroll', [AttendanceReportController::class, 'payrollAttendanceReport']);
+  Route::prefix('attendance/reports')->group(function () {
+    Route::get('/monthly-summary', [ReportController::class, 'getMonthlyAttendanceSummary']);
+    Route::get('/monthly-summary/pdf', [ReportController::class, 'generateMonthlyAttendancePdf']);
+  });
+  /*
     |--------------------------------------------------------------------------
     | Attendance Configuration Routes
     |--------------------------------------------------------------------------
     */
-    Route::prefix('attendance-config')->group(function () {
-      // Attendance Global Settings
-      Route::get('/settings', [AttendanceSettingController::class, 'show']);
-      Route::post('/settings', [AttendanceSettingController::class, 'storeOrUpdate']); // Use POST for create or update
+  Route::prefix('attendance-config')->group(function () {
+    // Attendance Global Settings
+    Route::get('/settings', [AttendanceSettingController::class, 'show']);
+    Route::post('/settings', [AttendanceSettingController::class, 'storeOrUpdate']); // Use POST for create or update
 
-      // Shift Definitions
-      Route::get('/shift-definitions/list', [ShiftDefinitionController::class, 'indexList']); // For dropdowns
-      Route::apiResource('/shift-definitions', ShiftDefinitionController::class);
+    // Shift Definitions
+    Route::get('/shift-definitions/list', [ShiftDefinitionController::class, 'indexList']); // For dropdowns
+    Route::apiResource('/shift-definitions', ShiftDefinitionController::class);
 
-      // Holidays
-      Route::apiResource('/holidays', HolidayController::class);
+    // Holidays
+    Route::apiResource('/holidays', HolidayController::class);
 
-      // User Default Shift Assignments (assuming these are part of UserController)
-      Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts']);
-      Route::put('/users/{user}/default-shifts', [UserController::class, 'updateUserDefaultShifts']);
+    // User Default Shift Assignments (assuming these are part of UserController)
+    Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts']);
+    Route::put('/users/{user}/default-shifts', [UserController::class, 'updateUserDefaultShifts']);
   });
 
   /*
@@ -738,11 +727,11 @@ Route::middleware('auth:sanctum')->group(function () {
   |--------------------------------------------------------------------------
   */
   Route::prefix('attendance')->group(function () {
-      Route::get('/daily-sheet', [AttendanceController::class, 'getDailySheet']);
-      Route::post('/record', [AttendanceController::class, 'recordAttendance']);
-      Route::put('/record/{attendance}', [AttendanceController::class, 'updateAttendanceStatus']); // For changing status later
-      // Add more routes for reports later
-      // Route::get('/reports/monthly', [AttendanceController::class, 'getMonthlyReport']);
+    Route::get('/daily-sheet', [AttendanceController::class, 'getDailySheet']);
+    Route::post('/record', [AttendanceController::class, 'recordAttendance']);
+    Route::put('/record/{attendance}', [AttendanceController::class, 'updateAttendanceStatus']); // For changing status later
+    // Add more routes for reports later
+    // Route::get('/reports/monthly', [AttendanceController::class, 'getMonthlyReport']);
   });
   Route::post('/visits/{visit}/send-whatsapp-report', [ReportController::class, 'sendVisitReportViaWhatsApp']);
   Route::get('/search/patient-visits', [PatientController::class, 'searchPatientVisitsForAutocomplete']);
@@ -753,92 +742,96 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/patients/save-from-online-lab', [PatientController::class, 'saveFromOnlineLab']);
 
   Route::get('/visits/{doctorvisit}/lab-barcode/pdf', [ReportController::class, 'printBarcodeWithViewer']);
-    // Devices
-    Route::get('/devices-list', [DeviceController::class, 'indexList']);
-    Route::post('/devices', [DeviceController::class, 'store']); // If you add device creation dialog
- // NEW route for lab reception queue
- Route::get('/lab/reception-queue', [LabRequestController::class, 'getNewlyRegisteredLabPendingQueue']);
-    // Device Specific Normal Ranges for Child Tests
-    Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
-    Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
-    Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
-    Route::get('/visits/{visit}/lab-invoice/pdf', [ReportController::class, 'generateLabInvoicePdf']);
-    Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf']);
-    Route::post('/visits/{doctorvisit}/print-barcode', [PatientController::class, 'printBarcode']); // For Zebra printer barcode printing
-    Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result']); // For "View Report Preview"
-    Route::post('/visits/{doctorvisit}/lab-report/mark-printed', [ReportController::class, 'markReportPrinted']); // Mark report as printed
-    Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns
-    Route::apiResource('service-groups', ServiceGroupController::class);
-    Route::prefix('sample-collection')->group(function () {
+  // Devices
+  Route::get('/devices-list', [DeviceController::class, 'indexList']);
+  Route::post('/devices', [DeviceController::class, 'store']); // If you add device creation dialog
+  // NEW route for lab reception queue
+  Route::get('/lab/reception-queue', [LabRequestController::class, 'getNewlyRegisteredLabPendingQueue']);
+  // Device Specific Normal Ranges for Child Tests
+  Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
+  Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
+  Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
+  Route::get('/visits/{visit}/lab-invoice/pdf', [ReportController::class, 'generateLabInvoicePdf']);
+  Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf']);
+  Route::post('/visits/{doctorvisit}/print-barcode', [PatientController::class, 'printBarcode']); // For Zebra printer barcode printing
+  Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'result']); // For "View Report Preview"
+  Route::post('/visits/{doctorvisit}/lab-report/mark-printed', [ReportController::class, 'markReportPrinted']); // Mark report as printed
+  Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']); // For dropdowns
+  Route::apiResource('service-groups', ServiceGroupController::class);
+  Route::prefix('sample-collection')->group(function () {
     Route::get('/queue', [SampleCollectionController::class, 'getQueue']);
     Route::patch('/labrequests/{labrequest}/mark-collected', [SampleCollectionController::class, 'markSampleCollected']);
     Route::post('/visits/{visit}/mark-all-collected', [SampleCollectionController::class, 'markAllSamplesCollectedForVisit']);
-      Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest']);
-      Route::post('/visits/{visit}/mark-patient-collected', [SampleCollectionController::class, 'markPatientSampleCollectedForVisit']);
+    Route::patch('/labrequests/{labrequest}/generate-sample-id', [SampleCollectionController::class, 'generateSampleIdForRequest']);
+    Route::post('/visits/{visit}/mark-patient-collected', [SampleCollectionController::class, 'markPatientSampleCollectedForVisit']);
   });
-   Route::get('specialists-list', [SpecialistController::class, 'indexList']);
-    Route::apiResource('specialists', SpecialistController::class);
-    
-    // Sub Specialists routes
-    Route::get('specialists/{specialist}/sub-specialists', [SubSpecialistController::class, 'index']);
-    Route::post('specialists/{specialist}/sub-specialists', [SubSpecialistController::class, 'store']);
-    Route::put('specialists/{specialist}/sub-specialists/{subSpecialist}', [SubSpecialistController::class, 'update']);
-    Route::delete('specialists/{specialist}/sub-specialists/{subSpecialist}', [SubSpecialistController::class, 'destroy']);
-    Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel']);
-     // NEW route for the services with cost details export
-     Route::get('/reports/services-with-costs/excel', [ExcelController::class, 'exportServicesWithCostsToExcel']);
-     Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices']);
-         // NEW route for the PDF services list export
-    Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf']);
-    Route::post('/services/activate-all', [ServiceController::class, 'activateAll']);
-    Route::get('/user/current-shift-lab-income-summary', [UserController::class, 'getCurrentUserLabIncomeSummary']);
-    Route::get('/cash-denominations', [CashDenominationController::class, 'getDenominationsForShift']);
-    Route::post('/cash-denominations', [CashDenominationController::class, 'saveDenominationCounts']);
+  Route::get('specialists-list', [SpecialistController::class, 'indexList']);
+  Route::apiResource('specialists', SpecialistController::class);
 
-    /*
+  // Sub Specialists routes
+  Route::get('specialists/{specialist}/sub-specialists', [SubSpecialistController::class, 'index']);
+  Route::post('specialists/{specialist}/sub-specialists', [SubSpecialistController::class, 'store']);
+  Route::put('specialists/{specialist}/sub-specialists/{subSpecialist}', [SubSpecialistController::class, 'update']);
+  Route::delete('specialists/{specialist}/sub-specialists/{subSpecialist}', [SubSpecialistController::class, 'destroy']);
+  Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel']);
+  // NEW route for the services with cost details export
+  Route::get('/reports/services-with-costs/excel', [ExcelController::class, 'exportServicesWithCostsToExcel']);
+  Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices']);
+  // NEW route for the PDF services list export
+  Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf']);
+  Route::post('/services/activate-all', [ServiceController::class, 'activateAll']);
+  Route::get('/user/current-shift-lab-income-summary', [UserController::class, 'getCurrentUserLabIncomeSummary']);
+  Route::get('/cash-denominations', [CashDenominationController::class, 'getDenominationsForShift']);
+  Route::post('/cash-denominations', [CashDenominationController::class, 'saveDenominationCounts']);
+
+  /*
     |--------------------------------------------------------------------------
     | HL7 Messages Routes
     |--------------------------------------------------------------------------
     */
-    Route::get('/hl7-messages', [HL7MessageController::class, 'index']);
-    Route::get('/hl7-messages/{id}', [HL7MessageController::class, 'show']);
-    Route::delete('/hl7-messages/{id}', [HL7MessageController::class, 'destroy']);
-    Route::get('/hl7-messages/recent', [HL7MessageController::class, 'recent']);
-    Route::get('/hl7-messages/devices', [HL7MessageController::class, 'devices']);
-    Route::get('/hl7-messages/statistics', [HL7MessageController::class, 'statistics']);
-    
-    // HL7 Message Insert Routes
-    Route::post('/hl7-messages/insert', [HL7MessageInsertController::class, 'store']);
-    Route::post('/hl7-messages/insert-batch', [HL7MessageInsertController::class, 'storeBatch']);
+  Route::get('/hl7-messages', [HL7MessageController::class, 'index']);
+  Route::get('/hl7-messages/{id}', [HL7MessageController::class, 'show']);
+  Route::delete('/hl7-messages/{id}', [HL7MessageController::class, 'destroy']);
+  Route::get('/hl7-messages/recent', [HL7MessageController::class, 'recent']);
+  Route::get('/hl7-messages/devices', [HL7MessageController::class, 'devices']);
+  Route::get('/hl7-messages/statistics', [HL7MessageController::class, 'statistics']);
+
+  // HL7 Message Insert Routes
+  Route::post('/hl7-messages/insert', [HL7MessageInsertController::class, 'store']);
+  Route::post('/hl7-messages/insert-batch', [HL7MessageInsertController::class, 'storeBatch']);
 
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | Ultramsg WhatsApp API Routes
     |--------------------------------------------------------------------------
     */
-    Route::prefix('ultramsg')->group(function () {
-        Route::post('/send-text', [\App\Http\Controllers\UltramsgController::class, 'sendTextMessage']);
-        Route::post('/send-document', [\App\Http\Controllers\UltramsgController::class, 'sendDocument']);
-        Route::post('/send-document-file', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFile']);
-        Route::post('/send-document-url', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromUrl']);
-        Route::get('/instance-status', [\App\Http\Controllers\UltramsgController::class, 'getInstanceStatus']);
-        Route::get('/configured', [\App\Http\Controllers\UltramsgController::class, 'isConfigured']);
-    });
+  Route::prefix('ultramsg')->group(function () {
+    Route::post('/send-text', [\App\Http\Controllers\UltramsgController::class, 'sendTextMessage']);
+    Route::post('/send-document', [\App\Http\Controllers\UltramsgController::class, 'sendDocument']);
+    Route::post('/send-document-file', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFile']);
+    Route::post('/send-document-url', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromUrl']);
+    Route::get('/instance-status', [\App\Http\Controllers\UltramsgController::class, 'getInstanceStatus']);
+    Route::get('/configured', [\App\Http\Controllers\UltramsgController::class, 'isConfigured']);
+  });
 
-    /*
+  /*
     |--------------------------------------------------------------------------
     | WhatsApp Cloud API Routes
     |--------------------------------------------------------------------------
     */
-    Route::prefix('whatsapp-cloud')->group(function () {
-        Route::post('/send-text', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendTextMessage']);
-        Route::post('/send-template', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendTemplateMessage']);
-        Route::post('/send-document', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendDocument']);
-        Route::post('/send-image', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendImage']);
-        Route::get('/phone-numbers', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'getPhoneNumbers']);
-        Route::get('/configured', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'isConfigured']);
-    });
+  Route::prefix('whatsapp-cloud')->group(function () {
+    Route::post('/send-text', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendTextMessage']);
+    Route::post('/send-template', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendTemplateMessage']);
+    Route::post('/send-document', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendDocument']);
+    Route::post('/send-image', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendImage']);
+    Route::post('/send-audio', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendAudio']);
+    Route::post('/send-video', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendVideo']);
+    Route::post('/send-location', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'sendLocation']);
+    Route::get('/phone-numbers', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'getPhoneNumbers']);
+    Route::get('/templates', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'getTemplates']);
+    Route::get('/configured', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'isConfigured']);
+  });
 });
 
 // Ultramsg routes with custom credentials (no auth required since credentials are in request)
@@ -865,11 +858,9 @@ Route::post('/firestore/update-patient-pdf', [App\Http\Controllers\Api\Firestore
 
 // Bankak Images endpoints
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/bankak-images', [BankakImageController::class, 'index']);
-    Route::get('/bankak-images/dates', [BankakImageController::class, 'getAvailableDates']);
-    Route::get('/bankak-images/stats', [BankakImageController::class, 'getStats']);
-
-
+  Route::get('/bankak-images', [BankakImageController::class, 'index']);
+  Route::get('/bankak-images/dates', [BankakImageController::class, 'getAvailableDates']);
+  Route::get('/bankak-images/stats', [BankakImageController::class, 'getStats']);
 });
 
 //send from firebase storage using visit_id and settings.storage_name
@@ -882,8 +873,8 @@ Route::post('/whatsapp-cloud/webhook', [\App\Http\Controllers\Api\WhatsAppCloudA
 // Webhook endpoints (no CSRF protection needed)
 Route::get('/webhook', [WebHookController::class, 'webhook']);
 Route::post('/webhook', [WebHookController::class, 'webhook']);
-Route::post('populatePatientChemistryData/{doctorvisit}',[PatientController::class,'populatePatientChemistryData']);
-Route::post('populatePatientHormoneData/{doctorvisit}',[PatientController::class,'populatePatientHormoneData']);
+Route::post('populatePatientChemistryData/{doctorvisit}', [PatientController::class, 'populatePatientChemistryData']);
+Route::post('populatePatientHormoneData/{doctorvisit}', [PatientController::class, 'populatePatientHormoneData']);
 
 
 Route::post('/sendWhatsappDirectPdfReport', [PatientController::class, 'sendWhatsappDirectPdfReport']);

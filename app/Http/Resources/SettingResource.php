@@ -1,5 +1,7 @@
 <?php
+
 namespace App\Http\Resources;
+
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,9 +25,7 @@ class SettingResource extends JsonResource
             'lab_name' => $this->lab_name,
             'hospital_name' => $this->hospital_name,
             'firestore_result_collection' => $this->firestore_result_collection,
-            'cloud_api_token' => $this->cloud_api_token,
             'disable_doctor_service_check' => (bool) $this->disable_doctor_service_check,
-            'phone_number_id' => $this->phone_number_id,
             'phone' => $this->phone,
             'gov' => $this->gov, // bool or int
             'country' => $this->country, // bool or int
@@ -72,7 +72,26 @@ class SettingResource extends JsonResource
             'show_logo_only_whatsapp' => (bool) $this->show_logo_only_whatsapp,
             'show_title_in_lab_result' => (bool) $this->show_title_in_lab_result,
             'storage_name' => $this->storage_name,
-            
+            'settings_enable_Sms_front' => (bool) $this->settings_enable_Sms_front,
+            'prevent_backdated_entry' => (bool) $this->prevent_backdated_entry,
+            'whatsapp_number' => $this->whatsapp_number,
+            'pdf_header_type' => $this->pdf_header_type,
+            'pdf_header_logo_position' => $this->pdf_header_logo_position,
+            'pdf_header_logo_width' => (int) $this->pdf_header_logo_width,
+            'pdf_header_logo_height' => (int) $this->pdf_header_logo_height,
+            'pdf_header_logo_x_offset' => (int) $this->pdf_header_logo_x_offset,
+            'pdf_header_logo_y_offset' => (int) $this->pdf_header_logo_y_offset,
+            'pdf_header_image_width' => (int) $this->pdf_header_image_width,
+            'pdf_header_image_height' => (int) $this->pdf_header_image_height,
+            'pdf_header_image_x_offset' => (int) $this->pdf_header_image_x_offset,
+            'pdf_header_image_y_offset' => (int) $this->pdf_header_image_y_offset,
+            'pdf_header_title' => $this->pdf_header_title,
+            'pdf_header_subtitle' => $this->pdf_header_subtitle,
+            'pdf_header_title_font_size' => (int) $this->pdf_header_title_font_size,
+            'pdf_header_subtitle_font_size' => (int) $this->pdf_header_subtitle_font_size,
+            'pdf_header_title_y_offset' => (int) $this->pdf_header_title_y_offset,
+            'pdf_header_subtitle_y_offset' => (int) $this->pdf_header_subtitle_y_offset,
+
 
             // Eager load related finance accounts if needed for display
             // 'default_finance_account_details' => new FinanceAccountResource($this->whenLoaded('defaultFinanceAccount')),
