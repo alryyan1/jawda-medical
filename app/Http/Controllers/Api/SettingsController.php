@@ -142,7 +142,7 @@ class SettingsController extends Controller
             'prevent_backdated_entry' => 'sometimes|boolean',
             'whatsapp_number' => 'nullable|string|max:20',
             'pdf_header_type' => 'nullable|string|in:logo,full_width,none',
-            'pdf_header_logo_position' => 'nullable|string|in:left,right',
+            'pdf_header_logo_position' => 'nullable|string',
             'pdf_header_logo_width' => 'nullable|integer',
             'pdf_header_logo_height' => 'nullable|integer',
             'pdf_header_logo_x_offset' => 'nullable|integer',

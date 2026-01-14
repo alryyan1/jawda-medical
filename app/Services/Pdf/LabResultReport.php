@@ -96,7 +96,7 @@ class LabResultReport
         }
 
         if ($watermarkPath) {
-            $pdf->SetAlpha(0.85); // Slightly lighter watermark
+            $pdf->SetAlpha(0.15); // Slightly lighter watermark
             // Fit watermark reasonably in center area
             $pdf->Image(
                 $watermarkPath,
@@ -170,13 +170,16 @@ class LabResultReport
                     $pdf->Ln($subtitleYOffset);
                     $pdf->SetFont('arial', '', $subtitleFontSize, '', true);
                     $pdf->Cell($page_width, 5, $subtitle, 0, 1, 'C');
+                } else {
+
+                    $pdf->Ln(15);
                 }
             } else {
                 $pdf->Ln(25);
             }
         }
 
-        $pdf->Ln(5);
+        $pdf->Ln(17);
 
         $y = $pdf->GetY();
         $pdf->SetFont('arial', '', 13, '', true);
