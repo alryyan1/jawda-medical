@@ -508,15 +508,18 @@ class WhatsAppCloudApiController extends Controller
                         if (isset($change['value']['messages'])) {
                             foreach ($change['value']['messages'] as $message) {
                                 //953041111231804 altamayoz
-                                if($recipientPhoneNumberId == '953041111231804'){
+                                if ($recipientPhoneNumberId == '953041111231804') {
                                     $collection = 'altamayoz';
+                                    //log get data from altamayoz
+                                    Log::info('getting data from altamayoz ' . $recipientPhoneNumberId);
 
-                                    $this->handleIncomingMessage($message, $change['value'],$collection);
-                                }
-                                if($recipientPhoneNumberId == '982254518296345'){
+                                    $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
+                                } elseif ($recipientPhoneNumberId == '982254518296345') {
                                     $collection = 'alryyan';
+                                    //log get data from alryyan
+                                    Log::info('getting data from alryyan ' . $recipientPhoneNumberId);
 
-                                    $this->handleIncomingMessage($message, $change['value'],$collection);
+                                    $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
                                 }
                             }
                         }
@@ -597,7 +600,7 @@ class WhatsAppCloudApiController extends Controller
      * @param array $value
      * @return void
      */
-    protected function handleIncomingMessage(array $message, array $value,$collection): void
+    protected function handleIncomingMessage(array $message, array $value, $collection, $phoneNumberId = null): void
     {
         // $collection =  'alryyan';
 
@@ -673,18 +676,18 @@ class WhatsAppCloudApiController extends Controller
 
             if ($pdfUrl) {
                 // Send notification message before sending the PDF document
-                $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات");
+                $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات", $phoneNumberId);
                 // Send the PDF document back to the sender
-                $this->sendDocumentToUser($from, $pdfUrl);
+                $this->sendDocumentToUser($from, $pdfUrl, null, $phoneNumberId);
             } else {
                 // Send error message if PDF not found
-                $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة لرقم الهاتف: {$from}");
+                $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة لرقم الهاتف: {$from}", $phoneNumberId);
             }
         }
         // Handle text messages that may contain a code/visit ID
         elseif ($type === 'text' && isset($message['text']['body'])) {
             $messageText = trim($message['text']['body']);
-            $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات");
+            $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات", $phoneNumberId);
 
             // Extract code/visit ID from message (assuming it's a numeric code)
             // You can modify this regex pattern based on your code format
@@ -702,10 +705,10 @@ class WhatsAppCloudApiController extends Controller
 
                 if ($pdfUrl) {
                     // Send the PDF document back to the sender
-                    $this->sendDocumentToUser($from, $pdfUrl, $code);
+                    $this->sendDocumentToUser($from, $pdfUrl, $code, $phoneNumberId);
                 } else {
                     // Send error message if PDF not found
-                    $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة للرقم: {$code}");
+                    $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة للرقم: {$code}", $phoneNumberId);
                 }
             } else {
                 Log::info('WhatsApp Cloud API: No code found in message.', [
@@ -739,7 +742,7 @@ class WhatsAppCloudApiController extends Controller
                 return null;
             }
 
-        
+
             $documentId = (string) $visitId;
             $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}/{$documentId}";
 
@@ -799,7 +802,7 @@ class WhatsAppCloudApiController extends Controller
      * @param string|null $collection Optional collection name (defaults to settings.firestore_result_collection)
      * @return string|null The most recent result URL or null if not found
      */
-    protected function getResultUrlFromFirestoreByPhone(string $phoneNumber, ?string $collection ): ?string
+    protected function getResultUrlFromFirestoreByPhone(string $phoneNumber, ?string $collection): ?string
     {
         try {
             $projectId = config('firebase.project_id');
@@ -814,7 +817,7 @@ class WhatsAppCloudApiController extends Controller
                 return null;
             }
 
-          
+
 
             // Normalize phone number (remove +, spaces, dashes, etc.)
             $normalizedPhone = preg_replace('/[^0-9]/', '', $phoneNumber);
@@ -1006,7 +1009,7 @@ class WhatsAppCloudApiController extends Controller
      * @param string|null $code Optional code/visit ID for filename
      * @return void
      */
-    protected function sendDocumentToUser(string $to, string $documentUrl, ?string $code = null): void
+    protected function sendDocumentToUser(string $to, string $documentUrl, ?string $code = null, $phoneNumberId = null): void
     {
         try {
             $filename = $code ? "result_{$code}.pdf" : 'result.pdf';
@@ -1015,7 +1018,9 @@ class WhatsAppCloudApiController extends Controller
                 $to,
                 $documentUrl,
                 $filename,
-                'نتيجة المختبر - Lab Result'
+                'نتيجة المختبر - Lab Result',
+                null,
+                $phoneNumberId
             );
 
             if ($result['success']) {
@@ -1047,10 +1052,10 @@ class WhatsAppCloudApiController extends Controller
      * @param string $text Message text to send
      * @return void
      */
-    protected function sendTextToUser(string $to, string $text): void
+    protected function sendTextToUser(string $to, string $text, $phoneNumberId = null): void
     {
         try {
-            $result = $this->whatsappService->sendTextMessage($to, $text);
+            $result = $this->whatsappService->sendTextMessage($to, $text, null, $phoneNumberId);
 
             if ($result['success']) {
                 Log::info('WhatsApp Cloud API: Text message sent successfully to user.', [
@@ -1079,14 +1084,29 @@ class WhatsAppCloudApiController extends Controller
      */
     protected function handleMessageStatus(array $status): void
     {
-        Log::info('WhatsApp Cloud API: Message status updated.', [
-            'message_id' => $status['id'] ?? null,
-            'status' => $status['status'] ?? null,
-            'timestamp' => $status['timestamp'] ?? null,
-        ]);
+        $messageId = $status['id'] ?? null;
+        $currentStatus = $status['status'] ?? null;
+        $errorInfo = null;
 
-        // Add your business logic here to handle status updates
-        // For example: update message status in database
+        if ($currentStatus === 'failed' && isset($status['errors'])) {
+            $errorInfo = $status['errors'][0] ?? null;
+            foreach ($status['errors'] as $error) {
+                Log::error("WhatsApp Delivery Failure [ID: {$messageId}]: ", [
+                    'error_code' => $error['code'] ?? 'N/A',
+                    'error_message' => $error['message'] ?? 'N/A',
+                    'error_data' => $error['error_data'] ?? 'N/A'
+                ]);
+            }
+        }
+
+        Log::info("WhatsApp Message Status: [ID: {$messageId}] is now {$currentStatus}");
+
+        // Broadcast to Pusher
+        try {
+            broadcast(new \App\Events\WhatsAppStatusUpdated($messageId, $currentStatus, $errorInfo));
+        } catch (\Throwable $e) {
+            Log::warning('Failed to broadcast WhatsApp status update: ' . $e->getMessage());
+        }
     }
 
     /**

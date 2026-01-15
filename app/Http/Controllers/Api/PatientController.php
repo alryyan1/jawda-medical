@@ -425,7 +425,7 @@ class PatientController extends Controller
         }
 
         $queueItemResource = $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null;
-           SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
+        // SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
 
         // Emit realtime update event (fire-and-forget)
         if ($queueItemResource) {

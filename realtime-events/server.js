@@ -418,6 +418,20 @@ app.post('/emit/doctor-shift-closed', verifyAuth, (req, res) => {
   }
 });
 
+// Emit whatsapp-status-updated
+app.post('/emit/whatsapp-status-updated', verifyAuth, (req, res) => {
+  try {
+    const payload = req.body; // Expecting { message_id, status, error? }
+    console.log('whatsapp-status-updated', payload);
+    io.emit('whatsapp-status-updated', payload);
+    console.log('whatsapp-status-updated emitted');
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error emitting whatsapp-status-updated:', err?.message || err);
+    return res.status(500).json({ error: 'Failed to emit whatsapp-status-updated' });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);
 });
