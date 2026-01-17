@@ -512,12 +512,16 @@ class WhatsAppCloudApiController extends Controller
                                     $collection = 'altamayoz';
                                     //log get data from altamayoz
                                     Log::info('getting data from altamayoz ' . $recipientPhoneNumberId);
+                                    $msg = "  استعلام جديد للنتائج لمختبر التميز  من الرقم  " . $message['from'];
+                                    $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
 
                                     $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
                                 } elseif ($recipientPhoneNumberId == '982254518296345') {
-                                    $collection = 'alryyan';
+                                    $collection = 'alroomy-shaglban';
                                     //log get data from alryyan
                                     Log::info('getting data from alryyan ' . $recipientPhoneNumberId);
+                                    $msg = "  استعلام جديد للنتائج الرومي شقلبان التميز  من الرقم  " . $message['from'];
+                                    $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
 
                                     $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
                                 }
@@ -683,22 +687,20 @@ class WhatsAppCloudApiController extends Controller
                 // Send error message if PDF not found
                 $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة لرقم الهاتف: {$from}", $phoneNumberId);
             }
-        }
-        // Handle text messages that may contain a code/visit ID
-        elseif ($type === 'text' && isset($message['text']['body'])) {
+        } elseif ($type === 'text' && isset($message['text']['body'])) {
             $messageText = trim($message['text']['body']);
-            $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات", $phoneNumberId);
 
-            // Extract code/visit ID from message (assuming it's a numeric code)
-            // You can modify this regex pattern based on your code format
-            if (preg_match('/\b(\d+)\b/', $messageText, $matches)) {
-                $code = $matches[1];
+            // Only process if the message is numeric (visit ID)ا
+            if (is_numeric($messageText)) {
+                $code = $messageText;
 
-                Log::info('WhatsApp Cloud API: Code extracted from message.', [
+                Log::info('WhatsApp Cloud API: Numeric visit ID received.', [
                     'code' => $code,
                     'from' => $from,
                     'message_text' => $messageText
                 ]);
+
+                $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات", $phoneNumberId);
 
                 // Fetch PDF URL from Firestore using the code
                 $pdfUrl = $this->getResultUrlFromFirestore($code, $collection);
@@ -711,7 +713,7 @@ class WhatsAppCloudApiController extends Controller
                     $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة للرقم: {$code}", $phoneNumberId);
                 }
             } else {
-                Log::info('WhatsApp Cloud API: No code found in message.', [
+                Log::info('WhatsApp Cloud API: Non-numeric text message ignored.', [
                     'message_text' => $messageText,
                     'from' => $from
                 ]);

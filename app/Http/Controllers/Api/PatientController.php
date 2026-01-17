@@ -402,30 +402,7 @@ class PatientController extends Controller
         }
         $settings = Setting::first();
 
-        // Dispatch job to upload lab result to Firebase
-        try {
-            if ($doctorVisit) {
-                // Check if storage_name is set
-                if (empty($settings->storage_name)) {
-                    Log::warning("Firebase upload skipped: storage_name is not set in settings");
-                } else {
-                    \App\Jobs\UploadLabResultToFirebase::dispatch(
-                        $patient->id,
-                        $doctorVisit->id,
-                        $settings->storage_name,
-                        true
-                    );
-                    // SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
-
-                    Log::info("Firebase upload job dispatched for patient {$patient->id}, visit {$doctorVisit->id}");
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
-        }
-
         $queueItemResource = $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null;
-        // SendAuthWhatsappMessage::dispatch($patient->id)->onQueue('notifications');
 
         // Emit realtime update event (fire-and-forget)
         if ($queueItemResource) {
@@ -442,19 +419,9 @@ class PatientController extends Controller
         }
 
         $responseData = [
-            'message' => "Patient results have been successfully authenticated. Upload to cloud storage has been queued.",
+            'message' => "Patient results have been successfully authenticated.",
             'data' => $queueItemResource
         ];
-
-        // Queue SMS message job (respects settings flag internally)
-        try {
-            if ($settings->send_sms_after_auth && $patient->phone) {
-                SmsResultAuth::dispatch($patient->id);
-                Log::info("SMS result auth job dispatched for patient {$patient->id}");
-            }
-        } catch (\Exception $e) {
-            Log::error('Error dispatching SMS result auth job: ' . $e->getMessage());
-        }
 
         return response()->json($responseData);
     }
