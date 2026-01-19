@@ -623,6 +623,8 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
   Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
+  Route::get('/whatsapp/messages/{phone}', [\App\Http\Controllers\Api\WhatsAppMessageController::class, 'index']);
+  Route::post('/whatsapp/messages', [\App\Http\Controllers\Api\WhatsAppMessageController::class, 'store']);
   Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
   Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
 

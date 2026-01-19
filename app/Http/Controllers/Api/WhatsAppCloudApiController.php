@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\WhatsAppCloudApiService;
 use App\Services\FirebaseService;
 use App\Models\Setting;
+
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -59,6 +60,8 @@ class WhatsAppCloudApiController extends Controller
         }
 
         $result = $this->whatsappService->sendTextMessage($to, $text, $accessToken, $phoneNumberId);
+
+
 
         return response()->json($result, $result['success'] ? 200 : 400);
     }
@@ -512,16 +515,40 @@ class WhatsAppCloudApiController extends Controller
                                     $collection = 'altamayoz';
                                     //log get data from altamayoz
                                     Log::info('getting data from altamayoz ' . $recipientPhoneNumberId);
-                                    $msg = "  استعلام جديد للنتائج لمختبر التميز  من الرقم  " . $message['from'];
-                                    $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
+                                    if (($message['type'] ?? '') === 'text' && isset($message['text']['body'])) {
+                                        $from = $message['from'];
+                                        $body = $message['text']['body'];
+
+                                        $msg = <<<MSG
+استعلام جديد للنتائج
+ التميز الفرع الجديد 
+من الرقم: $from
+المحتوى: $body
+MSG;
+                                        $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
+                                    } else {
+                                        $msg = "  استعلام جديد    لمختبر التميز  من الرقم  " . $message['from'];
+                                        $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
+                                        $this->sendTextToUser('249122867272', $msg, $recipientPhoneNumberId);
+                                    }
 
                                     $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
                                 } elseif ($recipientPhoneNumberId == '982254518296345') {
                                     $collection = 'alroomy-shaglban';
                                     //log get data from alryyan
                                     Log::info('getting data from alryyan ' . $recipientPhoneNumberId);
-                                    $msg = "  استعلام جديد للنتائج الرومي شقلبان التميز  من الرقم  " . $message['from'];
-                                    $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
+                                    if (($message['type'] ?? '') === 'text' && isset($message['text']['body'])) {
+                                        $from = $message['from'];
+                                        $body = $message['text']['body'];
+
+                                        $msg = <<<MSG
+استعلام جديد للنتائج
+الرومي شقلبان 
+من الرقم: $from
+المحتوى: $body
+MSG;
+                                        $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
+                                    }
 
                                     $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
                                 }
@@ -619,6 +646,23 @@ class WhatsAppCloudApiController extends Controller
             'type' => $type,
             'timestamp' => $timestamp,
         ]);
+
+        if (($type ?? '') === 'text' && isset($message['text']['body'])) {
+            // Dispatch event for incoming text message
+            // This allows the application (or frontend) to handle storage, keeping this controller DB-agnostic.
+            \App\Events\WhatsAppMessageReceived::dispatch([
+                'phone_number_id' => $phoneNumberId,
+                'waba_id' => null,
+                'from' => $from,
+                'to' => $phoneNumberId,
+                'type' => 'text',
+                'body' => $message['text']['body'],
+                'status' => 'received',
+                'message_id' => $messageId ?? null,
+                'direction' => 'incoming',
+                'raw_payload' => $message
+            ]);
+        }
 
         // Handle interactive messages (button replies) or button type messages
         // Check for button/interactive messages in multiple possible formats

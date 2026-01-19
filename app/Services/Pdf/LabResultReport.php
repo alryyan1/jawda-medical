@@ -316,9 +316,9 @@ class LabResultReport
             $pdf->Image(
                 $logo_path . '/' . $logo_name,
                 0,
-                0,
+                7,
                 $width +10,
-                48,
+                30,
                 '',
                 '',
                 '',
