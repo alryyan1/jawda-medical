@@ -24,20 +24,25 @@ class LabThermalReceipt extends MyCustomTCPDF
     public function __construct(DoctorVisit $visit, array $labRequestsToPrint = [])
     {
         parent::__construct('إيصال مختبر', $visit);
-        
+
         $this->visit = $visit;
         $this->labRequestsToPrint = $labRequestsToPrint ?: $visit->patientLabRequests->toArray();
         $this->appSettings = Setting::instance();
         $this->isCompanyPatient = !empty($visit->patient->company_id);
         $this->cashierName = Auth::user()?->name ?? $visit->user?->name ?? $this->labRequestsToPrint[0]['deposit_user']?->name ?? 'النظام';
-        
+
         // Set thermal defaults
         $thermalWidth = (float) ($this->appSettings?->thermal_printer_width ?? 76);
         $this->setThermalDefaults($thermalWidth);
-        
+
         // Set custom margins
         $this->SetMargins(5, 20, 5); // Left, Top, Right margins
-        
+
+        // Performance optimizations for images
+        $this->setCompression(true);           // Compress content streams
+        $this->setImageScale(1.25);            // Reasonable image DPI scaling
+        $this->setJPEGQuality(80);             // Balance quality/performance
+        // $this->setPngCompression(9);
         // Set font and alignment properties
         $this->fontName = 'ae_alhor'; // Use the converted Arabic font
         $this->setRTL(true);
@@ -61,7 +66,7 @@ class LabThermalReceipt extends MyCustomTCPDF
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $this->visit->patient->name);
         $pdfFileName = 'LabReceipt_Visit_' . $this->visit->id . '_' . $patientNameSanitized . '.pdf';
-        
+
         return $this->Output($pdfFileName, 'S');
     }
 
@@ -69,17 +74,36 @@ class LabThermalReceipt extends MyCustomTCPDF
     {
         // Logo
         $logoData = null;
-        if ($this->appSettings?->logo_base64 && str_starts_with($this->appSettings->logo_base64, 'data:image')) {
+        if ($this->appSettings?->header_base64) {
             try {
-                $logoData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $this->appSettings->logo_base64));
+                $originalImageData = null;
+
+                // Check if it's a file path
+                if (file_exists($this->appSettings->header_base64)) {
+                    $originalImageData = file_get_contents($this->appSettings->header_base64);
+                }
+                // Check if it's base64 data with data URI scheme
+                elseif (str_starts_with($this->appSettings->header_base64, 'data:image')) {
+                    $originalImageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $this->appSettings->header_base64));
+                }
+                // Check if it's raw base64 encoded string
+                elseif (base64_decode($this->appSettings->header_base64, true) !== false) {
+                    $originalImageData = base64_decode($this->appSettings->header_base64);
+                }
+
+                // Optimize the image for better performance
+                if ($originalImageData) {
+                    $logoData = $this->optimizeImage($originalImageData);
+                }
             } catch (\Exception $e) {
                 // Logo data invalid, continue without logo
             }
         }
 
         if ($logoData) {
-            $this->Image('@' . $logoData, '', (float)($this->GetY() + 1), 15, 0, '', '', 'T', false, 300, $this->alignCenter, false, false, (float)0, false, false, false);
+            $this->Image('@' . $logoData, '', 5, 30, 0, '', '', 'T', false, 300, $this->alignCenter, false, false, (float)0, false, false, false);
             $this->Ln($logoData ? 10 : 1);
+            $this->Ln(15);
         }
 
         // Hospital/Lab name
@@ -106,38 +130,38 @@ class LabThermalReceipt extends MyCustomTCPDF
     protected function generateReceiptInfo(): void
     {
         $this->SetFont($this->fontName, 'B', 12);
-        
+
         // Patient name (first line, left aligned)
-        $this->Cell(0, $this->lineHeight + 1, 'الاسم / '.$this->visit->patient->name, 0, 1, $this->alignStart);
-        
+        $this->Cell(0, $this->lineHeight + 1, 'الاسم / ' . $this->visit->patient->name, 0, 1, $this->alignStart);
+
         // Doctor name (second line, left aligned)
         // if ($this->visit->doctor) {
         //     $this->SetFont($this->fontName, '', 12);
         //     $this->Cell(0, $this->lineHeight, 'اسم الطبيب/ '.$this->visit->doctor->name, 0, 1, $this->alignStart);
         // }
         $this->Ln(5);
-        
+
         // Visit number in the middle and date on the right
         $this->SetFont($this->fontName, 'B', 13);
         $visitNumber = "ID " . $this->visit->patient->visit_number;
         $date = Carbon::now()->format('Y/m/d H:i A') . ' التاريخ ';
-        
+
         // Calculate positions for center and right alignment
         $pageWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
         $visitNumberWidth = $this->GetStringWidth($visitNumber);
         $dateWidth = $this->GetStringWidth($date);
-        
+
         // Position visit number in center
         $centerX = ($pageWidth - $visitNumberWidth) / 2;
         $this->SetX($this->getMargins()['left'] + $centerX);
         $this->Cell($visitNumberWidth, $this->lineHeight, $visitNumber, 0, 0, 'C');
-        
+
         $this->Ln(10);
         $this->SetFont($this->fontName, '', size: 7);
         // Position date on the right
         // $this->SetX($this->getMargins()['left'] + $pageWidth - $dateWidth);
         $this->Cell(0, $this->lineHeight, $date, 0, 1, 'L');
-        
+
         $this->Ln(5);
 
         // Company details (if present) - shown after date
@@ -177,18 +201,18 @@ class LabThermalReceipt extends MyCustomTCPDF
     {
         // Always generate barcode using visit ID
         $barcodeValue = (string) $this->visit->id;
-        
+
         // Add some space before barcode
         $this->Ln(3);
-        
+
         // Calculate center position for barcode
         $pageWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
         $barcodeWidth = 50; // Width of the barcode
         $centerX = ($pageWidth - $barcodeWidth) / 2;
-        
+
         // Set position to center the barcode
         $this->SetX($this->getMargins()['left'] + $centerX);
-        
+
         $style = [
             'position' => '',
             'align' => 'C',
@@ -205,10 +229,10 @@ class LabThermalReceipt extends MyCustomTCPDF
             'fontsize' => 8,
             'stretchtext' => 4
         ];
-        
+
         // Generate the barcode
         $this->write1DBarcode($barcodeValue, 'C128B', $barcodeWidth, '', '', (float)15, (float)0.3, $style, 'N');
-        
+
         // Add visit ID text below barcode
         $this->Ln(2);
         $this->SetFont($this->fontName, '', 8);
@@ -217,7 +241,7 @@ class LabThermalReceipt extends MyCustomTCPDF
         $textCenterX = ($pageWidth - $textWidth) / 2;
         $this->SetX($this->getMargins()['left'] + $textCenterX);
         $this->Cell($textWidth, $this->lineHeight, $visitIdText, 0, 1, 'C');
-        
+
         $this->Ln(3);
         $this->Cell(0, 0.1, '', 'T', 1, 'C');
         $this->Ln(0.5);
@@ -235,18 +259,18 @@ class LabThermalReceipt extends MyCustomTCPDF
         foreach ($this->labRequestsToPrint as $lr) {
             $testName = $lr['main_test']['main_test_name'] ?? 'فحص غير معروف';
             $quantity = (int) ($lr['count'] ?? 1);
-            
+
             // Add quantity if more than 1
             if ($quantity > 1) {
                 $testName .= " (×{$quantity})";
             }
-            
+
             $testNames[] = $testName;
         }
 
         // Join test names with commas and display in full width
         $allTestsText = implode('، ', $testNames);
-        
+
         $this->SetFont($this->fontName, '', 7);
         $pageUsableWidth = $this->getPageWidth() - $this->getMargins()['right'];
         $this->MultiCell(0, $this->lineHeight, $allTestsText, 0, 'L', false, 1);
@@ -284,7 +308,7 @@ class LabThermalReceipt extends MyCustomTCPDF
 
         // Display totals - simplified version
         $this->drawThermalTotalRow('الإجمالي:', $subTotalLab, $pageUsableWidth);
-        
+
         // Only show discount if there's actually a discount
         if ($hasDiscount && $totalDiscountOnLab > 0) {
             $this->drawThermalTotalRow('الخصم:', -$totalDiscountOnLab, $pageUsableWidth);
@@ -324,5 +348,79 @@ class LabThermalReceipt extends MyCustomTCPDF
 
         $this->Cell($labelWidth, $this->lineHeight, $label, 0, 0, $this->alignStart);
         $this->Cell($amountWidth, $this->lineHeight, number_format($amount, 2), 0, 1, $this->alignEnd);
+    }
+
+    /**
+     * Optimize image for PDF embedding using GD library - resize and convert to JPEG
+     * 
+     * @param string $imageData Raw image data
+     * @return string|null Optimized image data or null on failure
+     */
+    protected function optimizeImage(string $imageData): ?string
+    {
+        // Check if GD extension is available
+        if (!extension_loaded('gd')) {
+            return $imageData; // Return original if GD is not available
+        }
+
+        try {
+            // Create image from string using GD
+            $image = @imagecreatefromstring($imageData);
+            if (!$image) {
+                return $imageData; // Return original if we can't process it
+            }
+
+            // Get original dimensions
+            $originalWidth = imagesx($image);
+            $originalHeight = imagesy($image);
+
+            // Target max width for thermal receipt (300px is more than enough for 15mm display)
+            $maxWidth = 300;
+
+            // Only resize if image is larger than max width
+            if ($originalWidth > $maxWidth) {
+                $ratio = $maxWidth / $originalWidth;
+                $newWidth = $maxWidth;
+                $newHeight = (int)($originalHeight * $ratio);
+
+                // Create new resized image with GD
+                $resizedImage = imagecreatetruecolor($newWidth, $newHeight);
+
+                if (!$resizedImage) {
+                    imagedestroy($image);
+                    return $imageData;
+                }
+
+                // Fill with white background (better for JPEG conversion)
+                $white = imagecolorallocate($resizedImage, 255, 255, 255);
+                imagefill($resizedImage, 0, 0, $white);
+
+                // Enable alpha blending for better quality
+                imagealphablending($resizedImage, true);
+
+                // High-quality resampling using GD
+                imagecopyresampled($resizedImage, $image, 0, 0, 0, 0, $newWidth, $newHeight, $originalWidth, $originalHeight);
+
+                // Free original image memory
+                imagedestroy($image);
+                $image = $resizedImage;
+            }
+
+            // Enable interlaced JPEG for progressive loading
+            imageinterlace($image, 1);
+
+            // Convert to JPEG with compression using GD
+            ob_start();
+            imagejpeg($image, null, 80); // 80% quality - good balance
+            $optimizedData = ob_get_clean();
+
+            // Free image memory
+            imagedestroy($image);
+
+            return $optimizedData ?: $imageData;
+        } catch (\Exception $e) {
+            // If optimization fails, return original image data
+            return $imageData;
+        }
     }
 }
