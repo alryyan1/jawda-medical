@@ -1,0 +1,1950 @@
+{
+    "account_categories": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "account_hierarchy": {
+        "dependencies": [
+            "finance_accounts"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "child_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "account_hierarchy_child_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "parent_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "account_hierarchy_parent_id_foreign"
+            }
+        ]
+    },
+    "acon_cbc_parameters": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "acon_cbc_results": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "admission_deposits": {
+        "dependencies": [
+            "admissions",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "admission_id",
+                "REFERENCED_TABLE_NAME": "admissions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_deposits_admission_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_deposits_user_id_foreign"
+            }
+        ]
+    },
+    "admission_requested_lab_tests": {
+        "dependencies": [
+            "admissions",
+            "doctors",
+            "main_tests",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "admission_id",
+                "REFERENCED_TABLE_NAME": "admissions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_lab_tests_admission_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_lab_tests_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "main_test_id",
+                "REFERENCED_TABLE_NAME": "main_tests",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_lab_tests_main_test_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_lab_tests_user_id_foreign"
+            }
+        ]
+    },
+    "admission_requested_service_costs": {
+        "dependencies": [
+            "service_cost",
+            "sub_service_costs"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "service_cost_id",
+                "REFERENCED_TABLE_NAME": "service_cost",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_service_costs_service_cost_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "sub_service_cost_id",
+                "REFERENCED_TABLE_NAME": "sub_service_costs",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_service_costs_sub_service_cost_id_foreign"
+            }
+        ]
+    },
+    "admission_requested_service_deposits": {
+        "dependencies": [
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_service_deposits_user_id_foreign"
+            }
+        ]
+    },
+    "admission_requested_services": {
+        "dependencies": [
+            "admissions",
+            "doctors",
+            "services",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "admission_id",
+                "REFERENCED_TABLE_NAME": "admissions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_services_admission_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_services_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "service_id",
+                "REFERENCED_TABLE_NAME": "services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_services_service_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_deposited",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_services_user_deposited_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_requested_services_user_id_foreign"
+            }
+        ]
+    },
+    "admission_transactions": {
+        "dependencies": [
+            "admissions",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "admission_id",
+                "REFERENCED_TABLE_NAME": "admissions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_transactions_admission_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_transactions_user_id_foreign"
+            }
+        ]
+    },
+    "admission_vital_signs": {
+        "dependencies": [
+            "admissions",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "admission_id",
+                "REFERENCED_TABLE_NAME": "admissions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_vital_signs_admission_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admission_vital_signs_user_id_foreign"
+            }
+        ]
+    },
+    "admissions": {
+        "dependencies": {
+            "0": "beds",
+            "1": "doctors",
+            "2": "patients",
+            "3": "rooms",
+            "5": "users",
+            "6": "wards"
+        },
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "bed_id",
+                "REFERENCED_TABLE_NAME": "beds",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admissions_bed_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admissions_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admissions_patient_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "room_id",
+                "REFERENCED_TABLE_NAME": "rooms",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admissions_room_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "specialist_doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admissions_specialist_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admissions_user_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "ward_id",
+                "REFERENCED_TABLE_NAME": "wards",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "admissions_ward_id_foreign"
+            }
+        ]
+    },
+    "appointments": {
+        "dependencies": [
+            "doctors",
+            "doctor_schedules",
+            "doctorvisits"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "appointments_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "doctor_schedule_id",
+                "REFERENCED_TABLE_NAME": "doctor_schedules",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "appointments_doctor_schedule_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "doctorvisit_id",
+                "REFERENCED_TABLE_NAME": "doctorvisits",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "appointments_doctorvisit_id_foreign"
+            }
+        ]
+    },
+    "attendance_settings": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "attendances": {
+        "dependencies": [
+            "users",
+            "shifts_definitions"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "recorded_by_user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "attendances_recorded_by_user_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "shift_definition_id",
+                "REFERENCED_TABLE_NAME": "shifts_definitions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "attendances_shift_definition_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "supervisor_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "attendances_supervisor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "attendances_user_id_foreign"
+            }
+        ]
+    },
+    "audited_patient_records": {
+        "dependencies": [
+            "users",
+            "doctorvisits",
+            "company_relations",
+            "doctors",
+            "subcompanies",
+            "patients"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "audited_by_user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_patient_records_audited_by_user_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "doctor_visit_id",
+                "REFERENCED_TABLE_NAME": "doctorvisits",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_patient_records_doctor_visit_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "edited_company_relation_id",
+                "REFERENCED_TABLE_NAME": "company_relations",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_patient_records_edited_company_relation_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "edited_doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_patient_records_edited_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "edited_subcompany_id",
+                "REFERENCED_TABLE_NAME": "subcompanies",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_patient_records_edited_subcompany_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_patient_records_patient_id_foreign"
+            }
+        ]
+    },
+    "audited_requested_services": {
+        "dependencies": [
+            "audited_patient_records",
+            "requested_services",
+            "services"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "audited_patient_record_id",
+                "REFERENCED_TABLE_NAME": "audited_patient_records",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_requested_services_audited_patient_record_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "original_requested_service_id",
+                "REFERENCED_TABLE_NAME": "requested_services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_requested_services_original_requested_service_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "service_id",
+                "REFERENCED_TABLE_NAME": "services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "audited_requested_services_service_id_foreign"
+            }
+        ]
+    },
+    "balance_sheet_statements": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "bankak_images": {
+        "dependencies": [
+            "doctorvisits"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctorvisit_id",
+                "REFERENCED_TABLE_NAME": "doctorvisits",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "bankak_images_doctorvisit_id_foreign"
+            }
+        ]
+    },
+    "banks": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "beds": {
+        "dependencies": [
+            "rooms"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "room_id",
+                "REFERENCED_TABLE_NAME": "rooms",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "beds_room_id_foreign"
+            }
+        ]
+    },
+    "cash_tally": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "cbc5_bindings": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "cbc_bindings": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "chemistry_bindings": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "chief_complain": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "child_groups": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "child_test_devices": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "child_test_options": {
+        "dependencies": [
+            "child_tests"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "child_test_id",
+                "REFERENCED_TABLE_NAME": "child_tests",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "child_test_options_child_test_id_foreign"
+            }
+        ]
+    },
+    "child_tests": {
+        "dependencies": [
+            "child_groups",
+            "units"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "child_group_id",
+                "REFERENCED_TABLE_NAME": "child_groups",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "child_tests_child_group_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "unit_id",
+                "REFERENCED_TABLE_NAME": "units",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "child_tests_unit_id_foreign"
+            }
+        ]
+    },
+    "client_payments": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "clients": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "companies": {
+        "dependencies": [
+            "finance_accounts"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "finance_account_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "companies_finance_account_id_foreign"
+            }
+        ]
+    },
+    "company_main_test": {
+        "dependencies": [
+            "companies",
+            "main_tests"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "company_id",
+                "REFERENCED_TABLE_NAME": "companies",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "company_main_test_company_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "main_test_id",
+                "REFERENCED_TABLE_NAME": "main_tests",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "company_main_test_main_test_id_foreign"
+            }
+        ]
+    },
+    "company_relations": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "company_service": {
+        "dependencies": [
+            "companies",
+            "services"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "company_id",
+                "REFERENCED_TABLE_NAME": "companies",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "company_service_company_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "service_id",
+                "REFERENCED_TABLE_NAME": "services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "company_service_service_id_foreign"
+            }
+        ]
+    },
+    "containers": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "contract_states": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "contracts": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "cost_categories": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "cost_order": {
+        "dependencies": {
+            "0": "service_cost",
+            "2": "services",
+            "3": "sub_service_costs"
+        },
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "service_cost_id",
+                "REFERENCED_TABLE_NAME": "service_cost",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "cost_order_service_cost_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "service_cost_item",
+                "REFERENCED_TABLE_NAME": "service_cost",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "cost_order_service_cost_item_foreign"
+            },
+            {
+                "COLUMN_NAME": "service_id",
+                "REFERENCED_TABLE_NAME": "services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "cost_order_service_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "sub_service_cost_id",
+                "REFERENCED_TABLE_NAME": "sub_service_costs",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "cost_order_sub_service_cost_id_foreign"
+            }
+        ]
+    },
+    "costs": {
+        "dependencies": [
+            "doctor_shifts",
+            "shifts",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_shift_id",
+                "REFERENCED_TABLE_NAME": "doctor_shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "costs_doctor_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "shift_id",
+                "REFERENCED_TABLE_NAME": "shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "costs_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_cost",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "costs_user_cost_foreign"
+            }
+        ]
+    },
+    "countings": {
+        "dependencies": [
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "countings_user_id_foreign"
+            }
+        ]
+    },
+    "countries": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "credit_entries": {
+        "dependencies": [
+            "finance_accounts",
+            "finance_entries"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "finance_account_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "credit_entries_finance_account_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "finance_entry_id",
+                "REFERENCED_TABLE_NAME": "finance_entries",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "credit_entries_finance_entry_id_foreign"
+            }
+        ]
+    },
+    "debit_entries": {
+        "dependencies": [
+            "finance_accounts",
+            "finance_entries"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "finance_account_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "debit_entries_finance_account_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "finance_entry_id",
+                "REFERENCED_TABLE_NAME": "finance_entries",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "debit_entries_finance_entry_id_foreign"
+            }
+        ]
+    },
+    "debits": {
+        "dependencies": [
+            "clients",
+            "deducts",
+            "payment_types"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "client_id",
+                "REFERENCED_TABLE_NAME": "clients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "debits_client_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "deduct_id",
+                "REFERENCED_TABLE_NAME": "deducts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "debits_deduct_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "payment_type_id",
+                "REFERENCED_TABLE_NAME": "payment_types",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "debits_payment_type_id_foreign"
+            }
+        ]
+    },
+    "deducted_items": {
+        "dependencies": [
+            "clients",
+            "deducts",
+            "items",
+            "shifts",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "client_id",
+                "REFERENCED_TABLE_NAME": "clients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deducted_items_client_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "deduct_id",
+                "REFERENCED_TABLE_NAME": "deducts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deducted_items_deduct_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "item_id",
+                "REFERENCED_TABLE_NAME": "items",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deducted_items_item_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "shift_id",
+                "REFERENCED_TABLE_NAME": "shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deducted_items_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deducted_items_user_id_foreign"
+            }
+        ]
+    },
+    "deducts": {
+        "dependencies": [
+            "payment_types",
+            "shifts",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "payment_type_id",
+                "REFERENCED_TABLE_NAME": "payment_types",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deducts_payment_type_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "shift_id",
+                "REFERENCED_TABLE_NAME": "shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deducts_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deducts_user_id_foreign"
+            }
+        ]
+    },
+    "denos": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "denos_users": {
+        "dependencies": [
+            "denos",
+            "shifts",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "deno_id",
+                "REFERENCED_TABLE_NAME": "denos",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "denos_users_deno_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "shift_id",
+                "REFERENCED_TABLE_NAME": "shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "denos_users_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "denos_users_user_id_foreign"
+            }
+        ]
+    },
+    "departments": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "deposit_items": {
+        "dependencies": [
+            "deposits",
+            "items",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "deposit_id",
+                "REFERENCED_TABLE_NAME": "deposits",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deposit_items_deposit_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "item_id",
+                "REFERENCED_TABLE_NAME": "items",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deposit_items_item_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deposit_items_user_id_foreign"
+            }
+        ]
+    },
+    "deposits": {
+        "dependencies": [
+            "suppliers"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "supplier_id",
+                "REFERENCED_TABLE_NAME": "suppliers",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "deposits_supplier_id_foreign"
+            }
+        ]
+    },
+    "devices": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "diagnosis": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "doctor_schedules": {
+        "dependencies": [
+            "doctors"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctor_schedules_doctor_id_foreign"
+            }
+        ]
+    },
+    "doctor_service_costs": {
+        "dependencies": [
+            "doctors",
+            "sub_service_costs"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctor_service_costs_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "sub_service_cost_id",
+                "REFERENCED_TABLE_NAME": "sub_service_costs",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctor_service_costs_sub_service_cost_id_foreign"
+            }
+        ]
+    },
+    "doctor_services": {
+        "dependencies": [
+            "doctors",
+            "services"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctor_services_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "service_id",
+                "REFERENCED_TABLE_NAME": "services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctor_services_service_id_foreign"
+            }
+        ]
+    },
+    "doctor_shifts": {
+        "dependencies": [
+            "doctors",
+            "shifts",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctor_shifts_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "shift_id",
+                "REFERENCED_TABLE_NAME": "shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctor_shifts_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctor_shifts_user_id_foreign"
+            }
+        ]
+    },
+    "doctors": {
+        "dependencies": {
+            "0": "finance_accounts",
+            "2": "specialists",
+            "3": "sub_specialists"
+        },
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "finanace_account_id_insurance",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctors_finanace_account_id_insurance_foreign"
+            },
+            {
+                "COLUMN_NAME": "finance_account_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctors_finance_account_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "specialist_id",
+                "REFERENCED_TABLE_NAME": "specialists",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctors_specialist_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "sub_specialist_id",
+                "REFERENCED_TABLE_NAME": "sub_specialists",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctors_sub_specialist_id_foreign"
+            }
+        ]
+    },
+    "doctorvisits": {
+        "dependencies": [
+            "doctor_shifts",
+            "patients"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_shift_id",
+                "REFERENCED_TABLE_NAME": "doctor_shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctorvisits_doctor_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "doctorvisits_patient_id_foreign"
+            }
+        ]
+    },
+    "drug_categories": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "drugs": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "drugs_prescribed": {
+        "dependencies": [
+            "doctors",
+            "items",
+            "patients"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "drugs_prescribed_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "item_id",
+                "REFERENCED_TABLE_NAME": "items",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "drugs_prescribed_item_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "drugs_prescribed_patient_id_foreign"
+            }
+        ]
+    },
+    "employee_skills": {
+        "dependencies": [
+            "employees",
+            "skills"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "employee_id",
+                "REFERENCED_TABLE_NAME": "employees",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "employee_skills_employee_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "skill_id",
+                "REFERENCED_TABLE_NAME": "skills",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "employee_skills_skill_id_foreign"
+            }
+        ]
+    },
+    "employees": {
+        "dependencies": [
+            "departments",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "department_id",
+                "REFERENCED_TABLE_NAME": "departments",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "employees_department_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "employees_user_id_foreign"
+            }
+        ]
+    },
+    "failed_jobs": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "files": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "finance_accounts": {
+        "dependencies": [
+            "account_categories"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "account_category_id",
+                "REFERENCED_TABLE_NAME": "account_categories",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "finance_accounts_account_category_id_foreign"
+            }
+        ]
+    },
+    "finance_entries": {
+        "dependencies": [
+            "doctor_shifts",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_shift_id",
+                "REFERENCED_TABLE_NAME": "doctor_shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "finance_entries_doctor_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_created",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "finance_entries_user_created_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_net",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "finance_entries_user_net_foreign"
+            }
+        ]
+    },
+    "hl7": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "hl7_messages": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "holidays": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "hormone": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "hormone_bindings": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "images": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "income_statement_reports": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "income_statements": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "item_barcodes": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "items": {
+        "dependencies": [
+            "drug_categories",
+            "pharmacy_types",
+            "sections"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "drug_category_id",
+                "REFERENCED_TABLE_NAME": "drug_categories",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "items_drug_category_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "pharmacy_type_id",
+                "REFERENCED_TABLE_NAME": "pharmacy_types",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "items_pharmacy_type_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "section_id",
+                "REFERENCED_TABLE_NAME": "sections",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "items_section_id_foreign"
+            }
+        ]
+    },
+    "jobs": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "lab_comment_suggestions": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "lab_finished_notifications": {
+        "dependencies": [
+            "patients"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "lab_finished_notifications_patient_id_foreign"
+            }
+        ]
+    },
+    "labrequests": {
+        "dependencies": {
+            "0": "users",
+            "2": "main_tests",
+            "3": "patients"
+        },
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "user_deposited",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "labrequests_user_deposited_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_requested",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "labrequests_user_requested_foreign"
+            },
+            {
+                "COLUMN_NAME": "main_test_id",
+                "REFERENCED_TABLE_NAME": "main_tests",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "mantest_fk_id"
+            },
+            {
+                "COLUMN_NAME": "pid",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "pid_patients_id_fk"
+            }
+        ]
+    },
+    "main_tests": {
+        "dependencies": [
+            "containers",
+            "packages"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "container_id",
+                "REFERENCED_TABLE_NAME": "containers",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "cntainer_fk"
+            },
+            {
+                "COLUMN_NAME": "pack_id",
+                "REFERENCED_TABLE_NAME": "packages",
+                "REFERENCED_COLUMN_NAME": "package_id",
+                "CONSTRAINT_NAME": "pakid_FK"
+            }
+        ]
+    },
+    "medical_drug_routes": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "mindray2": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "mindray_cbc": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "model_has_permissions": {
+        "dependencies": [
+            "permissions"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "permission_id",
+                "REFERENCED_TABLE_NAME": "permissions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "model_has_permissions_permission_id_foreign"
+            }
+        ]
+    },
+    "model_has_roles": {
+        "dependencies": [
+            "roles"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "role_id",
+                "REFERENCED_TABLE_NAME": "roles",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "model_has_roles_role_id_foreign"
+            }
+        ]
+    },
+    "new_patient_notifications": {
+        "dependencies": [
+            "patients"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "new_patient_notifications_patient_id_foreign"
+            }
+        ]
+    },
+    "nurse_notes": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "offered_tests": {
+        "dependencies": [
+            "main_tests",
+            "offers"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "main_test_id",
+                "REFERENCED_TABLE_NAME": "main_tests",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "offered_tests_main_test_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "offer_id",
+                "REFERENCED_TABLE_NAME": "offers",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "offered_tests_offer_id_foreign"
+            }
+        ]
+    },
+    "offers": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "operation_finance_items": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "operations": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "packages": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "password_reset_tokens": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "patient_medical_histories": {
+        "dependencies": [
+            "patients"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patient_medical_histories_patient_id_foreign"
+            }
+        ]
+    },
+    "patients": {
+        "dependencies": {
+            "0": "companies",
+            "1": "company_relations",
+            "2": "doctors",
+            "3": "users",
+            "4": "shifts",
+            "6": "subcompanies"
+        },
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "company_id",
+                "REFERENCED_TABLE_NAME": "companies",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patients_company_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "company_relation_id",
+                "REFERENCED_TABLE_NAME": "company_relations",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patients_company_relation_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patients_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "sample_collected_by",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patients_sample_collected_by_foreign"
+            },
+            {
+                "COLUMN_NAME": "shift_id",
+                "REFERENCED_TABLE_NAME": "shifts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patients_shift_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "specialist_doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patients_specialist_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "subcompany_id",
+                "REFERENCED_TABLE_NAME": "subcompanies",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patients_subcompany_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "patients_user_id_foreign"
+            }
+        ]
+    },
+    "payment_suppliers": {
+        "dependencies": [
+            "suppliers",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "supplier_id",
+                "REFERENCED_TABLE_NAME": "suppliers",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "payment_suppliers_supplier_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "payment_suppliers_user_id_foreign"
+            }
+        ]
+    },
+    "payment_types": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "pdf_settings": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "permissions": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "personal_access_tokens": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "petty_cash_permissions": {
+        "dependencies": [
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "financial_auditor",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "petty_cash_permissions_financial_auditor_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_approved",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "petty_cash_permissions_user_approved_foreign"
+            }
+        ]
+    },
+    "pharmacy_types": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "requested_organisms": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "requested_results": {
+        "dependencies": {
+            "0": "users",
+            "2": "labrequests",
+            "3": "main_tests",
+            "4": "patients",
+            "5": "units"
+        },
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "authorized_by_user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_results_authorized_by_user_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "entered_by_user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_results_entered_by_user_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "lab_request_id",
+                "REFERENCED_TABLE_NAME": "labrequests",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_results_lab_request_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "main_test_id",
+                "REFERENCED_TABLE_NAME": "main_tests",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_results_main_test_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_results_patient_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "unit_id",
+                "REFERENCED_TABLE_NAME": "units",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_results_unit_id_foreign"
+            }
+        ]
+    },
+    "requested_service_cost": {
+        "dependencies": [
+            "requested_services",
+            "sub_service_costs"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "requested_service_id",
+                "REFERENCED_TABLE_NAME": "requested_services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_service_cost_requested_service_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "sub_service_cost_id",
+                "REFERENCED_TABLE_NAME": "sub_service_costs",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_service_cost_sub_service_cost_id_foreign"
+            }
+        ]
+    },
+    "requested_service_deposit_deletions": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "requested_service_deposits": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "requested_services": {
+        "dependencies": [
+            "doctors",
+            "doctorvisits",
+            "services",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "doctor_id",
+                "REFERENCED_TABLE_NAME": "doctors",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_services_doctor_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "doctorvisits_id",
+                "REFERENCED_TABLE_NAME": "doctorvisits",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_services_doctorvisits_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "service_id",
+                "REFERENCED_TABLE_NAME": "services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_services_service_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_deposited",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_services_user_deposited_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "requested_services_user_id_foreign"
+            }
+        ]
+    },
+    "role_has_permissions": {
+        "dependencies": [
+            "permissions",
+            "roles"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "permission_id",
+                "REFERENCED_TABLE_NAME": "permissions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "role_has_permissions_permission_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "role_id",
+                "REFERENCED_TABLE_NAME": "roles",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "role_has_permissions_role_id_foreign"
+            }
+        ]
+    },
+    "roles": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "rooms": {
+        "dependencies": [
+            "wards"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "ward_id",
+                "REFERENCED_TABLE_NAME": "wards",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "rooms_ward_id_foreign"
+            }
+        ]
+    },
+    "routes": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "sections": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "service_cost": {
+        "dependencies": [
+            "services",
+            "sub_service_costs"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "service_id",
+                "REFERENCED_TABLE_NAME": "services",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "service_cost_service_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "sub_service_cost_id",
+                "REFERENCED_TABLE_NAME": "sub_service_costs",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "service_cost_sub_service_cost_id_foreign"
+            }
+        ]
+    },
+    "service_groups": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "services": {
+        "dependencies": [
+            "service_groups"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "service_group_id",
+                "REFERENCED_TABLE_NAME": "service_groups",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "services_service_group_id_foreign"
+            }
+        ]
+    },
+    "settings": {
+        "dependencies": [
+            "banks",
+            "finance_accounts"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "bank_id",
+                "REFERENCED_TABLE_NAME": "banks",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_bank_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "company_account_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_company_account_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "endurance_account_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_endurance_account_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "finance_account_id",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_finance_account_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "main_bank",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_main_bank_foreign"
+            },
+            {
+                "COLUMN_NAME": "main_cash",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_main_cash_foreign"
+            },
+            {
+                "COLUMN_NAME": "pharmacy_bank",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_pharmacy_bank_foreign"
+            },
+            {
+                "COLUMN_NAME": "pharmacy_cash",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_pharmacy_cash_foreign"
+            },
+            {
+                "COLUMN_NAME": "pharmacy_income",
+                "REFERENCED_TABLE_NAME": "finance_accounts",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "settings_pharmacy_income_foreign"
+            }
+        ]
+    },
+    "shifts": {
+        "dependencies": [
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "user_closed",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "shifts_user_closed_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "shifts_user_id_foreign"
+            }
+        ]
+    },
+    "shifts_definitions": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "shipping_items": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "shipping_states": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "shippings": {
+        "dependencies": [
+            "shipping_items",
+            "shipping_states"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "shipping_item_id",
+                "REFERENCED_TABLE_NAME": "shipping_items",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "shippings_shipping_item_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "shipping_state_id",
+                "REFERENCED_TABLE_NAME": "shipping_states",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "shippings_shipping_state_id_foreign"
+            }
+        ]
+    },
+    "sickleaves": {
+        "dependencies": [
+            "patients"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "patient_id",
+                "REFERENCED_TABLE_NAME": "patients",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "sickleaves_patient_id_foreign"
+            }
+        ]
+    },
+    "skills": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "specialists": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "states": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "sub_routes": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "sub_service_costs": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "sub_specialists": {
+        "dependencies": [
+            "specialists"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "specialists_id",
+                "REFERENCED_TABLE_NAME": "specialists",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "sub_specialists_specialists_id_foreign"
+            }
+        ]
+    },
+    "subcompanies": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "suggested_organisms": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "suppliers": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "sysmex": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "sysmex550": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "tooth_requested_services": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "units": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "user_default_shifts": {
+        "dependencies": [
+            "shifts_definitions",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "shift_definition_id",
+                "REFERENCED_TABLE_NAME": "shifts_definitions",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "user_default_shifts_shift_definition_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "user_default_shifts_user_id_foreign"
+            }
+        ]
+    },
+    "user_doc_selections": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "user_routes": {
+        "dependencies": [
+            "routes",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "route_id",
+                "REFERENCED_TABLE_NAME": "routes",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "user_routes_route_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "user_routes_user_id_foreign"
+            }
+        ]
+    },
+    "user_settings": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "user_sub_routes": {
+        "dependencies": [
+            "sub_routes",
+            "users"
+        ],
+        "foreign_keys": [
+            {
+                "COLUMN_NAME": "sub_route_id",
+                "REFERENCED_TABLE_NAME": "sub_routes",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "user_sub_routes_sub_route_id_foreign"
+            },
+            {
+                "COLUMN_NAME": "user_id",
+                "REFERENCED_TABLE_NAME": "users",
+                "REFERENCED_COLUMN_NAME": "id",
+                "CONSTRAINT_NAME": "user_sub_routes_user_id_foreign"
+            }
+        ]
+    },
+    "users": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "wards": {
+        "dependencies": [],
+        "foreign_keys": []
+    },
+    "whats_app_messages": {
+        "dependencies": [],
+        "foreign_keys": []
+    }
+}

@@ -64,5 +64,22 @@ class DatabaseSeeder extends Seeder
         // $this->call(UserSubRoutesTableSeeder::class);
         $this->call(SpecialistsTableSeeder::class);
         // $this->call(AccountHierarchyTableSeeder::class);
+        $this->call(AttendanceSettingsTableSeeder::class);
+        $this->call(BedsTableSeeder::class);
+        $this->call(CashTallyTableSeeder::class);
+        $this->call(ClientsTableSeeder::class);
+        $this->call(DenosTableSeeder::class);
+        $this->call(DepositsTableSeeder::class);
+        $this->call(DrugCategoriesTableSeeder::class);
+        $this->call(PackagesTableSeeder::class);
+        $this->call(PaymentTypesTableSeeder::class);
+        $this->call(PersonalAccessTokensTableSeeder::class);
+        $this->call(PharmacyTypesTableSeeder::class);
+        $this->call(RoomsTableSeeder::class);
+        $this->call(SectionsTableSeeder::class);
+        $this->call(ShiftsTableSeeder::class);
+        $this->call(SuppliersTableSeeder::class);
+        $this->call(UsersTableSeeder::class);
+        $this->call(WardsTableSeeder::class);
     }
 }

@@ -1,0 +1,2293 @@
+﻿=== ALL TABLES ===
+account_categories
+account_hierarchy
+acon_cbc_parameters
+acon_cbc_results
+admission_deposits
+admission_requested_lab_tests
+admission_requested_service_costs
+admission_requested_service_deposits
+admission_requested_services
+admission_transactions
+admission_vital_signs
+admissions
+appointments
+attendance_settings
+attendances
+audited_patient_records
+audited_requested_services
+balance_sheet_statements
+bankak_images
+banks
+beds
+cash_tally
+cbc5_bindings
+cbc_bindings
+chemistry_bindings
+chief_complain
+child_groups
+child_test_devices
+child_test_options
+child_tests
+client_payments
+clients
+companies
+company_main_test
+company_relations
+company_service
+containers
+contract_states
+contracts
+cost_categories
+cost_order
+costs
+countings
+countries
+credit_entries
+debit_entries
+debits
+deducted_items
+deducts
+denos
+denos_users
+departments
+deposit_items
+deposits
+devices
+diagnosis
+doctor_schedules
+doctor_service_costs
+doctor_services
+doctor_shifts
+doctors
+doctorvisits
+drug_categories
+drugs
+drugs_prescribed
+employee_skills
+employees
+failed_jobs
+files
+finance_accounts
+finance_entries
+hl7
+hl7_messages
+holidays
+hormone
+hormone_bindings
+images
+income_statement_reports
+income_statements
+item_barcodes
+items
+jobs
+lab_comment_suggestions
+lab_finished_notifications
+labrequests
+main_tests
+medical_drug_routes
+migrations
+mindray2
+mindray_cbc
+model_has_permissions
+model_has_roles
+new_patient_notifications
+nurse_notes
+offered_tests
+offers
+operation_finance_items
+operations
+packages
+password_reset_tokens
+patient_medical_histories
+patients
+payment_suppliers
+payment_types
+pdf_settings
+permissions
+personal_access_tokens
+petty_cash_permissions
+pharmacy_types
+requested_organisms
+requested_results
+requested_service_cost
+requested_service_deposit_deletions
+requested_service_deposits
+requested_services
+role_has_permissions
+roles
+rooms
+routes
+sections
+service_cost
+service_groups
+services
+settings
+shifts
+shifts_definitions
+shipping_items
+shipping_states
+shippings
+sickleaves
+skills
+specialists
+states
+sub_routes
+sub_service_costs
+sub_specialists
+subcompanies
+suggested_organisms
+suppliers
+sysmex
+sysmex550
+tooth_requested_services
+units
+user_default_shifts
+user_doc_selections
+user_routes
+user_settings
+user_sub_routes
+users
+wards
+whats_app_messages
+
+=== TABLE STRUCTURES WITH FOREIGN KEYS ===
+
+--- Table: account_categories ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: account_hierarchy ---
+Columns:
+  - parent_id (bigint(20) unsigned) NOT NULL
+  - child_id (bigint(20) unsigned) NOT NULL
+  - level (int(11)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - child_id -> finance_accounts(id)
+  - parent_id -> finance_accounts(id)
+
+--- Table: acon_cbc_parameters ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (varchar(255)) NULL
+  - parameter_name (varchar(255)) NOT NULL
+  - test_code (varchar(255)) NOT NULL
+  - test_name (varchar(255)) NOT NULL
+  - value (varchar(255)) NOT NULL
+  - unit (varchar(255)) NULL
+  - reference_range (varchar(255)) NULL
+  - abnormal_flag (varchar(255)) NULL
+  - status (varchar(255)) NOT NULL
+  - test_date (datetime) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: acon_cbc_results ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (varchar(255)) NULL
+  - patient_name (varchar(255)) NULL
+  - patient_dob (date) NULL
+  - patient_gender (varchar(255)) NULL
+  - device_type (varchar(255)) NOT NULL
+  - test_date (datetime) NOT NULL
+  - results (longtext) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: admission_deposits ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - admission_id (bigint(20) unsigned) NOT NULL
+  - amount (decimal(10,2)) NOT NULL
+  - is_bank (tinyint(1)) NOT NULL
+  - notes (text) NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - admission_id -> admissions(id)
+  - user_id -> users(id)
+
+--- Table: admission_requested_lab_tests ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - admission_id (bigint(20) unsigned) NOT NULL
+  - main_test_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NULL
+  - price (decimal(10,2)) NOT NULL
+  - discount (decimal(10,2)) NOT NULL
+  - discount_per (int(11)) NOT NULL
+  - done (tinyint(1)) NOT NULL
+  - approval (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - admission_id -> admissions(id)
+  - doctor_id -> doctors(id)
+  - main_test_id -> main_tests(id)
+  - user_id -> users(id)
+
+--- Table: admission_requested_service_costs ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - admission_requested_service_id (bigint(20) unsigned) NOT NULL
+  - service_cost_id (bigint(20) unsigned) NOT NULL
+  - sub_service_cost_id (bigint(20) unsigned) NULL
+  - amount (decimal(10,2)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - service_cost_id -> service_cost(id)
+  - sub_service_cost_id -> sub_service_costs(id)
+
+--- Table: admission_requested_service_deposits ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - admission_requested_service_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - amount (decimal(10,2)) NOT NULL
+  - is_bank (tinyint(1)) NOT NULL
+  - notes (text) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - user_id -> users(id)
+
+--- Table: admission_requested_services ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - admission_id (bigint(20) unsigned) NOT NULL
+  - service_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - user_deposited (bigint(20) unsigned) NULL
+  - doctor_id (bigint(20) unsigned) NULL
+  - price (decimal(10,2)) NOT NULL
+  - endurance (decimal(10,2)) NOT NULL
+  - discount (decimal(10,2)) NOT NULL
+  - discount_per (int(11)) NOT NULL
+  - count (int(11)) NOT NULL
+  - doctor_note (text) NULL
+  - nurse_note (text) NULL
+  - done (tinyint(1)) NOT NULL
+  - approval (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - admission_id -> admissions(id)
+  - doctor_id -> doctors(id)
+  - service_id -> services(id)
+  - user_deposited -> users(id)
+  - user_id -> users(id)
+
+--- Table: admission_transactions ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - admission_id (bigint(20) unsigned) NOT NULL
+  - type (enum('debit','credit')) NOT NULL
+  - amount (decimal(10,2)) NOT NULL
+  - description (varchar(255)) NOT NULL
+  - reference_type (varchar(255)) NULL
+  - reference_id (bigint(20) unsigned) NULL
+  - is_bank (tinyint(1)) NOT NULL
+  - notes (text) NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - admission_id -> admissions(id)
+  - user_id -> users(id)
+
+--- Table: admission_vital_signs ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - admission_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - reading_date (date) NOT NULL
+  - reading_time (time) NOT NULL
+  - temperature (decimal(5,2)) NULL
+  - blood_pressure_systolic (int(11)) NULL
+  - blood_pressure_diastolic (int(11)) NULL
+  - oxygen_saturation (decimal(5,2)) NULL
+  - oxygen_flow (decimal(5,2)) NULL
+  - pulse_rate (int(11)) NULL
+  - notes (text) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - admission_id -> admissions(id)
+  - user_id -> users(id)
+
+--- Table: admissions ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - ward_id (bigint(20) unsigned) NOT NULL
+  - room_id (bigint(20) unsigned) NOT NULL
+  - bed_id (bigint(20) unsigned) NOT NULL
+  - admission_date (date) NOT NULL
+  - admission_time (time) NULL
+  - discharge_date (date) NULL
+  - discharge_time (time) NULL
+  - admission_type (varchar(255)) NULL
+  - admission_reason (text) NULL
+  - diagnosis (text) NULL
+  - provisional_diagnosis (text) NULL
+  - operations (text) NULL
+  - medical_history (text) NULL
+  - current_medications (text) NULL
+  - referral_source (varchar(255)) NULL
+  - expected_discharge_date (date) NULL
+  - next_of_kin_name (varchar(255)) NULL
+  - next_of_kin_relation (varchar(255)) NULL
+  - next_of_kin_phone (varchar(255)) NULL
+  - status (enum('admitted','discharged','transferred')) NOT NULL
+  - doctor_id (bigint(20) unsigned) NULL
+  - specialist_doctor_id (bigint(20) unsigned) NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - notes (text) NULL
+  - initial_deposit (decimal(10,2)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - bed_id -> beds(id)
+  - doctor_id -> doctors(id)
+  - patient_id -> patients(id)
+  - room_id -> rooms(id)
+  - specialist_doctor_id -> doctors(id)
+  - user_id -> users(id)
+  - ward_id -> wards(id)
+
+--- Table: appointments ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NOT NULL
+  - doctorvisit_id (bigint(20) unsigned) NULL
+  - doctor_schedule_id (bigint(20) unsigned) NULL
+  - appointment_date (date) NOT NULL
+  - appointment_time (time) NOT NULL
+  - notes (text) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - status (varchar(255)) NOT NULL
+Foreign Keys:
+  - doctor_id -> doctors(id)
+  - doctor_schedule_id -> doctor_schedules(id)
+  - doctorvisit_id -> doctorvisits(id)
+
+--- Table: attendance_settings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - number_of_shifts_per_day (tinyint(4)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: attendances ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - shift_definition_id (bigint(20) unsigned) NOT NULL
+  - attendance_date (date) NOT NULL
+  - status (enum('present','absent','late_present','early_leave','on_leave','holiday','off_day','sick_leave')) NOT NULL
+  - check_in_time (datetime) NULL
+  - check_out_time (datetime) NULL
+  - supervisor_id (bigint(20) unsigned) NULL
+  - notes (text) NULL
+  - recorded_by_user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - recorded_by_user_id -> users(id)
+  - shift_definition_id -> shifts_definitions(id)
+  - supervisor_id -> users(id)
+  - user_id -> users(id)
+
+--- Table: audited_patient_records ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - doctor_visit_id (bigint(20) unsigned) NOT NULL
+  - audited_by_user_id (bigint(20) unsigned) NULL
+  - audited_at (timestamp) NULL
+  - status (enum('pending_review','verified','needs_correction','rejected')) NOT NULL
+  - auditor_notes (text) NULL
+  - original_patient_data_snapshot (longtext) NULL
+  - edited_patient_name (varchar(255)) NULL
+  - edited_phone (varchar(25)) NULL
+  - edited_gender (enum('male','female','other')) NULL
+  - edited_age_year (int(11)) NULL
+  - edited_age_month (int(11)) NULL
+  - edited_age_day (int(11)) NULL
+  - edited_address (text) NULL
+  - edited_doctor_id (bigint(20) unsigned) NULL
+  - edited_insurance_no (varchar(255)) NULL
+  - edited_expire_date (date) NULL
+  - edited_guarantor (varchar(255)) NULL
+  - edited_subcompany_id (bigint(20) unsigned) NULL
+  - edited_company_relation_id (bigint(20) unsigned) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - audited_by_user_id -> users(id)
+  - doctor_visit_id -> doctorvisits(id)
+  - edited_company_relation_id -> company_relations(id)
+  - edited_doctor_id -> doctors(id)
+  - edited_subcompany_id -> subcompanies(id)
+  - patient_id -> patients(id)
+
+--- Table: audited_requested_services ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - audited_patient_record_id (bigint(20) unsigned) NOT NULL
+  - original_requested_service_id (bigint(20) unsigned) NULL
+  - service_id (bigint(20) unsigned) NOT NULL
+  - audited_price (decimal(15,2)) NOT NULL
+  - audited_count (int(11)) NOT NULL
+  - audited_discount_per (decimal(5,2)) NOT NULL
+  - audited_discount_fixed (decimal(15,2)) NOT NULL
+  - audited_endurance (decimal(15,2)) NOT NULL
+  - audited_status (enum('pending_review','approved_for_claim','rejected_by_auditor','needs_edits','cancelled_by_auditor')) NOT NULL
+  - auditor_notes_for_service (text) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - audited_patient_record_id -> audited_patient_records(id)
+  - original_requested_service_id -> requested_services(id)
+  - service_id -> services(id)
+
+--- Table: balance_sheet_statements ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - assets (longtext) NOT NULL
+  - obligations (longtext) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: bankak_images ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - image_url (varchar(255)) NOT NULL
+  - doctorvisit_id (bigint(20) unsigned) NULL
+  - phone (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - doctorvisit_id -> doctorvisits(id)
+
+--- Table: banks ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: beds ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - room_id (bigint(20) unsigned) NOT NULL
+  - bed_number (varchar(255)) NOT NULL
+  - status (enum('available','occupied','maintenance')) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - room_id -> rooms(id)
+
+--- Table: cash_tally ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: cbc5_bindings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - child_id_array (varchar(255)) NOT NULL
+  - name_in_sysmex_table (varchar(255)) NOT NULL
+
+--- Table: cbc_bindings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - child_id_array (varchar(255)) NOT NULL
+  - name_in_sysmex_table (varchar(255)) NOT NULL
+
+--- Table: chemistry_bindings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - child_id_array (varchar(255)) NULL
+  - name_in_mindray_table (varchar(255)) NOT NULL
+
+--- Table: chief_complain ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: child_groups ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: child_test_devices ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - child_test_id (bigint(20) unsigned) NOT NULL
+  - device_id (bigint(20) unsigned) NOT NULL
+  - normal_range (varchar(255)) NOT NULL
+
+--- Table: child_test_options ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - child_test_id (bigint(20) unsigned) NOT NULL
+Foreign Keys:
+  - child_test_id -> child_tests(id)
+
+--- Table: child_tests ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - child_test_name (varchar(70)) NOT NULL
+  - json_params (longtext) NULL
+  - low (double) NULL
+  - upper (double) NULL
+  - lower_limit (double(8,2)) NULL
+  - mean (double(8,2)) NULL
+  - upper_limit (double(8,2)) NULL
+  - main_test_id (bigint(20) unsigned) NOT NULL
+  - defval (text) NOT NULL
+  - unit_id (bigint(20) unsigned) NULL
+  - normalRange (text) NOT NULL
+  - max (decimal(8,2)) NULL
+  - lowest (decimal(8,2)) NULL
+  - test_order (int(11)) NULL
+  - child_group_id (bigint(20) unsigned) NULL
+Foreign Keys:
+  - child_group_id -> child_groups(id)
+  - unit_id -> units(id)
+
+--- Table: client_payments ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - amount (decimal(8,2)) NOT NULL
+  - client_id (bigint(20) unsigned) NOT NULL
+  - payment_date (date) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: clients ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - phone (varchar(10)) NOT NULL
+  - address (varchar(255)) NOT NULL
+  - email (varchar(255)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: companies ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - lab_endurance (double(8,2)) NOT NULL
+  - service_endurance (double(8,2)) NOT NULL
+  - status (tinyint(1)) NOT NULL
+  - lab_roof (int(11)) NOT NULL
+  - service_roof (int(11)) NOT NULL
+  - phone (varchar(255)) NOT NULL
+  - email (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - finance_account_id (bigint(20) unsigned) NULL
+  - lab2lab_firestore_id (varchar(255)) NULL
+Foreign Keys:
+  - finance_account_id -> finance_accounts(id)
+
+--- Table: company_main_test ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - main_test_id (bigint(20) unsigned) NOT NULL
+  - company_id (bigint(20) unsigned) NOT NULL
+  - status (tinyint(1)) NOT NULL
+  - price (double(8,2)) NOT NULL
+  - approve (tinyint(1)) NOT NULL
+  - endurance_static (int(11)) NOT NULL
+  - endurance_percentage (double(8,2)) NOT NULL
+  - use_static (tinyint(1)) NOT NULL
+Foreign Keys:
+  - company_id -> companies(id)
+  - main_test_id -> main_tests(id)
+
+--- Table: company_relations ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - lab_endurance (double(8,2)) NOT NULL
+  - service_endurance (double(8,2)) NOT NULL
+  - company_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: company_service ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - service_id (bigint(20) unsigned) NOT NULL
+  - company_id (bigint(20) unsigned) NOT NULL
+  - price (double(12,2)) NOT NULL
+  - static_endurance (double(8,2)) NOT NULL
+  - percentage_endurance (double(8,2)) NOT NULL
+  - static_wage (double(8,2)) NOT NULL
+  - percentage_wage (double(8,2)) NOT NULL
+  - use_static (tinyint(1)) NOT NULL
+  - approval (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - company_id -> companies(id)
+  - service_id -> services(id)
+
+--- Table: containers ---
+Columns:
+  - id (int(11)) NOT NULL
+  - container_name (varchar(50)) NOT NULL
+
+--- Table: contract_states ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - contract_id (bigint(20) unsigned) NOT NULL
+  - state_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: contracts ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - tenant_name (varchar(255)) NOT NULL
+  - room_no (varchar(255)) NOT NULL
+  - building_no (varchar(255)) NOT NULL
+  - checklist (tinyint(1)) NOT NULL
+  - notes (varchar(255)) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: cost_categories ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: cost_order ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - service_id (bigint(20) unsigned) NOT NULL
+  - service_cost_id (bigint(20) unsigned) NULL
+  - service_cost_item (bigint(20) unsigned) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - sub_service_cost_id (bigint(20) unsigned) NOT NULL
+Foreign Keys:
+  - service_cost_id -> service_cost(id)
+  - service_cost_item -> service_cost(id)
+  - service_id -> services(id)
+  - sub_service_cost_id -> sub_service_costs(id)
+
+--- Table: costs ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - shift_id (bigint(20) unsigned) NOT NULL
+  - user_cost (bigint(20) unsigned) NULL
+  - doctor_shift_id (bigint(20) unsigned) NULL
+  - description (varchar(255)) NULL
+  - comment (varchar(255)) NULL
+  - amount (int(11)) NOT NULL
+  - doctor_shift_id_for_sub_cost (int(11)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - cost_category_id (bigint(20) unsigned) NULL
+  - amount_bankak (int(11)) NOT NULL
+Foreign Keys:
+  - doctor_shift_id -> doctor_shifts(id)
+  - shift_id -> shifts(id)
+  - user_cost -> users(id)
+
+--- Table: countings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - user_id -> users(id)
+
+--- Table: countries ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: credit_entries ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - finance_account_id (bigint(20) unsigned) NOT NULL
+  - finance_entry_id (bigint(20) unsigned) NOT NULL
+  - amount (double) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - finance_account_id -> finance_accounts(id)
+  - finance_entry_id -> finance_entries(id)
+
+--- Table: debit_entries ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - finance_account_id (bigint(20) unsigned) NOT NULL
+  - finance_entry_id (bigint(20) unsigned) NOT NULL
+  - amount (double) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - finance_account_id -> finance_accounts(id)
+  - finance_entry_id -> finance_entries(id)
+
+--- Table: debits ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - deduct_id (bigint(20) unsigned) NULL
+  - client_id (bigint(20) unsigned) NOT NULL
+  - payment_type_id (bigint(20) unsigned) NOT NULL
+  - paid_amount (double) NOT NULL
+  - notes (longtext) NULL
+  - paid_date (date) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - client_id -> clients(id)
+  - deduct_id -> deducts(id)
+  - payment_type_id -> payment_types(id)
+
+--- Table: deducted_items ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - shift_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - deduct_id (bigint(20) unsigned) NOT NULL
+  - item_id (bigint(20) unsigned) NOT NULL
+  - client_id (bigint(20) unsigned) NULL
+  - strips (int(11)) NOT NULL
+  - box (double(8,2)) NOT NULL
+  - discount (int(11)) NOT NULL
+  - price (double(11,3)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - client_id -> clients(id)
+  - deduct_id -> deducts(id)
+  - item_id -> items(id)
+  - shift_id -> shifts(id)
+  - user_id -> users(id)
+
+--- Table: deducts ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - shift_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - payment_type_id (bigint(20) unsigned) NOT NULL
+  - complete (tinyint(1)) NOT NULL
+  - total_amount_received (double(8,2)) NOT NULL
+  - number (int(11)) NOT NULL
+  - notes (varchar(255)) NULL
+  - is_sell (tinyint(1)) NULL
+  - client_id (bigint(20) unsigned) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - is_postpaid (tinyint(1)) NOT NULL
+  - postpaid_complete (tinyint(1)) NOT NULL
+  - postpaid_date (datetime) NULL
+  - discount (double(10,3)) NOT NULL
+  - paid (double(10,3)) NOT NULL
+  - doctorvisit_id (bigint(20) unsigned) NULL
+  - endurance_percentage (double) NULL
+  - user_paid (bigint(20) unsigned) NULL
+  - payment_method (enum('cash','bankak')) NOT NULL
+  - factory_serial_no (varchar(255)) NOT NULL
+  - location (varchar(255)) NOT NULL
+  - factory_number (varchar(255)) NOT NULL
+Foreign Keys:
+  - payment_type_id -> payment_types(id)
+  - shift_id -> shifts(id)
+  - user_id -> users(id)
+
+--- Table: denos ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (int(11)) NOT NULL
+  - display_order (int(11)) NOT NULL
+
+--- Table: denos_users ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - shift_id (bigint(20) unsigned) NOT NULL
+  - deno_id (bigint(20) unsigned) NOT NULL
+  - count (int(10) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - deno_id -> denos(id)
+  - shift_id -> shifts(id)
+  - user_id -> users(id)
+
+--- Table: departments ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - location (varchar(255)) NULL
+
+--- Table: deposit_items ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - item_id (bigint(20) unsigned) NOT NULL
+  - deposit_id (bigint(20) unsigned) NOT NULL
+  - quantity (int(11)) NOT NULL
+  - cost (double) NOT NULL
+  - batch (varchar(255)) NULL
+  - expire (date) NULL
+  - notes (varchar(255)) NULL
+  - barcode (varchar(255)) NULL
+  - return (tinyint(1)) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - sell_price (double(10,3)) NOT NULL
+  - vat_cost (double(10,3)) NOT NULL
+  - vat_sell (double(10,3)) NOT NULL
+  - free_quantity (int(11)) NOT NULL
+Foreign Keys:
+  - deposit_id -> deposits(id)
+  - item_id -> items(id)
+  - user_id -> users(id)
+
+--- Table: deposits ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - supplier_id (bigint(20) unsigned) NOT NULL
+  - bill_number (varchar(255)) NOT NULL
+  - bill_date (date) NOT NULL
+  - complete (tinyint(1)) NOT NULL
+  - paid (tinyint(1)) NOT NULL
+  - user_id (bigint(20) unsigned) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - payment_method (varchar(255)) NOT NULL
+  - discount (double(10,3)) NOT NULL
+  - vat_sell (double) NOT NULL
+  - vat_cost (double) NOT NULL
+  - is_locked (tinyint(1)) NOT NULL
+  - showAll (tinyint(1)) NOT NULL
+Foreign Keys:
+  - supplier_id -> suppliers(id)
+
+--- Table: devices ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: diagnosis ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: doctor_schedules ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NOT NULL
+  - day_of_week (tinyint(3) unsigned) NOT NULL
+  - time_slot (enum('morning','evening')) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - doctor_id -> doctors(id)
+
+--- Table: doctor_service_costs ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NOT NULL
+  - sub_service_cost_id (bigint(20) unsigned) NOT NULL
+Foreign Keys:
+  - doctor_id -> doctors(id)
+  - sub_service_cost_id -> sub_service_costs(id)
+
+--- Table: doctor_services ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NOT NULL
+  - service_id (bigint(20) unsigned) NOT NULL
+  - percentage (double(8,2)) NOT NULL
+  - fixed (double(8,2)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - doctor_id -> doctors(id)
+  - service_id -> services(id)
+
+--- Table: doctor_shifts ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - shift_id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NOT NULL
+  - status (int(11)) NOT NULL
+  - start_time (timestamp) NULL
+  - end_time (timestamp) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - is_cash_revenue_prooved (tinyint(1)) NOT NULL
+  - is_cash_reclaim_prooved (tinyint(1)) NOT NULL
+  - is_company_revenue_prooved (tinyint(1)) NOT NULL
+  - is_company_reclaim_prooved (tinyint(1)) NOT NULL
+Foreign Keys:
+  - doctor_id -> doctors(id)
+  - shift_id -> shifts(id)
+  - user_id -> users(id)
+
+--- Table: doctors ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - firebase_id (varchar(255)) NULL
+  - phone (varchar(255)) NOT NULL
+  - cash_percentage (double) NOT NULL
+  - company_percentage (double) NOT NULL
+  - static_wage (double) NOT NULL
+  - lab_percentage (double) NOT NULL
+  - is_default (tinyint(1)) NOT NULL
+  - specialist_id (bigint(20) unsigned) NOT NULL
+  - sub_specialist_id (bigint(20) unsigned) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - start (int(11)) NOT NULL
+  - image (varchar(255)) NULL
+  - finance_account_id (bigint(20) unsigned) NULL
+  - finanace_account_id_insurance (bigint(20) unsigned) NULL
+  - calc_insurance (tinyint(1)) NOT NULL
+Foreign Keys:
+  - finanace_account_id_insurance -> finance_accounts(id)
+  - finance_account_id -> finance_accounts(id)
+  - specialist_id -> specialists(id)
+  - sub_specialist_id -> sub_specialists(id)
+
+--- Table: doctorvisits ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - doctor_shift_id (bigint(20) unsigned) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - is_new (int(11)) NOT NULL
+  - number (int(11)) NOT NULL
+  - only_lab (int(11)) NOT NULL
+  - shift_id (bigint(20) unsigned) NOT NULL
+  - file_id (bigint(20) unsigned) NULL
+  - visit_date (date) NOT NULL
+  - visit_time (time) NULL
+  - status (varchar(255)) NOT NULL
+  - visit_type (varchar(255)) NULL
+  - queue_number (int(11)) NULL
+  - reason_for_visit (text) NULL
+  - visit_notes (text) NULL
+Foreign Keys:
+  - doctor_shift_id -> doctor_shifts(id)
+  - patient_id -> patients(id)
+
+--- Table: drug_categories ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: drugs ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: drugs_prescribed ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NOT NULL
+  - item_id (bigint(20) unsigned) NOT NULL
+  - course (varchar(255)) NOT NULL
+  - days (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - medical_drug_route_id (bigint(20) unsigned) NULL
+Foreign Keys:
+  - doctor_id -> doctors(id)
+  - item_id -> items(id)
+  - patient_id -> patients(id)
+
+--- Table: employee_skills ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - employee_id (bigint(20) unsigned) NOT NULL
+  - skill_id (bigint(20) unsigned) NOT NULL
+Foreign Keys:
+  - employee_id -> employees(id)
+  - skill_id -> skills(id)
+
+--- Table: employees ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - age (int(11)) NOT NULL
+  - phone (text) NOT NULL
+  - email (text) NOT NULL
+  - salary (double) NOT NULL
+  - is_manager (tinyint(1)) NOT NULL
+  - job_position (text) NULL
+  - first_contract_date (date) NULL
+  - working_hours (text) NULL
+  - department_id (bigint(20) unsigned) NULL
+  - resume (longtext) NULL
+  - address (text) NULL
+  - language (text) NULL
+  - home_work_distance (text) NULL
+  - martial_status (text) NULL
+  - number_of_children (int(11)) NULL
+  - emergency_contact_name (text) NULL
+  - emergency_contact_phone (text) NULL
+  - country_id (bigint(20) unsigned) NOT NULL
+  - passport_no (varchar(255)) NULL
+  - date_of_birth (date) NULL
+  - place_of_birth (varchar(255)) NULL
+  - non_resident (tinyint(1)) NOT NULL
+  - user_id (bigint(20) unsigned) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - department_id -> departments(id)
+  - user_id -> users(id)
+
+--- Table: failed_jobs ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - uuid (varchar(255)) NOT NULL
+  - connection (text) NOT NULL
+  - queue (text) NOT NULL
+  - payload (longtext) NOT NULL
+  - exception (longtext) NOT NULL
+  - failed_at (timestamp) NOT NULL
+
+--- Table: files ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: finance_accounts ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - account_category_id (bigint(20) unsigned) NOT NULL
+  - debit (enum('debit','credit')) NOT NULL
+  - description (varchar(255)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - type (enum('revenue','cost')) NULL
+Foreign Keys:
+  - account_category_id -> account_categories(id)
+
+--- Table: finance_entries ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - description (text) NOT NULL
+  - transfer (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - doctor_shift_id (bigint(20) unsigned) NULL
+  - user_created (bigint(20) unsigned) NULL
+  - is_net (tinyint(1)) NOT NULL
+  - user_net (bigint(20) unsigned) NULL
+  - shift_id (bigint(20) unsigned) NULL
+  - file_name (varchar(255)) NOT NULL
+  - cancel (tinyint(1)) NOT NULL
+Foreign Keys:
+  - doctor_shift_id -> doctor_shifts(id)
+  - user_created -> users(id)
+  - user_net -> users(id)
+
+--- Table: hl7 ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - msg (longtext) NOT NULL
+
+--- Table: hl7_messages ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - raw_message (text) NOT NULL
+  - device (varchar(50)) NULL
+  - message_type (varchar(10)) NULL
+  - patient_id (varchar(50)) NULL
+  - processed_at (timestamp) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: holidays ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - holiday_date (date) NOT NULL
+  - is_recurring (tinyint(1)) NOT NULL
+  - description (text) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: hormone ---
+Columns:
+  - id (int(11)) NOT NULL
+  - doctorvisit_id (varchar(11)) NOT NULL
+  - tsh (double(10,2)) NOT NULL
+  - t3 (double(10,2)) NOT NULL
+  - t4 (double(10,2)) NOT NULL
+  - fsh (double(10,2)) NOT NULL
+  - lh (double(10,2)) NOT NULL
+  - prl (double(10,2)) NOT NULL
+  - vitd (double(10,2)) NOT NULL
+  - pth (double(10,2)) NOT NULL
+  - psa (double(10,2)) NOT NULL
+  - fpsa (double(10,2)) NOT NULL
+  - ft3 (double(10,2)) NOT NULL
+  - ft4 (double(10,2)) NOT NULL
+  - ferr (double(10,2)) NOT NULL
+  - folate (double(10,2)) NOT NULL
+  - afp (double(10,2)) NOT NULL
+  - ca153 (double(10,2)) NOT NULL
+  - ca199 (double(10,2)) NOT NULL
+  - ca125 (double(10,2)) NOT NULL
+  - amh (double(10,2)) NOT NULL
+  - e2 (double(10,2)) NOT NULL
+  - prog (double(10,2)) NOT NULL
+  - testo (double(10,2)) NOT NULL
+  - bhcg (double(10,2)) NOT NULL
+  - cortiso (double(10,2)) NOT NULL
+  - cea (double(10,2)) NOT NULL
+  - hiv (double(10,2)) NOT NULL
+  - antihcv (double(10,2)) NOT NULL
+  - trop (double(10,2)) NOT NULL
+  - vb12 (double(10,2)) NOT NULL
+  - hbsag (varchar(40)) NOT NULL
+  - ana (varchar(10)) NOT NULL
+  - dsdna (varchar(10)) NOT NULL
+  - ins (double(10,1)) NOT NULL
+  - cp (double(10,1)) NOT NULL
+  - antihbc (varchar(10)) NOT NULL
+  - Anti_HBe (varchar(10)) NOT NULL
+  - HBeAg (double(10,1)) NOT NULL
+  - ccp (double(10,1)) NOT NULL
+  - CK_MB (double(10,2)) NOT NULL
+  - CMV_IgG (double(10,2)) NOT NULL
+  - CMV_IgM (double(10,2)) NOT NULL
+  - dimer (double(10,2)) NOT NULL
+  - GH (double(10,2)) NOT NULL
+  - HE4 (double(10,2)) NOT NULL
+  - HSV_IgG (double(10,2)) NOT NULL
+  - HSV_IgM (double(10,2)) NOT NULL
+  - IgA (varchar(10)) NOT NULL
+  - IgE (varchar(10)) NOT NULL
+  - IgG (varchar(10)) NOT NULL
+  - IgM (varchar(10)) NOT NULL
+  - PCT (double(10,2)) NOT NULL
+  - Rubella_IgG (double(10,2)) NOT NULL
+  - Rubella_IgM (double(10,2)) NOT NULL
+  - TOXO_IgG (double(10,2)) NOT NULL
+  - TOXO_IgM (double(10,2)) NOT NULL
+  - acth (double(10,2)) NOT NULL
+  - antihbs (varchar(10)) NOT NULL
+
+--- Table: hormone_bindings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - child_id_array (varchar(255)) NOT NULL
+  - name_in_hormone_table (varchar(255)) NOT NULL
+
+--- Table: images ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - filename (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: income_statement_reports ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - income_statement_id (bigint(20) unsigned) NOT NULL
+
+--- Table: income_statements ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - data (longtext) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: item_barcodes ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - barcode (varchar(255)) NOT NULL
+  - box (int(11)) NOT NULL
+  - expire_date (date) NOT NULL
+
+--- Table: items ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - section_id (bigint(20) unsigned) NULL
+  - name (varchar(255)) NOT NULL
+  - require_amount (int(11)) NULL
+  - initial_balance (int(11)) NOT NULL
+  - initial_price (int(11)) NOT NULL
+  - tests (int(11)) NULL
+  - expire (date) NOT NULL
+  - cost_price (double(8,3)) NOT NULL
+  - sell_price (double(8,3)) NOT NULL
+  - tax (double(8,3)) NOT NULL
+  - drug_category_id (bigint(20) unsigned) NULL
+  - pharmacy_type_id (bigint(20) unsigned) NULL
+  - barcode (varchar(255)) NULL
+  - strips (smallint(6)) NOT NULL
+  - sc_name (varchar(255)) NOT NULL
+  - market_name (varchar(255)) NOT NULL
+  - batch (varchar(255)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - unit (varchar(255)) NOT NULL
+  - active1 (varchar(255)) NOT NULL
+  - active2 (varchar(255)) NOT NULL
+  - active3 (varchar(255)) NOT NULL
+  - pack_size (varchar(255)) NOT NULL
+  - approved_rp (double(10,3)) NOT NULL
+Foreign Keys:
+  - drug_category_id -> drug_categories(id)
+  - pharmacy_type_id -> pharmacy_types(id)
+  - section_id -> sections(id)
+
+--- Table: jobs ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - queue (varchar(255)) NOT NULL
+  - payload (longtext) NOT NULL
+  - attempts (tinyint(3) unsigned) NOT NULL
+  - reserved_at (int(10) unsigned) NULL
+  - available_at (int(10) unsigned) NOT NULL
+  - created_at (int(10) unsigned) NOT NULL
+
+--- Table: lab_comment_suggestions ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - suggestion (varchar(255)) NOT NULL
+  - usage_count (int(11)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: lab_finished_notifications ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - sent (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - patient_id -> patients(id)
+
+--- Table: labrequests ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - main_test_id (bigint(20) unsigned) NOT NULL
+  - pid (bigint(20) unsigned) NOT NULL
+  - hidden (int(11)) NOT NULL
+  - is_lab2lab (int(11)) NOT NULL
+  - valid (int(11)) NOT NULL
+  - no_sample (int(11)) NOT NULL
+  - result_status (varchar(255)) NOT NULL
+  - price (double(10,1)) NOT NULL
+  - amount_paid (double(10,1)) NOT NULL
+  - discount_per (int(11)) NOT NULL
+  - is_bankak (int(11)) NOT NULL
+  - comment (text) NULL
+  - user_requested (bigint(20) unsigned) NULL
+  - user_deposited (bigint(20) unsigned) NULL
+  - approve (tinyint(1)) NOT NULL
+  - endurance (double) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - is_paid (tinyint(1)) NOT NULL
+  - doctor_visit_id (int(11)) NOT NULL
+Foreign Keys:
+  - user_deposited -> users(id)
+  - user_requested -> users(id)
+  - main_test_id -> main_tests(id)
+  - pid -> patients(id)
+
+--- Table: main_tests ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - main_test_name (varchar(70)) NOT NULL
+  - conditions (text) NULL
+  - timer (int(11)) NULL
+  - hide_unit (tinyint(1)) NOT NULL
+  - is_special_test (tinyint(1)) NOT NULL
+  - pack_id (int(11)) NULL
+  - pageBreak (tinyint(1)) NOT NULL
+  - container_id (int(11)) NOT NULL
+  - price (double(10,1)) NULL
+  - divided (tinyint(1)) NOT NULL
+  - available (tinyint(1)) NOT NULL
+Foreign Keys:
+  - container_id -> containers(id)
+  - pack_id -> packages(package_id)
+
+--- Table: medical_drug_routes ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: migrations ---
+Columns:
+  - id (int(10) unsigned) NOT NULL
+  - migration (varchar(255)) NOT NULL
+  - batch (int(11)) NOT NULL
+
+--- Table: mindray2 ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - doctorvisit_id (int(11)) NOT NULL
+  - pho (double(10,1)) NOT NULL
+  - mg (double(10,2)) NOT NULL
+  - ca (double(10,2)) NOT NULL
+  - gluh (int(11)) NOT NULL
+  - tb (double(10,1)) NOT NULL
+  - db (double(10,1)) NOT NULL
+  - alt (int(11)) NOT NULL
+  - ast (int(11)) NOT NULL
+  - crp (double(10,1)) NOT NULL
+  - alp (int(11)) NOT NULL
+  - tp (double(10,1)) NOT NULL
+  - alb (double(10,1)) NOT NULL
+  - tg (int(11)) NOT NULL
+  - ldl (int(11)) NOT NULL
+  - hdl (int(11)) NOT NULL
+  - tc (int(11)) NOT NULL
+  - crea (double(10,1)) NOT NULL
+  - uric (double(10,1)) NOT NULL
+  - urea (int(11)) NOT NULL
+  - ckmb (double(10,2)) NOT NULL
+  - ck (double(10,2)) NOT NULL
+  - ldh (double(10,2)) NOT NULL
+  - fe (double(10,2)) NOT NULL
+  - fer (double(10,2)) NOT NULL
+  - glug (int(11)) NOT NULL
+  - ddimer (double(10,2)) NOT NULL
+  - amylase (double(10,2)) NOT NULL
+  - lipase (double(10,2)) NOT NULL
+  - aso (int(11)) NOT NULL
+  - tibc (double(10,2)) NOT NULL
+  - acr (double(10,2)) NOT NULL
+  - pcr (double(10,2)) NOT NULL
+  - hb (decimal(10,2)) NOT NULL
+  - na (double(10,2)) NOT NULL
+  - k (double(10,2)) NOT NULL
+  - c1 (double(10,2)) NOT NULL
+  - c2 (double(10,2)) NOT NULL
+  - ggt (varchar(200)) NOT NULL
+  - a1c (varchar(200)) NOT NULL
+  - iron (varchar(200)) NOT NULL
+  - tpc3 (varchar(200)) NOT NULL
+
+--- Table: mindray_cbc ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: model_has_permissions ---
+Columns:
+  - permission_id (bigint(20) unsigned) NOT NULL
+  - model_type (varchar(255)) NOT NULL
+  - model_id (bigint(20) unsigned) NOT NULL
+Foreign Keys:
+  - permission_id -> permissions(id)
+
+--- Table: model_has_roles ---
+Columns:
+  - role_id (bigint(20) unsigned) NOT NULL
+  - model_type (varchar(255)) NOT NULL
+  - model_id (bigint(20) unsigned) NOT NULL
+Foreign Keys:
+  - role_id -> roles(id)
+
+--- Table: new_patient_notifications ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - sent (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - patient_id -> patients(id)
+
+--- Table: nurse_notes ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: offered_tests ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - main_test_id (bigint(20) unsigned) NOT NULL
+  - offer_id (bigint(20) unsigned) NOT NULL
+  - price (int(10) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - main_test_id -> main_tests(id)
+  - offer_id -> offers(id)
+
+--- Table: offers ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - price (decimal(10,2)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: operation_finance_items ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - operation_id (bigint(20) unsigned) NOT NULL
+  - item_type (varchar(255)) NOT NULL
+  - category (varchar(255)) NOT NULL
+  - description (varchar(255)) NULL
+  - amount (decimal(15,2)) NOT NULL
+  - is_auto_calculated (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: operations ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - admission_id (bigint(20) unsigned) NULL
+  - operation_date (date) NOT NULL
+  - operation_time (time) NULL
+  - operation_type (varchar(255)) NOT NULL
+  - description (text) NULL
+  - surgeon_fee (decimal(15,2)) NOT NULL
+  - total_staff (decimal(15,2)) NOT NULL
+  - total_center (decimal(15,2)) NOT NULL
+  - total_amount (decimal(15,2)) NOT NULL
+  - cash_paid (decimal(15,2)) NOT NULL
+  - bank_paid (decimal(15,2)) NOT NULL
+  - bank_receipt_image (varchar(255)) NULL
+  - notes (text) NULL
+  - status (varchar(255)) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: packages ---
+Columns:
+  - package_id (int(11)) NOT NULL
+  - package_name (varchar(50)) NULL
+  - container (varchar(50)) NOT NULL
+  - exp_time (int(11)) NOT NULL
+
+--- Table: password_reset_tokens ---
+Columns:
+  - email (varchar(255)) NOT NULL
+  - token (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+
+--- Table: patient_medical_histories ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - allergies (text) NULL
+  - drug_history (text) NULL
+  - family_history (text) NULL
+  - social_history (text) NULL
+  - past_medical_history (text) NULL
+  - past_surgical_history (text) NULL
+  - general_appearance_summary (varchar(255)) NULL
+  - skin_summary (text) NULL
+  - head_neck_summary (text) NULL
+  - cardiovascular_summary (text) NULL
+  - respiratory_summary (text) NULL
+  - gastrointestinal_summary (text) NULL
+  - genitourinary_summary (text) NULL
+  - neurological_summary (text) NULL
+  - musculoskeletal_summary (text) NULL
+  - endocrine_summary (text) NULL
+  - peripheral_vascular_summary (text) NULL
+  - present_complains_summary (text) NULL
+  - history_of_present_illness_summary (text) NULL
+  - baseline_bp (varchar(255)) NULL
+  - baseline_temp (decimal(5,2)) NULL
+  - baseline_weight (decimal(6,2)) NULL
+  - baseline_height (decimal(5,2)) NULL
+  - baseline_heart_rate (varchar(255)) NULL
+  - baseline_spo2 (varchar(255)) NULL
+  - baseline_rbs (varchar(255)) NULL
+  - chronic_juandice (tinyint(1)) NULL
+  - chronic_pallor (tinyint(1)) NULL
+  - chronic_clubbing (tinyint(1)) NULL
+  - chronic_cyanosis (tinyint(1)) NULL
+  - chronic_edema_feet (tinyint(1)) NULL
+  - chronic_dehydration_tendency (tinyint(1)) NULL
+  - chronic_lymphadenopathy (tinyint(1)) NULL
+  - chronic_peripheral_pulses_issue (tinyint(1)) NULL
+  - chronic_feet_ulcer_history (tinyint(1)) NULL
+  - overall_care_plan_summary (text) NULL
+  - general_prescription_notes_summary (text) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - patient_id -> patients(id)
+
+--- Table: patients ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - lab_to_lab_object_id (varchar(255)) NULL
+  - file_id (bigint(20) unsigned) NULL
+  - name (varchar(255)) NOT NULL
+  - shift_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - doctor_id (bigint(20) unsigned) NULL
+  - specialist_doctor_id (bigint(20) unsigned) NULL
+  - phone (varchar(10)) NOT NULL
+  - lab_to_lab_id (varchar(255)) NULL
+  - gender (varchar(255)) NOT NULL
+  - dob (date) NULL
+  - social_status (enum('single','married','widowed','divorced')) NULL
+  - age_day (int(11)) NULL
+  - age_month (int(11)) NULL
+  - age_year (int(11)) NULL
+  - company_id (bigint(20) unsigned) NULL
+  - subcompany_id (bigint(20) unsigned) NULL
+  - company_relation_id (bigint(20) unsigned) NULL
+  - paper_fees (int(11)) NULL
+  - guarantor (varchar(255)) NULL
+  - expire_date (date) NULL
+  - insurance_no (varchar(255)) NULL
+  - is_lab_paid (tinyint(1)) NOT NULL
+  - lab_paid (int(11)) NOT NULL
+  - result_is_locked (tinyint(1)) NOT NULL
+  - sample_collected (tinyint(1)) NOT NULL
+  - sample_collect_time (time) NULL
+  - result_print_date (datetime) NULL
+  - result_url (text) NULL
+  - sample_print_date (datetime) NULL
+  - visit_number (int(11)) NOT NULL
+  - result_auth (tinyint(1)) NOT NULL
+  - result_auth_user (bigint(20) unsigned) NULL
+  - auth_date (timestamp) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - country_id (bigint(20) unsigned) NULL
+  - gov_id (varchar(255)) NULL
+  - address (text) NULL
+  - income_source (varchar(255)) NULL
+  - discount (double) NOT NULL
+  - doctor_finish (tinyint(1)) NOT NULL
+  - doctor_lab_request_confirm (tinyint(1)) NOT NULL
+  - doctor_lab_urgent_confirm (tinyint(1)) NOT NULL
+  - referred (varchar(255)) NULL
+  - discount_comment (varchar(255)) NULL
+  - sample_collected_by (bigint(20) unsigned) NULL
+Foreign Keys:
+  - company_id -> companies(id)
+  - company_relation_id -> company_relations(id)
+  - doctor_id -> doctors(id)
+  - sample_collected_by -> users(id)
+  - shift_id -> shifts(id)
+  - specialist_doctor_id -> doctors(id)
+  - subcompany_id -> subcompanies(id)
+  - user_id -> users(id)
+
+--- Table: payment_suppliers ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - supplier_id (bigint(20) unsigned) NOT NULL
+  - amount (double(10,3)) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - type_of_payment (enum('cash','bank','visa','mobile_transfer')) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - supplier_id -> suppliers(id)
+  - user_id -> users(id)
+
+--- Table: payment_types ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: pdf_settings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - font_family (varchar(255)) NOT NULL
+  - font_size (int(11)) NOT NULL
+  - logo_path (varchar(255)) NULL
+  - logo_width (decimal(5,2)) NULL
+  - logo_height (decimal(5,2)) NULL
+  - logo_position (enum('left','right')) NULL
+  - hospital_name (varchar(255)) NULL
+  - header_image_path (varchar(255)) NULL
+  - footer_phone (varchar(255)) NULL
+  - footer_address (text) NULL
+  - footer_email (varchar(255)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: permissions ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - guard_name (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: personal_access_tokens ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - tokenable_type (varchar(255)) NOT NULL
+  - tokenable_id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - token (varchar(64)) NOT NULL
+  - abilities (text) NULL
+  - last_used_at (timestamp) NULL
+  - expires_at (timestamp) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: petty_cash_permissions ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - date (date) NOT NULL
+  - amount (decimal(15,2)) NOT NULL
+  - beneficiary (varchar(255)) NOT NULL
+  - description (text) NULL
+  - pdf_file (varchar(255)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - finance_entry_id (bigint(20)) NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - signature_file_name (varchar(255)) NOT NULL
+  - phone (varchar(255)) NOT NULL
+  - user_approved (bigint(20) unsigned) NULL
+  - financial_auditor (bigint(20) unsigned) NULL
+  - user_approved_time (datetime) NULL
+  - auditor_approved_time (datetime) NULL
+Foreign Keys:
+  - financial_auditor -> users(id)
+  - user_approved -> users(id)
+
+--- Table: pharmacy_types ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: requested_organisms ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - lab_request_id (bigint(20) unsigned) NOT NULL
+  - organism (varchar(255)) NOT NULL
+  - sensitive (varchar(255)) NULL
+  - resistant (varchar(255)) NULL
+
+--- Table: requested_results ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - lab_request_id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - main_test_id (bigint(20) unsigned) NOT NULL
+  - child_test_id (bigint(20) unsigned) NOT NULL
+  - result (text) NOT NULL
+  - normal_range (text) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - unit_id (bigint(20) unsigned) NULL
+  - flags (varchar(50)) NULL
+  - result_comment (text) NULL
+  - json_results (longtext) NULL
+  - entered_by_user_id (bigint(20) unsigned) NULL
+  - entered_at (timestamp) NULL
+  - authorized_by_user_id (bigint(20) unsigned) NULL
+  - authorized_at (timestamp) NULL
+Foreign Keys:
+  - authorized_by_user_id -> users(id)
+  - entered_by_user_id -> users(id)
+  - lab_request_id -> labrequests(id)
+  - main_test_id -> main_tests(id)
+  - patient_id -> patients(id)
+  - unit_id -> units(id)
+
+--- Table: requested_service_cost ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - requested_service_id (bigint(20) unsigned) NOT NULL
+  - sub_service_cost_id (bigint(20) unsigned) NOT NULL
+  - service_cost_id (bigint(20) unsigned) NOT NULL
+  - amount (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - requested_service_id -> requested_services(id)
+  - sub_service_cost_id -> sub_service_costs(id)
+
+--- Table: requested_service_deposit_deletions ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - requested_service_deposit_id (bigint(20) unsigned) NOT NULL
+  - requested_service_id (bigint(20) unsigned) NOT NULL
+  - amount (decimal(10,2)) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - is_bank (tinyint(1)) NOT NULL
+  - is_claimed (tinyint(1)) NOT NULL
+  - shift_id (bigint(20) unsigned) NULL
+  - original_created_at (timestamp) NULL
+  - deleted_by (bigint(20) unsigned) NULL
+  - deleted_at (timestamp) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: requested_service_deposits ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - requested_service_id (bigint(20) unsigned) NOT NULL
+  - amount (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - is_bank (tinyint(1)) NOT NULL
+  - is_claimed (tinyint(1)) NOT NULL
+  - shift_id (bigint(20) unsigned) NOT NULL
+
+--- Table: requested_services ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - doctorvisits_id (bigint(20) unsigned) NOT NULL
+  - service_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - user_deposited (bigint(20) unsigned) NULL
+  - doctor_id (bigint(20) unsigned) NOT NULL
+  - price (double(11,2)) NOT NULL
+  - amount_paid (double(11,2)) NOT NULL
+  - endurance (double(11,2)) NOT NULL
+  - is_paid (tinyint(1)) NOT NULL
+  - discount (int(11)) NOT NULL
+  - bank (tinyint(1)) NOT NULL
+  - count (int(11)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - doctor_note (varchar(255)) NOT NULL
+  - nurse_note (varchar(255)) NOT NULL
+  - done (tinyint(1)) NOT NULL
+  - approval (tinyint(1)) NOT NULL
+  - discount_per (int(11)) NOT NULL
+Foreign Keys:
+  - doctor_id -> doctors(id)
+  - doctorvisits_id -> doctorvisits(id)
+  - service_id -> services(id)
+  - user_deposited -> users(id)
+  - user_id -> users(id)
+
+--- Table: role_has_permissions ---
+Columns:
+  - permission_id (bigint(20) unsigned) NOT NULL
+  - role_id (bigint(20) unsigned) NOT NULL
+Foreign Keys:
+  - permission_id -> permissions(id)
+  - role_id -> roles(id)
+
+--- Table: roles ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - guard_name (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: rooms ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - ward_id (bigint(20) unsigned) NOT NULL
+  - room_number (varchar(255)) NOT NULL
+  - room_type (enum('normal','vip')) NULL
+  - price_per_day (decimal(10,2)) NOT NULL
+  - capacity (int(11)) NOT NULL
+  - status (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - ward_id -> wards(id)
+
+--- Table: routes ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - path (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - icon (varchar(255)) NOT NULL
+  - is_multi (tinyint(1)) NOT NULL
+
+--- Table: sections ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: service_cost ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - sub_service_cost_id (bigint(20) unsigned) NOT NULL
+  - service_id (bigint(20) unsigned) NOT NULL
+  - percentage (double(8,2)) NOT NULL
+  - fixed (double(11,2)) NOT NULL
+  - cost_type (enum('total','after cost')) NOT NULL
+Foreign Keys:
+  - service_id -> services(id)
+  - sub_service_cost_id -> sub_service_costs(id)
+
+--- Table: service_groups ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: services ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - service_group_id (bigint(20) unsigned) NOT NULL
+  - price (double(11,2)) NOT NULL
+  - activate (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - variable (tinyint(1)) NOT NULL
+Foreign Keys:
+  - service_group_id -> service_groups(id)
+
+--- Table: settings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - is_header (tinyint(1)) NULL
+  - is_footer (tinyint(1)) NULL
+  - is_logo (tinyint(1)) NULL
+  - show_logo (tinyint(1)) NOT NULL
+  - show_logo_only_whatsapp (tinyint(1)) NOT NULL
+  - header_base64 (longtext) NULL
+  - footer_base64 (longtext) NULL
+  - header_content (varchar(255)) NULL
+  - footer_content (varchar(255)) NULL
+  - logo_base64 (longtext) NULL
+  - lab_name (varchar(255)) NULL
+  - firestore_result_collection (varchar(255)) NULL
+  - hospital_name (varchar(255)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - disable_doctor_service_check (tinyint(1)) NULL
+  - phone (varchar(255)) NULL
+  - gov (tinyint(1)) NULL
+  - country (tinyint(1)) NULL
+  - barcode (tinyint(1)) NULL
+  - show_water_mark (tinyint(1)) NULL
+  - vatin (varchar(255)) NULL
+  - cr (varchar(255)) NULL
+  - email (varchar(255)) NULL
+  - address (varchar(255)) NULL
+  - ultramsg_instance_id (varchar(255)) NULL
+  - ultramsg_token (varchar(255)) NULL
+  - ultramsg_base_url (varchar(255)) NULL
+  - ultramsg_default_country_code (varchar(255)) NULL
+  - send_result_after_auth (tinyint(1)) NULL
+  - send_result_after_result (tinyint(1)) NULL
+  - edit_result_after_auth (tinyint(1)) NULL
+  - auditor_stamp (varchar(255)) NULL
+  - manager_stamp (varchar(255)) NULL
+  - finance_account_id (bigint(20) unsigned) NULL
+  - bank_id (bigint(20) unsigned) NULL
+  - company_account_id (bigint(20) unsigned) NULL
+  - endurance_account_id (bigint(20) unsigned) NULL
+  - main_cash (bigint(20) unsigned) NULL
+  - main_bank (bigint(20) unsigned) NULL
+  - financial_year_start (date) NULL
+  - financial_year_end (date) NULL
+  - pharmacy_bank (bigint(20) unsigned) NULL
+  - pharmacy_cash (bigint(20) unsigned) NULL
+  - pharmacy_income (bigint(20) unsigned) NULL
+  - welcome_message (text) NULL
+  - send_welcome_message (tinyint(1)) NULL
+  - default_lab_report_template (varchar(255)) NULL
+  - watermark_image (varchar(255)) NULL
+  - send_sms_after_auth (tinyint(1)) NOT NULL
+  - send_whatsapp_after_auth (tinyint(1)) NOT NULL
+  - show_title_in_lab_result (tinyint(1)) NULL
+  - storage_name (varchar(255)) NULL
+  - prevent_backdated_entry (tinyint(1)) NOT NULL
+  - whatsapp_number (varchar(255)) NOT NULL
+  - pdf_header_type (varchar(255)) NULL
+  - pdf_header_logo_position (varchar(255)) NULL
+  - pdf_header_logo_width (int(11)) NULL
+  - pdf_header_logo_height (int(11)) NULL
+  - pdf_header_logo_x_offset (int(11)) NULL
+  - pdf_header_logo_y_offset (int(11)) NULL
+  - pdf_header_image_width (int(11)) NULL
+  - pdf_header_image_height (int(11)) NULL
+  - pdf_header_image_x_offset (int(11)) NULL
+  - pdf_header_image_y_offset (int(11)) NULL
+  - pdf_header_title (varchar(255)) NULL
+  - pdf_header_subtitle (varchar(255)) NULL
+  - pdf_header_title_font_size (int(11)) NULL
+  - pdf_header_subtitle_font_size (int(11)) NULL
+  - pdf_header_title_y_offset (int(11)) NULL
+  - pdf_header_subtitle_y_offset (int(11)) NULL
+Foreign Keys:
+  - bank_id -> banks(id)
+  - company_account_id -> finance_accounts(id)
+  - endurance_account_id -> finance_accounts(id)
+  - finance_account_id -> finance_accounts(id)
+  - main_bank -> finance_accounts(id)
+  - main_cash -> finance_accounts(id)
+  - pharmacy_bank -> finance_accounts(id)
+  - pharmacy_cash -> finance_accounts(id)
+  - pharmacy_income -> finance_accounts(id)
+
+--- Table: shifts ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - total (double(8,2)) NOT NULL
+  - bank (double(8,2)) NOT NULL
+  - expenses (double(8,2)) NOT NULL
+  - touched (tinyint(1)) NOT NULL
+  - closed_at (datetime) NULL
+  - is_closed (tinyint(1)) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - pharmacy_entry (tinyint(1)) NULL
+  - user_closed (bigint(20) unsigned) NULL
+Foreign Keys:
+  - user_closed -> users(id)
+  - user_id -> users(id)
+
+--- Table: shifts_definitions ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - shift_label (varchar(255)) NOT NULL
+  - start_time (time) NOT NULL
+  - end_time (time) NOT NULL
+  - is_active (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: shipping_items ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: shipping_states ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: shippings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - shipping_item_id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - phone (varchar(255)) NOT NULL
+  - express (varchar(255)) NOT NULL
+  - ctn (varchar(255)) NULL
+  - cbm (varchar(255)) NULL
+  - kg (varchar(255)) NULL
+  - prefix (varchar(255)) NOT NULL
+  - shipping_state_id (bigint(20) unsigned) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - shipping_item_id -> shipping_items(id)
+  - shipping_state_id -> shipping_states(id)
+
+--- Table: sickleaves ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (bigint(20) unsigned) NOT NULL
+  - from (date) NOT NULL
+  - to (date) NOT NULL
+  - job_and_place_of_work (varchar(255)) NULL
+  - hospital_no (varchar(255)) NULL
+  - o_p_department (varchar(255)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - patient_id -> patients(id)
+
+--- Table: skills ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: specialists ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - firestore_id (varchar(255)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: states ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: sub_routes ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - route_id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - path (varchar(255)) NOT NULL
+  - icon (varchar(255)) NOT NULL
+
+--- Table: sub_service_costs ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: sub_specialists ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - specialists_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - specialists_id -> specialists(id)
+
+--- Table: subcompanies ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - lab_endurance (double(8,2)) NOT NULL
+  - service_endurance (double(8,2)) NOT NULL
+  - company_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: suggested_organisms ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+
+--- Table: suppliers ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - phone (varchar(10)) NOT NULL
+  - address (varchar(255)) NOT NULL
+  - email (varchar(255)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: sysmex ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - doctorvisit_id (bigint(20) unsigned) NOT NULL
+  - wbc (decimal(8,3)) NULL
+  - rbc (decimal(8,3)) NULL
+  - hgb (decimal(5,2)) NULL
+  - hct (decimal(5,2)) NULL
+  - mcv (decimal(5,2)) NULL
+  - mch (decimal(5,2)) NULL
+  - mchc (decimal(5,2)) NULL
+  - plt (decimal(8,3)) NULL
+  - lym_p (decimal(5,2)) NULL
+  - mxd_p (decimal(5,2)) NULL
+  - neut_p (decimal(5,2)) NULL
+  - lym_c (decimal(8,3)) NULL
+  - mxd_c (decimal(8,3)) NULL
+  - neut_c (decimal(8,3)) NULL
+  - rdw_sd (decimal(5,2)) NULL
+  - rdw_cv (decimal(5,2)) NULL
+  - pdw (decimal(5,2)) NULL
+  - mpv (decimal(5,2)) NULL
+  - plcr (decimal(5,2)) NULL
+  - flag (int(11)) NOT NULL
+  - mono_p (decimal(10,2)) NOT NULL
+  - eos_p (double(10,2)) NOT NULL
+  - baso_p (double(10,2)) NOT NULL
+  - mono_abs (double(10,2)) NOT NULL
+  - eso_abs (double(10,2)) NOT NULL
+  - baso_abs (double(10,2)) NOT NULL
+  - MICROR (int(11)) NOT NULL
+  - bas_c (decimal(8,3)) NULL
+  - bas_p (decimal(5,2)) NULL
+  - eos_c (decimal(8,3)) NULL
+  - mon_c (decimal(8,3)) NULL
+  - mon_p (decimal(5,2)) NULL
+  - pct (decimal(5,3)) NULL
+  - plcc (decimal(8,3)) NULL
+  - hfc_c (decimal(8,3)) NULL
+  - hfc_p (decimal(5,2)) NULL
+  - plt_i (decimal(8,3)) NULL
+  - wbc_d (decimal(8,3)) NULL
+  - wbc_b (decimal(8,3)) NULL
+  - pdw_sd (decimal(5,2)) NULL
+  - inr_c (decimal(8,3)) NULL
+  - inr_p (decimal(5,2)) NULL
+
+--- Table: sysmex550 ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - patient_id (int(11)) NOT NULL
+  - WBC (decimal(10,1)) NOT NULL
+  - RBC (decimal(10,1)) NOT NULL
+  - HGB (decimal(10,1)) NOT NULL
+  - HCT (decimal(10,1)) NOT NULL
+  - MCV (decimal(10,1)) NOT NULL
+  - MCH (decimal(10,1)) NOT NULL
+  - MCHC (decimal(10,1)) NOT NULL
+  - PLT (decimal(10,1)) NOT NULL
+  - NEUTP (decimal(10,1)) NOT NULL
+  - LYMPHP (decimal(10,1)) NOT NULL
+  - MONOP (decimal(10,1)) NOT NULL
+  - EOP (decimal(10,1)) NOT NULL
+  - BASOP (decimal(10,1)) NOT NULL
+  - NEUTC (decimal(10,1)) NOT NULL
+  - LYMPHC (decimal(10,1)) NOT NULL
+  - MONOC (decimal(10,1)) NOT NULL
+  - EOC (decimal(10,1)) NOT NULL
+  - BASOC (decimal(10,1)) NOT NULL
+  - IGP (decimal(10,1)) NOT NULL
+  - IGC (decimal(10,1)) NOT NULL
+  - RDWSD (decimal(10,1)) NOT NULL
+  - RDWCV (decimal(10,1)) NOT NULL
+  - MICROR (decimal(10,1)) NOT NULL
+  - MACROR (decimal(10,1)) NOT NULL
+  - PDW (decimal(10,1)) NOT NULL
+  - MPV (decimal(10,1)) NOT NULL
+  - PLCR (decimal(10,0)) NOT NULL
+  - PCT (decimal(10,1)) NOT NULL
+
+--- Table: tooth_requested_services ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - requested_service_id (bigint(20) unsigned) NOT NULL
+  - tooth_id (bigint(20) unsigned) NOT NULL
+  - doctorvisit_id (bigint(20) unsigned) NOT NULL
+
+--- Table: units ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(20)) NOT NULL
+
+--- Table: user_default_shifts ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - shift_definition_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - shift_definition_id -> shifts_definitions(id)
+  - user_id -> users(id)
+
+--- Table: user_doc_selections ---
+Columns:
+  - user_id (int(10) unsigned) NOT NULL
+  - doc_id (int(10) unsigned) NOT NULL
+  - active (tinyint(4)) NOT NULL
+  - fav_service (int(10) unsigned) NULL
+
+--- Table: user_routes ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - route_id (bigint(20) unsigned) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+Foreign Keys:
+  - route_id -> routes(id)
+  - user_id -> users(id)
+
+--- Table: user_settings ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+  - theme (varchar(255)) NOT NULL
+  - lang (varchar(255)) NOT NULL
+  - web_dialog (tinyint(1)) NOT NULL
+  - node_dialog (tinyint(1)) NOT NULL
+  - node_direct (tinyint(1)) NOT NULL
+  - print_lab_direction (tinyint(1)) NOT NULL
+
+--- Table: user_sub_routes ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - sub_route_id (bigint(20) unsigned) NOT NULL
+  - user_id (bigint(20) unsigned) NOT NULL
+Foreign Keys:
+  - sub_route_id -> sub_routes(id)
+  - user_id -> users(id)
+
+--- Table: users ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - username (varchar(255)) NOT NULL
+  - password (varchar(255)) NOT NULL
+  - remember_token (varchar(100)) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+  - doctor_id (bigint(20) unsigned) NULL
+  - is_nurse (tinyint(1)) NOT NULL
+  - is_supervisor (tinyint(1)) NOT NULL
+  - is_active (tinyint(1)) NOT NULL
+  - user_type (enum('╪º╪│╪¬┘é╪¿╪º┘ä ┘à╪╣┘à┘ä','╪º╪»╪«╪º┘ä ┘å╪¬╪º╪ª╪¼','╪º╪│╪¬┘é╪¿╪º┘ä ╪╣┘è╪º╪»┘ç','╪«╪▓┘å┘ç ┘à┘ê╪¡╪»┘ç','╪¬╪º┘à┘è┘å')) NULL
+  - nav_items (longtext) NULL
+  - name (varchar(255)) NOT NULL
+  - user_money_collector_type (enum('lab','company','clinic','all')) NOT NULL
+
+--- Table: wards ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - name (varchar(255)) NOT NULL
+  - description (text) NULL
+  - status (tinyint(1)) NOT NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL
+
+--- Table: whats_app_messages ---
+Columns:
+  - id (bigint(20) unsigned) NOT NULL
+  - waba_id (varchar(255)) NULL
+  - phone_number_id (varchar(255)) NULL
+  - to (varchar(255)) NULL
+  - from (varchar(255)) NULL
+  - type (varchar(255)) NOT NULL
+  - body (text) NULL
+  - status (varchar(255)) NOT NULL
+  - message_id (varchar(255)) NULL
+  - direction (varchar(255)) NOT NULL
+  - raw_payload (longtext) NULL
+  - created_at (timestamp) NULL
+  - updated_at (timestamp) NULL

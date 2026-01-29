@@ -1,0 +1,699 @@
+﻿=== TABLES AND DEPENDENCIES ===
+
+Table: account_categories
+  No dependencies (independent table)
+
+Table: account_hierarchy
+  Depends on: finance_accounts
+  Foreign Keys:
+    - child_id -> finance_accounts(id)
+    - parent_id -> finance_accounts(id)
+
+Table: acon_cbc_parameters
+  No dependencies (independent table)
+
+Table: acon_cbc_results
+  No dependencies (independent table)
+
+Table: admission_deposits
+  Depends on: admissions, users
+  Foreign Keys:
+    - admission_id -> admissions(id)
+    - user_id -> users(id)
+
+Table: admission_requested_lab_tests
+  Depends on: admissions, doctors, main_tests, users
+  Foreign Keys:
+    - admission_id -> admissions(id)
+    - doctor_id -> doctors(id)
+    - main_test_id -> main_tests(id)
+    - user_id -> users(id)
+
+Table: admission_requested_service_costs
+  Depends on: service_cost, sub_service_costs
+  Foreign Keys:
+    - service_cost_id -> service_cost(id)
+    - sub_service_cost_id -> sub_service_costs(id)
+
+Table: admission_requested_service_deposits
+  Depends on: users
+  Foreign Keys:
+    - user_id -> users(id)
+
+Table: admission_requested_services
+  Depends on: admissions, doctors, services, users
+  Foreign Keys:
+    - admission_id -> admissions(id)
+    - doctor_id -> doctors(id)
+    - service_id -> services(id)
+    - user_deposited -> users(id)
+    - user_id -> users(id)
+
+Table: admission_transactions
+  Depends on: admissions, users
+  Foreign Keys:
+    - admission_id -> admissions(id)
+    - user_id -> users(id)
+
+Table: admission_vital_signs
+  Depends on: admissions, users
+  Foreign Keys:
+    - admission_id -> admissions(id)
+    - user_id -> users(id)
+
+Table: admissions
+  Depends on: beds, doctors, patients, rooms, users, wards
+  Foreign Keys:
+    - bed_id -> beds(id)
+    - doctor_id -> doctors(id)
+    - patient_id -> patients(id)
+    - room_id -> rooms(id)
+    - specialist_doctor_id -> doctors(id)
+    - user_id -> users(id)
+    - ward_id -> wards(id)
+
+Table: appointments
+  Depends on: doctors, doctor_schedules, doctorvisits
+  Foreign Keys:
+    - doctor_id -> doctors(id)
+    - doctor_schedule_id -> doctor_schedules(id)
+    - doctorvisit_id -> doctorvisits(id)
+
+Table: attendance_settings
+  No dependencies (independent table)
+
+Table: attendances
+  Depends on: users, shifts_definitions
+  Foreign Keys:
+    - recorded_by_user_id -> users(id)
+    - shift_definition_id -> shifts_definitions(id)
+    - supervisor_id -> users(id)
+    - user_id -> users(id)
+
+Table: audited_patient_records
+  Depends on: users, doctorvisits, company_relations, doctors, subcompanies, patients
+  Foreign Keys:
+    - audited_by_user_id -> users(id)
+    - doctor_visit_id -> doctorvisits(id)
+    - edited_company_relation_id -> company_relations(id)
+    - edited_doctor_id -> doctors(id)
+    - edited_subcompany_id -> subcompanies(id)
+    - patient_id -> patients(id)
+
+Table: audited_requested_services
+  Depends on: audited_patient_records, requested_services, services
+  Foreign Keys:
+    - audited_patient_record_id -> audited_patient_records(id)
+    - original_requested_service_id -> requested_services(id)
+    - service_id -> services(id)
+
+Table: balance_sheet_statements
+  No dependencies (independent table)
+
+Table: bankak_images
+  Depends on: doctorvisits
+  Foreign Keys:
+    - doctorvisit_id -> doctorvisits(id)
+
+Table: banks
+  No dependencies (independent table)
+
+Table: beds
+  Depends on: rooms
+  Foreign Keys:
+    - room_id -> rooms(id)
+
+Table: cash_tally
+  No dependencies (independent table)
+
+Table: cbc5_bindings
+  No dependencies (independent table)
+
+Table: cbc_bindings
+  No dependencies (independent table)
+
+Table: chemistry_bindings
+  No dependencies (independent table)
+
+Table: chief_complain
+  No dependencies (independent table)
+
+Table: child_groups
+  No dependencies (independent table)
+
+Table: child_test_devices
+  No dependencies (independent table)
+
+Table: child_test_options
+  Depends on: child_tests
+  Foreign Keys:
+    - child_test_id -> child_tests(id)
+
+Table: child_tests
+  Depends on: child_groups, units
+  Foreign Keys:
+    - child_group_id -> child_groups(id)
+    - unit_id -> units(id)
+
+Table: client_payments
+  No dependencies (independent table)
+
+Table: clients
+  No dependencies (independent table)
+
+Table: companies
+  Depends on: finance_accounts
+  Foreign Keys:
+    - finance_account_id -> finance_accounts(id)
+
+Table: company_main_test
+  Depends on: companies, main_tests
+  Foreign Keys:
+    - company_id -> companies(id)
+    - main_test_id -> main_tests(id)
+
+Table: company_relations
+  No dependencies (independent table)
+
+Table: company_service
+  Depends on: companies, services
+  Foreign Keys:
+    - company_id -> companies(id)
+    - service_id -> services(id)
+
+Table: containers
+  No dependencies (independent table)
+
+Table: contract_states
+  No dependencies (independent table)
+
+Table: contracts
+  No dependencies (independent table)
+
+Table: cost_categories
+  No dependencies (independent table)
+
+Table: cost_order
+  Depends on: service_cost, services, sub_service_costs
+  Foreign Keys:
+    - service_cost_id -> service_cost(id)
+    - service_cost_item -> service_cost(id)
+    - service_id -> services(id)
+    - sub_service_cost_id -> sub_service_costs(id)
+
+Table: costs
+  Depends on: doctor_shifts, shifts, users
+  Foreign Keys:
+    - doctor_shift_id -> doctor_shifts(id)
+    - shift_id -> shifts(id)
+    - user_cost -> users(id)
+
+Table: countings
+  Depends on: users
+  Foreign Keys:
+    - user_id -> users(id)
+
+Table: countries
+  No dependencies (independent table)
+
+Table: credit_entries
+  Depends on: finance_accounts, finance_entries
+  Foreign Keys:
+    - finance_account_id -> finance_accounts(id)
+    - finance_entry_id -> finance_entries(id)
+
+Table: debit_entries
+  Depends on: finance_accounts, finance_entries
+  Foreign Keys:
+    - finance_account_id -> finance_accounts(id)
+    - finance_entry_id -> finance_entries(id)
+
+Table: debits
+  Depends on: clients, deducts, payment_types
+  Foreign Keys:
+    - client_id -> clients(id)
+    - deduct_id -> deducts(id)
+    - payment_type_id -> payment_types(id)
+
+Table: deducted_items
+  Depends on: clients, deducts, items, shifts, users
+  Foreign Keys:
+    - client_id -> clients(id)
+    - deduct_id -> deducts(id)
+    - item_id -> items(id)
+    - shift_id -> shifts(id)
+    - user_id -> users(id)
+
+Table: deducts
+  Depends on: payment_types, shifts, users
+  Foreign Keys:
+    - payment_type_id -> payment_types(id)
+    - shift_id -> shifts(id)
+    - user_id -> users(id)
+
+Table: denos
+  No dependencies (independent table)
+
+Table: denos_users
+  Depends on: denos, shifts, users
+  Foreign Keys:
+    - deno_id -> denos(id)
+    - shift_id -> shifts(id)
+    - user_id -> users(id)
+
+Table: departments
+  No dependencies (independent table)
+
+Table: deposit_items
+  Depends on: deposits, items, users
+  Foreign Keys:
+    - deposit_id -> deposits(id)
+    - item_id -> items(id)
+    - user_id -> users(id)
+
+Table: deposits
+  Depends on: suppliers
+  Foreign Keys:
+    - supplier_id -> suppliers(id)
+
+Table: devices
+  No dependencies (independent table)
+
+Table: diagnosis
+  No dependencies (independent table)
+
+Table: doctor_schedules
+  Depends on: doctors
+  Foreign Keys:
+    - doctor_id -> doctors(id)
+
+Table: doctor_service_costs
+  Depends on: doctors, sub_service_costs
+  Foreign Keys:
+    - doctor_id -> doctors(id)
+    - sub_service_cost_id -> sub_service_costs(id)
+
+Table: doctor_services
+  Depends on: doctors, services
+  Foreign Keys:
+    - doctor_id -> doctors(id)
+    - service_id -> services(id)
+
+Table: doctor_shifts
+  Depends on: doctors, shifts, users
+  Foreign Keys:
+    - doctor_id -> doctors(id)
+    - shift_id -> shifts(id)
+    - user_id -> users(id)
+
+Table: doctors
+  Depends on: finance_accounts, specialists, sub_specialists
+  Foreign Keys:
+    - finanace_account_id_insurance -> finance_accounts(id)
+    - finance_account_id -> finance_accounts(id)
+    - specialist_id -> specialists(id)
+    - sub_specialist_id -> sub_specialists(id)
+
+Table: doctorvisits
+  Depends on: doctor_shifts, patients
+  Foreign Keys:
+    - doctor_shift_id -> doctor_shifts(id)
+    - patient_id -> patients(id)
+
+Table: drug_categories
+  No dependencies (independent table)
+
+Table: drugs
+  No dependencies (independent table)
+
+Table: drugs_prescribed
+  Depends on: doctors, items, patients
+  Foreign Keys:
+    - doctor_id -> doctors(id)
+    - item_id -> items(id)
+    - patient_id -> patients(id)
+
+Table: employee_skills
+  Depends on: employees, skills
+  Foreign Keys:
+    - employee_id -> employees(id)
+    - skill_id -> skills(id)
+
+Table: employees
+  Depends on: departments, users
+  Foreign Keys:
+    - department_id -> departments(id)
+    - user_id -> users(id)
+
+Table: failed_jobs
+  No dependencies (independent table)
+
+Table: files
+  No dependencies (independent table)
+
+Table: finance_accounts
+  Depends on: account_categories
+  Foreign Keys:
+    - account_category_id -> account_categories(id)
+
+Table: finance_entries
+  Depends on: doctor_shifts, users
+  Foreign Keys:
+    - doctor_shift_id -> doctor_shifts(id)
+    - user_created -> users(id)
+    - user_net -> users(id)
+
+Table: hl7
+  No dependencies (independent table)
+
+Table: hl7_messages
+  No dependencies (independent table)
+
+Table: holidays
+  No dependencies (independent table)
+
+Table: hormone
+  No dependencies (independent table)
+
+Table: hormone_bindings
+  No dependencies (independent table)
+
+Table: images
+  No dependencies (independent table)
+
+Table: income_statement_reports
+  No dependencies (independent table)
+
+Table: income_statements
+  No dependencies (independent table)
+
+Table: item_barcodes
+  No dependencies (independent table)
+
+Table: items
+  Depends on: drug_categories, pharmacy_types, sections
+  Foreign Keys:
+    - drug_category_id -> drug_categories(id)
+    - pharmacy_type_id -> pharmacy_types(id)
+    - section_id -> sections(id)
+
+Table: jobs
+  No dependencies (independent table)
+
+Table: lab_comment_suggestions
+  No dependencies (independent table)
+
+Table: lab_finished_notifications
+  Depends on: patients
+  Foreign Keys:
+    - patient_id -> patients(id)
+
+Table: labrequests
+  Depends on: users, main_tests, patients
+  Foreign Keys:
+    - user_deposited -> users(id)
+    - user_requested -> users(id)
+    - main_test_id -> main_tests(id)
+    - pid -> patients(id)
+
+Table: main_tests
+  Depends on: containers, packages
+  Foreign Keys:
+    - container_id -> containers(id)
+    - pack_id -> packages(package_id)
+
+Table: medical_drug_routes
+  No dependencies (independent table)
+
+Table: mindray2
+  No dependencies (independent table)
+
+Table: mindray_cbc
+  No dependencies (independent table)
+
+Table: model_has_permissions
+  Depends on: permissions
+  Foreign Keys:
+    - permission_id -> permissions(id)
+
+Table: model_has_roles
+  Depends on: roles
+  Foreign Keys:
+    - role_id -> roles(id)
+
+Table: new_patient_notifications
+  Depends on: patients
+  Foreign Keys:
+    - patient_id -> patients(id)
+
+Table: nurse_notes
+  No dependencies (independent table)
+
+Table: offered_tests
+  Depends on: main_tests, offers
+  Foreign Keys:
+    - main_test_id -> main_tests(id)
+    - offer_id -> offers(id)
+
+Table: offers
+  No dependencies (independent table)
+
+Table: operation_finance_items
+  No dependencies (independent table)
+
+Table: operations
+  No dependencies (independent table)
+
+Table: packages
+  No dependencies (independent table)
+
+Table: password_reset_tokens
+  No dependencies (independent table)
+
+Table: patient_medical_histories
+  Depends on: patients
+  Foreign Keys:
+    - patient_id -> patients(id)
+
+Table: patients
+  Depends on: companies, company_relations, doctors, users, shifts, subcompanies
+  Foreign Keys:
+    - company_id -> companies(id)
+    - company_relation_id -> company_relations(id)
+    - doctor_id -> doctors(id)
+    - sample_collected_by -> users(id)
+    - shift_id -> shifts(id)
+    - specialist_doctor_id -> doctors(id)
+    - subcompany_id -> subcompanies(id)
+    - user_id -> users(id)
+
+Table: payment_suppliers
+  Depends on: suppliers, users
+  Foreign Keys:
+    - supplier_id -> suppliers(id)
+    - user_id -> users(id)
+
+Table: payment_types
+  No dependencies (independent table)
+
+Table: pdf_settings
+  No dependencies (independent table)
+
+Table: permissions
+  No dependencies (independent table)
+
+Table: personal_access_tokens
+  No dependencies (independent table)
+
+Table: petty_cash_permissions
+  Depends on: users
+  Foreign Keys:
+    - financial_auditor -> users(id)
+    - user_approved -> users(id)
+
+Table: pharmacy_types
+  No dependencies (independent table)
+
+Table: requested_organisms
+  No dependencies (independent table)
+
+Table: requested_results
+  Depends on: users, labrequests, main_tests, patients, units
+  Foreign Keys:
+    - authorized_by_user_id -> users(id)
+    - entered_by_user_id -> users(id)
+    - lab_request_id -> labrequests(id)
+    - main_test_id -> main_tests(id)
+    - patient_id -> patients(id)
+    - unit_id -> units(id)
+
+Table: requested_service_cost
+  Depends on: requested_services, sub_service_costs
+  Foreign Keys:
+    - requested_service_id -> requested_services(id)
+    - sub_service_cost_id -> sub_service_costs(id)
+
+Table: requested_service_deposit_deletions
+  No dependencies (independent table)
+
+Table: requested_service_deposits
+  No dependencies (independent table)
+
+Table: requested_services
+  Depends on: doctors, doctorvisits, services, users
+  Foreign Keys:
+    - doctor_id -> doctors(id)
+    - doctorvisits_id -> doctorvisits(id)
+    - service_id -> services(id)
+    - user_deposited -> users(id)
+    - user_id -> users(id)
+
+Table: role_has_permissions
+  Depends on: permissions, roles
+  Foreign Keys:
+    - permission_id -> permissions(id)
+    - role_id -> roles(id)
+
+Table: roles
+  No dependencies (independent table)
+
+Table: rooms
+  Depends on: wards
+  Foreign Keys:
+    - ward_id -> wards(id)
+
+Table: routes
+  No dependencies (independent table)
+
+Table: sections
+  No dependencies (independent table)
+
+Table: service_cost
+  Depends on: services, sub_service_costs
+  Foreign Keys:
+    - service_id -> services(id)
+    - sub_service_cost_id -> sub_service_costs(id)
+
+Table: service_groups
+  No dependencies (independent table)
+
+Table: services
+  Depends on: service_groups
+  Foreign Keys:
+    - service_group_id -> service_groups(id)
+
+Table: settings
+  Depends on: banks, finance_accounts
+  Foreign Keys:
+    - bank_id -> banks(id)
+    - company_account_id -> finance_accounts(id)
+    - endurance_account_id -> finance_accounts(id)
+    - finance_account_id -> finance_accounts(id)
+    - main_bank -> finance_accounts(id)
+    - main_cash -> finance_accounts(id)
+    - pharmacy_bank -> finance_accounts(id)
+    - pharmacy_cash -> finance_accounts(id)
+    - pharmacy_income -> finance_accounts(id)
+
+Table: shifts
+  Depends on: users
+  Foreign Keys:
+    - user_closed -> users(id)
+    - user_id -> users(id)
+
+Table: shifts_definitions
+  No dependencies (independent table)
+
+Table: shipping_items
+  No dependencies (independent table)
+
+Table: shipping_states
+  No dependencies (independent table)
+
+Table: shippings
+  Depends on: shipping_items, shipping_states
+  Foreign Keys:
+    - shipping_item_id -> shipping_items(id)
+    - shipping_state_id -> shipping_states(id)
+
+Table: sickleaves
+  Depends on: patients
+  Foreign Keys:
+    - patient_id -> patients(id)
+
+Table: skills
+  No dependencies (independent table)
+
+Table: specialists
+  No dependencies (independent table)
+
+Table: states
+  No dependencies (independent table)
+
+Table: sub_routes
+  No dependencies (independent table)
+
+Table: sub_service_costs
+  No dependencies (independent table)
+
+Table: sub_specialists
+  Depends on: specialists
+  Foreign Keys:
+    - specialists_id -> specialists(id)
+
+Table: subcompanies
+  No dependencies (independent table)
+
+Table: suggested_organisms
+  No dependencies (independent table)
+
+Table: suppliers
+  No dependencies (independent table)
+
+Table: sysmex
+  No dependencies (independent table)
+
+Table: sysmex550
+  No dependencies (independent table)
+
+Table: tooth_requested_services
+  No dependencies (independent table)
+
+Table: units
+  No dependencies (independent table)
+
+Table: user_default_shifts
+  Depends on: shifts_definitions, users
+  Foreign Keys:
+    - shift_definition_id -> shifts_definitions(id)
+    - user_id -> users(id)
+
+Table: user_doc_selections
+  No dependencies (independent table)
+
+Table: user_routes
+  Depends on: routes, users
+  Foreign Keys:
+    - route_id -> routes(id)
+    - user_id -> users(id)
+
+Table: user_settings
+  No dependencies (independent table)
+
+Table: user_sub_routes
+  Depends on: sub_routes, users
+  Foreign Keys:
+    - sub_route_id -> sub_routes(id)
+    - user_id -> users(id)
+
+Table: users
+  No dependencies (independent table)
+
+Table: wards
+  No dependencies (independent table)
+
+Table: whats_app_messages
+  No dependencies (independent table)
+
+
+=== JSON data saved to table_dependencies.json ===
