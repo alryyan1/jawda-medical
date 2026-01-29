@@ -15,6 +15,7 @@ class PatientSearchResultResource extends JsonResource {
             'last_visit_file_id' => $this?->file_id, // For copying
             'last_visit_company_name' => $this?->patient?->company?->name,
             'last_visit_company_id' => $this?->patient?->company?->id,
+             'patient_id' => $this?->patient?->id
         ];
     }
 }

@@ -28,11 +28,19 @@ class Admission extends Model
         'notes',
         'provisional_diagnosis',
         'operations',
+        'medical_history',
+        'current_medications',
+        'referral_source',
+        'expected_discharge_date',
+        'next_of_kin_name',
+        'next_of_kin_relation',
+        'next_of_kin_phone',
     ];
 
     protected $casts = [
         'admission_date' => 'date',
         'discharge_date' => 'date',
+        'expected_discharge_date' => 'date',
         'admission_time' => 'datetime',
         'discharge_time' => 'datetime',
     ];
@@ -151,9 +159,9 @@ class Admission extends Model
     {
         $startDate = $this->admission_date;
         $endDate = $this->discharge_date ?? now()->toDateString();
-        
+
         $days = $startDate->diffInDays($endDate);
-        
+
         // If same day or difference is 0, return 1 (minimum 1 day)
         // Otherwise add 1 to include both start and end days
         return max(1, $days + 1);
@@ -167,7 +175,7 @@ class Admission extends Model
     {
         $totalCredits = (float) $this->transactions()->where('type', 'credit')->sum('amount');
         $totalDebits = (float) $this->transactions()->where('type', 'debit')->sum('amount');
-        
+
         return $totalCredits - $totalDebits;
     }
 }

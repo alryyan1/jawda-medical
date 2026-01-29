@@ -27,9 +27,9 @@ class AdmissionController extends Controller
         // Search filter
         if ($request->has('search') && !empty($request->search)) {
             $searchTerm = $request->search;
-            $query->whereHas('patient', function($q) use ($searchTerm) {
+            $query->whereHas('patient', function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
             });
         }
 
@@ -57,8 +57,8 @@ class AdmissionController extends Controller
         }
 
         $admissions = $query->orderBy('admission_date', 'desc')
-                           ->orderBy('admission_time', 'desc')
-                           ->paginate($request->get('per_page', 15));
+            ->orderBy('admission_time', 'desc')
+            ->paginate($request->get('per_page', 15));
 
         return AdmissionResource::collection($admissions);
     }
@@ -83,13 +83,23 @@ class AdmissionController extends Controller
             'notes' => 'nullable|string',
             'provisional_diagnosis' => 'nullable|string',
             'operations' => 'nullable|string',
+            'medical_history' => 'nullable|string',
+            'current_medications' => 'nullable|string',
+            'referral_source' => 'nullable|string|max:255',
+            'expected_discharge_date' => 'nullable|date',
+            'next_of_kin_name' => 'nullable|string|max:255',
+            'next_of_kin_relation' => 'nullable|string|max:255',
+            'next_of_kin_phone' => 'nullable|string|max:255',
         ]);
+
+        // Debug: Log validated data
+        \Log::info('Admission Store - Validated Data:', $validatedData);
 
         // Check if bed is available
         $bed = Bed::findOrFail($validatedData['bed_id']);
         if (!$bed->isAvailable()) {
             return response()->json(['message' => 'السرير غير متاح حالياً.'], 400);
-    }
+        }
 
         // Verify bed belongs to room and room belongs to ward
         if ($bed->room_id != $validatedData['room_id']) {
@@ -102,7 +112,7 @@ class AdmissionController extends Controller
         DB::transaction(function () use (&$admission, $validatedData, $bed) {
             // Set user_id to current authenticated user
             $validatedData['user_id'] = Auth::id();
-            
+
             // Set admission time if not provided
             if (empty($validatedData['admission_time'])) {
                 $validatedData['admission_time'] = Carbon::now()->format('H:i:s');
@@ -117,7 +127,7 @@ class AdmissionController extends Controller
             // Auto-add file opening fee service
             $fileOpeningServiceName = 'رسوم فتح الملف';
             $fileOpeningService = Service::where('name', $fileOpeningServiceName)->first();
-            
+
             if (!$fileOpeningService) {
                 // Get first service group or create a default one
                 $serviceGroup = ServiceGroup::first();
@@ -125,10 +135,10 @@ class AdmissionController extends Controller
                     // Create a default service group if none exists
                     $serviceGroup = ServiceGroup::create([
                         'name' => 'رسوم عامة',
-                        
+
                     ]);
                 }
-                
+
                 // Create the file opening fee service
                 $fileOpeningService = Service::create([
                     'name' => $fileOpeningServiceName,
@@ -167,7 +177,7 @@ class AdmissionController extends Controller
                     'user_id' => Auth::id(),
                 ]);
             }
-            
+
             // Sync specialist_doctor_id to patient if provided
             if (isset($validatedData['specialist_doctor_id']) && $validatedData['specialist_doctor_id']) {
                 $admission->patient->update(['specialist_doctor_id' => $validatedData['specialist_doctor_id']]);
@@ -198,6 +208,13 @@ class AdmissionController extends Controller
             'notes' => 'nullable|string',
             'provisional_diagnosis' => 'nullable|string',
             'operations' => 'nullable|string',
+            'medical_history' => 'nullable|string',
+            'current_medications' => 'nullable|string',
+            'referral_source' => 'nullable|string|max:255',
+            'expected_discharge_date' => 'nullable|date',
+            'next_of_kin_name' => 'nullable|string|max:255',
+            'next_of_kin_relation' => 'nullable|string|max:255',
+            'next_of_kin_phone' => 'nullable|string|max:255',
         ]);
 
         $admission->update($validatedData);
@@ -218,7 +235,7 @@ class AdmissionController extends Controller
         $totalCredits = (float) $admission->transactions()->where('type', 'credit')->sum('amount');
         $totalDebits = (float) $admission->transactions()->where('type', 'debit')->sum('amount');
         $balance = $totalCredits - $totalDebits;
-        
+
         if (abs($balance) > 0.01) { // Allow small floating point differences
             return response()->json([
                 'message' => 'لا يمكن إخراج المريض. الرصيد يجب أن يكون صفراً.',
@@ -329,7 +346,7 @@ class AdmissionController extends Controller
     public function getActive(Request $request)
     {
         $query = Admission::with(['patient', 'ward', 'room', 'bed', 'doctor'])
-                         ->where('status', 'admitted');
+            ->where('status', 'admitted');
 
         // Ward filter
         if ($request->has('ward_id') && $request->ward_id) {
@@ -337,10 +354,9 @@ class AdmissionController extends Controller
         }
 
         $admissions = $query->orderBy('admission_date', 'desc')
-                           ->orderBy('admission_time', 'desc')
-                           ->get();
+            ->orderBy('admission_time', 'desc')
+            ->get();
 
         return AdmissionResource::collection($admissions);
     }
-
 }
