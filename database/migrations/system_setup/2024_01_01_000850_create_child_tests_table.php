@@ -21,21 +21,21 @@ return new class extends Migration
             $table->string('mean')->nullable();
             $table->string('upper_limit')->nullable();
             $table->unsignedBigInteger('main_test_id');
-            $table->text('defval')->default('''');
+            $table->text('defval')->nullable();
             $table->unsignedBigInteger('unit_id')->nullable();
-            $table->text('normalRange')->default('''');
+            $table->text('normalRange')->nullable();
             $table->decimal('max', 8, 2)->nullable();
             $table->decimal('lowest', 8, 2)->nullable();
             $table->integer('test_order')->nullable();
             $table->unsignedBigInteger('child_group_id')->nullable();
             $table->foreign('child_group_id', 'child_tests_child_group_id_foreign')
-                  ->references('id')
-                  ->on('child_groups')
-                  ->onDelete('cascade');
+                ->references('id')
+                ->on('child_groups')
+                ->onDelete('cascade');
             $table->foreign('unit_id', 'child_tests_unit_id_foreign')
-                  ->references('id')
-                  ->on('units')
-                  ->onDelete('cascade');
+                ->references('id')
+                ->on('units')
+                ->onDelete('cascade');
         });
     }
 

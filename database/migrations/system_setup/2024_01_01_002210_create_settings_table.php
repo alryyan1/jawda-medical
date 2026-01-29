@@ -58,7 +58,7 @@ return new class extends Migration
             $table->unsignedBigInteger('pharmacy_bank')->nullable();
             $table->unsignedBigInteger('pharmacy_cash')->nullable();
             $table->unsignedBigInteger('pharmacy_income')->nullable();
-            $table->text('welcome_message')->nullable()->default(''? مرحباً بكم في مستشفى الرومي للأسنان! ✨\n\n? يسعدنا اختياركم لنا للعناية بصحة أسنانكم.\n\n?‍⚕️?‍⚕️ فريقنا المتخصص ملتزم بتقديم خدمات استثنائية في بيئة مريحة.\n\n? ابتسامتكم هي أولويتنا!\n\n? للاستفسارات، يرجى التواصل معنا وسنكون سعداء بالرد على استفساراتكم.\n\n? شكراً لثقتكم بنا.'');
+            $table->text('welcome_message')->nullable()->default('');
             $table->boolean('send_welcome_message')->nullable();
             $table->string('default_lab_report_template', 255)->nullable();
             $table->string('watermark_image', 255)->nullable();
