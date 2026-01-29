@@ -12,12 +12,25 @@ class RoomAndBedSeeder extends Seeder
      */
     public function run(): void
     {
-        // Get all wards
+        // Create 3 default wards if none exist
         $wards = \App\Models\Ward::all();
 
         if ($wards->isEmpty()) {
-            $this->command->error('No wards found. Please run WardSeeder first.');
-            return;
+            $this->command->info('No wards found. Creating 3 default wards...');
+
+            $wardData = [
+                ['name' => 'الباطنية', 'description' => 'قسم الأمراض الباطنية'],
+                ['name' => 'الجراحة', 'description' => 'قسم الجراحة العامة'],
+                ['name' => 'العناية المركزة', 'description' => 'وحدة العناية المركزة'],
+            ];
+
+            foreach ($wardData as $data) {
+                $ward = \App\Models\Ward::create($data);
+                $this->command->info("Created Ward: {$ward->name}");
+            }
+
+            // Reload wards
+            $wards = \App\Models\Ward::all();
         }
 
         $this->command->info('Creating 10 rooms with 10 beds each...');

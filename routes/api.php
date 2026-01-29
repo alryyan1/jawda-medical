@@ -320,6 +320,15 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('admission-vital-signs/{vitalSign}', [AdmissionVitalSignController::class, 'update']);
   Route::delete('admission-vital-signs/{vitalSign}', [AdmissionVitalSignController::class, 'destroy']);
 
+  /*
+    |--------------------------------------------------------------------------
+    | Operations Management Routes (Surgical Operations)
+    |--------------------------------------------------------------------------
+    */
+  Route::get('operations/financial-report', [\App\Http\Controllers\Api\OperationController::class, 'getFinancialReport']);
+  Route::apiResource('operations', \App\Http\Controllers\Api\OperationController::class);
+
+
   // PDF Settings
   Route::get('pdf-settings', [PdfSettingController::class, 'index']);
   Route::put('pdf-settings', [PdfSettingController::class, 'update']);
