@@ -16,9 +16,17 @@ class OperationController extends Controller
     /**
      * Display a listing of operations
      */
+    /**
+     * Display a listing of operations
+     */
     public function index(Request $request)
     {
-        $query = Operation::with(['admission.patient', 'user', 'financeItems']);
+        $query = Operation::with(['admission.patient', 'user', 'financeItems.operationItem', 'costs.operationItem']);
+
+        // Filter for templates (settings page)
+        if ($request->has('is_template') && $request->is_template) {
+            $query->whereNull('admission_id');
+        }
 
         // Filter by status
         if ($request->has('status') && $request->status !== '') {
@@ -62,10 +70,12 @@ class OperationController extends Controller
             'bank_receipt_image' => 'nullable|image|max:2048',
             'notes' => 'nullable|string',
             'manual_items' => 'nullable|array',
-            'manual_items.*.item_type' => 'required|string',
-            'manual_items.*.category' => 'required|in:staff,center',
-            'manual_items.*.description' => 'nullable|string',
-            'manual_items.*.amount' => 'required|numeric|min:0',
+
+            // Costs Validation
+            'costs' => 'nullable|array',
+            'costs.*.operation_item_id' => 'required|exists:operation_items,id',
+            'costs.*.perc' => 'nullable|numeric|min:0|max:100',
+            'costs.*.fixed' => 'nullable|numeric|min:0',
         ]);
 
         return DB::transaction(function () use ($validatedData, $request) {
@@ -81,7 +91,18 @@ class OperationController extends Controller
 
             $operation = Operation::create($validatedData);
 
-            // Calculate automatic items
+            // Sync Costs (Config)
+            if (isset($validatedData['costs'])) {
+                foreach ($validatedData['costs'] as $cost) {
+                    $operation->costs()->create([
+                        'operation_item_id' => $cost['operation_item_id'],
+                        'perc' => $cost['perc'] ?? null,
+                        'fixed' => $cost['fixed'] ?? null,
+                    ]);
+                }
+            }
+
+            // Calculate automatic items (Logic can be updated to use costs config if needed later)
             $operation->calculateAutoItems();
 
             // Add manual items if provided
@@ -100,7 +121,7 @@ class OperationController extends Controller
                 $operation->updateTotals();
             }
 
-            return new OperationResource($operation->load(['admission.patient', 'user', 'financeItems']));
+            return new OperationResource($operation->load(['admission.patient', 'user', 'financeItems.operationItem', 'costs.operationItem']));
         });
     }
 
@@ -109,7 +130,7 @@ class OperationController extends Controller
      */
     public function show(Operation $operation)
     {
-        return new OperationResource($operation->load(['admission.patient', 'user', 'financeItems']));
+        return new OperationResource($operation->load(['admission.patient', 'user', 'financeItems.operationItem', 'costs.operationItem']));
     }
 
     /**
@@ -129,10 +150,12 @@ class OperationController extends Controller
             'notes' => 'nullable|string',
             'status' => 'sometimes|in:pending,completed,cancelled',
             'manual_items' => 'nullable|array',
-            'manual_items.*.item_type' => 'required|string',
-            'manual_items.*.category' => 'required|in:staff,center',
-            'manual_items.*.description' => 'nullable|string',
-            'manual_items.*.amount' => 'required|numeric|min:0',
+
+            // Costs Validation
+            'costs' => 'nullable|array',
+            'costs.*.operation_item_id' => 'required|exists:operation_items,id',
+            'costs.*.perc' => 'nullable|numeric|min:0|max:100',
+            'costs.*.fixed' => 'nullable|numeric|min:0',
         ]);
 
         return DB::transaction(function () use ($validatedData, $request, $operation) {
@@ -148,21 +171,40 @@ class OperationController extends Controller
 
             $operation->update($validatedData);
 
+            // Update Costs if provided
+            if (isset($validatedData['costs'])) {
+                // Determine if we should sync (delete all and add) or update.
+                // Sync is safer for config lists.
+                $operation->costs()->delete();
+                foreach ($validatedData['costs'] as $cost) {
+                    $operation->costs()->create([
+                        'operation_item_id' => $cost['operation_item_id'],
+                        'perc' => $cost['perc'] ?? null,
+                        'fixed' => $cost['fixed'] ?? null,
+                    ]);
+                }
+            }
+
             // If surgeon fee changed, recalculate auto items
-            if (isset($validatedData['surgeon_fee'])) {
+            // But skip if 'skip_auto_calculations' is true
+            if (isset($validatedData['surgeon_fee']) && !$request->boolean('skip_auto_calculations')) {
                 $operation->calculateAutoItems();
             }
 
             // Update manual items if provided
             if (isset($validatedData['manual_items'])) {
-                // Delete old manual items
-                $operation->financeItems()->where('is_auto_calculated', false)->delete();
+                // If skipping auto calculations, we might want to treat ALL provided items as the source of truth
+                if ($request->boolean('skip_auto_calculations')) {
+                    // If we took full control, maybe we should delete ALL items before adding new ones?
+                    $operation->financeItems()->delete();
+                } else {
+                    $operation->financeItems()->where('is_auto_calculated', false)->delete();
+                }
 
                 // Add new manual items
                 foreach ($validatedData['manual_items'] as $item) {
                     $operation->financeItems()->create([
-                        'item_type' => $item['item_type'],
-                        'category' => $item['category'],
+                        'operation_item_id' => $item['operation_item_id'] ?? null,
                         'description' => $item['description'] ?? null,
                         'amount' => $item['amount'],
                         'is_auto_calculated' => false,
@@ -173,7 +215,7 @@ class OperationController extends Controller
                 $operation->updateTotals();
             }
 
-            return new OperationResource($operation->fresh()->load(['admission.patient', 'user', 'financeItems']));
+            return new OperationResource($operation->fresh()->load(['admission.patient', 'user', 'financeItems.operationItem', 'costs.operationItem']));
         });
     }
 
@@ -231,5 +273,29 @@ class OperationController extends Controller
             'total_balance' => $totalBalance,
             'operations' => OperationResource::collection($operations),
         ]);
+    }
+
+    /**
+     * Get list of operation items (catalogue)
+     */
+    public function getItems()
+    {
+        $items = \App\Models\OperationItem::where('is_active', true)->get();
+        return response()->json($items);
+    }
+
+    /**
+     * Generate Financial Report PDF
+     */
+    public function printReport(Operation $operation)
+    {
+        $operation->load(['admission.patient', 'financeItems']);
+
+        $report = new \App\Services\Pdf\OperationFinancialReport($operation);
+        $pdfContent = $report->generate();
+
+        return response($pdfContent)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="operation-report-' . $operation->id . '.pdf"');
     }
 }

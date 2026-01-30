@@ -5,31 +5,33 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class OperationFinanceItem extends Model
+class OperationCost extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'operation_id',
-        'operation_item_id', // Changed from item_type/category
-        'description',
-        'amount',
-        'is_auto_calculated',
+        'operation_item_id',
+        'perc',
+        'fixed',
     ];
 
     protected $casts = [
-        'amount' => 'decimal:2',
-        'is_auto_calculated' => 'boolean',
+        'perc' => 'decimal:2',
+        'fixed' => 'decimal:2',
     ];
 
     /**
-     * Relationship
+     * Relationship: Linked to the Operation Template (Settings)
      */
     public function operation()
     {
         return $this->belongsTo(Operation::class);
     }
 
+    /**
+     * Relationship: Linked to the Catalogue Item
+     */
     public function operationItem()
     {
         return $this->belongsTo(OperationItem::class);

@@ -124,59 +124,8 @@ class AdmissionController extends Controller
             // Update bed status to occupied
             $bed->update(['status' => 'occupied']);
 
-            // Auto-add file opening fee service
-            $fileOpeningServiceName = 'رسوم فتح الملف';
-            $fileOpeningService = Service::where('name', $fileOpeningServiceName)->first();
+            // Auto-add file opening fee service removed
 
-            if (!$fileOpeningService) {
-                // Get first service group or create a default one
-                $serviceGroup = ServiceGroup::first();
-                if (!$serviceGroup) {
-                    // Create a default service group if none exists
-                    $serviceGroup = ServiceGroup::create([
-                        'name' => 'رسوم عامة',
-
-                    ]);
-                }
-
-                // Create the file opening fee service
-                $fileOpeningService = Service::create([
-                    'name' => $fileOpeningServiceName,
-                    'service_group_id' => $serviceGroup->id,
-                    'price' => 25000, // Default price, can be configured later
-                    'activate' => true,
-                    'variable' => false,
-                ]);
-            }
-
-            // Add the service to the admission
-            if ($fileOpeningService && $fileOpeningService->price > 0) {
-                $requestedService = AdmissionRequestedService::create([
-                    'admission_id' => $admission->id,
-                    'service_id' => $fileOpeningService->id,
-                    'user_id' => Auth::id(),
-                    'doctor_id' => $admission->doctor_id,
-                    'price' => (float) $fileOpeningService->price,
-                    'endurance' => 0,
-                    'discount' => 0,
-                    'discount_per' => 0,
-                    'count' => 1,
-                    'approval' => false,
-                    'done' => false,
-                ]);
-
-                // Create debit transaction for the service
-                AdmissionTransaction::create([
-                    'admission_id' => $admission->id,
-                    'type' => 'debit',
-                    'amount' => (float) $fileOpeningService->price,
-                    'description' => $fileOpeningServiceName,
-                    'reference_type' => 'service',
-                    'reference_id' => $requestedService->id,
-                    'is_bank' => false,
-                    'user_id' => Auth::id(),
-                ]);
-            }
 
             // Sync specialist_doctor_id to patient if provided
             if (isset($validatedData['specialist_doctor_id']) && $validatedData['specialist_doctor_id']) {

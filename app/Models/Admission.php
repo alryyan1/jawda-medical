@@ -150,6 +150,14 @@ class Admission extends Model
     }
 
     /**
+     * Get the operations for the admission.
+     */
+    public function operations()
+    {
+        return $this->hasMany(Operation::class);
+    }
+
+    /**
      * Calculate the number of days the patient has been admitted.
      * If discharged, calculate from admission_date to discharge_date.
      * If still admitted, calculate from admission_date to current date.

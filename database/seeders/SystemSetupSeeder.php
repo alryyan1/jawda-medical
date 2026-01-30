@@ -106,7 +106,7 @@ class SystemSetupSeeder extends Seeder
 
         // 6. Reset Auto Increment
         \DB::statement('ALTER TABLE patients AUTO_INCREMENT = 1000;');
-        \DB::statement('ALTER TABLE doctor_visits AUTO_INCREMENT = 1000;');
+        \DB::statement('ALTER TABLE doctorvisits AUTO_INCREMENT = 1000;');
 
         \DB::statement('SET FOREIGN_KEY_CHECKS=1;');
     }

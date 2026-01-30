@@ -326,7 +326,10 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
   Route::get('operations/financial-report', [\App\Http\Controllers\Api\OperationController::class, 'getFinancialReport']);
+  Route::get('operations/items', [\App\Http\Controllers\Api\OperationController::class, 'getItems']);
+  Route::get('operations/{operation}/print-report', [\App\Http\Controllers\Api\OperationController::class, 'printReport']);
   Route::apiResource('operations', \App\Http\Controllers\Api\OperationController::class);
+  Route::apiResource('medical-operations', \App\Http\Controllers\Api\MedicalOperationController::class);
 
 
   // PDF Settings
