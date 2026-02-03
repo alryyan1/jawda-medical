@@ -24,6 +24,7 @@ class AdmissionResource extends JsonResource
             'room' => new RoomResource($this->whenLoaded('room')),
             'bed_id' => $this->bed_id,
             'bed' => new BedResource($this->whenLoaded('bed')),
+            'booking_type' => $this->booking_type ?? 'bed',
             'admission_date' => $this->admission_date?->toDateString(),
             'admission_time' => $this->admission_time?->format('H:i:s'),
             'discharge_date' => $this->discharge_date?->toDateString(),

@@ -76,6 +76,17 @@ class OperationController extends Controller
             'costs.*.operation_item_id' => 'required|exists:operation_items,id',
             'costs.*.perc' => 'nullable|numeric|min:0|max:100',
             'costs.*.fixed' => 'nullable|numeric|min:0',
+            'costs.*.is_surgeon' => 'nullable|boolean',
+            'costs' => [
+                'nullable',
+                'array',
+                function ($attribute, $value, $fail) {
+                    $surgeonCount = collect($value)->where('is_surgeon', true)->count();
+                    if ($surgeonCount > 1) {
+                        $fail('لا يمكن اختيار أكثر من جراح واحد للعملية.');
+                    }
+                },
+            ],
         ]);
 
         return DB::transaction(function () use ($validatedData, $request) {
@@ -98,6 +109,7 @@ class OperationController extends Controller
                         'operation_item_id' => $cost['operation_item_id'],
                         'perc' => $cost['perc'] ?? null,
                         'fixed' => $cost['fixed'] ?? null,
+                        'is_surgeon' => $cost['is_surgeon'] ?? false,
                     ]);
                 }
             }
@@ -156,6 +168,17 @@ class OperationController extends Controller
             'costs.*.operation_item_id' => 'required|exists:operation_items,id',
             'costs.*.perc' => 'nullable|numeric|min:0|max:100',
             'costs.*.fixed' => 'nullable|numeric|min:0',
+            'costs.*.is_surgeon' => 'nullable|boolean',
+            'costs' => [
+                'nullable',
+                'array',
+                function ($attribute, $value, $fail) {
+                    $surgeonCount = collect($value)->where('is_surgeon', true)->count();
+                    if ($surgeonCount > 1) {
+                        $fail('لا يمكن اختيار أكثر من جراح واحد للعملية.');
+                    }
+                },
+            ],
         ]);
 
         return DB::transaction(function () use ($validatedData, $request, $operation) {
@@ -181,6 +204,7 @@ class OperationController extends Controller
                         'operation_item_id' => $cost['operation_item_id'],
                         'perc' => $cost['perc'] ?? null,
                         'fixed' => $cost['fixed'] ?? null,
+                        'is_surgeon' => $cost['is_surgeon'] ?? false,
                     ]);
                 }
             }
@@ -207,7 +231,7 @@ class OperationController extends Controller
                         'operation_item_id' => $item['operation_item_id'] ?? null,
                         'description' => $item['description'] ?? null,
                         'amount' => $item['amount'],
-                        'is_auto_calculated' => false,
+                        'is_auto_calculated' => $item['is_auto_calculated'] ?? false,
                     ]);
                 }
 
@@ -228,6 +252,10 @@ class OperationController extends Controller
         if ($operation->bank_receipt_image) {
             Storage::disk('public')->delete($operation->bank_receipt_image);
         }
+
+        // Delete related items
+        $operation->financeItems()->delete();
+        $operation->costs()->delete();
 
         $operation->delete();
 

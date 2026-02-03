@@ -7,6 +7,9 @@ use App\Http\Controllers\Api\AdmissionVitalSignController;
 use App\Http\Controllers\Api\AdmissionRequestedServiceDepositController;
 use App\Http\Controllers\Api\AdmissionDepositController;
 use App\Http\Controllers\Api\AdmissionTransactionController;
+use App\Http\Controllers\Api\AdmissionTreatmentController;
+use App\Http\Controllers\Api\AdmissionDoseController;
+use App\Http\Controllers\Api\AdmissionNursingAssignmentController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
 use App\Http\Controllers\Api\AttendanceController;
@@ -319,6 +322,27 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('admissions/{admission}/vital-signs', [AdmissionVitalSignController::class, 'store']);
   Route::put('admission-vital-signs/{vitalSign}', [AdmissionVitalSignController::class, 'update']);
   Route::delete('admission-vital-signs/{vitalSign}', [AdmissionVitalSignController::class, 'destroy']);
+
+  // Admission Treatments
+  Route::get('admissions/{admission}/treatments', [AdmissionTreatmentController::class, 'index']);
+  Route::post('admissions/{admission}/treatments', [AdmissionTreatmentController::class, 'store']);
+  Route::get('admissions/{admission}/treatments/{treatment}', [AdmissionTreatmentController::class, 'show']);
+  Route::put('admissions/{admission}/treatments/{treatment}', [AdmissionTreatmentController::class, 'update']);
+  Route::delete('admissions/{admission}/treatments/{treatment}', [AdmissionTreatmentController::class, 'destroy']);
+
+  // Admission Doses
+  Route::get('admissions/{admission}/doses', [AdmissionDoseController::class, 'index']);
+  Route::post('admissions/{admission}/doses', [AdmissionDoseController::class, 'store']);
+  Route::get('admissions/{admission}/doses/{dose}', [AdmissionDoseController::class, 'show']);
+  Route::put('admissions/{admission}/doses/{dose}', [AdmissionDoseController::class, 'update']);
+  Route::delete('admissions/{admission}/doses/{dose}', [AdmissionDoseController::class, 'destroy']);
+
+  // Admission Nursing Assignments
+  Route::get('admissions/{admission}/nursing-assignments', [AdmissionNursingAssignmentController::class, 'index']);
+  Route::post('admissions/{admission}/nursing-assignments', [AdmissionNursingAssignmentController::class, 'store']);
+  Route::get('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'show']);
+  Route::put('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'update']);
+  Route::delete('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'destroy']);
 
   /*
     |--------------------------------------------------------------------------

@@ -72,7 +72,8 @@ class AdmissionController extends Controller
             'patient_id' => 'required|exists:patients,id',
             'ward_id' => 'required|exists:wards,id',
             'room_id' => 'required|exists:rooms,id',
-            'bed_id' => 'required|exists:beds,id',
+            'bed_id' => 'nullable|exists:beds,id',
+            'booking_type' => 'required|in:bed,room',
             'admission_date' => 'required|date',
             'admission_time' => 'nullable|date_format:H:i:s',
             'admission_type' => 'nullable|string|max:255',
@@ -92,24 +93,31 @@ class AdmissionController extends Controller
             'next_of_kin_phone' => 'nullable|string|max:255',
         ]);
 
+        // Validate bed_id is required when booking_type is 'bed'
+        if ($validatedData['booking_type'] === 'bed' && empty($validatedData['bed_id'])) {
+            return response()->json(['message' => 'السرير مطلوب عند اختيار نوع الحجز "سرير".'], 400);
+        }
+
         // Debug: Log validated data
         \Log::info('Admission Store - Validated Data:', $validatedData);
 
-        // Check if bed is available
-        $bed = Bed::findOrFail($validatedData['bed_id']);
-        if (!$bed->isAvailable()) {
-            return response()->json(['message' => 'السرير غير متاح حالياً.'], 400);
+        // Check if bed is available (only if booking_type is 'bed')
+        if ($validatedData['booking_type'] === 'bed') {
+            $bed = Bed::findOrFail($validatedData['bed_id']);
+            if (!$bed->isAvailable()) {
+                return response()->json(['message' => 'السرير غير متاح حالياً.'], 400);
+            }
+
+            // Verify bed belongs to room and room belongs to ward
+            if ($bed->room_id != $validatedData['room_id']) {
+                return response()->json(['message' => 'السرير لا ينتمي للغرفة المحددة.'], 400);
+            }
+            if ($bed->room->ward_id != $validatedData['ward_id']) {
+                return response()->json(['message' => 'الغرفة لا تنتمي للقسم المحدد.'], 400);
+            }
         }
 
-        // Verify bed belongs to room and room belongs to ward
-        if ($bed->room_id != $validatedData['room_id']) {
-            return response()->json(['message' => 'السرير لا ينتمي للغرفة المحددة.'], 400);
-        }
-        if ($bed->room->ward_id != $validatedData['ward_id']) {
-            return response()->json(['message' => 'الغرفة لا تنتمي للقسم المحدد.'], 400);
-        }
-
-        DB::transaction(function () use (&$admission, $validatedData, $bed) {
+        DB::transaction(function () use (&$admission, $validatedData) {
             // Set user_id to current authenticated user
             $validatedData['user_id'] = Auth::id();
 
@@ -118,11 +126,21 @@ class AdmissionController extends Controller
                 $validatedData['admission_time'] = Carbon::now()->format('H:i:s');
             }
 
+            // Set default booking_type if not provided
+            if (empty($validatedData['booking_type'])) {
+                $validatedData['booking_type'] = 'bed';
+            }
+
             // Create admission
             $admission = Admission::create($validatedData);
 
-            // Update bed status to occupied
-            $bed->update(['status' => 'occupied']);
+            // Update bed status to occupied (only if booking_type is 'bed')
+            if ($validatedData['booking_type'] === 'bed' && isset($validatedData['bed_id'])) {
+                $bed = Bed::find($validatedData['bed_id']);
+                if ($bed) {
+                    $bed->update(['status' => 'occupied']);
+                }
+            }
 
             // Auto-add file opening fee service removed
 
@@ -150,6 +168,10 @@ class AdmissionController extends Controller
     public function update(Request $request, Admission $admission)
     {
         $validatedData = $request->validate([
+            'ward_id' => 'nullable|exists:wards,id',
+            'room_id' => 'nullable|exists:rooms,id',
+            'bed_id' => 'nullable|exists:beds,id',
+            'booking_type' => 'nullable|in:bed,room',
             'admission_reason' => 'nullable|string',
             'diagnosis' => 'nullable|string',
             'doctor_id' => 'nullable|exists:doctors,id',
@@ -165,6 +187,11 @@ class AdmissionController extends Controller
             'next_of_kin_relation' => 'nullable|string|max:255',
             'next_of_kin_phone' => 'nullable|string|max:255',
         ]);
+
+        // Validate bed_id is required when booking_type is 'bed'
+        if (isset($validatedData['booking_type']) && $validatedData['booking_type'] === 'bed' && empty($validatedData['bed_id'])) {
+            return response()->json(['message' => 'السرير مطلوب عند اختيار نوع الحجز "سرير".'], 400);
+        }
 
         $admission->update($validatedData);
 
@@ -215,8 +242,10 @@ class AdmissionController extends Controller
                 'notes' => $validatedData['notes'] ?? $admission->notes,
             ]);
 
-            // Update bed status to available
-            $admission->bed->update(['status' => 'available']);
+            // Update bed status to available (only if bed exists)
+            if ($admission->bed_id && $admission->bed) {
+                $admission->bed->update(['status' => 'available']);
+            }
         });
 
         return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));

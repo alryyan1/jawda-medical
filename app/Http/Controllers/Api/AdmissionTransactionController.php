@@ -38,7 +38,7 @@ class AdmissionTransactionController extends Controller
             'type' => 'required|in:debit,credit',
             'amount' => 'required|numeric|min:0.01',
             'description' => 'required|string|max:255',
-            'reference_type' => 'nullable|in:service,deposit,manual,lab_test',
+            'reference_type' => 'nullable|in:service,deposit,manual,lab_test,room_charges',
             'reference_id' => 'nullable|integer',
             'is_bank' => 'boolean',
             'notes' => 'nullable|string',
@@ -81,24 +81,24 @@ class AdmissionTransactionController extends Controller
         // Calculate totals
         $totalCredits = (float) $transactions->where('type', 'credit')->sum('amount');
         $totalDebits = (float) $transactions->where('type', 'debit')->sum('amount');
-        $balance = $totalCredits - $totalDebits;
+        $balance = $totalDebits - $totalCredits;  // المستحقات - المدفوعات
 
         // Build ledger entries
         $entries = [];
         $runningBalance = 0;
 
         foreach ($transactions as $transaction) {
-            if ($transaction->type === 'credit') {
-                $runningBalance += (float) $transaction->amount;
+            if ($transaction->type === 'debit') {
+                $runningBalance += (float) $transaction->amount;  // الرسوم تزيد الرصيد المطلوب
             } else {
-                $runningBalance -= (float) $transaction->amount;
+                $runningBalance -= (float) $transaction->amount;  // الدفعات تقلل الرصيد المطلوب
             }
 
             $entries[] = [
                 'id' => $transaction->id,
                 'type' => $transaction->type,
                 'description' => $transaction->description,
-                'amount' => $transaction->type === 'credit' ? (float) $transaction->amount : -(float) $transaction->amount,
+                'amount' => $transaction->type === 'debit' ? (float) $transaction->amount : -(float) $transaction->amount,
                 'is_bank' => $transaction->is_bank,
                 'date' => $transaction->created_at->toDateString(),
                 'time' => $transaction->created_at->format('H:i:s'),
@@ -132,7 +132,7 @@ class AdmissionTransactionController extends Controller
     {
         $totalCredits = (float) $admission->transactions()->where('type', 'credit')->sum('amount');
         $totalDebits = (float) $admission->transactions()->where('type', 'debit')->sum('amount');
-        $balance = $totalCredits - $totalDebits;
+        $balance = $totalDebits - $totalCredits;  // المستحقات - المدفوعات
         
         return response()->json([
             'balance' => $balance,

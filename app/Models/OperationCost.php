@@ -14,11 +14,13 @@ class OperationCost extends Model
         'operation_item_id',
         'perc',
         'fixed',
+        'is_surgeon',
     ];
 
     protected $casts = [
         'perc' => 'decimal:2',
         'fixed' => 'decimal:2',
+        'is_surgeon' => 'boolean',
     ];
 
     /**
