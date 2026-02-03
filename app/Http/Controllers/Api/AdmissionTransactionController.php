@@ -38,7 +38,7 @@ class AdmissionTransactionController extends Controller
             'type' => 'required|in:debit,credit',
             'amount' => 'required|numeric|min:0.01',
             'description' => 'required|string|max:255',
-            'reference_type' => 'nullable|in:service,deposit,manual,lab_test,room_charges',
+            'reference_type' => 'nullable|in:service,deposit,manual,lab_test,room_charges,charge,discount',
             'reference_id' => 'nullable|integer',
             'is_bank' => 'boolean',
             'notes' => 'nullable|string',

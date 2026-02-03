@@ -47,4 +47,15 @@ class Room extends Model
     {
         return $this->hasMany(Admission::class);
     }
+
+    /**
+     * Get the current active admission for the room (room booking type only).
+     */
+    public function currentAdmission()
+    {
+        return $this->hasOne(Admission::class)
+            ->where('status', 'admitted')
+            ->where('booking_type', 'room')
+            ->latest('admission_date');
+    }
 }

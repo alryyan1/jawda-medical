@@ -16,7 +16,7 @@ class RoomController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Room::with(['ward', 'beds'])->withCount('beds');
+        $query = Room::with(['ward', 'beds', 'currentAdmission'])->withCount('beds');
 
         // Search filter
         if ($request->has('search') && !empty($request->search)) {

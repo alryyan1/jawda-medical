@@ -27,6 +27,10 @@ class RoomResource extends JsonResource
             'updated_at' => $this->updated_at?->toIso8601String(),
             'beds' => BedResource::collection($this->whenLoaded('beds')),
             'beds_count' => $this->whenLoaded('beds', fn() => $this->beds->count()),
+            'current_admission' => new AdmissionResource($this->whenLoaded('currentAdmission')),
+            'is_fully_occupied' => $this->whenLoaded('currentAdmission', function() {
+                return $this->currentAdmission !== null;
+            }),
         ];
     }
 }

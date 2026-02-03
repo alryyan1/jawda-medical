@@ -1,0 +1,432 @@
+{
+  "info": {
+    "name": "Admission System API Tests",
+    "description": "Complete API test collection for Admission System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost/jawda-medical/public/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admission_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "patient_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ward_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "room_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bed_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.token) {",
+                  "        pm.collectionVariables.set('token', jsonData.token);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": ["{{base_url}}"],
+              "path": ["login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admissions",
+      "item": [
+        {
+          "name": "Get All Admissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admissions?page=1&per_page=15",
+              "host": ["{{base_url}}"],
+              "path": ["admissions"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "per_page",
+                  "value": "15"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Active Admissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admissions/active",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "active"]
+            }
+          }
+        },
+        {
+          "name": "Create Bed-based Admission",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.collectionVariables.set('admission_id', jsonData.data.id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": {{patient_id}},\n  \"ward_id\": {{ward_id}},\n  \"room_id\": {{room_id}},\n  \"bed_id\": {{bed_id}},\n  \"booking_type\": \"bed\",\n  \"admission_date\": \"2026-02-03\",\n  \"admission_time\": \"10:30:00\",\n  \"diagnosis\": \"Test diagnosis\",\n  \"admission_type\": \"emergency\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admissions",
+              "host": ["{{base_url}}"],
+              "path": ["admissions"]
+            }
+          }
+        },
+        {
+          "name": "Create Room-based Admission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": {{patient_id}},\n  \"ward_id\": {{ward_id}},\n  \"room_id\": {{room_id}},\n  \"bed_id\": null,\n  \"booking_type\": \"room\",\n  \"admission_date\": \"2026-02-03\",\n  \"admission_time\": \"14:00:00\",\n  \"diagnosis\": \"Test diagnosis\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admissions",
+              "host": ["{{base_url}}"],
+              "path": ["admissions"]
+            }
+          }
+        },
+        {
+          "name": "Get Admission by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Admission",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diagnosis\": \"Updated diagnosis\",\n  \"notes\": \"Updated notes\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Transfer Patient",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ward_id\": \"{{ward_id}}\",\n  \"room_id\": \"{{room_id}}\",\n  \"bed_id\": \"{{bed_id}}\",\n  \"notes\": \"Transfer test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}", "transfer"]
+            }
+          }
+        },
+        {
+          "name": "Discharge Patient",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discharge_date\": \"2026-02-05\",\n  \"discharge_time\": \"14:00:00\",\n  \"notes\": \"Discharge test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}/discharge",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}", "discharge"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Get Ledger",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}/ledger",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}", "ledger"]
+            }
+          }
+        },
+        {
+          "name": "Get Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}/balance",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}", "balance"]
+            }
+          }
+        },
+        {
+          "name": "Add Debit Transaction (Charge)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"debit\",\n  \"amount\": 500.00,\n  \"description\": \"Test charge\",\n  \"reference_type\": \"charge\",\n  \"notes\": \"Test notes\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Add Credit Transaction (Payment)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"credit\",\n  \"amount\": 1000.00,\n  \"description\": \"Test payment\",\n  \"reference_type\": \"deposit\",\n  \"is_bank\": false,\n  \"notes\": \"Test notes\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Add Discount",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"debit\",\n  \"amount\": 100.00,\n  \"description\": \"Test discount\",\n  \"reference_type\": \"discount\",\n  \"notes\": \"Test discount notes\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Delete Transaction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admissions/{{admission_id}}/transactions/:transaction_id",
+              "host": ["{{base_url}}"],
+              "path": ["admissions", "{{admission_id}}", "transactions", ":transaction_id"],
+              "variable": [
+                {
+                  "key": "transaction_id",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
