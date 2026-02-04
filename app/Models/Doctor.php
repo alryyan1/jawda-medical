@@ -79,6 +79,7 @@ class Doctor extends Model
         'finance_account_id_insurance', // Corrected name from migration
         'calc_insurance',
         'is_default',
+        'category_id',
     ];
 
     protected $casts = [
@@ -165,6 +166,14 @@ class Doctor extends Model
     {
         return $this->hasMany(DoctorSchedule::class);
     }
+
+    /**
+     * Get the category that the doctor belongs to.
+     */
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
     /**
      * Calculate doctor's credit for a specific visit.
      * This is a placeholder for your specific business logic.
@@ -180,6 +189,15 @@ class Doctor extends Model
         //        }]);
         $array_1 = $this->specificServices()->pluck('service_id')->toArray();
         $total = 0;
+        
+        // Load category with services if doctor has a category
+        $category_service_ids = [];
+        if ($this->category_id && !$this->relationLoaded('category')) {
+            $this->load('category.services');
+        }
+        if ($this->category_id && $this->relationLoaded('category') && $this->category) {
+            $category_service_ids = $this->category->services->pluck('id')->toArray();
+        }
 
         // if ($only_company) {
         //     if ($doctorvisit->patient->company == null) return 0;
@@ -195,8 +213,11 @@ class Doctor extends Model
             $settings = Setting::first();
             $disable_doctor_service_check = $settings->disable_doctor_service_check;
 
-
-            if (in_array($service->service_id, $array_1) || $settings->disable_doctor_service_check) {
+            // Check if service is in individual doctor services OR in category services OR check is disabled
+            $isInIndividualServices = in_array($service->service_id, $array_1);
+            $isInCategoryServices = !empty($category_service_ids) && in_array($service->service_id, $category_service_ids);
+            
+            if ($isInIndividualServices || $isInCategoryServices || $disable_doctor_service_check) {
 
 
                 if ($doctorvisit->patient->company_id != null) {
@@ -207,30 +228,49 @@ class Doctor extends Model
                     $doctor_credit = $total_price * $this->company_percentage / 100;
                     $total += $doctor_credit;
                 } else {
-                    // return 5;
-                    $doctor_service = $this->specificServices->firstWhere(function ($item) use ($service) {
-                        return $item->pivot->service_id == $service->service_id;
-                    });
-                    //log docotorservice
-                    //  Log::info('servcie', [$doctor_service->pivot]);
-
-                    //                    dd($doctor_credit);
-                    if ($doctor_service?->pivot->percentage > 0) {
-
-                        $doctor_credit = $service->amount_paid * $doctor_service->pivot->percentage / 100;
-                    } elseif ($doctor_service?->pivot->fixed > 0 && $doctor_service->pivot->percentage == 0) {
-                        // return 5;
-                        $doctor_credit = $doctor_service->pivot->fixed;
-                    } else {
-
-                        //احتساب مصروفات الخدمه
-                        $totalCost = $service->getTotalCostsForDoctor($this);
-                        $paid = $service->amount_paid;
-                        $paid -= $totalCost;
-                        $doctor_credit = $paid * $this->cash_percentage / 100;
+                    $doctor_credit = 0;
+                    
+                    // Check if doctor has a category and if service exists in category
+                    $category_service = null;
+                    if ($this->category_id) {
+                        $category_service = $this->category->services->firstWhere(function ($item) use ($service) {
+                            return $item->id == $service->service_id;
+                        });
                     }
+                    
+                    // Priority: Category service settings > Individual doctor-service settings > Default percentage
+                    if ($category_service && $category_service->pivot) {
+                        // Use category service settings (priority)
+                        if ($category_service->pivot->percentage > 0) {
+                            $doctor_credit = $service->amount_paid * $category_service->pivot->percentage / 100;
+                        } elseif ($category_service->pivot->fixed > 0 && $category_service->pivot->percentage == 0) {
+                            $doctor_credit = $category_service->pivot->fixed;
+                        } else {
+                            // Fallback to default calculation if category service has no percentage/fixed
+                            $totalCost = $service->getTotalCostsForDoctor($this);
+                            $paid = $service->amount_paid;
+                            $paid -= $totalCost;
+                            $doctor_credit = $paid * $this->cash_percentage / 100;
+                        }
+                    } else {
+                        // Fallback to individual doctor-service settings
+                        $doctor_service = $this->specificServices->firstWhere(function ($item) use ($service) {
+                            return $item->pivot->service_id == $service->service_id;
+                        });
 
-
+                        if ($doctor_service?->pivot->percentage > 0) {
+                            $doctor_credit = $service->amount_paid * $doctor_service->pivot->percentage / 100;
+                        } elseif ($doctor_service?->pivot->fixed > 0 && $doctor_service->pivot->percentage == 0) {
+                            $doctor_credit = $doctor_service->pivot->fixed;
+                        } else {
+                            // Default calculation
+                            //احتساب مصروفات الخدمه
+                            $totalCost = $service->getTotalCostsForDoctor($this);
+                            $paid = $service->amount_paid;
+                            $paid -= $totalCost;
+                            $doctor_credit = $paid * $this->cash_percentage / 100;
+                        }
+                    }
 
                     $total += $doctor_credit;
                 }

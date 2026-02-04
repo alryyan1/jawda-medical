@@ -66,6 +66,7 @@ class DoctorController extends Controller
             'finance_account_id' => 'nullable|exists:finance_accounts,id',
             'calc_insurance' => 'required|boolean',
             'is_default' => 'sometimes|boolean',
+            'category_id' => 'nullable|exists:categories,id',
             // Add validation for linking to a user if applicable
             // 'user_id_to_link' => 'nullable|exists:users,id|unique:doctors,user_id_column_if_doctor_has_user'
         ]);
@@ -116,6 +117,7 @@ class DoctorController extends Controller
             'calc_insurance' => 'sometimes|required|boolean',
             'is_default' => 'sometimes|boolean',
             'firebase_id' => 'sometimes|required|string',
+            'category_id' => 'nullable|exists:categories,id',
         ]);
 
         if ($request->hasFile('image_file')) {

@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\DeviceChildTestNormalRangeController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DoctorController;
 use App\Http\Controllers\Api\DoctorScheduleController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DoctorServiceController;
 use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
@@ -185,6 +186,14 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/doctor-schedules', [DoctorScheduleController::class, 'index']);
   Route::get('/doctors/{doctor}/schedule', [DoctorScheduleController::class, 'getDoctorSchedule']);
   Route::post('/doctors/{doctor}/schedule', [DoctorScheduleController::class, 'storeOrUpdateForDoctor']);
+
+  // Categories Management
+  Route::apiResource('categories', CategoryController::class);
+  Route::post('/categories/{category}/assign-services', [CategoryController::class, 'assignServices']);
+  Route::put('/categories/{category}/services/{service}', [CategoryController::class, 'updateService']);
+  Route::delete('/categories/{category}/services/{service}', [CategoryController::class, 'removeService']);
+  Route::post('/categories/{category}/assign-doctor/{doctor}', [CategoryController::class, 'assignDoctor']);
+  Route::delete('/categories/{category}/remove-doctor/{doctor}', [CategoryController::class, 'removeDoctor']);
 
   /*
     |--------------------------------------------------------------------------
