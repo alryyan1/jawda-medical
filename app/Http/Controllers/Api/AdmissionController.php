@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Admission;
 use App\Models\Bed;
+use App\Models\ShortStayBed;
 use App\Models\Service;
 use App\Models\ServiceGroup;
 use App\Models\AdmissionRequestedService;
@@ -22,7 +23,7 @@ class AdmissionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Admission::with(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']);
+        $query = Admission::with(['patient', 'ward', 'room', 'bed', 'shortStayBed', 'doctor', 'specialistDoctor', 'user']);
 
         // Search filter
         if ($request->has('search') && !empty($request->search)) {
@@ -68,10 +69,11 @@ class AdmissionController extends Controller
      */
     public function store(Request $request)
     {
+        // First, validate basic fields
         $validatedData = $request->validate([
             'patient_id' => 'required|exists:patients,id',
-            'ward_id' => 'required|exists:wards,id',
-            'room_id' => 'required|exists:rooms,id',
+            'ward_id' => 'nullable|exists:wards,id',
+            'room_id' => 'nullable|exists:rooms,id',
             'bed_id' => 'nullable|exists:beds,id',
             'booking_type' => 'required|in:bed,room',
             'admission_date' => 'required|date',
@@ -91,18 +93,52 @@ class AdmissionController extends Controller
             'next_of_kin_name' => 'nullable|string|max:255',
             'next_of_kin_relation' => 'nullable|string|max:255',
             'next_of_kin_phone' => 'nullable|string|max:255',
+            'short_stay_bed_id' => 'nullable|exists:short_stay_beds,id',
+            'short_stay_duration' => 'nullable|in:12h,24h',
         ]);
 
-        // Validate bed_id is required when booking_type is 'bed'
-        if ($validatedData['booking_type'] === 'bed' && empty($validatedData['bed_id'])) {
-            return response()->json(['message' => 'السرير مطلوب عند اختيار نوع الحجز "سرير".'], 400);
+        // Check if this is a short stay admission
+        $isShortStay = !empty($validatedData['short_stay_bed_id']) || 
+                       (!empty($validatedData['admission_type']) && $validatedData['admission_type'] === 'اقامه قصيره');
+
+        if ($isShortStay) {
+            // For short stay, short_stay_bed_id and short_stay_duration are required
+            if (empty($validatedData['short_stay_bed_id'])) {
+                return response()->json([
+                    'message' => 'يرجى اختيار سرير الإقامة القصيرة.',
+                    'errors' => [
+                        'short_stay_bed_id' => ['سرير الإقامة القصيرة مطلوب عند اختيار نوع الإقامة "إقامة قصيرة".']
+                    ]
+                ], 400);
+            }
+            if (empty($validatedData['short_stay_duration'])) {
+                return response()->json([
+                    'message' => 'يرجى تحديد مدة الإقامة القصيرة (12 ساعة أو 24 ساعة).',
+                    'errors' => [
+                        'short_stay_duration' => ['مدة الإقامة القصيرة مطلوبة (12h أو 24h).']
+                    ]
+                ], 400);
+            }
+            // ward_id, room_id, bed_id are optional for short stay
+        } else {
+            // For regular admission, ward_id and room_id are required
+            if (empty($validatedData['ward_id'])) {
+                return response()->json(['message' => 'يرجى اختيار القسم.'], 400);
+            }
+            if (empty($validatedData['room_id'])) {
+                return response()->json(['message' => 'يرجى اختيار الغرفة.'], 400);
+            }
+            // Validate bed_id is required when booking_type is 'bed'
+            if ($validatedData['booking_type'] === 'bed' && empty($validatedData['bed_id'])) {
+                return response()->json(['message' => 'السرير مطلوب عند اختيار نوع الحجز "سرير".'], 400);
+            }
         }
 
         // Debug: Log validated data
         \Log::info('Admission Store - Validated Data:', $validatedData);
 
-        // Check if bed is available (only if booking_type is 'bed')
-        if ($validatedData['booking_type'] === 'bed') {
+        // Check if bed is available (only if booking_type is 'bed' and not short stay)
+        if (!$isShortStay && isset($validatedData['booking_type']) && $validatedData['booking_type'] === 'bed') {
             $bed = Bed::findOrFail($validatedData['bed_id']);
             if (!$bed->isAvailable()) {
                 return response()->json(['message' => 'السرير غير متاح حالياً.'], 400);
@@ -117,7 +153,7 @@ class AdmissionController extends Controller
             }
         }
 
-        DB::transaction(function () use (&$admission, $validatedData) {
+        DB::transaction(function () use (&$admission, $validatedData, $isShortStay) {
             // Set user_id to current authenticated user
             $validatedData['user_id'] = Auth::id();
 
@@ -131,14 +167,39 @@ class AdmissionController extends Controller
                 $validatedData['booking_type'] = 'bed';
             }
 
+            // For short stay admissions, ensure location fields are null
+            if ($isShortStay) {
+                $validatedData['ward_id'] = null;
+                $validatedData['room_id'] = null;
+                $validatedData['bed_id'] = null;
+            }
+
             // Create admission
             $admission = Admission::create($validatedData);
 
-            // Update bed status to occupied (only if booking_type is 'bed')
-            if ($validatedData['booking_type'] === 'bed' && isset($validatedData['bed_id'])) {
+            // Update bed status to occupied (only if booking_type is 'bed' and not short stay)
+            if (!$isShortStay && $validatedData['booking_type'] === 'bed' && isset($validatedData['bed_id'])) {
                 $bed = Bed::find($validatedData['bed_id']);
                 if ($bed) {
                     $bed->update(['status' => 'occupied']);
+                }
+            }
+
+            // Auto-add short stay transaction if this is a short stay admission
+            if ($isShortStay && isset($validatedData['short_stay_bed_id']) && isset($validatedData['short_stay_duration'])) {
+                $shortStayBed = ShortStayBed::find($validatedData['short_stay_bed_id']);
+                if ($shortStayBed) {
+                    $price = $shortStayBed->getPriceForDuration($validatedData['short_stay_duration']);
+                    if ($price > 0) {
+                        AdmissionTransaction::create([
+                            'admission_id' => $admission->id,
+                            'type' => 'debit',
+                            'amount' => $price,
+                            'description' => 'رسوم إقامة قصيرة (' . ($validatedData['short_stay_duration'] === '12h' ? '12 ساعة' : '24 ساعة') . ')',
+                            'reference_type' => 'short_stay',
+                            'user_id' => Auth::id(),
+                        ]);
+                    }
                 }
             }
 
@@ -151,7 +212,7 @@ class AdmissionController extends Controller
             }
         });
 
-        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
+        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'shortStayBed', 'doctor', 'specialistDoctor', 'user']));
     }
 
     /**
@@ -159,7 +220,7 @@ class AdmissionController extends Controller
      */
     public function show(Admission $admission)
     {
-        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
+        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'shortStayBed', 'doctor', 'specialistDoctor', 'user']));
     }
 
     /**
@@ -195,7 +256,7 @@ class AdmissionController extends Controller
 
         $admission->update($validatedData);
 
-        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
+        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'shortStayBed', 'doctor', 'specialistDoctor', 'user']));
     }
 
     /**
@@ -248,7 +309,7 @@ class AdmissionController extends Controller
             }
         });
 
-        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'doctor', 'specialistDoctor', 'user']));
+        return new AdmissionResource($admission->load(['patient', 'ward', 'room', 'bed', 'shortStayBed', 'doctor', 'specialistDoctor', 'user']));
     }
 
     /**
@@ -323,7 +384,7 @@ class AdmissionController extends Controller
      */
     public function getActive(Request $request)
     {
-        $query = Admission::with(['patient', 'ward', 'room', 'bed', 'doctor'])
+        $query = Admission::with(['patient', 'ward', 'room', 'bed', 'shortStayBed', 'doctor'])
             ->where('status', 'admitted');
 
         // Ward filter

@@ -37,6 +37,8 @@ class Admission extends Model
         'next_of_kin_name',
         'next_of_kin_relation',
         'next_of_kin_phone',
+        'short_stay_bed_id',
+        'short_stay_duration',
     ];
 
     protected $casts = [
@@ -77,6 +79,14 @@ class Admission extends Model
     public function bed()
     {
         return $this->belongsTo(Bed::class);
+    }
+
+    /**
+     * Get the short stay bed for the admission.
+     */
+    public function shortStayBed()
+    {
+        return $this->belongsTo(ShortStayBed::class, 'short_stay_bed_id');
     }
 
     /**

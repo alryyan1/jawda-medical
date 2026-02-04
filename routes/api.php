@@ -63,6 +63,7 @@ use App\Http\Controllers\Api\SubSpecialistController;
 use App\Http\Controllers\Api\SubcompanyController;
 use App\Http\Controllers\Api\SubServiceCostController;
 use App\Http\Controllers\Api\RoomController;
+use App\Http\Controllers\Api\ShortStayBedController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
@@ -277,6 +278,9 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('beds/available', [BedController::class, 'getAvailable']);
   Route::apiResource('beds', BedController::class);
 
+  // Short Stay Beds
+  Route::apiResource('short-stay-beds', ShortStayBedController::class);
+
   // Admissions
   // Specific routes must come BEFORE apiResource to avoid route conflicts
   Route::get('admissions/active', [AdmissionController::class, 'getActive']);
@@ -290,6 +294,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'store']);
   Route::delete('admissions/{admission}/transactions/{transaction}', [AdmissionTransactionController::class, 'destroy']);
   Route::get('admissions/{admission}/ledger', [AdmissionTransactionController::class, 'ledger']);
+  Route::get('admissions/{admission}/ledger/pdf', [AdmissionTransactionController::class, 'exportLedgerPdf']);
 
   // Admission Deposits (deprecated - kept for backward compatibility, will redirect to transactions)
   Route::get('admissions/{admission}/deposits', [AdmissionDepositController::class, 'index']);
