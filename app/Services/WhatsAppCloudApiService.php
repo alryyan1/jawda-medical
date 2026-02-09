@@ -68,10 +68,15 @@ class WhatsAppCloudApiService
     {
         $accessToken = $accessToken ?? $this->accessToken;
         $phoneNumberId = $phoneNumberId ?? $this->phoneNumberId;
+        Log::info('WhatsAppCloudApiService: Access token: ' . $accessToken);
 
         if (!$accessToken || !$phoneNumberId) {
             Log::error('WhatsAppCloudApiService: Service not configured.');
             return ['success' => false, 'error' => 'WhatsApp Cloud API service not configured.', 'data' => null];
+        }
+
+        if($phoneNumberId == "1010322575491077"){
+            $accessToken = 'EAAW6NIGs3xcBQp4qbUGEHol4WYmRYpbKbjWY8ZBxIalBV0psJoZA1evagLRnPKPwVIWaDZBjZCwFaFAUKcGnZBhoFQosZByzChm12UIeXQ94UVIojEXxGZCVFYVzx7Gbd6ZCYc4M18OIJwSg5idf9b2e5HVEXr7FFNuhduxOTBsTqQwmZA9ZBEYLubrAZAboVZB8rhGTR52WcZB4pSt39TLXr4X5xdZCQaSMRYtkey2oBc';
         }
 
         // Remove + from phone number if present (WhatsApp Cloud API expects numbers without +)

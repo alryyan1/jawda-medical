@@ -15,6 +15,8 @@ class CostResource extends JsonResource
             'user_cost_id' => $this->user_cost, // Assuming user_cost is the user_id
             'user_cost_name' => $this->whenLoaded('userCost', $this->userCost?->name),
             'doctor_shift_id' => $this->doctor_shift_id,
+            'doctor_shift_id_for_sub_cost' => $this->doctor_shift_id_for_sub_cost,
+            'sub_service_cost_id' => $this->sub_service_cost_id,
             'doctor_shift_doctor_name' => $this->whenLoaded('doctorShift', $this->doctorShift?->doctor?->name),
             'description' => $this->description,
             'comment' => $this->comment,

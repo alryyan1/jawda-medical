@@ -214,6 +214,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/doctor-shifts/start', [DoctorShiftController::class, 'startShift']);
   Route::put('/doctor-shifts/{doctorShift}/end', [DoctorShiftController::class, 'endShift']);
   Route::get('/doctor-shifts/{doctorShift}/financial-summary', [DoctorShiftController::class, 'showFinancialSummary']);
+  Route::get('/doctor-shifts/{doctorShift}/shift-service-costs', [DoctorShiftController::class, 'shiftServiceCosts']);
   Route::apiResource('doctor-shifts', DoctorShiftController::class)->except(['store', 'update']);
 
   /*

@@ -29,7 +29,6 @@ class ServiceCostController extends Controller
     {
         // $this->authorize('update', $service); // Need to be able to update the parent service definition
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
             'percentage' => 'required_without:fixed|nullable|numeric|min:0|max:100',
             'fixed' => 'required_without:percentage|nullable|numeric|min:0',
             'cost_type' => ['required', Rule::in(['total', 'after cost'])],
@@ -40,7 +39,14 @@ class ServiceCostController extends Controller
             return response()->json(['message' => 'يجب توفير قيمة نسبة مئوية أو مبلغ ثابت للتكلفة.'], 422);
         }
 
-        $serviceCost = $service->serviceCosts()->create($validated);
+        // DB columns may be NOT NULL; send 0 instead of null where applicable
+        $attributes = [
+            'percentage' => isset($validated['percentage']) && $validated['percentage'] !== null && $validated['percentage'] !== '' ? (float) $validated['percentage'] : 0,
+            'fixed' => isset($validated['fixed']) && $validated['fixed'] !== null && $validated['fixed'] !== '' ? (float) $validated['fixed'] : 0,
+            'cost_type' => $validated['cost_type'],
+            'sub_service_cost_id' => $validated['sub_service_cost_id'],
+        ];
+        $serviceCost = $service->serviceCosts()->create($attributes);
         return new ServiceCostResource($serviceCost->load('subServiceCost'));
     }
 
@@ -54,7 +60,6 @@ class ServiceCostController extends Controller
     {
         // $this->authorize('update', $serviceCost->service);
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
             'percentage' => 'sometimes|nullable|numeric|min:0|max:100',
             'fixed' => 'sometimes|nullable|numeric|min:0',
             'cost_type' => ['sometimes','required', Rule::in(['total', 'after cost'])],
@@ -66,7 +71,21 @@ class ServiceCostController extends Controller
             return response()->json(['message' => 'يجب توفير قيمة نسبة مئوية أو مبلغ ثابت للتكلفة.'], 422);
         }
 
-        $serviceCost->update($validated);
+        // DB columns may be NOT NULL; use 0 instead of null where applicable
+        $attributes = [];
+        if (array_key_exists('percentage', $validated)) {
+            $attributes['percentage'] = $validated['percentage'] !== null && $validated['percentage'] !== '' ? (float) $validated['percentage'] : 0;
+        }
+        if (array_key_exists('fixed', $validated)) {
+            $attributes['fixed'] = $validated['fixed'] !== null && $validated['fixed'] !== '' ? (float) $validated['fixed'] : 0;
+        }
+        if (array_key_exists('cost_type', $validated)) {
+            $attributes['cost_type'] = $validated['cost_type'];
+        }
+        if (array_key_exists('sub_service_cost_id', $validated)) {
+            $attributes['sub_service_cost_id'] = $validated['sub_service_cost_id'];
+        }
+        $serviceCost->update($attributes);
         return new ServiceCostResource($serviceCost->load('subServiceCost'));
     }
 

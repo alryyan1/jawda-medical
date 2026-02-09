@@ -40,7 +40,6 @@ class ServiceCost extends Model
     protected $table = 'service_cost'; // Explicitly define table name
 
     protected $fillable = [
-        'name',
         'service_id',
         'percentage',
         'fixed',

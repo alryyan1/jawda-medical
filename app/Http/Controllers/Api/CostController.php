@@ -41,6 +41,7 @@ class CostController extends Controller
             'amount_cash_input' => 'required_without:amount_bank|nullable|numeric|min:0', // Amount from cash
             'amount_bank_input' => 'required_without:amount_cash|nullable|numeric|min:0', // Amount from bank
             'doctor_shift_id_for_sub_cost' => 'nullable|integer|exists:doctor_shifts,id',
+            'sub_service_cost_id' => 'nullable|integer|exists:sub_service_costs,id',
         ]);
     
         // Ensure at least one amount is provided and not both zero if one is required
@@ -53,6 +54,8 @@ class CostController extends Controller
             'user_cost' => Auth::id(),
             'cost_category_id' => $validated['cost_category_id'] ?? null,
             'doctor_shift_id' => $validated['doctor_shift_id'] ?? null,
+            'doctor_shift_id_for_sub_cost' => $validated['doctor_shift_id_for_sub_cost'] ?? null,
+            'sub_service_cost_id' => $validated['sub_service_cost_id'] ?? null,
             'description' => $validated['description'],
             'comment' => $validated['comment'] ?? null,
             'amount' => $validated['amount_cash_input'] ?? 0,       // Store cash portion
@@ -71,6 +74,7 @@ class CostController extends Controller
             'cost_category_id' => 'nullable|integer|exists:cost_categories,id',
             'user_cost_id' => 'nullable|integer|exists:users,id', // User who recorded
             'shift_id' => 'nullable|integer|exists:shifts,id',
+            'doctor_shift_id_for_sub_cost' => 'nullable|integer|exists:doctor_shifts,id',
             'payment_method' => 'nullable|string|in:cash,bank', // 'cash' or 'bank'
             'search_description' => 'nullable|string|max:255',
             'sort_by' => 'nullable|string|in:created_at,amount,description',
@@ -86,6 +90,7 @@ class CostController extends Controller
         if ($request->filled('cost_category_id')) { $query->where('cost_category_id', $request->cost_category_id); }
         if ($request->filled('user_cost_id')) { $query->where('user_cost', $request->user_cost_id); }
         if ($request->filled('shift_id')) { $query->where('shift_id', $request->shift_id); }
+        if ($request->filled('doctor_shift_id_for_sub_cost')) { $query->where('doctor_shift_id_for_sub_cost', $request->doctor_shift_id_for_sub_cost); }
         if ($request->filled('payment_method') && $request->payment_method !== 'all') {
             if ($request->payment_method === 'cash') { $query->where('amount', '>', 0)->where('amount_bankak', '=', 0); }
             elseif ($request->payment_method === 'bank') { $query->where('amount_bankak', '>', 0)->where('amount', '=', 0); }

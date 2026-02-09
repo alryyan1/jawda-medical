@@ -17,10 +17,10 @@ class RequestedServiceCostResource extends JsonResource
             'amount' => (float) $this->amount,
             'created_at' => $this->created_at?->toIso8601String(),
             'sub_service_cost_name' => $this->whenLoaded('subServiceCost', $this->subServiceCost->name),
-            'service_cost_definition_name' => $this->whenLoaded('serviceCostDefinition', $this->serviceCostDefinition->name),
+            'service_cost_definition_name' => $this->whenLoaded('serviceCost', fn () => $this->serviceCost?->subServiceCost?->name),
             // Include full resources if needed
             'sub_service_cost' => new SubServiceCostResource($this->whenLoaded('subServiceCost')),
-            'service_cost_definition' => new ServiceCostResource($this->whenLoaded('serviceCostDefinition')),
+            'service_cost_definition' => new ServiceCostResource($this->whenLoaded('serviceCost')),
         ];
     }
 }

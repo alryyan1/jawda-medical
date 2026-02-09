@@ -379,6 +379,21 @@ class DoctorShiftController extends Controller
         return new DoctorShiftResource($doctorShift);
     }
 
+    /**
+     * Return shift service costs (مصروف الخدمات) for this doctor shift.
+     * Same data as in the PDF report: cost name and total amount per sub-service cost type.
+     */
+    public function shiftServiceCosts(DoctorShift $doctorShift)
+    {
+        $doctorShift->load([
+            'visits' => function ($query) {
+                $query->with(['requestedServices.service.service_costs.subServiceCost']);
+            },
+        ]);
+        $costs = $doctorShift->shift_service_costs();
+        return response()->json(['data' => $costs]);
+    }
+
     public function showFinancialSummary(Request $request, DoctorShift $doctorShift)
     {
         // Permission check: e.g., can('view doctor_shift_financial_summary')

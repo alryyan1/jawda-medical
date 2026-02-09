@@ -11,7 +11,7 @@ class ServiceCostResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'name' => $this->name,
+            'name' => $this->whenLoaded('subServiceCost', fn () => $this->subServiceCost?->name),
             'service_id' => $this->service_id,
             'percentage' => (float) $this->percentage,
             'fixed' => (float) $this->fixed,

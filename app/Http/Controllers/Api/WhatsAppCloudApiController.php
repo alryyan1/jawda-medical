@@ -534,7 +534,7 @@ MSG;
 
                                     $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
                                 } elseif ($recipientPhoneNumberId == '982254518296345') {
-                                    $collection = 'alroomy-shaglban';
+                                    $collection = 'alroomy-shaglaban';
                                     //log get data from alryyan
                                     Log::info('getting data from alryyan ' . $recipientPhoneNumberId);
                                     if (($message['type'] ?? '') === 'text' && isset($message['text']['body'])) {
@@ -544,6 +544,25 @@ MSG;
                                         $msg = <<<MSG
 استعلام جديد للنتائج
 الرومي شقلبان 
+من الرقم: $from
+المحتوى: $body
+MSG;
+                                        $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
+                                    }
+
+                                    $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
+                                }
+                                 elseif ($recipientPhoneNumberId == '1010322575491077') {
+                                    $collection = 'altamayoz_branch_one';
+                                    //log get data from alryyan
+                                    Log::info('getting data from alryyan ' . $recipientPhoneNumberId);
+                                    if (($message['type'] ?? '') === 'text' && isset($message['text']['body'])) {
+                                        $from = $message['from'];
+                                        $body = $message['text']['body'];
+
+                                        $msg = <<<MSG
+استعلام جديد للنتائج
+التميز الفرع الاول
 من الرقم: $from
 المحتوى: $body
 MSG;
@@ -1059,13 +1078,22 @@ MSG;
     {
         try {
             $filename = $code ? "result_{$code}.pdf" : 'result.pdf';
+            Log::info('WhatsApp Cloud API: Sending document to user.', [
+                'to' => $to,
+                'document_url' => $documentUrl,
+                'filename' => $filename,
+                'phoneNumberId' => $phoneNumberId
+            ]);
+            if($phoneNumberId == "1010322575491077"){
+                $aceessToken = 'EAAW6NIGs3xcBQp4qbUGEHol4WYmRYpbKbjWY8ZBxIalBV0psJoZA1evagLRnPKPwVIWaDZBjZCwFaFAUKcGnZBhoFQosZByzChm12UIeXQ94UVIojEXxGZCVFYVzx7Gbd6ZCYc4M18OIJwSg5idf9b2e5HVEXr7FFNuhduxOTBsTqQwmZA9ZBEYLubrAZAboVZB8rhGTR52WcZB4pSt39TLXr4X5xdZCQaSMRYtkey2oBc';
+            }
 
             $result = $this->whatsappService->sendDocument(
                 $to,
                 $documentUrl,
                 $filename,
                 'نتيجة المختبر - Lab Result',
-                null,
+                $aceessToken,
                 $phoneNumberId
             );
 

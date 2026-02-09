@@ -329,15 +329,33 @@ class DoctorVisit extends Model
     /**
      * Concatenated string of service cost names (or descriptions of costs incurred for this visit).
      */
-    public function services_cost_name(): string
+    public function services_cost_name()
     {
-        // This is highly dependent on how you track costs.
-        // If costs are line items:
-        // return $this->visitCosts()->pluck('description')->implode(', ');
-        if ($this->total_services_cost() > 0) {
-            return "تكاليف تشغيلية للخدمات والفحوصات"; // Generic description
+        $total = '';
+        /**@var RequestedService $requested_service */
+        foreach ($this->requestedServices as $requested_service) {
+
+            /**@var requestedServiceCost $requestedServiceCost */
+            foreach ($requested_service->requestedServiceCosts as $requestedServiceCost) {
+                $service_cost = $requestedServiceCost->serviceCost;
+                $name = $service_cost->subServiceCost->name;
+                if ($service_cost->fixed > 0) {
+                    $val = $requestedServiceCost->amount;
+                    $total .= <<<TEXT
+
+  -  $name    -  $service_cost->fixed = $val
+TEXT;
+                } else {
+                    $val = $requestedServiceCost->amount;
+
+                    $total .= <<<TEXT
+
+  -  $name  -  $service_cost->percentage % = $val
+TEXT;
+                }
+            }
         }
-        return "-";
+        return $total;
     }
     public function service_costs()
     {
