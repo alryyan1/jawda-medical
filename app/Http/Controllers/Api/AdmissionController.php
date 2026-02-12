@@ -10,6 +10,7 @@ use App\Models\Service;
 use App\Models\ServiceGroup;
 use App\Models\AdmissionRequestedService;
 use App\Models\AdmissionTransaction;
+use App\Services\Pdf\AdmissionsListReport;
 use Illuminate\Http\Request;
 use App\Http\Resources\AdmissionResource;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,11 @@ class AdmissionController extends Controller
             $query->where('ward_id', $request->ward_id);
         }
 
+        // Room filter
+        if ($request->has('room_id') && $request->room_id) {
+            $query->where('room_id', $request->room_id);
+        }
+
         // Patient filter
         if ($request->has('patient_id') && $request->patient_id) {
             $query->where('patient_id', $request->patient_id);
@@ -62,6 +68,87 @@ class AdmissionController extends Controller
             ->paginate($request->get('per_page', 15));
 
         return AdmissionResource::collection($admissions);
+    }
+
+    /**
+     * Export admissions list as PDF (same filters as index, same columns as list table).
+     */
+    public function exportListPdf(Request $request)
+    {
+        $query = Admission::with(['patient', 'ward', 'room', 'bed', 'shortStayBed', 'doctor', 'specialistDoctor', 'user']);
+
+        if ($request->has('search') && $request->search !== '') {
+            $searchTerm = $request->search;
+            $query->whereHas('patient', function ($q) use ($searchTerm) {
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+            });
+        }
+
+        if ($request->has('status') && $request->status !== '') {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('ward_id') && $request->ward_id) {
+            $query->where('ward_id', $request->ward_id);
+        }
+
+        if ($request->has('room_id') && $request->room_id) {
+            $query->where('room_id', $request->room_id);
+        }
+
+        if ($request->has('patient_id') && $request->patient_id) {
+            $query->where('patient_id', $request->patient_id);
+        }
+
+        if ($request->has('date_from')) {
+            $query->whereDate('admission_date', '>=', $request->date_from);
+        }
+        if ($request->has('date_to')) {
+            $query->whereDate('admission_date', '<=', $request->date_to);
+        }
+
+        $admissions = $query->orderBy('admission_date', 'desc')
+            ->orderBy('admission_time', 'desc')
+            ->limit(1000)
+            ->get();
+
+        $admissionIds = $admissions->pluck('id')->toArray();
+        $debits = [];
+        $credits = [];
+        if (! empty($admissionIds)) {
+            $debits = AdmissionTransaction::whereIn('admission_id', $admissionIds)
+                ->where('type', 'debit')
+                ->selectRaw('admission_id, COALESCE(SUM(amount), 0) as total')
+                ->groupBy('admission_id')
+                ->pluck('total', 'admission_id')
+                ->toArray();
+            $credits = AdmissionTransaction::whereIn('admission_id', $admissionIds)
+                ->where('type', 'credit')
+                ->selectRaw('admission_id, COALESCE(SUM(amount), 0) as total')
+                ->groupBy('admission_id')
+                ->pluck('total', 'admission_id')
+                ->toArray();
+        }
+
+        $balances = [];
+        foreach ($admissions as $a) {
+            $totalDebits = (float) ($debits[$a->id] ?? 0);
+            $totalCredits = (float) ($credits[$a->id] ?? 0);
+            $balances[$a->id] = [
+                'total_debits' => $totalDebits,
+                'total_credits' => $totalCredits,
+                'balance' => $totalDebits - $totalCredits,
+            ];
+        }
+
+        $report = new AdmissionsListReport($admissions, $balances);
+        $pdfContent = $report->generate();
+        $filename = 'admissions-list-' . now()->format('Y-m-d-His') . '.pdf';
+
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
     }
 
     /**

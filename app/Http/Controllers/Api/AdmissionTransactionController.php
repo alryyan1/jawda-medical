@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Admission;
 use App\Models\AdmissionTransaction;
+use App\Services\Admissions\StayDaysCalculator;
 use App\Services\Pdf\AdmissionLedgerReport;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Http\Resources\AdmissionTransactionResource;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +15,65 @@ use Illuminate\Support\Facades\DB;
 
 class AdmissionTransactionController extends Controller
 {
+    /**
+     * Sync or create the room_charges transaction for an admission based on current stay days and configurable rules.
+     * Only runs for non–short-stay admissions that have a room (ward/room/bed).
+     */
+    protected function syncStayFeesTransaction(Admission $admission): void
+    {
+        if ($admission->short_stay_bed_id || ! $admission->room_id) {
+            return;
+        }
+
+        $admission->loadMissing('room');
+
+        $admissionAt = $this->buildAdmissionCarbon($admission->admission_date, $admission->admission_time);
+        $endAt = $admission->status === 'discharged' && $admission->discharge_date && $admission->discharge_time
+            ? $this->buildAdmissionCarbon($admission->discharge_date, $admission->discharge_time)
+            : Carbon::now();
+
+        $days = StayDaysCalculator::calculate($admissionAt, $endAt);
+        $pricePerDay = (float) ($admission->room->price_per_day ?? 0);
+        $total = round($days * $pricePerDay, 2);
+
+        if ($total <= 0) {
+            return;
+        }
+
+        $existing = $admission->transactions()->where('reference_type', 'room_charges')->first();
+
+        if ($existing) {
+            if (abs((float) $existing->amount - $total) < 0.01) {
+                return;
+            }
+            $existing->update([
+                'amount' => $total,
+                'description' => 'رسوم إقامة (' . $days . ' ' . ($days === 1 ? 'يوم' : 'أيام') . ')',
+                'user_id' => Auth::id(),
+            ]);
+        } else {
+            $admission->transactions()->create([
+                'type' => 'debit',
+                'amount' => $total,
+                'description' => 'رسوم إقامة (' . $days . ' ' . ($days === 1 ? 'يوم' : 'أيام') . ')',
+                'reference_type' => 'room_charges',
+                'reference_id' => null,
+                'is_bank' => false,
+                'user_id' => Auth::id(),
+            ]);
+        }
+    }
+
+    protected function buildAdmissionCarbon($date, $time): Carbon
+    {
+        $dateStr = $date instanceof Carbon ? $date->format('Y-m-d') : $date;
+        $timeStr = $time instanceof Carbon ? $time->format('H:i:s') : ($time ?? '00:00:00');
+        if (strlen($timeStr) === 5) {
+            $timeStr .= ':00';
+        }
+
+        return Carbon::parse($dateStr . ' ' . $timeStr);
+    }
     /**
      * Display a listing of transactions for an admission.
      */
@@ -80,9 +141,12 @@ class AdmissionTransactionController extends Controller
 
     /**
      * Get the ledger (account statement) for an admission.
+     * Automatically syncs room_charges (stay fees) based on configurable day-count rules when ledger is opened.
      */
     public function ledger(Admission $admission)
     {
+        $this->syncStayFeesTransaction($admission);
+
         // Get all transactions
         $transactions = $admission->transactions()
             ->with('user')

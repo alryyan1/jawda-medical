@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AttendanceReportController;
+use App\Http\Controllers\Api\AdmissionSettingController;
 use App\Http\Controllers\Api\AttendanceSettingController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankakImageController;
@@ -294,6 +295,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Admissions
   // Specific routes must come BEFORE apiResource to avoid route conflicts
   Route::get('admissions/active', [AdmissionController::class, 'getActive']);
+  Route::get('admissions/list/pdf', [AdmissionController::class, 'exportListPdf']);
   Route::apiResource('admissions', AdmissionController::class);
   Route::put('admissions/{admission}/discharge', [AdmissionController::class, 'discharge']);
   Route::put('admissions/{admission}/transfer', [AdmissionController::class, 'transfer']);
@@ -702,6 +704,10 @@ Route::middleware('auth:sanctum')->group(function () {
     | ATTENDANCE MODULE - CONFIGURATION ROUTES
     |--------------------------------------------------------------------------
     */
+
+  // Admission stay fee rules (configurable)
+  Route::get('/admission-settings', [AdmissionSettingController::class, 'show']);
+  Route::put('/admission-settings', [AdmissionSettingController::class, 'update']);
 
   // 1. Global Attendance Settings
   // Fetches the single global attendance settings record
