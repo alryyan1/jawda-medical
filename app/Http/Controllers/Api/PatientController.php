@@ -1178,7 +1178,7 @@ class PatientController extends Controller
                     $query->where('name', 'LIKE', "%{$searchTerm}%")
                         ->orWhere('phone', 'LIKE', "%{$searchTerm}%"); // Optionally search by phone too
                 })
-                ->orderBy('id', 'asc')
+                ->orderBy('id', 'desc')
                 ->take($limit)
                 ->get();
         }

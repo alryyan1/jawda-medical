@@ -35,14 +35,20 @@ class SystemSetupCommand extends Command
 
         $this->info('Starting system setup...');
 
-        $migrationPath = 'database/migrations/system_setup';
+        $systemSetupPath = 'database/migrations/system_setup';
+        $migrationsPath = 'database/migrations';
 
         // Run Migrations
         if ($this->option('fresh')) {
             if ($this->confirm('This will wipe all data in the database. Are you sure?', true)) {
                 $this->info('Wiping database and running fresh migrations...');
                 $this->call('migrate:fresh', [
-                    '--path' => $migrationPath,
+                    '--path' => $systemSetupPath,
+                    '--force' => true,
+                ]);
+                $this->info('Running root migrations...');
+                $this->call('migrate', [
+                    '--path' => $migrationsPath,
                     '--force' => true,
                 ]);
             } else {
@@ -50,9 +56,14 @@ class SystemSetupCommand extends Command
                 return 0;
             }
         } else {
-            $this->info('Running migrations...');
+            $this->info('Running system setup migrations...');
             $this->call('migrate', [
-                '--path' => $migrationPath,
+                '--path' => $systemSetupPath,
+                '--force' => true,
+            ]);
+            $this->info('Running database migrations...');
+            $this->call('migrate', [
+                '--path' => $migrationsPath,
                 '--force' => true,
             ]);
         }

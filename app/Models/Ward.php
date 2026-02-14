@@ -34,4 +34,12 @@ class Ward extends Model
     {
         return $this->hasMany(Admission::class);
     }
+
+    /**
+     * Get all beds in the ward (through rooms).
+     */
+    public function beds()
+    {
+        return $this->hasManyThrough(Bed::class, Room::class);
+    }
 }

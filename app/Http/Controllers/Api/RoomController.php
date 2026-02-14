@@ -16,7 +16,11 @@ class RoomController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Room::with(['ward', 'beds', 'currentAdmission'])->withCount('beds');
+        $query = Room::with([
+            'ward',
+            'beds' => fn ($q) => $q->with(['currentAdmission' => fn ($q) => $q->with('patient')]),
+            'currentAdmission',
+        ])->withCount('beds');
 
         // Search filter
         if ($request->has('search') && !empty($request->search)) {
@@ -49,11 +53,18 @@ class RoomController extends Controller
     {
         $validatedData = $request->validate([
             'ward_id' => 'required|exists:wards,id',
-            'room_number' => 'required|string|max:255',
+            'room_number' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('rooms', 'room_number')->where('ward_id', $request->ward_id),
+            ],
             'room_type' => ['nullable', Rule::in(['normal', 'vip'])],
             'capacity' => 'required|integer|min:1',
             'status' => 'required|boolean',
             'price_per_day' => 'nullable|numeric|min:0',
+        ], [
+            'room_number.unique' => 'رقم الغرفة مكرر في هذا القسم.',
         ]);
 
         $room = Room::create($validatedData);
@@ -74,13 +85,24 @@ class RoomController extends Controller
      */
     public function update(Request $request, Room $room)
     {
+        $wardId = $request->input('ward_id', $room->ward_id);
         $validatedData = $request->validate([
             'ward_id' => 'sometimes|required|exists:wards,id',
-            'room_number' => ['sometimes', 'required', 'string', 'max:255'],
+            'room_number' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('rooms', 'room_number')
+                    ->where('ward_id', $wardId)
+                    ->ignore($room->id),
+            ],
             'room_type' => ['nullable', Rule::in(['normal', 'vip'])],
             'capacity' => 'sometimes|required|integer|min:1',
             'status' => 'sometimes|required|boolean',
             'price_per_day' => 'nullable|numeric|min:0',
+        ], [
+            'room_number.unique' => 'رقم الغرفة مكرر في هذا القسم.',
         ]);
 
         $room->update($validatedData);

@@ -15,7 +15,13 @@ class WardController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Ward::withCount('rooms');
+        $query = Ward::withCount([
+            'rooms',
+            'beds',
+            'admissions as current_admissions_count' => function ($q) {
+                $q->where('status', 'admitted');
+            },
+        ]);
 
         // Search filter
         if ($request->has('search') && !empty($request->search)) {
@@ -96,7 +102,12 @@ class WardController extends Controller
      */
     public function getRooms(Ward $ward)
     {
-        $rooms = $ward->rooms()->with('beds')->get();
+        $rooms = $ward->rooms()
+            ->with('beds')
+            ->withCount(['admissions as current_admissions_count' => function ($q) {
+                $q->where('status', 'admitted');
+            }])
+            ->get();
         return \App\Http\Resources\RoomResource::collection($rooms);
     }
 

@@ -22,10 +22,11 @@ class SystemSetupSeeder extends Seeder
         \DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
         // 1. Run basic setup seeders (excluding Auth tables)
-        $this->call(\Database\Seeders\system_setup_seeders\WardsTableSeeder::class);
-        $this->call(\Database\Seeders\system_setup_seeders\RoomsTableSeeder::class);
-        $this->call(\Database\Seeders\system_setup_seeders\BedsTableSeeder::class);
+        // $this->call(\Database\Seeders\system_setup_seeders\WardsTableSeeder::class);
+        // $this->call(\Database\Seeders\system_setup_seeders\RoomsTableSeeder::class);
+        // $this->call(\Database\Seeders\system_setup_seeders\BedsTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\SpecialistsTableSeeder::class);
+        $this->call(\Database\Seeders\system_setup_seeders\DoctorsTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\ContainersTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\PackagesTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\MainTestsTableSeeder::class);
@@ -103,8 +104,10 @@ class SystemSetupSeeder extends Seeder
         $adminUser->assignRole($adminRole);
         $this->command->info("Admin user setup complete. Username: admin, Password: admin");
 
+        // 6. Create default shift (requires user_id 1 = admin)
+        $this->call(\Database\Seeders\system_setup_seeders\ShiftsTableSeeder::class);
 
-        // 6. Reset Auto Increment
+        // 7. Reset Auto Increment
         \DB::statement('ALTER TABLE patients AUTO_INCREMENT = 1000;');
         \DB::statement('ALTER TABLE doctorvisits AUTO_INCREMENT = 1000;');
 

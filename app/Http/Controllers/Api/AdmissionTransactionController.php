@@ -34,6 +34,10 @@ class AdmissionTransactionController extends Controller
 
         $days = StayDaysCalculator::calculate($admissionAt, $endAt);
         $pricePerDay = (float) ($admission->room->price_per_day ?? 0);
+        // حجز غرفة كاملة: ضرب السعر في 2
+        if ($admission->booking_type === 'room') {
+            $pricePerDay *= 2;
+        }
         $total = round($days * $pricePerDay, 2);
 
         if ($total <= 0) {
