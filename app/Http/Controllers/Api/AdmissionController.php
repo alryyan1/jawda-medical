@@ -172,7 +172,7 @@ class AdmissionController extends Controller
             'specialist_doctor_id' => 'nullable|exists:doctors,id',
             'notes' => 'nullable|string',
             'provisional_diagnosis' => 'nullable|string',
-            'operations' => 'nullable|string',
+
             'medical_history' => 'nullable|string',
             'current_medications' => 'nullable|string',
             'referral_source' => 'nullable|string|max:255',
@@ -185,8 +185,8 @@ class AdmissionController extends Controller
         ]);
 
         // Check if this is a short stay admission
-        $isShortStay = !empty($validatedData['short_stay_bed_id']) || 
-                       (!empty($validatedData['admission_type']) && $validatedData['admission_type'] === 'اقامه قصيره');
+        $isShortStay = !empty($validatedData['short_stay_bed_id']) ||
+            (!empty($validatedData['admission_type']) && $validatedData['admission_type'] === 'اقامه قصيره');
 
         if ($isShortStay) {
             // For short stay, short_stay_bed_id and short_stay_duration are required
@@ -326,7 +326,7 @@ class AdmissionController extends Controller
             'specialist_doctor_id' => 'nullable|exists:doctors,id',
             'notes' => 'nullable|string',
             'provisional_diagnosis' => 'nullable|string',
-            'operations' => 'nullable|string',
+
             'medical_history' => 'nullable|string',
             'current_medications' => 'nullable|string',
             'referral_source' => 'nullable|string|max:255',

@@ -25,7 +25,7 @@ class DoctorShiftController extends Controller
     private function checkShiftIsOpen()
     {
         $currentGeneralShift = Shift::orderBy('id', 'desc')->first();
-        
+
         if (!$currentGeneralShift) {
             return response()->json(['message' => 'لا توجد وردية   لبدء .'], 400);
         }
@@ -48,8 +48,8 @@ class DoctorShiftController extends Controller
             'doctor',
             'doctor.specialist:id,name,firestore_id',
         ])
-        ->withCount('doctorVisits as patients_count') // Use withCount instead of N+1 queries
-        ->where('status', 1);
+            ->withCount('doctorVisits as patients_count') // Use withCount instead of N+1 queries
+            ->where('status', 1);
 
         if ($request->has('clinic_shift_id')) {
             $query->where('shift_id', $request->clinic_shift_id);
@@ -63,8 +63,8 @@ class DoctorShiftController extends Controller
     {
         return $doctorShift->doctor_credit_cash();
     }
-   
-   
+
+
     /**
      * Start a new shift session for a doctor.
      * This might be called by an admin or the doctor themselves.
@@ -78,14 +78,14 @@ class DoctorShiftController extends Controller
         // if (!Auth::user()->can('start doctor_shifts')) {
         //     return response()->json(['message' => 'لا يمكنك فتح وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
         // }
-        
+
         // Check if shift is open before proceeding
         $shiftCheck = $this->checkShiftIsOpen();
         if ($shiftCheck instanceof \Illuminate\Http\JsonResponse) {
             return $shiftCheck; // Return error response if shift is closed
         }
         $currentGeneralShift = $shiftCheck;
-        
+
         $validated = $request->validate([
             'doctor_id' => 'required|exists:doctors,id',
             // 'shift_id' => 'required|exists:shifts,id', // If a doctor can only have one session per general shift
@@ -105,7 +105,7 @@ class DoctorShiftController extends Controller
                 ->update(['status' => false]);
             // return response()->json(['message' => 'هذا الطبيب لديه وردية عمل مفتوحة بالفعل.'], 409); // 409 Conflict
         }
-        
+
         $doctorShift = DoctorShift::create([
             'doctor_id' => $validated['doctor_id'],
             'shift_id' => $currentGeneralShift->id,
@@ -154,7 +154,7 @@ class DoctorShiftController extends Controller
 
         return new DoctorShiftResource($doctorShift->load('doctor'));
     }
-   
+
     public function moneyInsu(Request $request, DoctorShift $doctorShift)
     {
         return $doctorShift->doctor_credit_company;
@@ -163,7 +163,7 @@ class DoctorShiftController extends Controller
     {
         return $doctorShift->doctor_credit_cash() + $doctorShift->doctor_credit_company + $doctorShift->doctor->static_wage;
     }
-  
+
     /**
      * Display a listing of the DoctorShift resources.
      * This serves as the data source for reports like the "Doctor Shifts Report".
@@ -263,7 +263,7 @@ class DoctorShiftController extends Controller
 
     //     return DoctorShiftResource::collection($doctorShifts);
     // }
-   /**
+    /**
      * Display a listing of the DoctorShift resources for reporting.
      *
      * @param  \Illuminate\Http\Request  $request
@@ -341,12 +341,12 @@ class DoctorShiftController extends Controller
 
         if ($sortBy === 'doctor_name') {
             $query->join('doctors', 'doctor_shifts.doctor_id', '=', 'doctors.id')
-                  ->orderBy('doctors.name', $sortDirection)
-                  ->select('doctor_shifts.*');
+                ->orderBy('doctors.name', $sortDirection)
+                ->select('doctor_shifts.*');
         } elseif ($sortBy === 'user_name') {
             $query->join('users', 'doctor_shifts.user_id', '=', 'users.id')
-                  ->orderBy('users.name', $sortDirection)
-                  ->select('doctor_shifts.*');
+                ->orderBy('users.name', $sortDirection)
+                ->select('doctor_shifts.*');
         } elseif ($sortBy !== 'total_entitlement') {
             $query->orderBy($sortBy, $sortDirection);
         }
@@ -440,7 +440,7 @@ class DoctorShiftController extends Controller
 
 
 
-   
+
 
         return response()->json(['data' => $summary]);
     }
@@ -485,7 +485,7 @@ class DoctorShiftController extends Controller
             ];
         });
 
-        return response()->json($doctorsWithStatus);
+        return response()->json($doctorsWithStatus->values());
     }
     // In DoctorVisitController.php or a new VisitActionController.php
     public function reassignToShift(Request $request, DoctorVisit $visit)
@@ -536,9 +536,9 @@ class DoctorShiftController extends Controller
         ]);
 
         // Check if is_cash_revenue_prooved is being set to true and close the shift
-        $shouldCloseShift = isset($validated['is_cash_reclaim_prooved']) ;
+        $shouldCloseShift = isset($validated['is_cash_reclaim_prooved']);
         // return ['shouldCloseShift' => $shouldCloseShift];
-        if (isset($validated['is_cash_reclaim_prooved']) ) {
+        if (isset($validated['is_cash_reclaim_prooved'])) {
             // return response()->json(['message' => 'لا يمكن تغيير الحالة الى مغلقة لان المناوبة مفتوحة.'], 400);
             // Close the doctor shift
             $doctorShift->update([

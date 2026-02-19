@@ -29,7 +29,7 @@ class Admission extends Model
         'user_id',
         'notes',
         'provisional_diagnosis',
-        'operations',
+
         'medical_history',
         'current_medications',
         'referral_source',
@@ -161,13 +161,7 @@ class Admission extends Model
         return $this->hasMany(AdmissionTransaction::class);
     }
 
-    /**
-     * Get the operations for the admission.
-     */
-    public function operations()
-    {
-        return $this->hasMany(Operation::class);
-    }
+
 
     /**
      * Get the treatments for the admission.
@@ -210,10 +204,10 @@ class Admission extends Model
     private function calculateStayDays()
     {
         // admission_date is already a Carbon instance from casts
-        $admissionDateTime = $this->admission_date instanceof Carbon 
-            ? $this->admission_date->copy() 
+        $admissionDateTime = $this->admission_date instanceof Carbon
+            ? $this->admission_date->copy()
             : Carbon::parse($this->admission_date);
-        
+
         // Set admission time if provided
         if ($this->admission_time) {
             if ($this->admission_time instanceof Carbon) {
@@ -234,13 +228,13 @@ class Admission extends Model
         } else {
             $admissionDateTime->setTime(0, 0, 0);
         }
-        
+
         // Handle discharge_date
         if ($this->discharge_date) {
-            $dischargeDateTime = $this->discharge_date instanceof Carbon 
-                ? $this->discharge_date->copy() 
+            $dischargeDateTime = $this->discharge_date instanceof Carbon
+                ? $this->discharge_date->copy()
                 : Carbon::parse($this->discharge_date);
-            
+
             // Set discharge time if provided
             if ($this->discharge_time) {
                 if ($this->discharge_time instanceof Carbon) {
@@ -264,35 +258,35 @@ class Admission extends Model
         } else {
             $dischargeDateTime = Carbon::now();
         }
-        
+
         $admissionHour = (int) $admissionDateTime->format('H');
-        
+
         // نظام الـ 24 ساعة (الدخول الصباحي): 7:00 ص - 12:00 ظ
         // إذا دخل المريض من 7:00 ص إلى 12:00 ظ، يومه ينتهي في نفس التوقيت من اليوم التالي (24 ساعة كاملة)
         // مثال: دخل 9:00 ص، ينتهي 9:00 ص اليوم التالي
         if ($admissionHour >= 7 && $admissionHour < 12) {
             // احسب الفرق بالساعات بين وقت الدخول ووقت الخروج
             $hours = $admissionDateTime->diffInHours($dischargeDateTime, false);
-            
+
             // إذا كانت المدة أقل من 24 ساعة، احسبها كيوم واحد
             if ($hours < 24) {
                 return 1;
             }
-            
+
             // احسب الأيام بناءً على الساعات (كل 24 ساعة = يوم واحد)
             // استخدم ceil لضمان احتساب أي جزء من اليوم كيوم كامل
             $days = ceil($hours / 24.0);
-            
+
             return max(1, $days);
         }
-        
+
         // نظام اليوم الكامل (الدخول المسائي/المتأخر): 1:00 ظ - 6:00 ص اليوم التالي
         // إذا دخل المريض من 1:00 ظ إلى 6:00 ص اليوم التالي، يومه ينتهي حكماً عند 12:00 ظ من اليوم التالي
         // مثال: دخل 4:00 عصراً أو 3:00 فجراً، عند 12:00 ظ يُعتبر أتم يوماً كاملاً
         if ($admissionHour >= 13 || $admissionHour < 6) {
             // حدد نقطة البداية للاحتساب (12:00 ظ)
             $noonOfAdmissionDay = $admissionDateTime->copy()->setTime(12, 0, 0);
-            
+
             // إذا كان الدخول قبل 12:00 ظ من نفس اليوم (من 1:00 فجراً إلى 6:00 ص)
             if ($admissionHour < 6) {
                 // ابدأ من 12:00 ظ من نفس يوم الدخول
@@ -301,11 +295,11 @@ class Admission extends Model
                 // إذا كان الدخول بعد 12:00 ظ (من 1:00 ظ فما بعد)، ابدأ من 12:00 ظ من اليوم التالي
                 $startDate = $admissionDateTime->copy()->addDay()->setTime(12, 0, 0);
             }
-            
+
             // حدد نقطة النهاية للاحتساب (12:00 ظ)
             $dischargeHour = (int) $dischargeDateTime->format('H');
             $noonOfDischargeDay = $dischargeDateTime->copy()->setTime(12, 0, 0);
-            
+
             // إذا كان الخروج قبل 12:00 ظ من يوم الخروج
             if ($dischargeDateTime->lt($noonOfDischargeDay)) {
                 // احسب حتى 12:00 ظ من اليوم السابق (لأنه لم يصل لـ 12:00 ظ من يوم الخروج)
@@ -314,20 +308,20 @@ class Admission extends Model
                 // إذا كان الخروج بعد 12:00 ظ، احسب حتى 12:00 ظ من نفس يوم الخروج
                 $endDate = $noonOfDischargeDay;
             }
-            
+
             // احسب عدد الأيام بين نقطة البداية ونقطة النهاية
             // كل مرة نصل لـ 12:00 ظ = يوم كامل
             $days = $startDate->diffInDays($endDate);
-            
+
             // إذا كانت نقطة البداية بعد نقطة النهاية أو في نفس اليوم، فهذا يعني يوم واحد على الأقل
             if ($startDate->gte($endDate)) {
                 return 1;
             }
-            
+
             // أضف يوم واحد لأننا نحسب من 12:00 ظ إلى 12:00 ظ (يوم كامل)
             return max(1, $days + 1);
         }
-        
+
         // الحالة الافتراضية (6:00 ص - 7:00 ص): احسب بنفس الطريقة القديمة
         $days = $admissionDateTime->diffInDays($dischargeDateTime);
         return max(1, $days + 1);

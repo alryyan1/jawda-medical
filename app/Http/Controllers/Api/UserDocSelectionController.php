@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class UserDocSelectionController extends Controller
 {
@@ -19,22 +20,22 @@ class UserDocSelectionController extends Controller
     {
         try {
             $userId = Auth::id();
-            
+
             if (!$userId) {
                 return response()->json(['message' => 'غير مصرح بالوصول'], 401);
             }
 
             $favorites = UserDocSelection::where('user_id', $userId)
                 ->where('active', true)
-                ->with(['doctor' => function($query) {
+                ->with(['doctor' => function ($query) {
                     $query->select('doctors.id', 'doctors.name', 'specialists.name as specialist_name')
-                          ->leftJoin('specialists', 'doctors.specialist_id', '=', 'specialists.id');
+                        ->leftJoin('specialists', 'doctors.specialist_id', '=', 'specialists.id');
                 }])
                 ->get();
 
             return response()->json([
                 'success' => true,
-                'data' => $favorites->pluck('doctor')->filter()
+                'data' => $favorites->pluck('doctor')->filter()->values()
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -52,33 +53,33 @@ class UserDocSelectionController extends Controller
     {
         try {
             $userId = Auth::id();
-            
+
             if (!$userId) {
                 return response()->json(['message' => 'غير مصرح بالوصول'], 401);
             }
 
             $search = $request->get('search', '');
-            
+
             $doctorsQuery = Doctor::select('doctors.id', 'doctors.name', 'specialists.name as specialist_name')
                 ->leftJoin('specialists', 'doctors.specialist_id', '=', 'specialists.id');
-            
+
             if ($search) {
-                $doctorsQuery->where(function($query) use ($search) {
+                $doctorsQuery->where(function ($query) use ($search) {
                     $query->where('doctors.name', 'like', "%{$search}%")
-                          ->orWhere('specialists.name', 'like', "%{$search}%");
+                        ->orWhere('specialists.name', 'like', "%{$search}%");
                 });
             }
-            
+
             $doctors = $doctorsQuery->get();
-            
+
             // Get favorite doctor data for this user
             $favoriteData = UserDocSelection::where('user_id', $userId)
                 ->where('active', true)
                 ->get(['doc_id', 'fav_service'])
                 ->keyBy('doc_id');
-            
+
             // Add favorite status and service to each doctor
-            $doctorsWithFavorites = $doctors->map(function($doctor) use ($favoriteData) {
+            $doctorsWithFavorites = $doctors->map(function ($doctor) use ($favoriteData) {
                 $favoriteInfo = $favoriteData->get($doctor->id);
                 $doctor->is_favorite = $favoriteInfo ? true : false;
                 $doctor->fav_service_id = $favoriteInfo ? $favoriteInfo->fav_service : null;
@@ -105,7 +106,7 @@ class UserDocSelectionController extends Controller
     {
         try {
             $userId = Auth::id();
-            
+
             if (!$userId) {
                 return response()->json(['message' => 'غير مصرح بالوصول'], 401);
             }
@@ -124,12 +125,12 @@ class UserDocSelectionController extends Controller
             }
 
             $docId = $request->doc_id;
-            
+
             // Check if already exists
             $existing = UserDocSelection::where('user_id', $userId)
                 ->where('doc_id', $docId)
                 ->first();
-            
+
             if ($existing) {
                 // Update existing record to active using where clause
                 $updated = UserDocSelection::where('user_id', $userId)
@@ -138,7 +139,7 @@ class UserDocSelectionController extends Controller
                         'active' => true,
                         'fav_service' => $request->fav_service
                     ]);
-                
+
                 if (!$updated) {
                     return response()->json([
                         'success' => false,
@@ -175,7 +176,7 @@ class UserDocSelectionController extends Controller
     {
         try {
             $userId = Auth::id();
-            
+
             if (!$userId) {
                 return response()->json(['message' => 'غير مصرح بالوصول'], 401);
             }
@@ -184,7 +185,7 @@ class UserDocSelectionController extends Controller
             $exists = UserDocSelection::where('user_id', $userId)
                 ->where('doc_id', $docId)
                 ->exists();
-            
+
             if (!$exists) {
                 return response()->json([
                     'success' => false,
@@ -224,7 +225,7 @@ class UserDocSelectionController extends Controller
     {
         try {
             $userId = Auth::id();
-            
+
             if (!$userId) {
                 return response()->json(['message' => 'غير مصرح بالوصول'], 401);
             }
@@ -243,39 +244,39 @@ class UserDocSelectionController extends Controller
             }
 
             $docId = $request->doc_id;
-            
+
             // Debug logging
             \Log::info('Toggle favorite request', [
                 'user_id' => $userId,
                 'doc_id' => $docId,
                 'fav_service' => $request->fav_service
             ]);
-            
+
             // Check if the selection exists and get current status
             $selection = UserDocSelection::where('user_id', $userId)
                 ->where('doc_id', $docId)
                 ->first();
-            
+
             if ($selection) {
                 // Toggle active status
                 $newStatus = !$selection->active;
-                
+
                 // Update using where clause (since we have composite primary key)
                 \Log::info('Updating selection', [
                     'user_id' => $userId,
                     'doc_id' => $docId,
                     'new_status' => $newStatus
                 ]);
-                
+
                 $updated = UserDocSelection::where('user_id', $userId)
                     ->where('doc_id', $docId)
                     ->update([
                         'active' => $newStatus,
                         'fav_service' => $request->fav_service
                     ]);
-                
+
                 \Log::info('Update result', ['updated_rows' => $updated]);
-                
+
                 if ($updated) {
                     $message = $newStatus ? 'تم إضافة الطبيب للمفضلة بنجاح' : 'تم إزالة الطبيب من المفضلة بنجاح';
                 } else {
