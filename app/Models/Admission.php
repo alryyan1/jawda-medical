@@ -138,6 +138,14 @@ class Admission extends Model
     }
 
     /**
+     * Get the requested surgeries for the admission.
+     */
+    public function requestedSurgeries()
+    {
+        return $this->hasMany(RequestedSurgery::class);
+    }
+
+    /**
      * Get the requested lab tests for the admission.
      */
     public function requestedLabTests()

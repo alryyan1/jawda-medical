@@ -361,13 +361,20 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'update']);
   Route::delete('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'destroy']);
 
+  // Requested Surgeries (nested under admissions)
+  Route::get('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'index']);
+  Route::post('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'store']);
+  Route::delete('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroy']);
+  Route::patch('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'updateFinance']);
+
   /*
     |--------------------------------------------------------------------------
     | Operations Management Routes (Surgical Operations)
     |--------------------------------------------------------------------------
     */
-
-
+  // Surgical Operations
+  Route::apiResource('surgical-operations', \App\Http\Controllers\Api\SurgicalOperationController::class);
+  Route::apiResource('surgical-operations.charges', \App\Http\Controllers\Api\SurgicalOperationChargeController::class)->shallow();
 
   // PDF Settings
   Route::get('pdf-settings', [PdfSettingController::class, 'index']);
