@@ -11,11 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('surgical_operations', function (Blueprint $table) {
+        Schema::create('discount_lab_requests', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->integer('price')->default(0);
+            $table->unsignedBigInteger('patient_id');
+            $table->boolean('is_approved')->default(false);
             $table->timestamps();
+
+            $table->foreign('patient_id')->references('id')->on('patients')->onDelete('cascade');
         });
     }
 
@@ -24,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('surgical_operations');
+        Schema::dropIfExists('discount_lab_requests');
     }
 };

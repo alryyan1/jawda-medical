@@ -15,7 +15,8 @@ class SurgicalOperationCharge extends Model
         'type',
         'amount',
         'reference_type',
-        'reference_charge_id'
+        'reference_charge_id',
+        'beneficiary'
     ];
 
     public function operation()

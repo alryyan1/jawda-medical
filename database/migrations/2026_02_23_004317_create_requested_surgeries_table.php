@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('admission_id')->constrained('admissions')->cascadeOnDelete();
             $table->foreignId('surgery_id')->constrained('surgical_operations');
-            $table->decimal('price', 10, 2)->default(0);
+            $table->integer('price')->default(0);
             $table->foreignId('doctor_id')->nullable()->constrained('doctors')->nullOnDelete();
             $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();

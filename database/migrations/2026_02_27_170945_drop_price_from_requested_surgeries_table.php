@@ -11,11 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('surgical_operations', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->integer('price')->default(0);
-            $table->timestamps();
+        Schema::table('requested_surgeries', function (Blueprint $table) {
+            $table->dropColumn('price');
         });
     }
 
@@ -24,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('surgical_operations');
+        Schema::table('requested_surgeries', function (Blueprint $table) {
+            $table->decimal('price', 15, 2)->default(0);
+        });
     }
 };

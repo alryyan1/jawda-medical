@@ -23,7 +23,6 @@ class SurgicalOperationController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'price' => 'numeric|min:0'
         ]);
 
         $operation = SurgicalOperation::create($validated);
@@ -45,7 +44,6 @@ class SurgicalOperationController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'price' => 'sometimes|numeric|min:0'
         ]);
 
         $surgicalOperation->update($validated);

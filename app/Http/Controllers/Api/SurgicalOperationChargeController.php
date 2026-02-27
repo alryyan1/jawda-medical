@@ -21,7 +21,8 @@ class SurgicalOperationChargeController extends Controller
             'type' => 'required|in:fixed,percentage',
             'amount' => 'required|numeric|min:0',
             'reference_type' => 'nullable|in:total,charge',
-            'reference_charge_id' => 'nullable|exists:surgical_operation_charges,id'
+            'reference_charge_id' => 'nullable|exists:surgical_operation_charges,id',
+            'beneficiary' => 'required|in:center,staff'
         ]);
 
         $charge = $surgicalOperation->charges()->create($validated);
@@ -39,7 +40,8 @@ class SurgicalOperationChargeController extends Controller
             'type' => 'sometimes|in:fixed,percentage',
             'amount' => 'sometimes|numeric|min:0',
             'reference_type' => 'nullable|in:total,charge',
-            'reference_charge_id' => 'nullable|exists:surgical_operation_charges,id'
+            'reference_charge_id' => 'nullable|exists:surgical_operation_charges,id',
+            'beneficiary' => 'sometimes|in:center,staff'
         ]);
 
         $charge->update($validated);

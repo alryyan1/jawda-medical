@@ -14,12 +14,18 @@ class RequestedSurgeryFinance extends Model
         'admission_id',
         'surgery_id',
         'finance_charge_id',
+        'doctor_id',
         'amount',
     ];
 
     public function requestedSurgery()
     {
         return $this->belongsTo(RequestedSurgery::class);
+    }
+
+    public function doctor()
+    {
+        return $this->belongsTo(Doctor::class);
     }
 
     public function financeCharge()

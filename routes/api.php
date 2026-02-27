@@ -364,8 +364,19 @@ Route::middleware('auth:sanctum')->group(function () {
   // Requested Surgeries (nested under admissions)
   Route::get('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'index']);
   Route::post('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'store']);
+  Route::patch('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'update']);
+  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/approve', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'approve']);
+  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/reject', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'reject']);
   Route::delete('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroy']);
   Route::patch('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'updateFinance']);
+  Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/print', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'print']);
+  Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/invoice', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'invoice']);
+  Route::get('requested-surgeries/{requestedSurgery}/ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'getLedger']);
+  Route::post('requested-surgeries/{requestedSurgery}/transactions', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'addTransaction']);
+  Route::get('requested-surgeries/{requestedSurgery}/print-ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'printLedger']);
+
+  // Surgery Statistics
+  Route::get('/surgeries/statistics', [\App\Http\Controllers\Api\SurgeryStatisticsController::class, 'getStatistics']);
 
   /*
     |--------------------------------------------------------------------------
@@ -374,7 +385,9 @@ Route::middleware('auth:sanctum')->group(function () {
     */
   // Surgical Operations
   Route::apiResource('surgical-operations', \App\Http\Controllers\Api\SurgicalOperationController::class);
-  Route::apiResource('surgical-operations.charges', \App\Http\Controllers\Api\SurgicalOperationChargeController::class)->shallow();
+  Route::apiResource('surgical-operations.charges', \App\Http\Controllers\Api\SurgicalOperationChargeController::class);
+  Route::get('standard-surgical-charges', [\App\Http\Controllers\Api\StandardSurgicalChargeController::class, 'index']);
+  Route::post('surgical-operations/{surgical_operation}/import-standard-charges', [\App\Http\Controllers\Api\StandardSurgicalChargeController::class, 'import']);
 
   // PDF Settings
   Route::get('pdf-settings', [PdfSettingController::class, 'index']);
@@ -457,6 +470,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Removed: container barcode and print-all-samples endpoints
   Route::get('/visits/{visit}/available-lab-tests', [LabRequestController::class, 'availableTestsForVisit']);
   Route::post('/visits/{visit}/lab-requests-batch', [LabRequestController::class, 'storeBatchForVisit']);
+  Route::post('/discount-lab-requests', [\App\Http\Controllers\DiscountLabRequestController::class, 'store']);
 
   Route::put('/labrequests/{labrequest}', [LabRequestController::class, 'update']);
   Route::delete('/labrequests/{labrequest}', [LabRequestController::class, 'destroy']);

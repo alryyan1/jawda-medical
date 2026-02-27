@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('surgical_operations', function (Blueprint $table) {
+        Schema::create('standard_surgical_charges', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->integer('price')->default(0);
+            $table->enum('type', ['center', 'staff'])->default('center');
             $table->timestamps();
         });
     }
@@ -24,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('surgical_operations');
+        Schema::dropIfExists('standard_surgical_charges');
     }
 };

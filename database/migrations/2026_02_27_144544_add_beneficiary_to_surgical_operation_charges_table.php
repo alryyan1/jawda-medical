@@ -11,11 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('surgical_operations', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->integer('price')->default(0);
-            $table->timestamps();
+        Schema::table('surgical_operation_charges', function (Blueprint $table) {
+            $table->enum('beneficiary', ['center', 'staff'])->default('center');
         });
     }
 
@@ -24,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('surgical_operations');
+        Schema::table('surgical_operation_charges', function (Blueprint $table) {
+            $table->dropColumn('beneficiary');
+        });
     }
 };

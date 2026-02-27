@@ -12,10 +12,24 @@ class RequestedSurgery extends Model
     protected $fillable = [
         'admission_id',
         'surgery_id',
-        'price',
         'doctor_id',
         'user_id',
+        'status',
+        'approved_by',
+        'approved_at',
     ];
+
+    protected $appends = ['total_price'];
+
+    public function getTotalPriceAttribute()
+    {
+        return $this->finances->sum('amount');
+    }
+
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
 
     public function admission()
     {
@@ -40,5 +54,10 @@ class RequestedSurgery extends Model
     public function finances()
     {
         return $this->hasMany(RequestedSurgeryFinance::class);
+    }
+
+    public function transactions()
+    {
+        return $this->hasMany(RequestedSurgeryTransaction::class);
     }
 }
