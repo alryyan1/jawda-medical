@@ -551,8 +551,7 @@ MSG;
                                     }
 
                                     $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
-                                }
-                                 elseif ($recipientPhoneNumberId == '1010322575491077') {
+                                } elseif ($recipientPhoneNumberId == '1010322575491077') {
                                     $collection = 'altamayoz_branch_one';
                                     //log get data from alryyan
                                     Log::info('getting data from alryyan ' . $recipientPhoneNumberId);
@@ -736,19 +735,52 @@ MSG;
             // Get collection from settings
 
 
-            // Fetch PDF URL from Firestore using the sender's phone number
-            $pdfUrl = $this->getResultUrlFromFirestoreByPhone($from, $collection);
-            //log pdfurl
-            Log::info('PDF URL: ' . $pdfUrl);
+            // For test_notification_ template, the payload typically contains the text or ID
+            // Here we assume the button payload contains the visitId and collection as JSON
+            $payloadString = $buttonData['payload'] ?? $buttonData['text'] ?? $buttonData['title'] ?? null;
+            $visitId = null;
 
-            if ($pdfUrl) {
-                // Send notification message before sending the PDF document
-                $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات", $phoneNumberId);
-                // Send the PDF document back to the sender
-                $this->sendDocumentToUser($from, $pdfUrl, null, $phoneNumberId);
+            if ($payloadString) {
+                // Try to decode as JSON
+                $payloadData = json_decode($payloadString, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($payloadData)) {
+                    $visitId = $payloadData['visitId'] ?? null;
+                    if (isset($payloadData['collection'])) {
+                        $collection = $payloadData['collection'];
+                    }
+                } else {
+                    // Fallback to old behavior (just a numeric ID)
+                    $visitId = $payloadString;
+                }
+            }
+
+            Log::info('WhatsApp Cloud API: Extracting visit ID and collection from button.', [
+                'button_data' => $buttonData,
+                'extracted_visit_id' => $visitId,
+                'extracted_collection' => $collection,
+                'raw_payload' => $payloadString
+            ]);
+
+            if ($visitId && is_numeric($visitId)) {
+                // Fetch PDF URL from Firestore using the visit ID
+                $pdfUrl = $this->getResultUrlFromFirestore($visitId, $collection);
+                //log pdfurl
+                Log::info('PDF URL: ' . $pdfUrl);
+
+                if ($pdfUrl) {
+                    // Send notification message before sending the PDF document
+                    $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات", $phoneNumberId);
+                    // Send the PDF document back to the sender
+                    $this->sendDocumentToUser($from, $pdfUrl, $visitId, $phoneNumberId);
+                } else {
+                    // Send error message if PDF not found
+                    $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة للزيارة رقم: {$visitId}", $phoneNumberId);
+                }
             } else {
-                // Send error message if PDF not found
-                $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة لرقم الهاتف: {$from}", $phoneNumberId);
+                Log::warning('WhatsApp Cloud API: Invalid or missing visit ID from button payload.', [
+                    'button_data' => $buttonData
+                ]);
+                $this->sendTextToUser($from, "عذراً، لم نتمكن من التعرف على رقم الزيارة.", $phoneNumberId);
             }
         } elseif ($type === 'text' && isset($message['text']['body'])) {
             $messageText = trim($message['text']['body']);
@@ -860,7 +892,7 @@ MSG;
     }
 
     /**
-     * Get the most recent result URL from Firestore by searching for patient phone number.
+     * Get the most recent result URL from Firestore by searching fo؛r patient phone number.
      * Queries documents where patient_phone matches, sorted by updated_at descending.
      *
      * @param string $phoneNumber The patient phone number to search for
@@ -1084,7 +1116,7 @@ MSG;
                 'filename' => $filename,
                 'phoneNumberId' => $phoneNumberId
             ]);
-            if($phoneNumberId == "1010322575491077"){
+            if ($phoneNumberId == "1010322575491077") {
                 $aceessToken = 'EAAW6NIGs3xcBQp4qbUGEHol4WYmRYpbKbjWY8ZBxIalBV0psJoZA1evagLRnPKPwVIWaDZBjZCwFaFAUKcGnZBhoFQosZByzChm12UIeXQ94UVIojEXxGZCVFYVzx7Gbd6ZCYc4M18OIJwSg5idf9b2e5HVEXr7FFNuhduxOTBsTqQwmZA9ZBEYLubrAZAboVZB8rhGTR52WcZB4pSt39TLXr4X5xdZCQaSMRYtkey2oBc';
             }
 
