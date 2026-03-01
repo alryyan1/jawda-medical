@@ -16,6 +16,7 @@ class RequestedSurgeryFinance extends Model
         'finance_charge_id',
         'doctor_id',
         'amount',
+        'payment_method',
     ];
 
     public function requestedSurgery()

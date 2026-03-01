@@ -143,6 +143,37 @@ class RequestedSurgeryController extends Controller
         }
     }
 
+    public function unapprove(Admission $admission, RequestedSurgery $requestedSurgery)
+    {
+        if ($requestedSurgery->admission_id !== $admission->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Prevent unapproving if there are any payments (credit transactions)
+        $hasPayments = $requestedSurgery->transactions()->where('type', 'credit')->exists();
+        if ($hasPayments) {
+            return response()->json(['message' => 'لا يمكن التراجع عن الاعتماد لوجود دفعات مسجلة'], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $requestedSurgery->update([
+                'status'      => 'pending',
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+
+            // Delete the default debit transactions (charges) that were created on approval
+            $requestedSurgery->transactions()->where('type', 'debit')->delete();
+
+            DB::commit();
+            return response()->json($requestedSurgery->load(['surgery', 'doctor', 'user', 'approvedBy', 'finances.financeCharge']));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['message' => 'حدث خطأ أثناء التراجع عن الاعتماد', 'error' => $e->getMessage()], 500);
+        }
+    }
+
     public function reject(Admission $admission, RequestedSurgery $requestedSurgery)
     {
         if ($requestedSurgery->admission_id !== $admission->id) {
@@ -163,6 +194,7 @@ class RequestedSurgeryController extends Controller
         $validated = $request->validate([
             'amount' => 'sometimes|numeric|min:0',
             'doctor_id' => 'sometimes|nullable|exists:doctors,id',
+            'payment_method' => 'sometimes|in:cash,bankak',
         ]);
 
         DB::beginTransaction();
@@ -243,21 +275,51 @@ class RequestedSurgeryController extends Controller
     public function addTransaction(Request $request, RequestedSurgery $requestedSurgery)
     {
         $validated = $request->validate([
-            'type'        => 'required|in:debit,credit',
-            'amount'      => 'required|numeric|min:0.01',
-            'description' => 'required|string|max:255',
-            'notes'       => 'nullable|string',
+            'payment_method' => 'required|in:cash,bankak',
+            'amount'         => 'required|numeric|min:0.01',
+            'description'    => 'required|string|max:255',
+            'notes'          => 'nullable|string',
         ]);
 
+        $transactions = $requestedSurgery->transactions()->get();
+        $totalDebits = $transactions->where('type', 'debit')->sum('amount');
+        $totalCredits = $transactions->where('type', 'credit')->sum('amount');
+        $balance = $totalDebits - $totalCredits;
+
+        if ($balance <= 0) {
+            return response()->json(['message' => 'العملية مسددة بالكامل، لا يمكن إضافة دفعات جديدة'], 422);
+        }
+
+        if ($validated['amount'] > $balance) {
+            return response()->json(['message' => 'المبلغ المدخل أكبر من الرصيد المتبقي (' . number_format($balance, 2) . ')'], 422);
+        }
+
         $transaction = $requestedSurgery->transactions()->create([
-            'type'        => $validated['type'],
-            'amount'      => $validated['amount'],
-            'description' => $validated['description'],
-            'notes'       => $validated['notes'] ?? null,
-            'user_id'     => Auth::id(),
+            'type'           => 'credit', // Manual entries are now specifically payments
+            'payment_method' => $validated['payment_method'],
+            'amount'         => $validated['amount'],
+            'description'    => $validated['description'],
+            'notes'          => $validated['notes'] ?? null,
+            'user_id'        => Auth::id(),
         ]);
 
         return response()->json($transaction->load('user:id,name'));
+    }
+
+    public function destroyTransaction(RequestedSurgery $requestedSurgery, RequestedSurgeryTransaction $transaction)
+    {
+        if ($transaction->requested_surgery_id !== $requestedSurgery->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        // Prevent deleting debit transactions (charges)
+        if ($transaction->type === 'debit') {
+            return response()->json(['message' => 'لا يمكن حذف الرسوم التلقائية للعملية'], 422);
+        }
+
+        $transaction->delete();
+
+        return response()->json(['message' => 'تم حذف المعاملة بنجاح']);
     }
 
     public function printLedger(RequestedSurgery $requestedSurgery)

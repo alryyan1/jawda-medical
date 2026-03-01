@@ -53,7 +53,7 @@ use Spatie\Permission\Traits\HasRoles;
  */
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable,HasRoles; // <--- And here
+    use HasApiTokens, HasFactory, Notifiable, HasRoles; // <--- And here
 
     protected $fillable = [
         'name',
@@ -68,6 +68,7 @@ class User extends Authenticatable
         'is_active',
         'user_type',
         'nav_items',
+        'admission_tabs',
     ];
 
     // No guarded attributes on User for this change
@@ -85,12 +86,12 @@ class User extends Authenticatable
         'is_supervisor' => 'boolean',
         'is_active' => 'boolean',
     ];
-    
+
     public function defaultShifts(): BelongsToMany
     {
         return $this->belongsToMany(ShiftDefinition::class, 'user_default_shifts', 'user_id', 'shift_definition_id')
-                    ->using(UserDefaultShift::class)
-                    ->withTimestamps();
+            ->using(UserDefaultShift::class)
+            ->withTimestamps();
     }
 
     public function attendances(): HasMany

@@ -12,6 +12,7 @@ class RequestedSurgeryTransaction extends Model
     protected $fillable = [
         'requested_surgery_id',
         'type',
+        'payment_method',
         'amount',
         'description',
         'notes',

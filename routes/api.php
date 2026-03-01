@@ -367,16 +367,19 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::patch('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'update']);
   Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/approve', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'approve']);
   Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/reject', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'reject']);
+  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/unapprove', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'unapprove']);
   Route::delete('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroy']);
   Route::patch('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'updateFinance']);
   Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/print', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'print']);
   Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/invoice', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'invoice']);
   Route::get('requested-surgeries/{requestedSurgery}/ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'getLedger']);
   Route::post('requested-surgeries/{requestedSurgery}/transactions', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'addTransaction']);
+  Route::delete('requested-surgeries/{requestedSurgery}/transactions/{transaction}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroyTransaction']);
   Route::get('requested-surgeries/{requestedSurgery}/print-ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'printLedger']);
 
   // Surgery Statistics
   Route::get('/surgeries/statistics', [\App\Http\Controllers\Api\SurgeryStatisticsController::class, 'getStatistics']);
+  Route::get('/surgeries/daily-report', [\App\Http\Controllers\Api\SurgeryStatisticsController::class, 'getDailyReport']);
 
   /*
     |--------------------------------------------------------------------------

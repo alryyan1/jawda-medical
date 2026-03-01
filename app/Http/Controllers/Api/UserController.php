@@ -46,20 +46,26 @@ class UserController extends Controller
             'user_type' => 'nullable|string|max:255',
             'nav_items' => 'nullable|array',
             'nav_items.*' => 'string|max:255',
+            'admission_tabs' => 'nullable|array',
+            'admission_tabs.*' => 'string|max:255',
         ]);
 
         $createData = collect($validatedData)->except(['password_confirmation', 'roles'])->toArray();
         $createData['password'] = Hash::make($validatedData['password']);
-        
+
         // Set defaults if not provided
         $createData['is_nurse'] = $validatedData['is_nurse'] ?? false;
         $createData['is_supervisor'] = $validatedData['is_supervisor'] ?? false;
         $createData['is_active'] = $validatedData['is_active'] ?? true; // Default to active
         $createData['user_money_collector_type'] = $validatedData['user_money_collector_type'] ?? 'all';
-        
+
         // Handle nav_items - encode as JSON if provided
         if (isset($createData['nav_items'])) {
             $createData['nav_items'] = json_encode($createData['nav_items']);
+        }
+
+        if (isset($createData['admission_tabs'])) {
+            $createData['admission_tabs'] = json_encode($createData['admission_tabs']);
         }
 
 
@@ -91,14 +97,20 @@ class UserController extends Controller
             'user_type' => 'nullable|string|max:255',
             'nav_items' => 'nullable|array',
             'nav_items.*' => 'string|max:255',
+            'admission_tabs' => 'nullable|array',
+            'admission_tabs.*' => 'string|max:255',
         ]);
 
         // Prepare data for update, excluding password and roles (handled separately)
         $updateData = collect($validatedData)->except(['roles', 'password', 'password_confirmation'])->toArray();
-        
+
         // Handle nav_items - encode as JSON if provided
         if (isset($updateData['nav_items'])) {
             $updateData['nav_items'] = json_encode($updateData['nav_items']);
+        }
+
+        if (isset($updateData['admission_tabs'])) {
+            $updateData['admission_tabs'] = json_encode($updateData['admission_tabs']);
         }
 
         // Handle password change if provided
@@ -111,12 +123,12 @@ class UserController extends Controller
         if ($request->has('is_supervisor')) $updateData['is_supervisor'] = $request->boolean('is_supervisor');
         if ($request->has('is_active')) $updateData['is_active'] = $request->boolean('is_active');
         if ($request->has('user_type')) $updateData['user_type'] = (string) $request->input('user_type');
-        if (!$request->has('user_type') || $request->input('user_type') ==  null){
+        if (!$request->has('user_type') || $request->input('user_type') ==  null) {
             $updateData['user_type'] = null;
         }
         $user->update($updateData);
 
-        if ($request->has('roles') ) { // Assuming 'assign roles' permission
+        if ($request->has('roles')) { // Assuming 'assign roles' permission
             $user->syncRoles($validatedData['roles'] ?? []);
         }
 
@@ -174,7 +186,7 @@ class UserController extends Controller
 
         return UserResource::collection($users);
     }
-  
+
 
     public function destroy(User $user)
     {
@@ -190,7 +202,7 @@ class UserController extends Controller
     // Endpoint to get all roles for dropdowns/checkboxes in user form
     public function getRolesList()
     {
-    
+
         return RoleResource::collection(Role::orderBy('name')->get());
     }
 
@@ -258,7 +270,7 @@ class UserController extends Controller
         $totalCostBank = $shift->totalCostBank($user->id);
         $totalCashService = $totalPaidService - $totalBankService;
         $totalCostCash = $totalCost - $totalCostBank;
-        $netCash = ($totalCashService + $totallabCash )- $totalCostCash;
+        $netCash = ($totalCashService + $totallabCash) - $totalCostCash;
         $netBank = ($totalBankService + $totalLabBank) - $totalCostBank;
 
         // You might also want to include other income sources or expenses handled by the user
@@ -344,9 +356,9 @@ class UserController extends Controller
 
         // Sum up payments from LabRequest records where this user was the depositor in this shift
         $query = LabRequest::where('user_deposited', $user->id)
-                           ->whereHas('patient', function ($query) use ($shiftId) {
-                            $query->where('shift_id', $shiftId);
-                           });
+            ->whereHas('patient', function ($query) use ($shiftId) {
+                $query->where('shift_id', $shiftId);
+            });
 
         $totalIncome = (float) (clone $query)->sum('amount_paid');
         $totalBank = (float) (clone $query)->where('is_bankak', true)->sum('amount_paid');
@@ -432,20 +444,20 @@ class UserController extends Controller
         }
 
         $doctorVisits = [];
-        
+
         // Get lab transactions - LabRequest has doctor_visit_id, and DoctorVisit has shift_id
-        $labRequests = \App\Models\LabRequest::whereHas('doctorVisit', function($query) use ($shift) {
+        $labRequests = \App\Models\LabRequest::whereHas('doctorVisit', function ($query) use ($shift) {
             $query->where('shift_id', $shift->id);
         })
-        ->where('user_deposited', $userId)
-        ->where('is_paid', true)
-        ->with(['doctorVisit.patient:id,name', 'doctorVisit.doctor:id,name', 'mainTest:id,main_test_name'])
-        ->get();
+            ->where('user_deposited', $userId)
+            ->where('is_paid', true)
+            ->with(['doctorVisit.patient:id,name', 'doctorVisit.doctor:id,name', 'mainTest:id,main_test_name'])
+            ->get();
 
         foreach ($labRequests as $labRequest) {
             $doctorVisit = $labRequest->doctorVisit;
             if (!$doctorVisit) continue;
-            
+
             $visitId = $doctorVisit->id;
             if (!isset($doctorVisits[$visitId])) {
                 $doctorVisits[$visitId] = [
@@ -464,17 +476,17 @@ class UserController extends Controller
                     'total_service_cash' => 0,
                 ];
             }
-            
+
             $amount = (float) $labRequest->amount_paid;
             $isBank = (bool) $labRequest->is_bankak;
-            
+
             $doctorVisits[$visitId]['lab_transactions'][] = [
                 'test_name' => $labRequest->mainTest->main_test_name ?? 'غير محدد',
                 'amount' => $amount,
                 'is_bank' => $isBank,
                 'date' => $labRequest->created_at?->format('Y-m-d H:i:s'),
             ];
-            
+
             $doctorVisits[$visitId]['total_lab_paid'] += $amount;
             if ($isBank) {
                 $doctorVisits[$visitId]['total_lab_bank'] += $amount;
@@ -492,10 +504,10 @@ class UserController extends Controller
         foreach ($serviceDeposits as $deposit) {
             $requestedService = $deposit->requestedService;
             if (!$requestedService) continue;
-            
+
             $doctorVisit = $requestedService->doctorVisit;
             if (!$doctorVisit) continue;
-            
+
             $visitId = $doctorVisit->id;
             if (!isset($doctorVisits[$visitId])) {
                 $doctorVisits[$visitId] = [
@@ -514,18 +526,18 @@ class UserController extends Controller
                     'total_service_cash' => 0,
                 ];
             }
-            
+
             $amount = (float) $deposit->amount;
             $isBank = (bool) $deposit->is_bank;
             $serviceName = $requestedService->service->name ?? 'غير محدد';
-            
+
             $doctorVisits[$visitId]['service_transactions'][] = [
                 'service_name' => $serviceName,
                 'amount' => $amount,
                 'is_bank' => $isBank,
                 'date' => $deposit->created_at?->format('Y-m-d H:i:s'),
             ];
-            
+
             $doctorVisits[$visitId]['total_service_paid'] += $amount;
             if ($isBank) {
                 $doctorVisits[$visitId]['total_service_bank'] += $amount;

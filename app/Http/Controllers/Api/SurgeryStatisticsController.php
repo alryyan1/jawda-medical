@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\RequestedSurgery;
 use App\Models\RequestedSurgeryTransaction;
+use App\Models\RequestedSurgeryFinance;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -130,6 +131,78 @@ class SurgeryStatisticsController extends Controller
             'status_breakdown' => $statusData,
             'monthly_trend' => $monthlyTrend,
             'doctor_performance' => $doctorPerformance,
+        ]);
+    }
+
+    public function getDailyReport(Request $request)
+    {
+        $year = $request->input('year', Carbon::now()->year);
+        $month = $request->input('month', Carbon::now()->month);
+
+        $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $endDate = $startDate->copy()->endOfMonth();
+
+        $daysInMonth = $startDate->daysInMonth;
+        $reportData = [];
+
+        // Pre-fetch data for the entire month to avoid N+1 queries in the loop
+        $surgeriesCount = RequestedSurgery::whereBetween('created_at', [$startDate, $endDate])
+            ->select(DB::raw('DATE(created_at) as date'), DB::raw('COUNT(*) as count'))
+            ->groupBy('date')
+            ->get()
+            ->pluck('count', 'date');
+
+        $transactions = RequestedSurgeryTransaction::whereBetween('created_at', [$startDate, $endDate])
+            ->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('SUM(CASE WHEN type = "debit" THEN amount ELSE 0 END) as total_income'),
+                DB::raw('SUM(CASE WHEN type = "credit" AND payment_method = "cash" THEN amount ELSE 0 END) as total_cash'),
+                DB::raw('SUM(CASE WHEN type = "credit" AND payment_method = "bankak" THEN amount ELSE 0 END) as total_bank')
+            )
+            ->groupBy('date')
+            ->get()
+            ->keyBy('date');
+
+        $financeCharges = RequestedSurgeryFinance::whereBetween('created_at', [$startDate, $endDate])
+            ->with('financeCharge')
+            ->get()
+            ->groupBy(function ($item) {
+                return Carbon::parse($item->created_at)->format('Y-m-d');
+            });
+
+        for ($i = 1; $i <= $daysInMonth; $i++) {
+            $date = Carbon::createFromDate($year, $month, $i)->format('Y-m-d');
+
+            $staffCharges = 0;
+            $centerCharges = 0;
+
+            if (isset($financeCharges[$date])) {
+                foreach ($financeCharges[$date] as $charge) {
+                    if ($charge->financeCharge) {
+                        if ($charge->financeCharge->beneficiary === 'staff') {
+                            $staffCharges += (float)$charge->amount;
+                        } elseif ($charge->financeCharge->beneficiary === 'center') {
+                            $centerCharges += (float)$charge->amount;
+                        }
+                    }
+                }
+            }
+
+            $reportData[] = [
+                'date' => $date,
+                'surgeries_count' => $surgeriesCount[$date] ?? 0,
+                'total_income' => (float)($transactions[$date]->total_income ?? 0),
+                'staff_charges' => $staffCharges,
+                'center_charges' => $centerCharges,
+                'total_cash' => (float)($transactions[$date]->total_cash ?? 0),
+                'total_bank' => (float)($transactions[$date]->total_bank ?? 0),
+            ];
+        }
+
+        return response()->json([
+            'year' => $year,
+            'month' => $month,
+            'data' => $reportData
         ]);
     }
 }
