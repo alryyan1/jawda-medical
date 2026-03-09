@@ -21,23 +21,19 @@ class AdmissionTransactionController extends Controller
      */
     protected function syncStayFeesTransaction(Admission $admission): void
     {
-        if ($admission->short_stay_bed_id || ! $admission->room_id) {
+        if ($admission->short_stay_bed_id || ! $admission->bed_id) {
             return;
         }
 
-        $admission->loadMissing('room');
+        $admission->loadMissing('bed.room');
 
-        $admissionAt = $this->buildAdmissionCarbon($admission->admission_date, $admission->admission_time);
-        $endAt = $admission->status === 'discharged' && $admission->discharge_date && $admission->discharge_time
-            ? $this->buildAdmissionCarbon($admission->discharge_date, $admission->discharge_time)
+        $admissionAt = $admission->admission_date;
+        $endAt = $admission->status === 'discharged' && $admission->discharge_date
+            ? $admission->discharge_date
             : Carbon::now();
 
         $days = StayDaysCalculator::calculate($admissionAt, $endAt);
-        $pricePerDay = (float) ($admission->room->price_per_day ?? 0);
-        // حجز غرفة كاملة: ضرب السعر في 2
-        if ($admission->booking_type === 'room') {
-            $pricePerDay *= 2;
-        }
+        $pricePerDay = (float) ($admission->bed->room->price_per_day ?? 0);
         $total = round($days * $pricePerDay, 2);
 
         if ($total <= 0) {
@@ -68,16 +64,6 @@ class AdmissionTransactionController extends Controller
         }
     }
 
-    protected function buildAdmissionCarbon($date, $time): Carbon
-    {
-        $dateStr = $date instanceof Carbon ? $date->format('Y-m-d') : $date;
-        $timeStr = $time instanceof Carbon ? $time->format('H:i:s') : ($time ?? '00:00:00');
-        if (strlen($timeStr) === 5) {
-            $timeStr .= ':00';
-        }
-
-        return Carbon::parse($dateStr . ' ' . $timeStr);
-    }
     /**
      * Display a listing of transactions for an admission.
      */
@@ -87,7 +73,7 @@ class AdmissionTransactionController extends Controller
             ->with('user')
             ->orderBy('created_at', 'desc')
             ->get();
-        
+
         return AdmissionTransactionResource::collection($transactions);
     }
 
@@ -220,7 +206,7 @@ class AdmissionTransactionController extends Controller
         $totalCredits = (float) $admission->transactions()->where('type', 'credit')->sum('amount');
         $totalDebits = (float) $admission->transactions()->where('type', 'debit')->sum('amount');
         $balance = $totalDebits - $totalCredits;  // المستحقات - المدفوعات
-        
+
         return response()->json([
             'balance' => $balance,
             'total_credits' => $totalCredits,
@@ -245,7 +231,7 @@ class AdmissionTransactionController extends Controller
 
         try {
             $transaction->delete();
-            
+
             return response()->json(['message' => 'تم حذف المعاملة بنجاح.'], 200);
         } catch (\Exception $e) {
             return response()->json(['message' => 'فشل حذف المعاملة: ' . $e->getMessage()], 500);
@@ -334,5 +320,3 @@ class AdmissionTransactionController extends Controller
         }
     }
 }
-
-

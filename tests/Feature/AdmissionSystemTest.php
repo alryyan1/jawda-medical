@@ -27,22 +27,22 @@ class AdmissionSystemTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create test user
         $this->user = User::factory()->create();
-        
+
         // Create test patient
         $this->patient = Patient::factory()->create([
             'name' => 'Test Patient',
             'phone' => '1234567890',
         ]);
-        
+
         // Create test ward
         $this->ward = Ward::factory()->create([
             'name' => 'Test Ward',
             'status' => true,
         ]);
-        
+
         // Create test room
         $this->room = Room::factory()->create([
             'ward_id' => $this->ward->id,
@@ -52,7 +52,7 @@ class AdmissionSystemTest extends TestCase
             'status' => true,
             'price_per_day' => 200.00,
         ]);
-        
+
         // Create test bed
         $this->bed = Bed::factory()->create([
             'room_id' => $this->room->id,
@@ -68,14 +68,9 @@ class AdmissionSystemTest extends TestCase
     {
         $response = $this->actingAs($this->user)->postJson('/api/admissions', [
             'patient_id' => $this->patient->id,
-            'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
-            'admission_date' => '2026-02-03',
-            'admission_time' => '10:30:00',
+            'admission_date' => '2026-02-03 10:30:00',
             'diagnosis' => 'Test diagnosis',
-            'admission_type' => 'emergency',
         ]);
 
         $response->assertStatus(201);
@@ -86,7 +81,6 @@ class AdmissionSystemTest extends TestCase
                 'ward_id',
                 'room_id',
                 'bed_id',
-                'booking_type',
                 'admission_date',
                 'status',
             ],
@@ -96,7 +90,6 @@ class AdmissionSystemTest extends TestCase
         $this->assertDatabaseHas('admissions', [
             'patient_id' => $this->patient->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
             'status' => 'admitted',
         ]);
 
@@ -108,51 +101,27 @@ class AdmissionSystemTest extends TestCase
     }
 
     /**
-     * Test creating a room-based admission
+     * Test creating a room admission (implicitly bed-based or just room-linked)
      */
-    public function test_create_room_based_admission()
+    public function test_create_room_admission()
     {
         $response = $this->actingAs($this->user)->postJson('/api/admissions', [
             'patient_id' => $this->patient->id,
-            'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
-            'bed_id' => null,
-            'booking_type' => 'room',
-            'admission_date' => '2026-02-03',
-            'admission_time' => '14:00:00',
+            'bed_id' => $this->bed->id,
+            'admission_date' => '2026-02-03 14:00:00',
             'diagnosis' => 'Test diagnosis',
         ]);
 
         $response->assertStatus(201);
-        
-        // Verify admission was created without bed
+
+        // Verify admission was created (room_id no longer on admissions table)
         $this->assertDatabaseHas('admissions', [
             'patient_id' => $this->patient->id,
-            'room_id' => $this->room->id,
-            'bed_id' => null,
-            'booking_type' => 'room',
+            'bed_id' => $this->bed->id,
+            'status' => 'admitted',
         ]);
     }
 
-    /**
-     * Test validation: bed_id required when booking_type is 'bed'
-     */
-    public function test_bed_id_required_for_bed_booking()
-    {
-        $response = $this->actingAs($this->user)->postJson('/api/admissions', [
-            'patient_id' => $this->patient->id,
-            'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
-            'bed_id' => null,
-            'booking_type' => 'bed',
-            'admission_date' => '2026-02-03',
-        ]);
-
-        $response->assertStatus(400);
-        $response->assertJson([
-            'message' => 'السرير مطلوب عند اختيار نوع الحجز "سرير".',
-        ]);
-    }
 
     /**
      * Test stay days calculation - Morning period (7 AM - 12 PM)
@@ -162,13 +131,9 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
-            'admission_date' => '2026-02-03',
-            'admission_time' => '08:00:00',
-            'discharge_date' => '2026-02-04',
-            'discharge_time' => '10:00:00',
+            'admission_date' => '2026-02-03 08:00:00',
+            'discharge_date' => '2026-02-04 10:00:00',
             'status' => 'discharged',
         ]);
 
@@ -184,13 +149,9 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
-            'admission_date' => '2026-02-03',
-            'admission_time' => '14:00:00',
-            'discharge_date' => '2026-02-04',
-            'discharge_time' => '06:00:00',
+            'admission_date' => '2026-02-03 14:00:00',
+            'discharge_date' => '2026-02-04 06:00:00',
             'status' => 'discharged',
         ]);
 
@@ -206,13 +167,9 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
-            'admission_date' => '2026-02-03',
-            'admission_time' => '06:30:00',
-            'discharge_date' => '2026-02-05',
-            'discharge_time' => '06:30:00',
+            'admission_date' => '2026-02-03 06:30:00',
+            'discharge_date' => '2026-02-05 06:30:00',
             'status' => 'discharged',
         ]);
 
@@ -228,9 +185,7 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
             'status' => 'admitted',
         ]);
 
@@ -260,9 +215,7 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
             'status' => 'admitted',
         ]);
 
@@ -294,9 +247,7 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
             'status' => 'admitted',
         ]);
 
@@ -329,7 +280,7 @@ class AdmissionSystemTest extends TestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         // Balance = 800 - 400 = 400
         $this->assertEquals(800.00, $data['summary']['total_debits']);
         $this->assertEquals(400.00, $data['summary']['total_credits']);
@@ -344,13 +295,9 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
-            'admission_date' => '2026-02-03',
-            'admission_time' => '10:00:00',
-            'discharge_date' => '2026-02-08',
-            'discharge_time' => '10:00:00',
+            'admission_date' => '2026-02-03 10:00:00',
+            'discharge_date' => '2026-02-08 10:00:00',
             'status' => 'discharged',
         ]);
 
@@ -385,28 +332,23 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
             'status' => 'admitted',
         ]);
 
         $response = $this->actingAs($this->user)->putJson(
             "/api/admissions/{$admission->id}/transfer",
             [
-                'ward_id' => (string) $this->ward->id,
-                'room_id' => (string) $room2->id,
                 'bed_id' => (string) $bed2->id,
                 'notes' => 'Transfer test',
             ]
         );
 
         $response->assertStatus(200);
-        
-        // Verify admission was updated
+
+        // Verify admission was updated (room_id no longer on admissions table)
         $this->assertDatabaseHas('admissions', [
             'id' => $admission->id,
-            'room_id' => $room2->id,
             'bed_id' => $bed2->id,
         ]);
 
@@ -424,35 +366,39 @@ class AdmissionSystemTest extends TestCase
     }
 
     /**
-     * Test discharging a patient
+     * Test discharging a patient (even with balance)
      */
     public function test_discharge_patient()
     {
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
             'status' => 'admitted',
+        ]);
+
+        // Add a debit transaction so balance is not zero
+        AdmissionTransaction::factory()->create([
+            'admission_id' => $admission->id,
+            'type' => 'debit',
+            'amount' => 500.00,
         ]);
 
         $response = $this->actingAs($this->user)->putJson(
             "/api/admissions/{$admission->id}/discharge",
             [
-                'discharge_date' => '2026-02-05',
-                'discharge_time' => '14:00:00',
+                'discharge_date' => '2026-02-05 14:00:00',
                 'notes' => 'Discharge test',
             ]
         );
 
         $response->assertStatus(200);
-        
+
         // Verify admission status
         $this->assertDatabaseHas('admissions', [
             'id' => $admission->id,
             'status' => 'discharged',
-            'discharge_date' => '2026-02-05',
+            'discharge_date' => '2026-02-05 14:00:00',
         ]);
 
         // Verify bed is available
@@ -470,9 +416,7 @@ class AdmissionSystemTest extends TestCase
         $admission = Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
             'bed_id' => $this->bed->id,
-            'booking_type' => 'bed',
             'status' => 'discharged',
         ]);
 
@@ -491,25 +435,6 @@ class AdmissionSystemTest extends TestCase
         ]);
     }
 
-    /**
-     * Test room fully occupied status
-     */
-    public function test_room_fully_occupied_status()
-    {
-        // Create room-based admission
-        $admission = Admission::factory()->create([
-            'patient_id' => $this->patient->id,
-            'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
-            'bed_id' => null,
-            'booking_type' => 'room',
-            'status' => 'admitted',
-        ]);
-
-        // Check room has current admission
-        $this->room->refresh();
-        $this->assertTrue($this->room->currentAdmission !== null);
-    }
 
     /**
      * Test admission list filtering
@@ -520,14 +445,14 @@ class AdmissionSystemTest extends TestCase
         Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
+            'bed_id' => $this->bed->id,
             'status' => 'admitted',
         ]);
 
         Admission::factory()->create([
             'patient_id' => $this->patient->id,
             'ward_id' => $this->ward->id,
-            'room_id' => $this->room->id,
+            'bed_id' => $this->bed->id,
             'status' => 'discharged',
         ]);
 
@@ -538,7 +463,7 @@ class AdmissionSystemTest extends TestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         // All results should be admitted
         foreach ($data['data'] as $admission) {
             $this->assertEquals('admitted', $admission['status']);

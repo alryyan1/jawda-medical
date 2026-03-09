@@ -175,7 +175,7 @@ class ReportController extends Controller
         try {
             $doctorShiftsReport = new \App\Services\Pdf\DoctorShiftsReport();
             $pdfContent = $doctorShiftsReport->generate($request);
-            
+
             $pdfFileName = '' . date('Ymd_His') . '.pdf';
             return response($pdfContent, 200)
                 ->header('Content-Type', 'application/pdf')
@@ -207,7 +207,7 @@ class ReportController extends Controller
         if ($shiftDefinitionId) {
             $userIdsWithAttendanceQuery->where('shift_definition_id', $shiftDefinitionId);
         }
-        
+
         $userIdsWithAttendance = $userIdsWithAttendanceQuery->distinct()->pluck('user_id');
 
         if ($userIdsWithAttendance->isEmpty()) {
@@ -228,15 +228,15 @@ class ReportController extends Controller
 
         // 2. Fetch User models for these IDs
         $users = User::whereIn('id', $userIdsWithAttendance)
-                     ->with('defaultShifts') // Eager load default shifts if needed for display
-                     ->orderBy('name')
-                     ->get(['id', 'name', 'is_supervisor']); // Select only needed columns
+            ->with('defaultShifts') // Eager load default shifts if needed for display
+            ->orderBy('name')
+            ->get(['id', 'name', 'is_supervisor']); // Select only needed columns
 
         $holidaysInMonth = Holiday::whereBetween('holiday_date', [$startDate, $endDate])
             ->pluck('holiday_date')->map(fn($d) => $d->format('Y-m-d'));
 
         $totalWorkingDaysInMonth = $this->calculateWorkingDaysInMonth($startDate, $endDate, $holidaysInMonth->all());
-        
+
         $summaryData = [];
         foreach ($users as $user) {
             // Fetch attendance records specifically for this user and period/shift
@@ -246,19 +246,19 @@ class ReportController extends Controller
             if ($shiftDefinitionId) {
                 $userAttendanceQuery->where('shift_definition_id', $shiftDefinitionId);
             }
-            
+
             $userAttendanceRecords = $userAttendanceQuery->get();
 
             $present_days = $userAttendanceRecords->where('status', 'present')->count();
             $late_present_days = $userAttendanceRecords->where('status', 'late_present')->count();
             // According to your previous frontend, late_present also counts towards present_days for display
             $total_present_for_display = $present_days + $late_present_days;
-            
+
             $absent_days = $userAttendanceRecords->where('status', 'absent')->count();
             $on_leave_days = $userAttendanceRecords->where('status', 'on_leave')->count();
             $sick_leave_days = $userAttendanceRecords->where('status', 'sick_leave')->count();
             $early_leave_days = $userAttendanceRecords->where('status', 'early_leave')->count();
-            
+
             // Calculate holidays that fell on workdays for *this user*
             // This requires a more complex check against the user's actual working pattern.
             // For simplicity, if we assume all users have the same Mon-Fri pattern:
@@ -272,7 +272,7 @@ class ReportController extends Controller
                     $userHolidaysOnWorkdays++;
                 }
             }
-            
+
             // Scheduled days: total working days in month minus holidays that were workdays
             // This is a general calculation. For individual scheduled days, it would need their work pattern.
             $scheduledDays = $totalWorkingDaysInMonth; // Start with total business days
@@ -297,7 +297,7 @@ class ReportController extends Controller
                 'holidays_on_workdays' => $userHolidaysOnWorkdays, // Count of holidays falling on their workdays
             ];
         }
-        
+
         $shiftName = $shiftDefinitionId ? ShiftDefinition::find($shiftDefinitionId)?->name : null;
 
         return [
@@ -339,14 +339,14 @@ class ReportController extends Controller
     {
         // if (!Auth::user()->can('print monthly_attendance_report')) { /* ... */ }
         $reportContent = $this->getMonthlyAttendanceSummaryData($request);
-        
+
         $summaryList = $reportContent['data'];
         $meta = $reportContent['meta'];
 
         if (empty($summaryList)) {
             // For PDF, we can generate an empty report or a message
             // For API response, a 404 or empty data is fine
-             return response()->json(['message' => 'No attendance data to generate PDF for the selected criteria.'], 404);
+            return response()->json(['message' => 'No attendance data to generate PDF for the selected criteria.'], 404);
         }
 
         // Use dedicated PDF service (similar to LabResultReport)
@@ -512,7 +512,7 @@ class ReportController extends Controller
         $reportTitle = 'تقرير عقد الخدمات لشركة: ' . $company->name;
         $filterCriteriaString = $searchTerm ? "بحث: " . $searchTerm : "جميع الخدمات المتعاقد عليها";
 
-        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4',true, 'UTF-8', false,false,$filterCriteriaString);
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteriaString);
         $pdf->AddPage();
 
         $headers = ['اسم الخدمة', 'المجموعة', 'سعر العقد', 'تحمل الشركة', 'موافقة'];
@@ -570,7 +570,7 @@ class ReportController extends Controller
         $reportTitle = 'تقرير عقد الفحوصات لشركة: ' . $company->name;
         $filterCriteriaString = $searchTerm ? "بحث: " . $searchTerm : "جميع الفحوصات المتعاقد عليها";
 
-        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4',true, 'UTF-8', false,false,$filterCriteriaString);
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteriaString);
         $pdf->AddPage();
 
         $headers = ['اسم الفحص', 'نوع العينة', 'سعر العقد', 'تحمل الشركة', 'موافقة'];
@@ -987,188 +987,17 @@ class ReportController extends Controller
     }
     public function clinicReport_old(Request $request)
     {
+        $doctor_shift_id = $request->get('doctor_shift_id');
+        $doctorShift = DoctorShift::with(['user', 'doctor', 'visits.patient.company', 'visits.requestedServices.service'])->find($doctor_shift_id);
 
-
-        $user_id = $request->get('user');
-        $doctor_shift_id = $request->get(key: 'doctor_shift_id');
-        $doctorShift = DoctorShift::find($doctor_shift_id);
-
-
-        $pdf = new MyCustomTCPDF('تقرير الخاص', '', 'L', 'mm', 'A4');
-
-        $lg = array();
-        $lg['a_meta_charset'] = 'UTF-8';
-        $lg['a_meta_dir'] = 'rtl';
-        $lg['a_meta_language'] = 'fa';
-        $lg['w_page'] = 'page';
-        $pdf->setLanguageArray($lg);
-        $pdf->setCreator(PDF_CREATOR);
-        $pdf->setAuthor('Nicola Asuni');
-        $pdf->setTitle('التقرير الخاص');
-        $pdf->setSubject('TCPDF Tutorial');
-        $pdf->setKeywords('TCPDF, PDF, example, test, guide');
-        $pdf->setHeaderData(PDF_HEADER_LOGO, PDF_HEADER_LOGO_WIDTH, PDF_HEADER_TITLE, PDF_HEADER_STRING);
-        $pdf->setHeaderFont(array(PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN));
-        $pdf->setFooterFont(array(PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA));
-        $pdf->setDefaultMonospacedFont(PDF_FONT_MONOSPACED);
-        $pdf->setMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
-        $pdf->setHeaderMargin(PDF_MARGIN_HEADER);
-        $pdf->setFooterMargin(PDF_MARGIN_FOOTER);
-        $pdf->setAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
-        $pdf->setFont('times', 'BI', 12);
-        $pdf->AddPage();
-        $page_width = $pdf->getPageWidth() - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT;
-        $pdf->setFont('arial', 'b', 22);
-
-        $pdf->Cell($page_width, 5, 'التقرير الخاص', 0, 1, 'C');
-        $pdf->Ln();
-        $pdf->setFont('arial', 'b', 16);
-
-        $pdf->setFillColor(200, 200, 200);
-        $table_col_widht = $page_width / 6;
-        $pdf->Cell($table_col_widht, 5, 'التاريخ ', 1, 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht, 5, $doctorShift->created_at->format('Y/m/d'), 1, 0, 'C');
-        $pdf->Cell($table_col_widht, 5, ' ', 0, 0, 'C', fill: 0);
-        $pdf->Cell($table_col_widht, 5, ' ', 0, 0, 'C', fill: 0);
-
-        $pdf->Cell($table_col_widht, 5, 'المستخدم ', 1, 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht, 5, $doctorShift->user->username, 1, 1, 'C');
-
-        $table_col_widht = ($page_width - 20) / 7;
-        $pdf->Ln();
-        $pdf->setFont('arial', 'b', 14);
-        $table_col_widht = ($page_width) / 6;
-
-        $pdf->Cell($table_col_widht, 5, 'الطبيب', 1, 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht, 5, $doctorShift->doctor->name, 1, 0, 'C', fill: 0, stretch: 1);
-        $pdf->Cell($table_col_widht, 5, '', 0, 0, 'C', fill: 0);
-        $pdf->Cell($table_col_widht, 5, '', 0, 0, 'C', fill: 0);
-        $pdf->Cell($table_col_widht, 5, 'زمن فتح العياده', 1, 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht, 5, $doctorShift->created_at->format('h:i A'), 1, 1, 'C', fill: 0);
-        $pdf->Ln();
-        $pdf->Cell('30', 5, 'المرضي', 1, 0, 'C', fill: 0);
-        $y = $pdf->getY();
-        $pdf->setXY(160, $y);
-        $pdf->Cell('30', 5, 'الاستحقاق النقدي', 1, 0, 'C', fill: 0);
-        $pdf->Cell('30', 5, number_format($doctorShift->doctor_credit_cash(), 1), 1, 0, 'C', fill: 0);
-        $pdf->Cell('10', 5, ' ', 0, 0, 'C', fill: 0);
-
-        $pdf->Cell('30', 5, 'استحقاق التامين', 1, 0, 'C', fill: 0);
-        $pdf->Cell('30', 5, number_format(+$doctorShift->doctor_credit_company(), 1), 1, 0, 'C', fill: 0);
-        $pdf->Ln(5);
-        $pdf->Ln(5);
-        $table_col_widht = ($page_width) / 9;
-
-        $pdf->Cell($table_col_widht / 2, 5, 'رقم', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht * 2, 5, 'اسم', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht, 5, 'الشركه', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht / 1.3, 5, 'اجمالي', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht / 1.3, 5, 'نقدا', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht / 1.3, 5, 'بنك', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht / 1.3, 5, '  استحقاق الطبيب ', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht * 2, 5, 'الخدمات *', 'TB', 1, 'C', fill: 1);
-        $pdf->Ln();
-        $pdf->setFont('arial', '', 11);
-        $index = 1;
-        /** @var Doctorvisit $doctorvisit */
-        $visits = $doctorShift->visits->reverse()->filter(function (Doctorvisit $visit) {
-            return $visit->only_lab == 0;
-        });
-        $safi_total = 0;
-        foreach ($visits as $doctorvisit) {
-            $y = $pdf->GetY();
-            $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
-
-            if ($doctorvisit->patient->company) {
-                $pdf->setTextColor(200, 0, 0);
-            }
-            $pdf->Cell($table_col_widht / 2, 5, $doctorvisit->number, 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht * 2, 5, $doctorvisit->patient->name, 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht, 5, $doctorvisit->patient?->company?->name, 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorvisit->total_services($doctorShift->doctor), 1), 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorvisit->total_paid_services() - $doctorvisit->bankak_service(), 1), 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorvisit->bankak_service(), 1), 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht, 5, number_format($doctorvisit->doctorShift->doctor->doctor_credit($doctorvisit), 1), 0, 0, 'C', fill: 0);
-
-            $safi_total += $doctorvisit->hospital_credit();
-            // $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorvisit->hospital_credit(), 1), 0, 0, 'C', fill: 0);
-            $pdf->MultiCell($table_col_widht * 2, 5, $doctorvisit->services_concatinated(), 0, 'R', false, stretch: 1);
-            $y = $pdf->GetY();
-            $index++;
-            $pdf->setTextColor(0, 0, 0);
-
-            $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
+        if (!$doctorShift) {
+            return response()->json(['message' => 'لم يتم العثور على مناوبة الطبيب المحددة.'], 404);
         }
-        $pdf->Ln();
 
+        $report = new \App\Services\Pdf\ClinicShiftReport($doctorShift);
+        $pdfContent = $report->generate();
 
-        $pdf->Cell($table_col_widht / 2, 5, '', 'TB', 0, 'C', fill: 0);
-        $pdf->Cell($table_col_widht * 2, 5, '', 'TB', 0, 'C', fill: 0);
-
-        $pdf->Cell($table_col_widht, 5, '', 'TB', 0, 'C', fill: 0);
-        $pdf->setTextColor(0, 100, 0);
-
-        $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorShift->total_services(), 1), 'TB', 0, 'C', fill: 0);
-        $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorShift->total_paid_services() - $doctorShift->total_bank(), 1), 'TB', 0, 'C', fill: 0);
-        $pdf->Cell($table_col_widht / 1.3, 5, number_format($doctorShift->total_bank(), 1), 'TB', 0, 'C', fill: 0);
-        $pdf->Cell($table_col_widht, 5, number_format($doctorShift->doctor_credit_cash() + $doctorShift->doctor_credit_company(), 1), 'TB', 0, 'C', fill: 0);
-
-        $pdf->Cell($table_col_widht * 2, 5, ' ', 0, 1, 'C', fill: 0);
-
-        $pdf->AddPage();
-
-
-        $col = $page_width / 2;
-        $pdf->Ln();
-        $pdf->Cell($page_width, 5, 'مصروف الخدمات', 0, 1, 'C', fill: 0);
-        $pdf->Cell($col, 5, 'مصروف الخدمه', 0, 0, 'C', fill: 1);
-        $pdf->Cell($col, 5, 'الاجمالي', 0, 1, 'C', fill: 1);
-        foreach ($doctorShift->shift_service_costs() as $cost) {
-            $pdf->Cell($col, 5, $cost['name'], 0, 0, 'C', fill: 0);
-            $pdf->Cell($col, 5, number_format($cost['amount'], 1), 0, 1, 'C', fill: 0);
-        }
-        $pdf->Ln();
-
-        $table_col_widht = $page_width / 6;
-        $pdf->Cell($table_col_widht / 2, 5, 'رقم', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht, 5, 'اسم', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht, 5, 'الشركه', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht / 2, 5, 'الاجمالي', 'TB', 0, 'C', fill: 1);
-
-        $pdf->Cell($table_col_widht, 5, 'اجمالي مصروفات', 'TB', 0, 'C', fill: 1);
-        $pdf->Cell($table_col_widht * 2, 5, 'مصروفات *', 'TB', 1, 'C', fill: 1);
-        $pdf->Ln();
-        $pdf->setFont('arial', '', 11);
-        $index = 1;
-        /** @var Doctorvisit $doctorvisit */
-        $visits = $doctorShift->visits->filter(function (Doctorvisit $visit) {
-            return $visit->only_lab == 0;
-        });
-
-        foreach ($visits as $doctorvisit) {
-            $y = $pdf->GetY();
-            $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
-
-            $pdf->Cell($table_col_widht / 2, 5, $doctorvisit->number, 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht, 5, $doctorvisit->patient->name, 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht, 5, $doctorvisit->patient?->company?->name, 0, 0, 'C', fill: 0);
-            $pdf->Cell($table_col_widht / 2, 5, number_format($doctorvisit->total_services($doctorShift->doctor), 1), 0, 0, 'C', fill: 0);
-
-            $pdf->Cell($table_col_widht, 5, number_format($doctorvisit->total_services_cost(), 1), 0, 0, 'C', fill: 0);
-            $pdf->MultiCell($table_col_widht * 2, 5, $doctorvisit->services_cost_name(), 0, 'R', false, stretch: 1);
-            $y = $pdf->GetY();
-            $index++;
-
-            $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
-        }
-        $pdf->Ln();
-
-
-        $pdf->Ln();
-
-        // Generate PDF content and return as response
         $pdfFileName = 'clinic_report_' . date('Ymd_His') . '.pdf';
-        $pdfContent = $pdf->Output($pdfFileName, 'S');
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
@@ -1526,13 +1355,13 @@ class ReportController extends Controller
         if ($visit->requestedServices()->count() === 0) {
             return response()->json(['message' => 'لا توجد خدمات لإنشاء إيصال لها في هذه الزيارة.'], 404);
         }
-    
+
         $report = new \App\Services\Pdf\ThermalServiceReceiptReport($visit);
         $pdfContent = $report->generate();
-        
+
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
         $filename = 'ServiceReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
-    
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$filename}\"");
@@ -1544,20 +1373,20 @@ class ReportController extends Controller
         if ($requestedService->doctorvisits_id !== $visit->id) {
             return response()->json(['message' => 'الخدمة المطلوبة لا تنتمي إلى هذه الزيارة.'], 404);
         }
-    
+
         // Load the service relationship for the PDF generation
         $requestedService->load('service');
-        
+
         // Convert to array format expected by ThermalServiceReceiptReport
         $requestedServiceArray = $requestedService->toArray();
-    
+
         $report = new \App\Services\Pdf\ThermalServiceReceiptReport($visit, [$requestedServiceArray]);
         $pdfContent = $report->generate();
-        
+
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
         $serviceNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $requestedService->service->name ?? 'Service');
         $filename = 'ServiceReceipt_Visit_' . $visit->id . '_' . $serviceNameSanitized . '_' . $patientNameSanitized . '.pdf';
-    
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$filename}\"");
@@ -2215,7 +2044,6 @@ class ReportController extends Controller
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
-
     }
     public function serviceCostBreakdownReport(Request $request)
     {
@@ -2749,9 +2577,9 @@ class ReportController extends Controller
                     ->orWhere(function ($q) use ($startDate, $endDate) { // Shifts started before but ended in period or are still open and started before end
                         $q->where('start_time', '<', $startDate)
                             ->where(function ($q2) use ($startDate) {
-                            $q2->whereNull('end_time')
-                                ->orWhere('end_time', '>=', $startDate); // Corrected: shift ended on or after start of period
-                        });
+                                $q2->whereNull('end_time')
+                                    ->orWhere('end_time', '>=', $startDate); // Corrected: shift ended on or after start of period
+                            });
                     });
             })
             ->get();
@@ -2984,7 +2812,7 @@ class ReportController extends Controller
         if (!$patient) {
             return response()->json(['message' => 'Patient not found for this visit.'], 404);
         }
-        
+
         // Format phone number using your service (it uses default country code from settings)
         $formattedChatId = UltramsgService::formatPhoneNumber($validated['chat_id']);
         if (!$formattedChatId) {
@@ -3012,7 +2840,7 @@ class ReportController extends Controller
                 Log::error("WhatsApp Send: PDF generation failed or returned empty for visit {$visit->id}, type {$validated['report_type']}.");
                 return response()->json(['message' => 'Failed to generate PDF content.'], 500);
             }
-            
+
             $pdfContentBase64 = base64_encode($pdfContent);
         } catch (\Exception $e) {
             Log::error("WhatsApp Send: PDF generation error for visit {$visit->id}, type {$validated['report_type']}: " . $e->getMessage());
@@ -3020,7 +2848,7 @@ class ReportController extends Controller
         }
 
         $caption = $validated['caption'] ?? "Lab results for {$patient->name}";
-    
+
 
         $result = $this->whatsAppService->sendMediaMessage(
             $formattedChatId,
@@ -3526,8 +3354,6 @@ class ReportController extends Controller
             ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0');
-
-
     }
 
     /**
@@ -3541,7 +3367,7 @@ class ReportController extends Controller
     public function markReportPrinted(Request $request, DoctorVisit $doctorvisit)
     {
         $patient = $doctorvisit->patient;
-        
+
         if (!$patient) {
             return response()->json([
                 'message' => 'Patient not found for this visit.',
@@ -3561,10 +3387,10 @@ class ReportController extends Controller
             'patientLabRequests.mainTest',
             'patientLabRequests.results'
         ]);
-        
+
         // Set test_count attribute (expected by PatientLabQueueItemResource)
         $doctorvisit->test_count = $doctorvisit->patientLabRequests->count();
-        
+
         // Calculate oldest_request_time manually from loaded relationship
         if ($doctorvisit->patientLabRequests->isNotEmpty()) {
             $oldestRequest = $doctorvisit->patientLabRequests->min('created_at');
@@ -3574,7 +3400,7 @@ class ReportController extends Controller
         }
 
         $queueItemResource = new PatientLabQueueItemResource($doctorvisit);
-        
+
         // Emit realtime update event (fire-and-forget)
         try {
             $payload = [
@@ -3609,7 +3435,7 @@ class ReportController extends Controller
 
             /** @var Patient $patient */
             $patient = $doctorvisit->patient;
-            
+
             if (!$patient->labrequests || $patient->labrequests->isEmpty()) {
                 return response()->json(['status' => false, 'message' => 'No lab requests found for this patient'], 400);
             }
@@ -3617,11 +3443,11 @@ class ReportController extends Controller
             // Get dimensions from request or use defaults
             $width = $request->input('width', 50);
             $height = $request->input('height', 25);
-            
+
             // Validate dimensions
             $width = max(10, min(200, (float)$width));
             $height = max(10, min(200, (float)$height));
-            
+
             $custom_layout = array($width, $height);
             $settings = Setting::all()->first();
 
@@ -3634,10 +3460,10 @@ class ReportController extends Controller
             $page_width = $width; // Use the dynamic width
             $pdf->setAutoPageBreak(TRUE, 0);
             $pdf->setMargins(0, 0, 0);
-            
+
             // Try to add custom font, fallback to helvetica if fails
             $arial = 'arial'; // Default fallback
-        
+
             $containers = $patient->labrequests->map(function (LabRequest $req) {
                 return $req->mainTest->container;
             })->unique('id');
@@ -3728,16 +3554,15 @@ class ReportController extends Controller
                     'Expires' => '0'
                 ]);
             }
-            
         } catch (\Exception $e) {
             Log::error('PDF barcode generation failed: ' . $e->getMessage(), [
                 'doctor_visit_id' => $doctorvisit->id,
                 'patient_id' => $doctorvisit->patient?->id,
                 'error' => $e->getTraceAsString()
             ]);
-            
+
             return response()->json([
-                'status' => false, 
+                'status' => false,
                 'message' => 'Failed to generate PDF barcode labels: ' . $e->getMessage()
             ], 500);
         }
@@ -3757,7 +3582,7 @@ class ReportController extends Controller
     private function generatePdfLabelForContainer(Pdf $pdf, Patient $patient, Doctorvisit $doctorvisit, $container, string $arialFont, int $pageWidth): void
     {
         $pdf->AddPage();
-        
+
         // Get tests for this specific container
         $testsForContainer = $patient->labrequests
             ->filter(function (LabRequest $labrequest) use ($container) {
@@ -3796,7 +3621,7 @@ class ReportController extends Controller
         // Generate label content
         $pdf->SetFillColor(240, 240, 240);
         $pdf->SetFont('helvetica', '', 7, '', true);
-        
+
         // Header row with PID and date
         $pdf->Cell(5, 3, '', 0, 0, 'C');
         $pdf->Cell(15, 3, 'PID ' . $doctorvisit->id, 0, 0, '');
@@ -4365,7 +4190,7 @@ class ReportController extends Controller
         if ($request->filled('search_test_name')) {
             $query->where('main_tests.main_test_name', 'LIKE', '%' . $request->search_test_name . '%');
         }
-        
+
         // Remove container_id and package_id filters if they are not part of the requirement anymore
         // if ($request->filled('container_id')) {
         //     $query->where('main_tests.container_id', $request->container_id);
@@ -4391,7 +4216,7 @@ class ReportController extends Controller
 
         $perPage = $request->input('per_page', 15);
         $statistics = $query->paginate($perPage);
-        
+
         // The items in $statistics will now have main_test_id, main_test_name, and request_count.
         // We can still use LabTestStatisticResource, but it will only populate these fields.
         return \App\Http\Resources\LabTestStatisticResource::collection($statistics); // Ensure resource is imported
@@ -4415,7 +4240,7 @@ class ReportController extends Controller
 
         // Count total lab requests for this test
         $labRequestsQuery = LabRequest::where('main_test_id', $mainTestId);
-        
+
         if ($request->filled('date_from')) {
             $labRequestsQuery->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
@@ -4611,7 +4436,7 @@ class ReportController extends Controller
     {
         // Start output buffering to prevent any output before PDF
         ob_start();
-        
+
         $request->validate([
             'shift_id' => 'nullable|integer|exists:shifts,id',
             'date_from' => 'nullable|date_format:Y-m-d',
@@ -4750,7 +4575,7 @@ class ReportController extends Controller
         return $response;
     }
 
-  /**
+    /**
      * Export the list of services to a PDF file.
      */
     public function exportServicesListToPdf(Request $request)
@@ -4775,7 +4600,7 @@ class ReportController extends Controller
             $groupId = $request->service_group_id;
             $query->where('service_group_id', $groupId);
             $group = \App\Models\ServiceGroup::find($groupId);
-            if($group) $filterCriteria[] = "Group: " . $group->name;
+            if ($group) $filterCriteria[] = "Group: " . $group->name;
         }
 
         $services = $query->get();
@@ -4783,25 +4608,32 @@ class ReportController extends Controller
 
         // --- PDF Generation ---
         $reportTitle = 'Services List';
-        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4',  true,
-        'UTF-8',
-        false,
-        false,
-        $filterCriteriaString);
+        $pdf = new MyCustomTCPDF(
+            $reportTitle,
+            null,
+            'P',
+            'mm',
+            'A4',
+            true,
+            'UTF-8',
+            false,
+            false,
+            $filterCriteriaString
+        );
         $pdf->AddPage();
-        
+
         // --- Table Headers ---
         $headers = ['ID', 'Service Name', 'Service Group', 'Price', 'Status', 'Variable Price?'];
         // A4 Portrait width ~190mm usable
         $colWidths = [15, 70, 35, 25, 20, 25];
-        $colWidths[count($colWidths)-1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
+        $colWidths[count($colWidths) - 1] = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'] - array_sum(array_slice($colWidths, 0, -1));
         $alignments = ['C', 'L', 'L', 'R', 'C', 'C'];
-        
+
         $pdf->DrawTableHeader($headers, $colWidths, $alignments);
-        
+
         // --- Table Body ---
         $fill = false;
-        if($services->isEmpty()){
+        if ($services->isEmpty()) {
             $pdf->Cell(array_sum($colWidths), 10, 'No services found matching the criteria.', 1, 1, 'C');
         } else {
             foreach ($services as $service) {
@@ -4819,7 +4651,7 @@ class ReportController extends Controller
         }
         // Draw final line under the table
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
-        
+
         $pdfFileName = 'Services_List_' . date('Y-m-d') . '.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
 
@@ -4842,9 +4674,9 @@ class ReportController extends Controller
         $filterCriteria = [];
         if ($request->filled('search')) {
             $searchTerm = $request->search;
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', '%' . $searchTerm . '%')
-                  ->orWhere('phone', 'LIKE', '%' . $searchTerm . '%');
+                    ->orWhere('phone', 'LIKE', '%' . $searchTerm . '%');
             });
             $filterCriteria[] = "Search: " . $searchTerm;
         }
@@ -4905,7 +4737,7 @@ class ReportController extends Controller
         // }
 
         $result = CashReconciliationReport::generateFromRequest($request);
-        
+
         if (isset($result['error'])) {
             return response()->json(['message' => $result['error']], $result['status']);
         }
@@ -4921,7 +4753,7 @@ class ReportController extends Controller
     public function generateCashReconciliationPdfWeb(Request $request)
     {
         $result = CashReconciliationReport::generateFromRequest($request);
-        
+
         if (isset($result['error'])) {
             return response()->json(['message' => $result['error']], $result['status']);
         }
@@ -4934,12 +4766,3 @@ class ReportController extends Controller
     // Ensure MyCustomTCPDF has drawTextWatermark and drawReportSignatures methods, or define them here
     // ... other helper methods like drawReportSignatures ...
 }
-
-
-
-
-
-
-
-
-

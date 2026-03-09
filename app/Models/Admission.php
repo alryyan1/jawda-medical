@@ -13,14 +13,11 @@ class Admission extends Model
     protected $fillable = [
         'patient_id',
         'ward_id',
-        'room_id',
         'bed_id',
-        'booking_type',
         'admission_date',
-        'admission_time',
+        'admission_days',
+        'admission_purpose',
         'discharge_date',
-        'discharge_time',
-        'admission_type',
         'admission_reason',
         'diagnosis',
         'status',
@@ -37,16 +34,12 @@ class Admission extends Model
         'next_of_kin_name',
         'next_of_kin_relation',
         'next_of_kin_phone',
-        'short_stay_bed_id',
-        'short_stay_duration',
     ];
 
     protected $casts = [
-        'admission_date' => 'date',
-        'discharge_date' => 'date',
+        'admission_date' => 'datetime',
+        'discharge_date' => 'datetime',
         'expected_discharge_date' => 'date',
-        'admission_time' => 'datetime',
-        'discharge_time' => 'datetime',
     ];
 
     /**
@@ -66,12 +59,8 @@ class Admission extends Model
     }
 
     /**
-     * Get the room for the admission.
+     * Room is derivable via bed: $admission->bed->room
      */
-    public function room()
-    {
-        return $this->belongsTo(Room::class);
-    }
 
     /**
      * Get the bed for the admission.
@@ -81,13 +70,6 @@ class Admission extends Model
         return $this->belongsTo(Bed::class);
     }
 
-    /**
-     * Get the short stay bed for the admission.
-     */
-    public function shortStayBed()
-    {
-        return $this->belongsTo(ShortStayBed::class, 'short_stay_bed_id');
-    }
 
     /**
      * Get the doctor for the admission.
@@ -203,66 +185,16 @@ class Admission extends Model
      */
     public function getDaysAdmittedAttribute()
     {
-        return $this->calculateStayDays();
-    }
-
-    /**
-     * Calculate stay days based on admission time period.
-     */
-    private function calculateStayDays()
-    {
         // admission_date is already a Carbon instance from casts
         $admissionDateTime = $this->admission_date instanceof Carbon
             ? $this->admission_date->copy()
             : Carbon::parse($this->admission_date);
-
-        // Set admission time if provided
-        if ($this->admission_time) {
-            if ($this->admission_time instanceof Carbon) {
-                $admissionDateTime->setTime(
-                    (int) $this->admission_time->format('H'),
-                    (int) $this->admission_time->format('i'),
-                    (int) $this->admission_time->format('s')
-                );
-            } else {
-                // Parse time string (HH:mm:ss)
-                $timeParts = explode(':', $this->admission_time);
-                $admissionDateTime->setTime(
-                    isset($timeParts[0]) ? (int) $timeParts[0] : 0,
-                    isset($timeParts[1]) ? (int) $timeParts[1] : 0,
-                    isset($timeParts[2]) ? (int) $timeParts[2] : 0
-                );
-            }
-        } else {
-            $admissionDateTime->setTime(0, 0, 0);
-        }
 
         // Handle discharge_date
         if ($this->discharge_date) {
             $dischargeDateTime = $this->discharge_date instanceof Carbon
                 ? $this->discharge_date->copy()
                 : Carbon::parse($this->discharge_date);
-
-            // Set discharge time if provided
-            if ($this->discharge_time) {
-                if ($this->discharge_time instanceof Carbon) {
-                    $dischargeDateTime->setTime(
-                        (int) $this->discharge_time->format('H'),
-                        (int) $this->discharge_time->format('i'),
-                        (int) $this->discharge_time->format('s')
-                    );
-                } else {
-                    // Parse time string (HH:mm:ss)
-                    $timeParts = explode(':', $this->discharge_time);
-                    $dischargeDateTime->setTime(
-                        isset($timeParts[0]) ? (int) $timeParts[0] : 0,
-                        isset($timeParts[1]) ? (int) $timeParts[1] : 0,
-                        isset($timeParts[2]) ? (int) $timeParts[2] : 0
-                    );
-                }
-            } else {
-                $dischargeDateTime->setTime(0, 0, 0);
-            }
         } else {
             $dischargeDateTime = Carbon::now();
         }

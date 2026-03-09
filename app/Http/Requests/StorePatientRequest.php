@@ -30,6 +30,8 @@ class StorePatientRequest extends FormRequest
             'guarantor' => 'nullable|string|max:255',
             'subcompany_id' => 'nullable|integer|exists:subcompanies,id',
             'company_relation_id' => 'nullable|integer|exists:company_relations,id',
+            'social_status' => ['nullable', Rule::in(['single', 'married', 'widowed', 'divorced'])],
+            'income_source' => 'nullable|string|max:255',
             // 'expire_date' => 'nullable|date_format:Y-m-d',
             // Additional fields that might come from the form to create the DoctorVisit
             // 'visit_type' => 'required|string|max:50', // e.g., "New", "Follow-up"

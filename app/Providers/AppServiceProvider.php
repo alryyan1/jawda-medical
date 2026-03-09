@@ -7,6 +7,7 @@ use App\Services\Contracts\SmsClient;
 use App\Services\AirtelSmsClient;
 use App\Models\SysmexResult;
 use App\Observers\SysmexResultObserver;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -18,6 +19,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(SmsClient::class, function () {
             return new AirtelSmsClient();
         });
+
+        // Sanctum::ignoreMigrations();
     }
 
     /**

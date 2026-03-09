@@ -73,10 +73,10 @@ class VisitServiceController extends Controller
         //     return response()->json(['message' => 'لا يمكن تعديل/حذف خدمة مدفوعة أو مكتملة.'], 403);
         // }
 
-        if($requestedService && $requestedService->doctorVisit && $requestedService->doctorVisit->doctorShift && $requestedService->doctorVisit->doctorShift->status == 0){
+        if ($requestedService && $requestedService->doctorVisit && $requestedService->doctorVisit->doctorShift && $requestedService->doctorVisit->doctorShift->status == 0) {
             return response()->json(['message' => 'لا يمكن حذف  لأن ورديه الطبيب غير مفتوحة.'], 403);
         }
-        
+
 
         return null;
     }
@@ -174,11 +174,11 @@ class VisitServiceController extends Controller
                             } else {
                                 // return $company;
                                 //compnay relation
-                                if($patient->companyRelation != null){
+                                if ($patient->companyRelation != null) {
                                     $companyRelation = $patient->companyRelation;
                                     $companyServiceEndurance = ($price * (float) ($companyRelation->service_endurance ?? 0)) / 100;
                                     $companyEnduranceAmount = $price - $companyServiceEndurance;
-                                }else{
+                                } else {
 
                                     $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
                                     $companyEnduranceAmount = $price - $companyServiceEndurance;
@@ -276,7 +276,7 @@ class VisitServiceController extends Controller
 
         DB::beginTransaction();
         try {
-            if($requestedService->deposits()->count() > 0){
+            if ($requestedService->deposits()->count() > 0) {
                 return response()->json(['message' => 'لا يمكنك حذف الخدمة لأنها مدفوعة.'], 403);
             }
             $requestedService->costBreakdown()->delete(); // Delete associated cost breakdown entries
@@ -309,6 +309,7 @@ class VisitServiceController extends Controller
             'count' => 'sometimes|integer|min:1',
             'discount_per' => 'sometimes|integer|min:0|max:100',
             'discount' => 'sometimes|numeric|min:0',
+            'price' => 'sometimes|numeric|min:0',
             'endurance' => 'sometimes|numeric|min:0', // Allow updating endurance if rules permit
             // Add other editable fields like 'doctor_note', 'nurse_note', 'approval'
             'approval' => 'sometimes|boolean',

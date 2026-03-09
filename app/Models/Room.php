@@ -55,7 +55,6 @@ class Room extends Model
     {
         return $this->hasOne(Admission::class)
             ->where('status', 'admitted')
-            ->where('booking_type', 'room')
             ->latest('admission_date');
     }
 }

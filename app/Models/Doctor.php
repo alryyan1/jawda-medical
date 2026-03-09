@@ -244,7 +244,7 @@ class Doctor extends Model
                         if ($category_service->pivot->percentage > 0) {
                             $doctor_credit = $service->amount_paid * $category_service->pivot->percentage / 100;
                         } elseif ($category_service->pivot->fixed > 0 && $category_service->pivot->percentage == 0) {
-                            $doctor_credit = $category_service->pivot->fixed;
+                            $doctor_credit = $category_service->pivot->fixed * $service->count;
                         } else {
                             // Fallback to default calculation if category service has no percentage/fixed
                             $totalCost = $service->getTotalCostsForDoctor($this);
@@ -261,7 +261,7 @@ class Doctor extends Model
                         if ($doctor_service?->pivot->percentage > 0) {
                             $doctor_credit = $service->amount_paid * $doctor_service->pivot->percentage / 100;
                         } elseif ($doctor_service?->pivot->fixed > 0 && $doctor_service->pivot->percentage == 0) {
-                            $doctor_credit = $doctor_service->pivot->fixed;
+                            $doctor_credit = $doctor_service->pivot->fixed * $service->count;
                         } else {
                             // Default calculation
                             //احتساب مصروفات الخدمه

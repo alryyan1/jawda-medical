@@ -37,6 +37,8 @@ class UpdatePatientRequest extends FormRequest
             'address' => 'nullable|string|max:1000',
             'result_url' => 'nullable|string|url',
             'discount_comment' => 'nullable|string|max:1000',
+            'social_status' => ['nullable', Rule::in(['single', 'married', 'widowed', 'divorced'])],
+            'income_source' => 'nullable|string|max:255',
             // These fields are usually managed by specific actions, not general update
             // 'is_lab_paid' => 'sometimes|boolean',
             // 'lab_paid' => 'sometimes|numeric|min:0',
