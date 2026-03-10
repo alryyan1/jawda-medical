@@ -569,6 +569,8 @@ MSG;
                                     }
 
                                     $this->handleIncomingMessage($message, $change['value'], $collection, $recipientPhoneNumberId);
+                                } else {
+                                    $this->handleFinanceMessage($message, $change['value'], $recipientPhoneNumberId);
                                 }
                             }
                         }
@@ -814,6 +816,113 @@ MSG;
                 ]);
             }
         }
+    }
+
+    /**
+     * Handle finance PDF button clicks from request_finance_approve template.
+     * When user clicks "PDF تنزيل", fetch download_url from Firestore and send the document.
+     */
+    protected function handleFinanceMessage(array $message, array $value, $phoneNumberId = null): void
+    {
+        $from = $message['from'] ?? null;
+        $type = $message['type'] ?? null;
+
+        if (!$from) {
+            return;
+        }
+
+        $buttonData = null;
+        if ($type === 'interactive' && isset($message['interactive']['button_reply'])) {
+            $buttonData = $message['interactive']['button_reply'];
+        } elseif ($type === 'button' && isset($message['button'])) {
+            $buttonData = $message['button'];
+        }
+
+        if (!$buttonData) {
+            Log::info('WhatsApp Cloud API: Finance handler - non-button message ignored.', ['from' => $from, 'type' => $type]);
+            return;
+        }
+
+        $payloadString = $buttonData['payload'] ?? $buttonData['id'] ?? $buttonData['text'] ?? $buttonData['title'] ?? null;
+        if (!$payloadString) {
+            Log::info('WhatsApp Cloud API: Finance handler - no payload in button.', ['button_data' => $buttonData]);
+            return;
+        }
+
+        $pdfUrl = null;
+
+        if (str_starts_with($payloadString, 'admission_')) {
+            $admissionId = substr($payloadString, strlen('admission_'));
+            if (is_numeric($admissionId)) {
+                $pdfUrl = $this->getFinancePdfUrlByAdmission((int) $admissionId);
+            }
+        } elseif ($payloadString === 'finance_pdf') {
+            $pdfUrl = $this->getFinancePdfUrlByPhone($from);
+        }
+
+        if ($pdfUrl) {
+            $this->sendTextToUser($from, 'سيتم إرسال التقرير إليكم خلال لحظات', $phoneNumberId);
+            $this->sendDocumentToUser($from, $pdfUrl, 'finance_report', $phoneNumberId);
+        } else {
+            $this->sendTextToUser($from, 'عذراً، لم يتم العثور على التقرير.', $phoneNumberId);
+        }
+    }
+
+    /**
+     * Get finance PDF download URL from Firestore by admission ID.
+     */
+    protected function getFinancePdfUrlByAdmission(int $admissionId): ?string
+    {
+        $documentPath = "pharmacies/one_care/admissions/{$admissionId}";
+        return $this->getDocumentFieldFromFirestore($documentPath, 'download_url');
+    }
+
+    /**
+     * Get finance PDF download URL from Firestore by phone (pdf_requests collection).
+     */
+    protected function getFinancePdfUrlByPhone(string $phone): ?string
+    {
+        $normalizedPhone = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($normalizedPhone) >= 9 && strpos($normalizedPhone, '249') !== 0) {
+            $normalizedPhone = '249' . ltrim($normalizedPhone, '0');
+        }
+        $documentPath = "pharmacies/one_care/pdf_requests/{$normalizedPhone}";
+        $url = $this->getDocumentFieldFromFirestore($documentPath, 'download_url');
+        if ($url) {
+            return $url;
+        }
+        $documentPath = "pharmacies/one_care/pdf_requests/{$phone}";
+        return $this->getDocumentFieldFromFirestore($documentPath, 'download_url');
+    }
+
+    /**
+     * Get a string field from a Firestore document by path.
+     */
+    protected function getDocumentFieldFromFirestore(string $documentPath, string $fieldName): ?string
+    {
+        try {
+            $projectId = config('firebase.project_id');
+            if (!$projectId) {
+                return null;
+            }
+            $accessToken = FirebaseService::getAccessToken();
+            if (!$accessToken) {
+                return null;
+            }
+            $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$documentPath}";
+            $response = Http::withToken($accessToken)->get($url);
+            if ($response->successful()) {
+                $document = $response->json();
+                $fields = $document['fields'] ?? [];
+                return $fields[$fieldName]['stringValue'] ?? null;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('WhatsApp Cloud API: Failed to get Firestore document.', [
+                'path' => $documentPath,
+                'error' => $e->getMessage(),
+            ]);
+        }
+        return null;
     }
 
     /**

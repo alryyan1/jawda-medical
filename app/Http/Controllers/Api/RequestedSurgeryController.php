@@ -377,6 +377,15 @@ class RequestedSurgeryController extends Controller
             return response()->json(['message' => 'فشل تحديث رابط التقرير في Firestore'], 500);
         }
 
+        $pdfRequestsPath = "pharmacies/one_care/pdf_requests/{$patientPhone}";
+        $pdfRequestFields = [
+            'admission_id' => $admission->id,
+            'download_url' => $downloadUrl,
+            'requested_surgery_id' => $requestedSurgery->id,
+            'updated_at' => now(),
+        ];
+        FirebaseService::createOrUpdateFirestoreDocumentByPath($pdfRequestsPath, $pdfRequestFields);
+
         return response()->json([
             'success' => true,
             'download_url' => $downloadUrl,
