@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Admission;
 use App\Models\DoctorVisit;
-use App\Http\Resources\DoctorVisitResource; // Or a dedicated ActivePatientListItemResource
+use App\Http\Resources\DoctorVisitResource;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -17,8 +18,15 @@ class ClinicWorkspaceController extends Controller
             'search' => 'nullable|string|max:100',
         ]);
 
-        $query = DoctorVisit::with(['patient.subcompany', 'doctor','patient.company','requestedServices','patientLabRequests'])
-                           ->withCount('requestedServices'); // Add count of requested services
+        $query = DoctorVisit::with([
+            'patient.subcompany',
+            'patient.company',
+            'patient.admission' => fn ($q) => $q->with(['ward', 'bed.room', 'bed']),
+            'doctor',
+            'requestedServices',
+            'patientLabRequests',
+        ])
+            ->withCount('requestedServices'); // Add count of requested services
                             // ->whereDate('visit_date', Carbon::today()) // Example: visits for today
                             // ->whereNotIn('status', ['completed', 'cancelled']); // Example: not completed or cancelled
 
@@ -49,8 +57,21 @@ class ClinicWorkspaceController extends Controller
 
         $activeVisits = $query->get();
 
-        // You might want a specific resource that flattens Patient + Visit info for the list
-        // For now, DoctorVisitResource which loads patient and doctor should work.
+        // Attach requested surgeries summary to each patient's admission (single batch query)
+        $admissionIds = $activeVisits
+            ->pluck('patient.admission.id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $summaries = Admission::getRequestedSurgeriesSummariesFor($admissionIds);
+        foreach ($activeVisits as $visit) {
+            $admission = $visit->patient?->admission;
+            if ($admission && isset($summaries[$admission->id])) {
+                $admission->setAttribute('requested_surgeries_summary', $summaries[$admission->id]);
+            }
+        }
+
         return DoctorVisitResource::collection($activeVisits);
     }
 }

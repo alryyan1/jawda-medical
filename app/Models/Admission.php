@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\RequestedSurgery;
+use App\Models\RequestedSurgeryTransaction;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -265,6 +267,47 @@ class Admission extends Model
         // الحالة الافتراضية (6:00 ص - 7:00 ص): احسب بنفس الطريقة القديمة
         $days = $admissionDateTime->diffInDays($dischargeDateTime);
         return max(1, $days + 1);
+    }
+
+    /**
+     * Get requested surgeries summary for multiple admissions in one query (avoids N+1).
+     *
+     * @param  array<int>  $admissionIds
+     * @return array<int, array{total_initial: float, paid: float, balance: float}>
+     */
+    public static function getRequestedSurgeriesSummariesFor(array $admissionIds): array
+    {
+        if (empty($admissionIds)) {
+            return [];
+        }
+
+        $totals = RequestedSurgery::whereIn('admission_id', $admissionIds)
+            ->selectRaw('admission_id, COALESCE(SUM(initial_price), 0) as total_initial')
+            ->groupBy('admission_id')
+            ->pluck('total_initial', 'admission_id')
+            ->toArray();
+
+        $paid = RequestedSurgeryTransaction::query()
+            ->join('requested_surgeries', 'requested_surgery_transactions.requested_surgery_id', '=', 'requested_surgeries.id')
+            ->whereIn('requested_surgeries.admission_id', $admissionIds)
+            ->where('requested_surgery_transactions.type', 'credit')
+            ->selectRaw('requested_surgeries.admission_id, COALESCE(SUM(requested_surgery_transactions.amount), 0) as paid')
+            ->groupBy('requested_surgeries.admission_id')
+            ->pluck('paid', 'admission_id')
+            ->toArray();
+
+        $result = [];
+        foreach ($admissionIds as $id) {
+            $totalInitial = (float) ($totals[$id] ?? 0);
+            $paidAmount = (float) ($paid[$id] ?? 0);
+            $result[$id] = [
+                'total_initial' => $totalInitial,
+                'paid' => $paidAmount,
+                'balance' => $totalInitial - $paidAmount,
+            ];
+        }
+
+        return $result;
     }
 
     /**

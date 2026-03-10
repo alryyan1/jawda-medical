@@ -329,6 +329,32 @@ class RequestedSurgeryController extends Controller
         ]);
     }
 
+    /**
+     * Summary for all requested surgeries of a given admission:
+     * - total_initial: sum of initial_price
+     * - paid: sum of credit transactions
+     * - balance: total_initial - paid
+     */
+    public function admissionSummary(Admission $admission)
+    {
+        $totalInitial = (float) RequestedSurgery::where('admission_id', $admission->id)
+            ->sum('initial_price');
+
+        $paid = (float) RequestedSurgeryTransaction::whereHas('requestedSurgery', function ($q) use ($admission) {
+                $q->where('admission_id', $admission->id);
+            })
+            ->where('type', 'credit')
+            ->sum('amount');
+
+        $balance = $totalInitial - $paid;
+
+        return response()->json([
+            'total_initial' => $totalInitial,
+            'paid'          => $paid,
+            'balance'       => $balance,
+        ]);
+    }
+
     public function addTransaction(Request $request, RequestedSurgery $requestedSurgery)
     {
         $validated = $request->validate([

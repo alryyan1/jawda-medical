@@ -88,7 +88,10 @@ class PatientResource extends JsonResource
             'doctor_visit' => new DoctorVisitResource($this->whenLoaded('doctorVisit')),
             'has_cbc' => $this->doctorVisit?->hasCbc(),
             'result_url' => $this->result_url,
-            'doctor_in_patient' => $this?->doctor?->name
+            'doctor_in_patient' => $this?->doctor?->name,
+
+            // Active admission (eager-loaded for clinic-active-patients, admission registration)
+            'admission' => new AdmissionForPatientListItemResource($this->whenLoaded('admission')),
         ];
     }
 }

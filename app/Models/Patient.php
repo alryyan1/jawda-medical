@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use App\Models\Admission;
 
 /**
  * 
@@ -220,6 +221,15 @@ class Patient extends Model
             // You can set other defaults for the many NOT NULL string fields here if needed
             // e.g., $patient->history_of_present_illness = $patient->history_of_present_illness ?? '';
         });
+    }
+
+    /**
+     * The current active admission for this patient (if any).
+     */
+    public function admission()
+    {
+        return $this->hasOne(Admission::class)
+            ->where('status', 'admitted');
     }
 
     // Relationships

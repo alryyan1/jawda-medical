@@ -12,6 +12,7 @@ use App\Models\AdmissionTransaction;
 use App\Services\Pdf\AdmissionsListReport;
 use Illuminate\Http\Request;
 use App\Http\Resources\AdmissionResource;
+use App\Models\Patient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -72,6 +73,23 @@ class AdmissionController extends Controller
             ->paginate($request->get('per_page', 15));
 
         return AdmissionResource::collection($admissions);
+    }
+
+    /**
+     * Get the active admission for a given patient (or null if none).
+     */
+    public function getPatientActiveAdmission(Patient $patient)
+    {
+        $admission = $patient->admission()
+            ->with(['ward', 'bed.room', 'bed', 'doctor', 'specialistDoctor', 'user'])
+            ->orderByDesc('admission_date')
+            ->first();
+
+        if (! $admission) {
+            return response()->json(['data' => null]);
+        }
+
+        return new AdmissionResource($admission);
     }
 
     /**

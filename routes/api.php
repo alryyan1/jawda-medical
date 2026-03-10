@@ -233,6 +233,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Patients
   Route::apiResource('patients', PatientController::class);
   Route::get('/clinic-active-patients', [ClinicWorkspaceController::class, 'getActivePatients']);
+  Route::get('/patients/{patient}/admission', [AdmissionController::class, 'getPatientActiveAdmission']);
 
   // Doctor Visits
   Route::put('/doctor-visits/{doctorVisit}/status', [DoctorVisitController::class, 'updateStatus']);
@@ -364,6 +365,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Requested Surgeries (nested under admissions + by date)
   Route::get('requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'indexByDate']);
   Route::get('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'index']);
+  Route::get('admissions/{admission}/requested-surgeries/summary', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'admissionSummary']);
   Route::post('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'store']);
   Route::patch('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'update']);
   Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/approve', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'approve']);
