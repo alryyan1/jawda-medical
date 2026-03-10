@@ -14,6 +14,23 @@ use Illuminate\Support\Facades\DB;
 
 class RequestedSurgeryController extends Controller
 {
+    /**
+     * List requested surgeries by date (created_at). Query: ?date=Y-m-d (default: today).
+     */
+    public function indexByDate(Request $request)
+    {
+        $date = $request->get('date', now()->toDateString());
+        $surgeries = RequestedSurgery::whereDate('created_at', $date)
+            ->with([
+                'surgery',
+                'admission.patient',
+            ])
+            ->orderBy('created_at')
+            ->get();
+
+        return response()->json($surgeries);
+    }
+
     public function index(Admission $admission)
     {
         $surgeries = $admission->requestedSurgeries()
@@ -33,8 +50,9 @@ class RequestedSurgeryController extends Controller
     public function store(Request $request, Admission $admission)
     {
         $validated = $request->validate([
-            'surgery_id' => 'required|exists:surgical_operations,id',
-            'doctor_id'  => 'nullable|exists:doctors,id',
+            'surgery_id'     => 'required|exists:surgical_operations,id',
+            'doctor_id'      => 'nullable|exists:doctors,id',
+            'initial_price'  => 'nullable|numeric|min:0',
         ]);
 
         /** @var SurgicalOperation $surgicalOperation */
@@ -44,10 +62,11 @@ class RequestedSurgeryController extends Controller
         try {
             // 1. Create the requested surgery record
             $requestedSurgery = RequestedSurgery::create([
-                'admission_id' => $admission->id,
-                'surgery_id'   => $surgicalOperation->id,
-                'doctor_id'    => $validated['doctor_id'] ?? null,
-                'user_id'      => Auth::id(),
+                'admission_id'  => $admission->id,
+                'surgery_id'    => $surgicalOperation->id,
+                'initial_price' => isset($validated['initial_price']) ? (float) $validated['initial_price'] : null,
+                'doctor_id'     => $validated['doctor_id'] ?? null,
+                'user_id'       => Auth::id(),
             ]);
 
             // 2. Resolve and insert finance charges
@@ -97,6 +116,23 @@ class RequestedSurgeryController extends Controller
             DB::rollBack();
             return response()->json(['message' => 'حدث خطأ أثناء طلب العملية', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    public function update(Request $request, Admission $admission, RequestedSurgery $requestedSurgery)
+    {
+        if ($requestedSurgery->admission_id !== $admission->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'initial_price' => 'nullable|numeric|min:0',
+        ]);
+
+        $requestedSurgery->update($validated);
+
+        return response()->json(
+            $requestedSurgery->load(['surgery', 'doctor', 'user', 'approvedBy', 'finances.financeCharge'])
+        );
     }
 
     public function destroy(Admission $admission, RequestedSurgery $requestedSurgery)
@@ -224,6 +260,27 @@ class RequestedSurgeryController extends Controller
             DB::rollBack();
             return response()->json(['message' => 'حدث خطأ أثناء تحديث التكاليف', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    public function destroyFinance(RequestedSurgeryFinance $requestedSurgeryFinance)
+    {
+        // Prevent deleting a finance row that other charges depend on
+        $hasDependents = RequestedSurgeryFinance::where('requested_surgery_id', $requestedSurgeryFinance->requested_surgery_id)
+            ->whereHas('financeCharge', function ($query) use ($requestedSurgeryFinance) {
+                $query->where('reference_type', 'charge')
+                    ->where('reference_charge_id', $requestedSurgeryFinance->finance_charge_id);
+            })
+            ->exists();
+
+        if ($hasDependents) {
+            return response()->json([
+                'message' => 'لا يمكن حذف هذا البند لأنه مستخدم لحساب بنود أخرى',
+            ], 422);
+        }
+
+        $requestedSurgeryFinance->delete();
+
+        return response()->json(null, 204);
     }
 
     public function print(Admission $admission, RequestedSurgery $requestedSurgery)

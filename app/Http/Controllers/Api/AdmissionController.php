@@ -45,10 +45,13 @@ class AdmissionController extends Controller
             $query->where('ward_id', $request->ward_id);
         }
 
-        // Room filter (via bed.room_id)
-        if ($request->has('room_id') && $request->room_id) {
-            $query->whereHas('bed', function ($q) use ($request) {
-                $q->where('room_id', $request->room_id);
+        // Room filter (via bed.room_id; admissions table has no room_id column)
+        $roomId = $request->has('room_id') && $request->room_id
+            ? (is_array($request->room_id) ? ($request->room_id[0] ?? null) : $request->room_id)
+            : null;
+        if ($roomId) {
+            $query->whereHas('bed', function ($q) use ($roomId) {
+                $q->where('beds.room_id', $roomId);
             });
         }
 
@@ -94,9 +97,12 @@ class AdmissionController extends Controller
             $query->where('ward_id', $request->ward_id);
         }
 
-        if ($request->has('room_id') && $request->room_id) {
-            $query->whereHas('bed', function ($q) use ($request) {
-                $q->where('room_id', $request->room_id);
+        $roomIdPdf = $request->has('room_id') && $request->room_id
+            ? (is_array($request->room_id) ? ($request->room_id[0] ?? null) : $request->room_id)
+            : null;
+        if ($roomIdPdf) {
+            $query->whereHas('bed', function ($q) use ($roomIdPdf) {
+                $q->where('beds.room_id', $roomIdPdf);
             });
         }
 
@@ -267,6 +273,7 @@ class AdmissionController extends Controller
             'next_of_kin_phone' => 'nullable|string|max:255',
         ]);
 
+        $oldBedId = $admission->bed_id;
         if (isset($validatedData['bed_id'])) {
             $bed = Bed::with('room')->findOrFail($validatedData['bed_id']);
             if (Admission::where('bed_id', $bed->id)->where('status', 'admitted')->where('id', '!=', $admission->id)->exists()) {
@@ -275,7 +282,18 @@ class AdmissionController extends Controller
             $validatedData['ward_id'] = $bed->room->ward_id;
         }
 
-        $admission->update($validatedData);
+        DB::transaction(function () use ($admission, $validatedData, $oldBedId) {
+            $admission->update($validatedData);
+            $newBedId = $admission->bed_id;
+            // Free old bed when moving to another bed
+            if ($oldBedId && $oldBedId !== $newBedId) {
+                Bed::where('id', $oldBedId)->update(['status' => 'available']);
+            }
+            // Mark new bed as occupied when assigning
+            if ($newBedId) {
+                Bed::where('id', $newBedId)->update(['status' => 'occupied']);
+            }
+        });
 
         return new AdmissionResource($admission->load(['patient', 'ward', 'bed.room', 'bed', 'doctor', 'specialistDoctor', 'user']));
     }

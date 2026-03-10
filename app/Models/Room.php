@@ -41,20 +41,20 @@ class Room extends Model
     }
 
     /**
-     * Get the admissions for the room.
+     * Get the admissions for the room (via beds; admissions table has no room_id).
      */
     public function admissions()
     {
-        return $this->hasMany(Admission::class);
+        return $this->hasManyThrough(Admission::class, Bed::class, 'room_id', 'bed_id');
     }
 
     /**
-     * Get the current active admission for the room (room booking type only).
+     * Get the current active admission for the room (via beds).
      */
     public function currentAdmission()
     {
-        return $this->hasOne(Admission::class)
-            ->where('status', 'admitted')
-            ->latest('admission_date');
+        return $this->hasOneThrough(Admission::class, Bed::class, 'room_id', 'bed_id')
+            ->where('admissions.status', 'admitted')
+            ->latest('admissions.admission_date');
     }
 }

@@ -12,11 +12,16 @@ class RequestedSurgery extends Model
     protected $fillable = [
         'admission_id',
         'surgery_id',
+        'initial_price',
         'doctor_id',
         'user_id',
         'status',
         'approved_by',
         'approved_at',
+    ];
+
+    protected $casts = [
+        'initial_price' => 'decimal:2',
     ];
 
     protected $appends = ['total_price'];

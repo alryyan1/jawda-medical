@@ -63,7 +63,7 @@ class WardController extends Controller
      */
     public function show(Ward $ward)
     {
-        return new WardResource($ward->load('rooms.beds'));
+        return new WardResource($ward->load('rooms.beds.currentAdmission.patient'));
     }
 
     /**

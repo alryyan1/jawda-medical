@@ -361,7 +361,8 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'update']);
   Route::delete('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'destroy']);
 
-  // Requested Surgeries (nested under admissions)
+  // Requested Surgeries (nested under admissions + by date)
+  Route::get('requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'indexByDate']);
   Route::get('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'index']);
   Route::post('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'store']);
   Route::patch('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'update']);
@@ -370,6 +371,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/unapprove', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'unapprove']);
   Route::delete('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroy']);
   Route::patch('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'updateFinance']);
+  Route::delete('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroyFinance']);
   Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/print', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'print']);
   Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/invoice', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'invoice']);
   Route::get('requested-surgeries/{requestedSurgery}/ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'getLedger']);
