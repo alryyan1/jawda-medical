@@ -23,6 +23,7 @@ class PatientResource extends JsonResource
             'age_year' => $this->age_year,
             'age_month' => $this->age_month,
             'age_day' => $this->age_day,
+            'dob' => $this->dob ? Carbon::parse($this->dob)->toDateString() : null,
             // 'user_name' => $this->user?->username,
             'full_age' => $this->getFullAgeAttribute(), // Accessor for display
             'doctor'=> new DoctorStrippedResource($this->whenLoaded('doctor')),

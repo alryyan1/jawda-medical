@@ -19,6 +19,7 @@ class StorePatientRequest extends FormRequest
             'name' => 'required|string|max:255',
             'phone' => ['required', 'string', 'max:20', /* Rule::unique('patients','phone') -> consider if phone must be unique system-wide or just a warning */],
             'gender' => ['required', Rule::in(['male', 'female', 'other'])],
+            'dob' => 'nullable|date',
             'age_year' => 'nullable|integer|min:0|max:150',
             'age_month' => 'nullable|integer|min:0|max:11',
             'age_day' => 'nullable|integer|min:0|max:30',
@@ -32,6 +33,7 @@ class StorePatientRequest extends FormRequest
             'company_relation_id' => 'nullable|integer|exists:company_relations,id',
             'social_status' => ['nullable', Rule::in(['single', 'married', 'widowed', 'divorced'])],
             'income_source' => 'nullable|string|max:255',
+            'from_addmission_page' => 'nullable|boolean',
             // 'expire_date' => 'nullable|date_format:Y-m-d',
             // Additional fields that might come from the form to create the DoctorVisit
             // 'visit_type' => 'required|string|max:50', // e.g., "New", "Follow-up"

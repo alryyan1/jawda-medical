@@ -254,6 +254,20 @@ class RequestedSurgeryController extends Controller
                 }
             }
 
+            // Enforce: total finance amount must not exceed initial_price
+            $requestedSurgery = $requestedSurgeryFinance->requestedSurgery;
+            $initialPrice = $requestedSurgery?->initial_price;
+            if ($initialPrice !== null && (float) $initialPrice > 0) {
+                $totalFinances = RequestedSurgeryFinance::where('requested_surgery_id', $requestedSurgeryFinance->requested_surgery_id)
+                    ->sum('amount');
+                if ($totalFinances > (float) $initialPrice) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'إجمالي التكاليف لا يمكن أن يتجاوز السعر المبدئي (' . number_format((float) $initialPrice, 0) . ' ج.س)',
+                    ], 422);
+                }
+            }
+
             DB::commit();
             return response()->json($requestedSurgeryFinance->load(['financeCharge', 'doctor']));
         } catch (\Exception $e) {
@@ -317,7 +331,8 @@ class RequestedSurgeryController extends Controller
 
         $totalDebits = $transactions->where('type', 'debit')->sum('amount');
         $totalCredits = $transactions->where('type', 'credit')->sum('amount');
-        $balance = $totalDebits - $totalCredits;
+        $initialPrice = (float) ($requestedSurgery->initial_price ?? 0);
+        $balance = $initialPrice - $totalCredits;
 
         return response()->json([
             'transactions' => $transactions,
@@ -364,10 +379,9 @@ class RequestedSurgeryController extends Controller
             'notes'          => 'nullable|string',
         ]);
 
-        $transactions = $requestedSurgery->transactions()->get();
-        $totalDebits = $transactions->where('type', 'debit')->sum('amount');
-        $totalCredits = $transactions->where('type', 'credit')->sum('amount');
-        $balance = $totalDebits - $totalCredits;
+        $initialPrice = (float) ($requestedSurgery->initial_price ?? 0);
+        $totalCredits = (float) $requestedSurgery->transactions()->where('type', 'credit')->sum('amount');
+        $balance = $initialPrice - $totalCredits;
 
         if ($balance <= 0) {
             return response()->json(['message' => 'العملية مسددة بالكامل، لا يمكن إضافة دفعات جديدة'], 422);

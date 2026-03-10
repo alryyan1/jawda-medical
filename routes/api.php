@@ -233,6 +233,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Patients
   Route::apiResource('patients', PatientController::class);
   Route::get('/clinic-active-patients', [ClinicWorkspaceController::class, 'getActivePatients']);
+  Route::get('/admission-patients-by-date', [ClinicWorkspaceController::class, 'getAdmissionPatientsByDate']);
   Route::get('/patients/{patient}/admission', [AdmissionController::class, 'getPatientActiveAdmission']);
 
   // Doctor Visits

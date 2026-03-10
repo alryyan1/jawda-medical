@@ -23,6 +23,7 @@ class UpdatePatientRequest extends FormRequest
             'name' => 'sometimes|required|string|max:255',
             'phone' => ['sometimes','required','string','max:10'],
             'gender' => ['sometimes','required', Rule::in(['male', 'female'])],
+            'dob' => 'nullable|date',
             'age_day' => 'nullable|integer|min:0|max:30',
             'age_month' => 'nullable|integer|min:0|max:11',
             'age_year' => 'nullable|integer|min:0|max:150',

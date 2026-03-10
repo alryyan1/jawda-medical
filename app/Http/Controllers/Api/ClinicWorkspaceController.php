@@ -74,4 +74,49 @@ class ClinicWorkspaceController extends Controller
 
         return DoctorVisitResource::collection($activeVisits);
     }
+
+    /**
+     * Get patients registered from the admission page on a specific date.
+     */
+    public function getAdmissionPatientsByDate(Request $request)
+    {
+        $request->validate([
+            'date' => 'required|date_format:Y-m-d',
+        ]);
+
+        $date = Carbon::parse($request->date)->startOfDay();
+
+        $query = DoctorVisit::with([
+            'patient.subcompany',
+            'patient.company',
+            'patient.admission' => fn ($q) => $q->with(['ward', 'bed.room', 'bed']),
+            'doctor',
+            'requestedServices',
+            'patientLabRequests',
+        ])
+            ->withCount('requestedServices')
+            ->whereHas('patient', function ($q) use ($date) {
+                $q->where('from_addmission_page', true)
+                    ->whereDate('created_at', $date);
+            })
+            ->orderBy('created_at', 'desc');
+
+        $visits = $query->get();
+
+        $admissionIds = $visits
+            ->pluck('patient.admission.id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $summaries = Admission::getRequestedSurgeriesSummariesFor($admissionIds);
+        foreach ($visits as $visit) {
+            $admission = $visit->patient?->admission;
+            if ($admission && isset($summaries[$admission->id])) {
+                $admission->setAttribute('requested_surgeries_summary', $summaries[$admission->id]);
+            }
+        }
+
+        return DoctorVisitResource::collection($visits);
+    }
 }

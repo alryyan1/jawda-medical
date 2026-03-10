@@ -128,6 +128,7 @@ class Patient extends Model
         'doctor_id', // Primary doctor link
         'phone',
         'gender',
+        'dob',
         'age_day',
         'age_month',
         'age_year',
@@ -166,6 +167,7 @@ class Patient extends Model
         'lab_to_lab_id',
         'social_status',
         'income_source',
+        'from_addmission_page',
         'specialist_doctor_id',
     ];
 
@@ -175,6 +177,7 @@ class Patient extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'dob' => 'date',
         'expire_date' => 'date',
         'is_lab_paid' => 'boolean',
         'result_is_locked' => 'boolean',
@@ -196,6 +199,7 @@ class Patient extends Model
         'lymphadenopathy' => 'boolean',
         'peripheral_pulses' => 'boolean',
         'feet_ulcer' => 'boolean',
+        'from_addmission_page' => 'boolean',
         'doctor_finish' => 'boolean',
         'doctor_lab_request_confirm' => 'boolean',
         'doctor_lab_urgent_confirm' => 'boolean',
