@@ -376,6 +376,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::patch('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'updateFinance']);
   Route::delete('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroyFinance']);
   Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/print', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'print']);
+  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/prepare-whatsapp', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'prepareWhatsApp']);
   Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/invoice', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'invoice']);
   Route::get('requested-surgeries/{requestedSurgery}/ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'getLedger']);
   Route::post('requested-surgeries/{requestedSurgery}/transactions', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'addTransaction']);

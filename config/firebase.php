@@ -10,9 +10,12 @@ return [
     |
     */
 
-    'project_id' => env('FIREBASE_PROJECT_ID', 'hospitalapp-681f1'),
-    'storage_bucket' => env('FIREBASE_STORAGE_BUCKET', 'hospitalapp-681f1.firebasestorage.app'),
-    'api_key' => env('FIREBASE_API_KEY', 'AIzaSyAkjo7wFjRMjyDfssFPVqG-nfoNDfv_jk0'),
+    // Should match the service account JSON (project_id: "sales-9e9b8")
+    'project_id' => env('FIREBASE_PROJECT_ID', 'sales-9e9b8'),
+    // Use the default bucket for this project unless overridden in .env
+    // Newer Firebase projects use .firebasestorage.app; legacy use .appspot.com
+    'storage_bucket' => env('FIREBASE_STORAGE_BUCKET', 'sales-9e9b8.firebasestorage.app'),
+    'api_key' => env('FIREBASE_API_KEY'),
     
     /*
     |--------------------------------------------------------------------------

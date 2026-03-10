@@ -98,6 +98,9 @@ Route::get('/ultramsg/send-text-message-online', function () {
     ]);
 });
 
+// Simple page to check Firebase configuration & connection
+Route::get('/firebase-check', [\App\Http\Controllers\FirebaseDebugController::class, 'index']);
+
 Route::get('/hl7', function () {
     // return 123;
     //get hl7 message from hl7_messages table

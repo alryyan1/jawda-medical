@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Kreait\Firebase\Factory;
 
 class FirebaseService
 {
@@ -233,6 +234,59 @@ class FirebaseService
     }
 
     /**
+     * Get Firebase project ID (from config or service account file).
+     */
+    public static function getProjectId(): ?string
+    {
+        $projectId = config('firebase.project_id');
+        if ($projectId) {
+            return $projectId;
+        }
+        $path = config('firebase.service_account_path');
+        if (!$path || !file_exists($path)) {
+            return null;
+        }
+        $data = json_decode(file_get_contents($path), true);
+        return $data['project_id'] ?? null;
+    }
+
+    /**
+     * List root-level Firestore collection IDs.
+     * Returns array of collection IDs or null on failure.
+     */
+    public static function listRootCollectionIds(): ?array
+    {
+        $projectId = self::getProjectId();
+        if (!$projectId) {
+            Log::warning('Firebase project ID not available for listCollectionIds');
+            return null;
+        }
+        $accessToken = self::getAccessToken();
+        if (!$accessToken) {
+            Log::warning('FCM access token unavailable for listCollectionIds');
+            return null;
+        }
+        $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents:listCollectionIds";
+        try {
+            $response = Http::withToken($accessToken)
+                ->asJson()
+                ->post($url, []);
+            if (!$response->successful()) {
+                Log::warning('Firestore listCollectionIds failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+            $data = $response->json();
+            return $data['collectionIds'] ?? [];
+        } catch (\Throwable $e) {
+            Log::warning('Firestore listCollectionIds exception', ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    /**
      * Update Firestore document field
      */
     public static function updateFirestoreDocument(string $collection, string $documentId, array $fields): bool
@@ -309,6 +363,152 @@ class FirebaseService
     }
 
     /**
+     * Create or update a Firestore document by full path (supports nested paths).
+     * Document path format: pharmacies/one_care/admissions/{admissionId}
+     *
+     * @param  string  $documentPath  Full document path (e.g. pharmacies/one_care/admissions/123)
+     * @param  array  $fields  Key-value pairs to write (values are formatted for Firestore)
+     * @return bool
+     */
+    public static function createOrUpdateFirestoreDocumentByPath(string $documentPath, array $fields): bool
+    {
+        try {
+            $projectId = config('firebase.project_id');
+            if (!$projectId) {
+                Log::warning('Firebase project ID not configured');
+                return false;
+            }
+
+            $accessToken = self::getAccessToken();
+            if (!$accessToken) {
+                Log::warning('FCM access token unavailable for Firestore update');
+                return false;
+            }
+
+            $formattedFields = [];
+            foreach ($fields as $key => $value) {
+                $formattedFields[$key] = self::formatFirestoreValue($value);
+            }
+
+            $payload = ['fields' => $formattedFields];
+            $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$documentPath}";
+
+            $getResponse = Http::withToken($accessToken)->get($url);
+
+            if ($getResponse->successful()) {
+                $currentDoc = $getResponse->json();
+                $currentFields = $currentDoc['fields'] ?? [];
+                foreach ($formattedFields as $key => $formatted) {
+                    $currentFields[$key] = $formatted;
+                }
+                $updatePayload = ['fields' => $currentFields];
+                $response = Http::withToken($accessToken)->patch($url, $updatePayload);
+            } elseif ($getResponse->status() === 404) {
+                $pathParts = explode('/', $documentPath);
+                $documentId = array_pop($pathParts);
+                $parentPath = implode('/', $pathParts);
+                $createUrl = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$parentPath}?documentId={$documentId}";
+                $response = Http::withToken($accessToken)->post($createUrl, $payload);
+            } else {
+                Log::warning('Failed to get Firestore document', [
+                    'documentPath' => $documentPath,
+                    'status' => $getResponse->status(),
+                ]);
+                return false;
+            }
+
+            if (!$response->successful()) {
+                Log::warning('Failed to create/update Firestore document by path', [
+                    'documentPath' => $documentPath,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return false;
+            }
+
+            Log::info('Firestore document created/updated by path', [
+                'documentPath' => $documentPath,
+                'fields' => array_keys($fields),
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('Firestore create/update by path exception', [
+                'error' => $e->getMessage(),
+                'documentPath' => $documentPath,
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Upload PDF content to Firebase Storage and return the public download URL.
+     *
+     * @param  string  $content  Raw PDF binary content
+     * @param  string  $storagePath  Path in bucket (e.g. one_care/admissions/123/surgery_456.pdf)
+     * @return string  Public download URL
+     *
+     * @throws \Exception
+     */
+    public static function uploadPdfToStorage(string $content, string $storagePath): string
+    {
+        $serviceAccountPath = config('firebase.service_account_path');
+
+        if (!file_exists($serviceAccountPath)) {
+            throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}. Please configure Firebase properly.");
+        }
+
+        $factory = (new Factory)
+            ->withServiceAccount($serviceAccountPath)
+            ->withProjectId(config('firebase.project_id'));
+
+        $storage = $factory->createStorage();
+        $bucketName = config('firebase.storage_bucket');
+        $bucket = $storage->getBucket($bucketName);
+
+        $object = $bucket->upload($content, [
+            'name' => $storagePath,
+            'metadata' => [
+                'contentType' => 'application/pdf',
+                'cacheControl' => 'public, max-age=31536000',
+            ],
+        ]);
+
+        try {
+            $object->acl()->add('allUsers', 'READER');
+        } catch (\Throwable $e) {
+            Log::info('Firebase Storage ACL skipped (uniform bucket-level access may be enabled)', [
+                'path' => $storagePath,
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        return self::generatePublicUrlForPath($storagePath);
+    }
+
+    /**
+     * Generate public URL for a Firebase Storage path.
+     */
+    public static function generatePublicUrlForPath(string $storagePath): string
+    {
+        $serviceAccountPath = config('firebase.service_account_path');
+
+        if (!file_exists($serviceAccountPath)) {
+            throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}. Please configure Firebase properly.");
+        }
+
+        $factory = (new Factory)
+            ->withServiceAccount($serviceAccountPath)
+            ->withProjectId(config('firebase.project_id'));
+
+        $storage = $factory->createStorage();
+        $bucketName = config('firebase.storage_bucket');
+        $bucket = $storage->getBucket($bucketName);
+
+        return 'https://storage.googleapis.com/'.$bucket->name().'/'.$storagePath;
+    }
+
+    /**
      * Format value for Firestore
      */
     private static function formatFirestoreValue($value)
@@ -316,17 +516,22 @@ class FirebaseService
         if (is_bool($value)) {
             return ['booleanValue' => $value];
         } elseif (is_int($value)) {
-            return ['integerValue' => (string)$value];
+            return ['integerValue' => (string) $value];
         } elseif (is_float($value)) {
             return ['doubleValue' => $value];
         } elseif (is_string($value)) {
             return ['stringValue' => $value];
-        } elseif (is_array($value)) {
+        } elseif (is_array($value) && !isset($value['stringValue']) && !isset($value['integerValue']) && !isset($value['timestampValue'])) {
             return ['arrayValue' => ['values' => array_map([self::class, 'formatFirestoreValue'], $value)]];
+        } elseif ($value instanceof \DateTimeInterface) {
+            $utc = $value instanceof \Carbon\Carbon
+                ? $value->utc()
+                : \Carbon\Carbon::parse($value)->utc();
+            return ['timestampValue' => $utc->format('Y-m-d\TH:i:s.v\Z')];
         } elseif (is_null($value)) {
             return ['nullValue' => null];
         } else {
-            return ['stringValue' => (string)$value];
+            return ['stringValue' => (string) $value];
         }
     }
 

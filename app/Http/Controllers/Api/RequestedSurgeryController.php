@@ -8,9 +8,11 @@ use App\Models\RequestedSurgery;
 use App\Models\RequestedSurgeryFinance;
 use App\Models\SurgicalOperation;
 use App\Models\RequestedSurgeryTransaction;
+use App\Services\FirebaseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RequestedSurgeryController extends Controller
 {
@@ -309,6 +311,76 @@ class RequestedSurgeryController extends Controller
         return response($pdfContent)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', 'inline; filename="surgery_finance_report.pdf"');
+    }
+
+    /**
+     * Prepare WhatsApp: store admission in Firestore, generate PDF, upload to Storage, update Firestore with download_url.
+     */
+    public function prepareWhatsApp(Admission $admission, RequestedSurgery $requestedSurgery)
+    {
+        if ($requestedSurgery->admission_id !== $admission->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $admission->load(['patient', 'ward', 'bed', 'doctor', 'requestedSurgeries.surgery', 'requestedSurgeries.finances.financeCharge']);
+        $requestedSurgery->load(['surgery', 'finances.financeCharge']);
+
+        $patient = $admission->patient;
+        $patientPhone = $patient->phone ?? '';
+        $normalizedPhone = preg_replace('/[^0-9]/', '', $patientPhone);
+        if ($normalizedPhone && strpos($normalizedPhone, '249') !== 0) {
+            $normalizedPhone = (strpos($normalizedPhone, '0') === 0 ? substr($normalizedPhone, 1) : $normalizedPhone);
+            $patientPhone = '249' . $normalizedPhone;
+        } else {
+            $patientPhone = $normalizedPhone ?: $patientPhone;
+        }
+
+        $firestorePath = "pharmacies/one_care/admissions/{$admission->id}";
+        $admissionFields = [
+            'admission_id' => $admission->id,
+            'patient_name' => $patient->name ?? '',
+            'patient_phone' => $patientPhone,
+            'admission_date' => $admission->admission_date?->format('Y-m-d') ?? '',
+            'status' => $admission->status ?? '',
+            'surgery_name' => $requestedSurgery->surgery?->name ?? '',
+            'total_price' => (float) ($requestedSurgery->total_price ?? 0),
+            'updated_at' => now(),
+        ];
+
+        if (!FirebaseService::createOrUpdateFirestoreDocumentByPath($firestorePath, $admissionFields)) {
+            Log::warning('Failed to store admission in Firestore', ['admission_id' => $admission->id]);
+            return response()->json(['message' => 'فشل حفظ تفاصيل التنويم في Firestore'], 500);
+        }
+
+        $report = new \App\Services\Pdf\SurgeryFinanceReport($requestedSurgery);
+        $pdfContent = $report->generate();
+
+        $storagePath = "one_care/admissions/{$admission->id}/surgery_{$requestedSurgery->id}.pdf";
+        try {
+            $downloadUrl = FirebaseService::uploadPdfToStorage($pdfContent, $storagePath);
+        } catch (\Throwable $e) {
+            Log::error('Failed to upload surgery PDF to Firebase Storage', [
+                'admission_id' => $admission->id,
+                'requested_surgery_id' => $requestedSurgery->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['message' => 'فشل رفع التقرير إلى التخزين'], 500);
+        }
+
+        $updateFields = [
+            'download_url' => $downloadUrl,
+            'updated_at' => now(),
+        ];
+        if (!FirebaseService::createOrUpdateFirestoreDocumentByPath($firestorePath, $updateFields)) {
+            Log::warning('Failed to update Firestore with download_url', ['admission_id' => $admission->id]);
+            return response()->json(['message' => 'فشل تحديث رابط التقرير في Firestore'], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'download_url' => $downloadUrl,
+        ]);
     }
 
     public function invoice(Admission $admission, RequestedSurgery $requestedSurgery)
