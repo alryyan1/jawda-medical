@@ -18,10 +18,12 @@ class RequestedSurgery extends Model
         'status',
         'approved_by',
         'approved_at',
+        'request_send_status',
     ];
 
     protected $casts = [
         'initial_price' => 'decimal:2',
+        'request_send_status' => 'boolean',
     ];
 
     protected $appends = ['total_price'];

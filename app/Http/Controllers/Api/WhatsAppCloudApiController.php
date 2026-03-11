@@ -844,8 +844,21 @@ MSG;
         }
 
         $payloadString = $buttonData['payload'] ?? $buttonData['id'] ?? $buttonData['text'] ?? $buttonData['title'] ?? null;
+        Log::info('WhatsApp Cloud API: Finance handler - payload string.', ['payload_string' => $payloadString]);
         if (!$payloadString) {
             Log::info('WhatsApp Cloud API: Finance handler - no payload in button.', ['button_data' => $buttonData]);
+            return;
+        }
+
+        // Handle اعتماد (approve) button: admission_{admissionId}_surgery_{surgeryId}_approve
+        if (preg_match('/^admission_(\d+)_surgery_(\d+)_approve$/', $payloadString, $m)) {
+            $this->handleFinanceApprove((int) $m[1], (int) $m[2], $from, $phoneNumberId);
+            return;
+        }
+
+        // Handle رفض (reject) button: admission_{admissionId}_surgery_{surgeryId}_reject
+        if (preg_match('/^admission_(\d+)_surgery_(\d+)_reject$/', $payloadString, $m)) {
+            $this->handleFinanceReject((int) $m[1], (int) $m[2], $from, $phoneNumberId);
             return;
         }
 
@@ -865,6 +878,56 @@ MSG;
             $this->sendDocumentToUser($from, $pdfUrl, 'finance_report', $phoneNumberId);
         } else {
             $this->sendTextToUser($from, 'عذراً، لم يتم العثور على التقرير.', $phoneNumberId);
+        }
+    }
+
+    /**
+     * Handle اعتماد (approve) button: update approved_at in Firestore only.
+     */
+    protected function handleFinanceApprove(int $admissionId, int $surgeryId, string $from, $phoneNumberId): void
+    {
+        $this->updateFirestoreApprovedAt($admissionId, $surgeryId, now());
+    }
+
+    /**
+     * Handle رفض (reject) button: set approved_at to null in Firestore only.
+     */
+    protected function handleFinanceReject(int $admissionId, int $surgeryId, string $from, $phoneNumberId): void
+    {
+        $this->updateFirestoreApprovedAt($admissionId, $surgeryId, null);
+    }
+
+    /**
+     * Update requested_surgery.approved_at in Firestore only.
+     */
+    protected function updateFirestoreApprovedAt(int $admissionId, int $requestedSurgeryId, $approvedAt): void
+    {
+        $firestorePath = "pharmacies/one_care/admissions/{$admissionId}";
+        $fields = FirebaseService::getFirestoreDocumentFields($firestorePath);
+        if (!$fields || !isset($fields['requested_surgeries']) || !is_array($fields['requested_surgeries'])) {
+            return;
+        }
+
+        $requestedSurgeriesData = $fields['requested_surgeries'];
+        $updated = false;
+        foreach ($requestedSurgeriesData as &$rs) {
+            if (!is_array($rs)) {
+                continue;
+            }
+            $id = $rs['id'] ?? null;
+            if ((int) $id === $requestedSurgeryId) {
+                $rs['approved_at'] = $approvedAt instanceof \DateTimeInterface ? $approvedAt->format('Y-m-d H:i:s') : $approvedAt;
+                $updated = true;
+                break;
+            }
+        }
+        unset($rs);
+
+        if ($updated) {
+            FirebaseService::createOrUpdateFirestoreDocumentByPath($firestorePath, [
+                'requested_surgeries' => $requestedSurgeriesData,
+                'updated_at'          => now(),
+            ]);
         }
     }
 

@@ -232,8 +232,8 @@ class Patient extends Model
      */
     public function admission()
     {
-        return $this->hasOne(Admission::class)
-            ->where('status', 'admitted');
+        return $this->hasOne(Admission::class);
+            
     }
 
     // Relationships

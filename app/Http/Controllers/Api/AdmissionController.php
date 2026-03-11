@@ -347,6 +347,7 @@ class AdmissionController extends Controller
             if ($admission->bed_id && $admission->bed) {
                 $admission->bed->update(['status' => 'available']);
             }
+            $admission->update(['bed_id' => null,'ward_id'=>null]);
         });
 
         return new AdmissionResource($admission->load(['patient', 'ward', 'bed.room', 'bed', 'doctor', 'specialistDoctor', 'user']));

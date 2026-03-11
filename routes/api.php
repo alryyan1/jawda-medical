@@ -377,6 +377,9 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::delete('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroyFinance']);
   Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/print', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'print']);
   Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/prepare-whatsapp', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'prepareWhatsApp']);
+  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/mark-request-sent', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'markRequestSent']);
+  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/sync-approval-from-firestore', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'syncApprovalFromFirestore']);
+  Route::post('admissions/{admission}/sync-all-from-firestore', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'syncAllFromFirestore']);
   Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/invoice', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'invoice']);
   Route::get('requested-surgeries/{requestedSurgery}/ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'getLedger']);
   Route::post('requested-surgeries/{requestedSurgery}/transactions', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'addTransaction']);

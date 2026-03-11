@@ -509,6 +509,82 @@ class FirebaseService
     }
 
     /**
+     * Get Firestore document fields as plain PHP array (decoded).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function getFirestoreDocumentFields(string $documentPath): ?array
+    {
+        try {
+            $projectId = config('firebase.project_id');
+            if (!$projectId) {
+                return null;
+            }
+            $accessToken = self::getAccessToken();
+            if (!$accessToken) {
+                return null;
+            }
+            $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$documentPath}";
+            $response = \Illuminate\Support\Facades\Http::withToken($accessToken)->get($url);
+            if (!$response->successful()) {
+                return null;
+            }
+            $document = $response->json();
+            $fields = $document['fields'] ?? [];
+            $decoded = [];
+            foreach ($fields as $key => $encoded) {
+                $decoded[$key] = self::parseFirestoreValue($encoded);
+            }
+            return $decoded;
+        } catch (\Throwable $e) {
+            Log::warning('Firestore getDocumentFields exception', [
+                'path' => $documentPath,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Parse Firestore encoded value to PHP.
+     *
+     * @param  array<string, mixed>  $v
+     * @return mixed
+     */
+    public static function parseFirestoreValue(array $v): mixed
+    {
+        if (isset($v['stringValue'])) {
+            return $v['stringValue'];
+        }
+        if (isset($v['integerValue'])) {
+            return (int) $v['integerValue'];
+        }
+        if (isset($v['doubleValue'])) {
+            return (float) $v['doubleValue'];
+        }
+        if (isset($v['booleanValue'])) {
+            return $v['booleanValue'];
+        }
+        if (isset($v['nullValue'])) {
+            return null;
+        }
+        if (isset($v['timestampValue'])) {
+            return \Carbon\Carbon::parse($v['timestampValue']);
+        }
+        if (isset($v['arrayValue']['values'])) {
+            return array_map([self::class, 'parseFirestoreValue'], $v['arrayValue']['values']);
+        }
+        if (isset($v['mapValue']['fields'])) {
+            $result = [];
+            foreach ($v['mapValue']['fields'] as $k => $fv) {
+                $result[$k] = self::parseFirestoreValue($fv);
+            }
+            return $result;
+        }
+        return null;
+    }
+
+    /**
      * Format value for Firestore
      */
     private static function formatFirestoreValue($value)
@@ -521,8 +597,20 @@ class FirebaseService
             return ['doubleValue' => $value];
         } elseif (is_string($value)) {
             return ['stringValue' => $value];
-        } elseif (is_array($value) && !isset($value['stringValue']) && !isset($value['integerValue']) && !isset($value['timestampValue'])) {
-            return ['arrayValue' => ['values' => array_map([self::class, 'formatFirestoreValue'], $value)]];
+        } elseif (is_array($value) && !isset($value['stringValue']) && !isset($value['integerValue']) && !isset($value['timestampValue']) && !isset($value['mapValue'])) {
+            $keys = array_keys($value);
+            $isList = $keys === range(0, count($value) - 1);
+            if ($isList) {
+                return ['arrayValue' => ['values' => array_map([self::class, 'formatFirestoreValue'], $value)]];
+            }
+            // Use stdClass so mapValue.fields serializes as JSON object, not array.
+            // PHP arrays with numeric keys would otherwise become JSON arrays, causing
+            // "Cannot bind a list to map for field 'fields'" from Firestore.
+            $fields = new \stdClass();
+            foreach ($value as $k => $v) {
+                $fields->{$k} = self::formatFirestoreValue($v);
+            }
+            return ['mapValue' => ['fields' => $fields]];
         } elseif ($value instanceof \DateTimeInterface) {
             $utc = $value instanceof \Carbon\Carbon
                 ? $value->utc()

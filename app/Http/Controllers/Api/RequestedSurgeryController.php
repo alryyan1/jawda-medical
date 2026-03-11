@@ -174,6 +174,7 @@ class RequestedSurgeryController extends Controller
             }
 
             DB::commit();
+            $this->syncRequestedSurgeryApprovalToFirestore($admission->id, $requestedSurgery->id, $requestedSurgery->approved_by, $requestedSurgery->approved_at, $requestedSurgery->status);
             return response()->json($requestedSurgery->load(['surgery', 'doctor', 'user', 'approvedBy', 'finances.financeCharge']));
         } catch (\Exception $e) {
             DB::rollBack();
@@ -205,6 +206,7 @@ class RequestedSurgeryController extends Controller
             $requestedSurgery->transactions()->where('type', 'debit')->delete();
 
             DB::commit();
+            $this->syncRequestedSurgeryApprovalToFirestore($admission->id, $requestedSurgery->id, null, null, 'pending');
             return response()->json($requestedSurgery->load(['surgery', 'doctor', 'user', 'approvedBy', 'finances.financeCharge']));
         } catch (\Exception $e) {
             DB::rollBack();
@@ -224,7 +226,138 @@ class RequestedSurgeryController extends Controller
             'approved_at' => now(),
         ]);
 
+        $this->syncRequestedSurgeryApprovalToFirestore($admission->id, $requestedSurgery->id, $requestedSurgery->approved_by, $requestedSurgery->approved_at, 'rejected');
+
         return response()->json($requestedSurgery->load(['surgery', 'doctor', 'user', 'approvedBy', 'finances.financeCharge']));
+    }
+
+    /**
+     * Sync approval from Firestore to database (when Firestore is updated externally).
+     */
+    public function syncApprovalFromFirestore(Request $request, Admission $admission, RequestedSurgery $requestedSurgery)
+    {
+        if ($requestedSurgery->admission_id !== $admission->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'approved_at' => 'nullable|string',
+            'approved_by' => 'nullable|integer|exists:users,id',
+            'status'      => 'required|in:pending,approved,rejected',
+        ]);
+
+        $approvedAt = null;
+        if (!empty($validated['approved_at'])) {
+            try {
+                $approvedAt = \Carbon\Carbon::parse($validated['approved_at']);
+            } catch (\Throwable $e) {
+                return response()->json(['message' => 'Invalid approved_at format'], 422);
+            }
+        }
+
+        $requestedSurgery->update([
+            'approved_at' => $approvedAt,
+            'approved_by' => $validated['approved_by'] ?? null,
+            'status'      => $validated['status'],
+        ]);
+
+        return response()->json(
+            $requestedSurgery->load(['surgery', 'doctor', 'user', 'approvedBy', 'finances.financeCharge'])
+        );
+    }
+
+    /**
+     * Fetch Firestore document and sync all requested surgeries with approved_at to DB.
+     */
+    public function syncAllFromFirestore(Admission $admission)
+    {
+        $firestorePath = "pharmacies/one_care/admissions/{$admission->id}";
+        $fields = FirebaseService::getFirestoreDocumentFields($firestorePath);
+        if (!$fields || !isset($fields['requested_surgeries']) || !is_array($fields['requested_surgeries'])) {
+            return response()->json(['synced' => 0, 'message' => 'لا توجد بيانات في Firestore']);
+        }
+
+        $requestedSurgeriesData = $fields['requested_surgeries'];
+        $synced = 0;
+
+        foreach ($requestedSurgeriesData as $rs) {
+            if (!is_array($rs)) {
+                continue;
+            }
+            $approvedAt = $rs['approved_at'] ?? null;
+            if (empty($approvedAt)) {
+                continue;
+            }
+
+            $id = (int) ($rs['id'] ?? 0);
+            if ($id <= 0) {
+                continue;
+            }
+
+            $requestedSurgery = RequestedSurgery::where('id', $id)
+                ->where('admission_id', $admission->id)
+                ->first();
+
+            if (!$requestedSurgery) {
+                continue;
+            }
+
+            try {
+                $parsedAt = \Carbon\Carbon::parse($approvedAt);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            $requestedSurgery->update([
+                'approved_at' => $parsedAt,
+                'approved_by' => isset($rs['approved_by']) ? (int) $rs['approved_by'] : null,
+                'status'      => $rs['status'] ?? 'approved',
+            ]);
+            $synced++;
+        }
+
+        return response()->json([
+            'synced' => $synced,
+            'surgeries' => $admission->requestedSurgeries()
+                ->with(['surgery', 'doctor', 'user', 'approvedBy', 'finances.financeCharge'])
+                ->get(),
+        ]);
+    }
+
+    /**
+     * Sync requested surgery approval (approved_at, approved_by, status) to Firestore.
+     */
+    protected function syncRequestedSurgeryApprovalToFirestore(int $admissionId, int $requestedSurgeryId, ?int $approvedBy, $approvedAt, string $status): void
+    {
+        $firestorePath = "pharmacies/one_care/admissions/{$admissionId}";
+        $fields = FirebaseService::getFirestoreDocumentFields($firestorePath);
+        if (!$fields || !isset($fields['requested_surgeries']) || !is_array($fields['requested_surgeries'])) {
+            return;
+        }
+
+        $requestedSurgeriesData = $fields['requested_surgeries'];
+        $updated = false;
+        foreach ($requestedSurgeriesData as &$rs) {
+            if (!is_array($rs)) {
+                continue;
+            }
+            $id = $rs['id'] ?? null;
+            if ($id === $requestedSurgeryId) {
+                $rs['approved_by'] = $approvedBy;
+                $rs['approved_at'] = $approvedAt instanceof \DateTimeInterface ? $approvedAt->format('Y-m-d H:i:s') : $approvedAt;
+                $rs['status'] = $status;
+                $updated = true;
+                break;
+            }
+        }
+        unset($rs);
+
+        if ($updated) {
+            FirebaseService::createOrUpdateFirestoreDocumentByPath($firestorePath, [
+                'requested_surgeries' => $requestedSurgeriesData,
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     public function updateFinance(Request $request, RequestedSurgeryFinance $requestedSurgeryFinance)
@@ -335,6 +468,31 @@ class RequestedSurgeryController extends Controller
             $patientPhone = $normalizedPhone ?: $patientPhone;
         }
 
+        $requestedSurgeriesData = [];
+        foreach ($admission->requestedSurgeries as $rs) {
+            $financesData = [];
+            foreach ($rs->finances ?? [] as $f) {
+                $fc = $f->financeCharge;
+                $financesData[] = [
+                    'name' => $fc?->name ?? '',
+                    'amount' => (float) ($f->amount ?? 0),
+                    'payment_method' => $f->payment_method ?? 'cash',
+                    'beneficiary' => $fc?->beneficiary ?? '',
+                ];
+            }
+            $requestedSurgeriesData[] = [
+                'id' => $rs->id,
+                'surgery_name' => $rs->surgery?->name ?? '',
+                'initial_price' => (float) ($rs->initial_price ?? 0),
+                'status' => $rs->status ?? '',
+                'total_price' => (float) $rs->total_price,
+                'download_url' => null,
+                'approved_by' => $rs->approved_by,
+                'approved_at' => $rs->approved_at?->format('Y-m-d H:i:s'),
+                'finances' => $financesData,
+            ];
+        }
+
         $firestorePath = "pharmacies/one_care/admissions/{$admission->id}";
         $admissionFields = [
             'admission_id' => $admission->id,
@@ -344,6 +502,7 @@ class RequestedSurgeryController extends Controller
             'status' => $admission->status ?? '',
             'surgery_name' => $requestedSurgery->surgery?->name ?? '',
             'total_price' => (float) ($requestedSurgery->total_price ?? 0),
+            'requested_surgeries' => $requestedSurgeriesData,
             'updated_at' => now(),
         ];
 
@@ -368,8 +527,17 @@ class RequestedSurgeryController extends Controller
             return response()->json(['message' => 'فشل رفع التقرير إلى التخزين'], 500);
         }
 
+        foreach ($requestedSurgeriesData as &$rsData) {
+            if ($rsData['id'] === $requestedSurgery->id) {
+                $rsData['download_url'] = $downloadUrl;
+                break;
+            }
+        }
+        unset($rsData);
+
         $updateFields = [
             'download_url' => $downloadUrl,
+            'requested_surgeries' => $requestedSurgeriesData,
             'updated_at' => now(),
         ];
         if (!FirebaseService::createOrUpdateFirestoreDocumentByPath($firestorePath, $updateFields)) {
@@ -390,6 +558,22 @@ class RequestedSurgeryController extends Controller
             'success' => true,
             'download_url' => $downloadUrl,
         ]);
+    }
+
+    /**
+     * Mark request as sent (after prepareWhatsApp + WhatsApp send complete).
+     */
+    public function markRequestSent(Admission $admission, RequestedSurgery $requestedSurgery)
+    {
+        if ($requestedSurgery->admission_id !== $admission->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $requestedSurgery->update(['request_send_status' => true]);
+
+        return response()->json(
+            $requestedSurgery->load(['surgery', 'doctor', 'user', 'approvedBy', 'finances.financeCharge'])
+        );
     }
 
     public function invoice(Admission $admission, RequestedSurgery $requestedSurgery)
