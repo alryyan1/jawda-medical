@@ -98,6 +98,7 @@ class VisitServiceController extends Controller
             ->with([
                 'service.serviceGroup',
                 'service.serviceCosts.subServiceCost', // Eager load service costs for potential display
+                'returnedRefunds.user',
                 'requestingUser:id,name',
                 'depositUser:id,name',
                 'performingDoctor:id,name',

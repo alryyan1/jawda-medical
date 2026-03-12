@@ -37,6 +37,7 @@ class LabRequestResource extends JsonResource
             'sample_id' => $this->sample_id,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
+            'returned_refunds' => ReturnedLabRequestResource::collection($this->whenLoaded('returnedRefunds')),
 
             // --- ADD/ENSURE THIS ---
             // Eager load 'results.childTest.unit' if needed for display consistency

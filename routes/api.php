@@ -52,6 +52,8 @@ use App\Http\Controllers\Api\PdfSettingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RequestedServiceCostController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
+use App\Http\Controllers\Api\ReturnedRequestedServiceController;
+use App\Http\Controllers\Api\ReturnedLabRequestController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SampleCollectionController;
 use App\Http\Controllers\Api\ServiceController;
@@ -247,6 +249,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('/requested-services/{requestedService}', [VisitServiceController::class, 'updateRequestedService']);
   Route::delete('/visits/{visit}/requested-services/{requestedService}', [VisitServiceController::class, 'removeRequestedService']);
   Route::post('/requested-services/{requestedService}/deposits', [RequestedServiceDepositController::class, 'store']);
+  Route::post('/requested-services/{requestedService}/refunds', [ReturnedRequestedServiceController::class, 'store']);
 
   /*
     |--------------------------------------------------------------------------
@@ -487,6 +490,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('/labrequests/{labrequest}', [LabRequestController::class, 'update']);
   Route::delete('/labrequests/{labrequest}', [LabRequestController::class, 'destroy']);
   Route::post('/labrequests/{labrequest}/pay', [LabRequestController::class, 'recordPayment']);
+  Route::post('/labrequests/{labrequest}/refunds', [ReturnedLabRequestController::class, 'store']);
   Route::post('/labrequests/{labrequest}/authorize', [LabRequestController::class, 'authorizeResults']);
 
   Route::get('/lab/ready-for-print-queue', [LabRequestController::class, 'getLabReadyForPrintQueue']);
@@ -543,6 +547,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
   // "The route api/reports/monthly-lab-income could not be found."
   Route::get('/reports/monthly-lab-income', [ReportController::class, 'monthlyLabIncome']);
+  Route::get('/reports/monthly-shifts-summary', [ReportController::class, 'monthlyShiftsSummary']);
   //api/reports/clinic-report/1/financial-summary/pdf
   Route::get('/reports/doctor-shifts/{doctorShift}/financial-summary/pdf', [ReportController::class, 'clinicReport']);
   // The route api/reports/clinic-shift-summary/pdf could not be found.
@@ -937,6 +942,7 @@ Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::c
 Route::patch('/doctor-visits/{visit}/update-all-lab-requests-bankak', [LabRequestController::class, 'updateAllLabRequestsBankak'])->middleware('auth:sanctum');
 Route::get('/lab-requests/visit/{visit}/thermal-receipt-pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
 Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
+Route::get('/visits/{visit}/clinic-invoice/pdf', [ReportController::class, 'generateClinicInvoicePdf']);
 Route::get('/visits/{visit}/requested-services/{requestedService}/thermal-receipt/pdf', [ReportController::class, 'generateSingleServiceThermalReceipt']);
 Route::post('/reports/cash-reconciliation/pdf', [ReportController::class, 'generateCashReconciliationPdf'])->middleware('auth:sanctum');
 

@@ -555,7 +555,7 @@ class LabRequestController extends Controller
     public function indexForVisit(Request $request, DoctorVisit $visit)
     {
         $labRequests = $visit->patientLabRequests()
-            ->with(['mainTest:id,main_test_name,price,container_id', 'mainTest.container:id,container_name', 'requestingUser:id,name'])
+            ->with(['mainTest:id,main_test_name,price,container_id', 'mainTest.container:id,container_name', 'requestingUser:id,name', 'returnedRefunds.user'])
             ->orderBy('created_at', 'asc') // Or by main_test.name
             ->get();
         return LabRequestResource::collection($labRequests);

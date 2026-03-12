@@ -37,6 +37,8 @@ use App\Models\Patient;
 use App\Models\RequestedServiceCost;
 use App\Models\RequestedServiceDeposit;
 use App\Models\RequestedService;
+use App\Models\ReturnedRequestedService;
+use App\Models\ReturnedLabRequest;
 use App\Models\ShiftDefinition;
 use App\Models\SubServiceCost;
 use App\Models\Deno;
@@ -1361,6 +1363,24 @@ class ReportController extends Controller
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
         $filename = 'ServiceReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$filename}\"");
+    }
+
+    public function generateClinicInvoicePdf(Request $request, DoctorVisit $visit)
+    {
+        if ($visit->requestedServices()->count() === 0) {
+            return response()->json(['message' => 'لا توجد خدمات لإنشاء فاتورة لها في هذه الزيارة.'], 404);
+        }
+
+        $visit->load(['patient.country', 'doctor', 'requestedServices.service', 'createdByUser']);
+        $report = new \App\Services\Pdf\ClinicVisitInvoiceA5($visit);
+        $pdfContent = $report->generate();
+
+        $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name ?? 'Patient');
+        $filename = 'clinic-invoice-visit-' . $visit->id . '_' . $patientNameSanitized . '.pdf';
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
@@ -3987,6 +4007,106 @@ class ReportController extends Controller
             $pdf->Ln(2); // Space after an organism block
         }
     }
+    /**
+     * Get monthly shifts financial summary: one row per shift with revenue, cost, refund, net.
+     */
+    public function monthlyShiftsSummary(Request $request)
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'nullable|integer|min:2000|max:' . (date('Y') + 5),
+        ]);
+
+        $year = $validated['year'] ?? (int) date('Y');
+        $month = $validated['month'];
+
+        $dateFrom = Carbon::createFromDate($year, $month, 1)->startOfMonth()->toDateString();
+        $dateTo = Carbon::createFromDate($year, $month, 1)->endOfMonth()->toDateString();
+
+        $shifts = Shift::with('userOpened:id,name')
+            ->whereDate('created_at', '>=', $dateFrom)
+            ->whereDate('created_at', '<=', $dateTo)
+            ->orderBy('created_at')
+            ->get();
+
+        $rows = [];
+        $summary = [
+            'revenue_cash' => 0,
+            'revenue_bank' => 0,
+            'cost_cash' => 0,
+            'cost_bank' => 0,
+            'refund_cash' => 0,
+            'refund_bank' => 0,
+            'net_cash' => 0,
+            'net_bank' => 0,
+            'net_total' => 0,
+        ];
+
+        foreach ($shifts as $shift) {
+            $revenueServiceCash = (float) $shift->totalPaidService(null) - (float) $shift->totalPaidServiceBank(null);
+            $revenueServiceBank = (float) $shift->totalPaidServiceBank(null);
+            $revenueLabCash = (float) $shift->paidLab(null) - (float) $shift->bankakLab(null);
+            $revenueLabBank = (float) $shift->bankakLab(null);
+
+            $revenueCash = $revenueServiceCash + $revenueLabCash;
+            $revenueBank = $revenueServiceBank + $revenueLabBank;
+
+            $costTotal = (float) $shift->totalCost(null);
+            $costBank = (float) $shift->totalCostBank(null);
+            $costCash = $costTotal - $costBank;
+
+            $serviceCashRefund = (float) ReturnedRequestedService::where('shift_id', $shift->id)->where('returned_payment_method', 'cash')->sum('amount');
+            $serviceBankRefund = (float) ReturnedRequestedService::where('shift_id', $shift->id)->where('returned_payment_method', 'bank')->sum('amount');
+            $labCashRefund = (float) ReturnedLabRequest::where('shift_id', $shift->id)->where('returned_payment_method', 'cash')->sum('amount');
+            $labBankRefund = (float) ReturnedLabRequest::where('shift_id', $shift->id)->where('returned_payment_method', 'bank')->sum('amount');
+
+            $refundCash = $serviceCashRefund + $labCashRefund;
+            $refundBank = $serviceBankRefund + $labBankRefund;
+
+            $netCash = $revenueCash - $refundCash - $costCash;
+            $netBank = $revenueBank - $refundBank - $costBank;
+            $netTotal = $netCash + $netBank;
+
+            $rows[] = [
+                'id' => $shift->id,
+                'date' => $shift->created_at->format('Y-m-d'),
+                'created_at' => $shift->created_at->toIso8601String(),
+                'is_closed' => (bool) $shift->is_closed,
+                'user_opened' => $shift->userOpened ? ['id' => $shift->userOpened->id, 'name' => $shift->userOpened->name] : null,
+                'revenue_cash' => round($revenueCash, 2),
+                'revenue_bank' => round($revenueBank, 2),
+                'cost_cash' => round($costCash, 2),
+                'cost_bank' => round($costBank, 2),
+                'refund_cash' => round($refundCash, 2),
+                'refund_bank' => round($refundBank, 2),
+                'net_cash' => round($netCash, 2),
+                'net_bank' => round($netBank, 2),
+                'net_total' => round($netTotal, 2),
+            ];
+
+            $summary['revenue_cash'] += $revenueCash;
+            $summary['revenue_bank'] += $revenueBank;
+            $summary['cost_cash'] += $costCash;
+            $summary['cost_bank'] += $costBank;
+            $summary['refund_cash'] += $refundCash;
+            $summary['refund_bank'] += $refundBank;
+            $summary['net_cash'] += $netCash;
+            $summary['net_bank'] += $netBank;
+            $summary['net_total'] += $netTotal;
+        }
+
+        return response()->json([
+            'data' => $rows,
+            'summary' => array_map(fn ($v) => round($v, 2), $summary),
+            'report_period' => [
+                'month' => $month,
+                'year' => $year,
+                'from' => $dateFrom,
+                'to' => $dateTo,
+            ],
+        ]);
+    }
+
     /**
      * Get daily lab income data for a specified month and year.
      * Focuses on total_paid, cash_paid, bank_paid for lab requests.

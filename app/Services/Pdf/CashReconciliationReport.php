@@ -231,6 +231,23 @@ class CashReconciliationReport
         $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_bank, 0), 1, 1, 'C', $rowFill);
         $rowFill = !$rowFill;
 
+        // Refund row (when refunds exist)
+        $totalCashRefund = $incomeData->total_cash_refund ?? 0;
+        $totalBankRefund = $incomeData->total_bank_refund ?? 0;
+        if ($totalCashRefund > 0 || $totalBankRefund > 0) {
+            $this->pdf->SetFont('arial', 'B', 10);
+            if ($rowFill) {
+                $this->pdf->SetFillColor(255, 247, 237);
+            } else {
+                $this->pdf->SetFillColor(255, 250, 240);
+            }
+            $this->pdf->Cell($usableWidth * 0.4, 7, 'الاسترداد', 1, 0, 'C', $rowFill);
+            $this->pdf->SetFont('arial', 'B', 10);
+            $this->pdf->Cell($usableWidth * 0.3, 7, number_format($totalCashRefund, 0), 1, 0, 'C', $rowFill);
+            $this->pdf->Cell($usableWidth * 0.3, 7, number_format($totalBankRefund, 0), 1, 1, 'C', $rowFill);
+            $rowFill = !$rowFill;
+        }
+
         // Expenses row
         $this->pdf->SetFont('arial', 'B', 10);
         if ($rowFill) {
@@ -244,14 +261,16 @@ class CashReconciliationReport
         $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_bank_expenses, 0), 1, 1, 'C', $rowFill);
         $rowFill = !$rowFill;
 
-        // Net balance row - emphasized
+        // Net balance row - emphasized (after deducting refunds)
+        $netCashAfterRefund = ($incomeData->net_cash ?? 0) - $totalCashRefund;
+        $netBankAfterRefund = ($incomeData->net_bank ?? 0) - $totalBankRefund;
         $this->pdf->SetFont('arial', 'B', 11);
         $this->pdf->SetFillColor(240, 245, 250);
         $this->pdf->SetTextColor(45, 55, 72);
         $this->pdf->Cell($usableWidth * 0.4, 8, 'الصافي', 1, 0, 'C', true);
         $this->pdf->SetFont('arial', 'B', 11);
-        $this->pdf->Cell($usableWidth * 0.3, 8, number_format($incomeData->net_cash, 0), 1, 0, 'C', true);
-        $this->pdf->Cell($usableWidth * 0.3, 8, number_format($incomeData->net_bank, 0), 1, 1, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, number_format($netCashAfterRefund, 0), 1, 0, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, number_format($netBankAfterRefund, 0), 1, 1, 'C', true);
         $this->pdf->SetTextColor(0, 0, 0);
 
         // Total denominations row
@@ -266,8 +285,8 @@ class CashReconciliationReport
         $this->pdf->Cell($usableWidth * 0.3, 7, number_format($this->data['totalDenominations'], 0), 1, 0, 'C', $rowFill);
         $this->pdf->Cell($usableWidth * 0.3, 7, '-', 1, 1, 'C', $rowFill);
 
-        // Difference row - with conditional styling
-        $cashDifference = $incomeData->net_cash - $this->data['totalDenominations'];
+        // Difference row - with conditional styling (uses net after refunds)
+        $cashDifference = $netCashAfterRefund - $this->data['totalDenominations'];
         $this->pdf->SetFont('arial', 'B', 11);
         if ($cashDifference == 0) {
             $this->pdf->SetFillColor(236, 253, 245);
@@ -487,17 +506,17 @@ class CashReconciliationReport
                 $incomeResponse = app(UserController::class)->getCurrentUserShiftIncomeSummary(new Request(['shift_id' => $shiftId, 'user_id' => $userId]));
                 $incomeData = $incomeResponse->getData()->data;
             } catch (\Exception $e) {
-                // dd($incomeData);
-                dd($e->getMessage(),$e->getLine(),$e->getFile());
                 Log::error("Error fetching income data: " . $e->getMessage());
-                // $incomeData = (object) [
-                //     'total_cash' => 0,
-                //     'total_bank' => 0,
-                //     'total_cash_expenses' => 0,
-                //     'total_bank_expenses' => 0,
-                //     'net_cash' => 0,
-                //     'net_bank' => 0
-                // ];
+                $incomeData = (object) [
+                    'total_cash' => 0,
+                    'total_bank' => 0,
+                    'total_cash_refund' => 0,
+                    'total_bank_refund' => 0,
+                    'total_cash_expenses' => 0,
+                    'total_bank_expenses' => 0,
+                    'net_cash' => 0,
+                    'net_bank' => 0,
+                ];
             }
 
             // Fetch denominations data

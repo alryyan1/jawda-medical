@@ -152,6 +152,14 @@ class RequestedService extends Model
     {
         return $this->hasMany(RequestedServiceDeposit::class, 'requested_service_id');
     }
+
+    /**
+     * Get all refund records for this requested service.
+     */
+    public function returnedRefunds()
+    {
+        return $this->hasMany(ReturnedRequestedService::class, 'requested_service_id');
+    }
     public function totalDepositsBank()
     {
         return $this->deposits()->where('is_bank', 1)->sum('amount');
