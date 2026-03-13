@@ -26,6 +26,7 @@ class RequestedSurgeryController extends Controller
             ->with([
                 'surgery',
                 'admission.patient',
+                'finances',
             ])
             ->orderBy('created_at')
             ->get();

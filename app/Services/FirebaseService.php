@@ -466,6 +466,16 @@ class FirebaseService
         $bucketName = config('firebase.storage_bucket');
         $bucket = $storage->getBucket($bucketName);
 
+        // Delete existing file if present so the new one replaces it
+        try {
+            $existing = $bucket->object($storagePath);
+            if ($existing->exists()) {
+                $existing->delete();
+            }
+        } catch (\Throwable $e) {
+            // Object may not exist, ignore
+        }
+
         $object = $bucket->upload($content, [
             'name' => $storagePath,
             'metadata' => [
