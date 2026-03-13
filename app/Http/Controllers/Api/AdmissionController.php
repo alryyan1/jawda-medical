@@ -354,6 +354,31 @@ class AdmissionController extends Controller
     }
 
     /**
+     * Vacate the bed only (clear bed_id) without discharging the patient.
+     * Patient stays admitted in "قيد الإجراء" status.
+     */
+    public function vacateBed(Admission $admission)
+    {
+        if ($admission->status !== 'admitted') {
+            return response()->json(['message' => 'المريض غير مقيم حالياً.'], 400);
+        }
+
+        if (!$admission->bed_id) {
+            return response()->json(['message' => 'المريض غير مرتبط بسرير.'], 400);
+        }
+
+        DB::transaction(function () use ($admission) {
+            $oldBedId = $admission->bed_id;
+            if ($oldBedId && $admission->bed) {
+                $admission->bed->update(['status' => 'available']);
+            }
+            $admission->update(['bed_id' => null, 'ward_id' => null]);
+        });
+
+        return new AdmissionResource($admission->load(['patient', 'ward', 'bed.room', 'bed', 'doctor', 'specialistDoctor', 'user']));
+    }
+
+    /**
      * Transfer a patient to a different bed/room/ward.
      */
     public function transfer(Request $request, Admission $admission)

@@ -18,6 +18,7 @@ class RequestedSurgeryController extends Controller
 {
     /**
      * List requested surgeries by date (created_at). Query: ?date=Y-m-d (default: today).
+     * Includes paid_cash and paid_bank from credit transactions per surgery.
      */
     public function indexByDate(Request $request)
     {
@@ -26,12 +27,24 @@ class RequestedSurgeryController extends Controller
             ->with([
                 'surgery',
                 'admission.patient',
-                'finances',
+                'finances.financeCharge',
+                'transactions',
             ])
             ->orderBy('created_at')
             ->get();
 
-        return response()->json($surgeries);
+        $result = $surgeries->map(function ($s) {
+            $credits = $s->transactions->where('type', 'credit');
+            $paidCash = (float) $credits->where('payment_method', 'cash')->sum('amount');
+            $paidBank = (float) $credits->where('payment_method', 'bankak')->sum('amount');
+            $data = $s->toArray();
+            $data['paid_cash'] = $paidCash;
+            $data['paid_bank'] = $paidBank;
+            unset($data['transactions']);
+            return $data;
+        });
+
+        return response()->json($result);
     }
 
     public function index(Admission $admission)
@@ -614,6 +627,7 @@ class RequestedSurgeryController extends Controller
      * Summary for all requested surgeries of a given admission:
      * - total_initial: sum of initial_price
      * - paid: sum of credit transactions
+     * - paid_cash, paid_bank: by payment_method
      * - balance: total_initial - paid
      */
     public function admissionSummary(Admission $admission)
@@ -621,17 +635,51 @@ class RequestedSurgeryController extends Controller
         $totalInitial = (float) RequestedSurgery::where('admission_id', $admission->id)
             ->sum('initial_price');
 
-        $paid = (float) RequestedSurgeryTransaction::whereHas('requestedSurgery', function ($q) use ($admission) {
+        $credits = RequestedSurgeryTransaction::whereHas('requestedSurgery', function ($q) use ($admission) {
                 $q->where('admission_id', $admission->id);
             })
             ->where('type', 'credit')
-            ->sum('amount');
+            ->get();
 
+        $paid = (float) $credits->sum('amount');
+        $paidCash = (float) $credits->where('payment_method', 'cash')->sum('amount');
+        $paidBank = (float) $credits->where('payment_method', 'bankak')->sum('amount');
         $balance = $totalInitial - $paid;
 
         return response()->json([
             'total_initial' => $totalInitial,
             'paid'          => $paid,
+            'paid_cash'     => $paidCash,
+            'paid_bank'     => $paidBank,
+            'balance'       => $balance,
+        ]);
+    }
+
+    /**
+     * Summary for requested surgeries by date (created_at).
+     * Query: ?date=Y-m-d (default: today).
+     */
+    public function summaryByDate(Request $request)
+    {
+        $date = $request->get('date', now()->toDateString());
+        $surgeryIds = RequestedSurgery::whereDate('created_at', $date)->pluck('id');
+
+        $totalInitial = (float) RequestedSurgery::whereIn('id', $surgeryIds)->sum('initial_price');
+
+        $credits = RequestedSurgeryTransaction::whereIn('requested_surgery_id', $surgeryIds)
+            ->where('type', 'credit')
+            ->get();
+
+        $paid = (float) $credits->sum('amount');
+        $paidCash = (float) $credits->where('payment_method', 'cash')->sum('amount');
+        $paidBank = (float) $credits->where('payment_method', 'bankak')->sum('amount');
+        $balance = $totalInitial - $paid;
+
+        return response()->json([
+            'total_initial' => $totalInitial,
+            'paid'          => $paid,
+            'paid_cash'     => $paidCash,
+            'paid_bank'     => $paidBank,
             'balance'       => $balance,
         ]);
     }

@@ -303,6 +303,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('admissions/list/pdf', [AdmissionController::class, 'exportListPdf']);
   Route::apiResource('admissions', AdmissionController::class);
   Route::put('admissions/{admission}/discharge', [AdmissionController::class, 'discharge']);
+  Route::put('admissions/{admission}/vacate-bed', [AdmissionController::class, 'vacateBed']);
   Route::put('admissions/{admission}/transfer', [AdmissionController::class, 'transfer']);
   Route::get('admissions/{admission}/balance', [AdmissionTransactionController::class, 'balance']);
 
@@ -368,6 +369,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
   // Requested Surgeries (nested under admissions + by date)
   Route::get('requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'indexByDate']);
+  Route::get('requested-surgeries/summary', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'summaryByDate']);
   Route::get('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'index']);
   Route::get('admissions/{admission}/requested-surgeries/summary', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'admissionSummary']);
   Route::post('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'store']);
