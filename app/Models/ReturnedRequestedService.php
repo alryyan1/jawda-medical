@@ -16,6 +16,7 @@ class ReturnedRequestedService extends Model
         'requested_service_id',
         'amount',
         'returned_payment_method',
+        'return_reason',
         'user_id',
         'shift_id',
     ];

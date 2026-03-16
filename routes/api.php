@@ -168,6 +168,9 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::apiResource('roles', RoleController::class);
   Route::post('/users/{user}/update-password', [UserController::class, 'updatePassword']);
 
+  Route::put('/returned-lab-requests/{returnedLabRequest}', [ReturnedLabRequestController::class, 'update']);
+  Route::put('/returned-requested-services/{returnedRequestedService}', [ReturnedRequestedServiceController::class, 'update']);
+
   /*
     |--------------------------------------------------------------------------
     | Medical Staff Routes (Doctors & Specialists)

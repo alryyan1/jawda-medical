@@ -23,6 +23,7 @@ class ReturnedLabRequestController extends Controller
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
             'returned_payment_method' => 'required|in:cash,bank',
+            'return_reason' => 'required|string|max:255',
         ]);
 
         $amountPaid = (float) $labrequest->amount_paid;
@@ -41,6 +42,7 @@ class ReturnedLabRequestController extends Controller
             'lab_request_id' => $labrequest->id,
             'amount' => $validated['amount'],
             'returned_payment_method' => $validated['returned_payment_method'],
+            'return_reason' => $validated['return_reason'] ?? null,
             'user_id' => Auth::id(),
             'shift_id' => $currentShift?->id,
         ]);
@@ -49,5 +51,28 @@ class ReturnedLabRequestController extends Controller
             'message' => 'تم تسجيل الاسترداد بنجاح',
             'data' => $refund->load('user:id,name'),
         ], 201);
+    }
+
+    /**
+     * Update a refund for a lab request.
+     */
+    public function update(Request $request, ReturnedLabRequest $returnedLabRequest)
+    {
+        if (! Auth::id()) {
+            return response()->json(['message' => 'يجب تسجيل الدخول لتعديل الاسترداد.'], 401);
+        }
+
+        $validated = $request->validate([
+            'returned_payment_method' => 'required|in:cash,bank',
+        ]);
+
+        $returnedLabRequest->update([
+            'returned_payment_method' => $validated['returned_payment_method'],
+        ]);
+
+        return response()->json([
+            'message' => 'تم تحديث الاسترداد بنجاح',
+            'data' => $returnedLabRequest->load('user:id,name'),
+        ]);
     }
 }

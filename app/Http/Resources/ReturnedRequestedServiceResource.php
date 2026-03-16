@@ -14,6 +14,7 @@ class ReturnedRequestedServiceResource extends JsonResource
             'requested_service_id' => $this->requested_service_id,
             'amount' => (float) $this->amount,
             'returned_payment_method' => $this->returned_payment_method,
+            'return_reason' => $this->return_reason,
             'user_id' => $this->user_id,
             'user' => new UserStrippedResource($this->whenLoaded('user')),
             'created_at' => $this->created_at?->toIso8601String(),

@@ -16,6 +16,7 @@ class ReturnedLabRequest extends Model
         'lab_request_id',
         'amount',
         'returned_payment_method',
+        'return_reason',
         'user_id',
         'shift_id',
     ];
