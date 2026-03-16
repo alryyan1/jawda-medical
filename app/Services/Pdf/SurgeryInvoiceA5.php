@@ -58,11 +58,12 @@ class SurgeryInvoiceA5 extends TCPDF
         $this->SetY(8);
 
         // Logos
-        $logoSize = 20;
+        $logoSize = 40;
         if ($logo_name && file_exists($logo_path . '/' . $logo_name)) {
-            $this->Image($logo_path . '/' . $logo_name, $lMargin, 10, $logoSize, $logoSize);
-            $this->Image($logo_path . '/' . $logo_name, $pageWidth - $lMargin - $logoSize, 10, $logoSize, $logoSize);
+            // $this->Image($logo_path . '/' . $logo_name, 15, 10, $logoSize, $logoSize);
+            $this->Image($logo_path . '/' . $logo_name, 40 , 10, $logoSize, $logoSize);
         }
+
 
         // بسم الله الرحمن الرحيم
         $this->SetFont('arial', '', 10);

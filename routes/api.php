@@ -81,6 +81,8 @@ use App\Http\Controllers\Api\ImageProxyController;
 use App\Http\Controllers\Api\BindingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\EmployeeExpenseController;
 use App\Http\Controllers\Api\SmsController;
 
 /*
@@ -794,6 +796,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/monthly-summary', [ReportController::class, 'getMonthlyAttendanceSummary']);
     Route::get('/monthly-summary/pdf', [ReportController::class, 'generateMonthlyAttendancePdf']);
   });
+  /*
+    |--------------------------------------------------------------------------
+    | Employee Expense Routes
+    |--------------------------------------------------------------------------
+    */
+  Route::apiResource('employees', EmployeeController::class);
+  Route::get('employee-expenses/print', [EmployeeExpenseController::class, 'printPdf']);
+  Route::apiResource('employee-expenses', EmployeeExpenseController::class)->only(['index', 'store', 'destroy']);
+
   /*
     |--------------------------------------------------------------------------
     | Attendance Configuration Routes
