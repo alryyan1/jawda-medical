@@ -13,7 +13,7 @@ class Employee extends Model
     protected $fillable = [
         'name',
         'job_title',
-        'department',
+        'department_id',
         'fixed_amount',
         'is_active',
     ];
@@ -22,6 +22,11 @@ class Employee extends Model
         'is_active' => 'boolean',
         'fixed_amount' => 'float',
     ];
+
+    public function department(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
 
     public function expenses(): HasMany
     {

@@ -15,22 +15,22 @@ class EmployeeExpensesReport
     private $isRTL;
     private $date;
 
-    public function generate(Request $request): string
+    public function handle(string $date): string
     {
-        $this->date = $request->input('date', Carbon::today()->toDateString());
-        
-        $expenses = EmployeeExpense::with(['employee', 'recordedBy:id,name'])
-            ->whereDate('date', $this->date)
-            ->get()
-            ->groupBy(function($expense) {
-                return $expense->employee->department ?? 'General';
-            });
+        $this->date = $date;
+        $expenses = EmployeeExpense::with(['employee.department', 'recorded_by'])
+            ->whereDate('date', $date)
+            ->get();
 
-        if ($expenses->isEmpty()) {
+        $groupedExpenses = $expenses->groupBy(function($expense) {
+            return $expense->employee->department->name ?? ($this->isRTL ? 'عام' : 'General');
+        });
+
+        if ($groupedExpenses->isEmpty()) {
             throw new \Exception('No expenses found for the selected date.');
         }
 
-        return $this->generatePdf($expenses);
+        return $this->generatePdf($groupedExpenses);
     }
 
     private function generatePdf($groupedExpenses): string
@@ -109,7 +109,7 @@ class EmployeeExpensesReport
                 number_format($amount, 2),
                 number_format($expense->bank_amount, 2),
                 number_format($expense->cash_amount, 2),
-                $expense->created_at->format('Y-m-d h:i A')
+                $expense->created_at->format('h:i A')
             ];
             
             $this->pdf->DrawTableRow($rowData, $colWidths, $aligns, false, 6, 10);

@@ -83,6 +83,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeExpenseController;
+use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\SmsController;
 
 /*
@@ -804,6 +805,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::apiResource('employees', EmployeeController::class);
   Route::get('employee-expenses/print', [EmployeeExpenseController::class, 'printPdf']);
   Route::apiResource('employee-expenses', EmployeeExpenseController::class)->only(['index', 'store', 'destroy']);
+  Route::apiResource('departments', DepartmentController::class)->only(['index', 'store']);
 
   /*
     |--------------------------------------------------------------------------

@@ -10,36 +10,35 @@ class EmployeeController extends Controller
 {
     public function index()
     {
-        return response()->json(Employee::where('is_active', true)->orderBy('name')->get());
+        return Employee::with('department')->orderBy('name')->get();
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'job_title' => 'nullable|string|max:255',
-            'department' => 'nullable|string|max:255',
-            'fixed_amount' => 'required|numeric|min:0',
+            'name' => 'required|string',
+            'fixed_amount' => 'required|numeric',
+            'job_title' => 'nullable|string',
+            'department_id' => 'nullable|exists:departments,id',
         ]);
 
         $employee = Employee::create($validated);
-
-        return response()->json($employee, 201);
+        return response()->json($employee->load('department'), 201);
     }
 
     public function update(Request $request, Employee $employee)
     {
         $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'job_title' => 'sometimes|nullable|string|max:255',
-            'department' => 'sometimes|nullable|string|max:255',
-            'fixed_amount' => 'sometimes|required|numeric|min:0',
+            'name' => 'sometimes|required|string',
+            'job_title' => 'sometimes|nullable|string',
+            'department_id' => 'sometimes|nullable|exists:departments,id',
+            'fixed_amount' => 'sometimes|required|numeric',
             'is_active' => 'sometimes|required|boolean',
         ]);
 
         $employee->update($validated);
 
-        return response()->json($employee);
+        return response()->json($employee->load('department'));
     }
 
     public function destroy(Employee $employee)

@@ -272,8 +272,6 @@ class UserController extends Controller
         $totalCostBank = $shift->totalCostBank($user->id);
         $totalCashService = $totalPaidService - $totalBankService;
         $totalCostCash = $totalCost - $totalCostBank;
-        $netCash = ($totalCashService + $totallabCash) - $totalCostCash;
-        $netBank = ($totalBankService + $totalLabBank) - $totalCostBank;
 
         $serviceRefundQuery = ReturnedRequestedService::where('user_id', $user->id)
             ->where('shift_id', $shiftId);
@@ -289,6 +287,9 @@ class UserController extends Controller
         $totalBankRefund = $serviceBankRefund + $labBankRefund;
         $totalRefund = $totalCashRefund + $totalBankRefund;
         $netTotal = ($totalPaidService + $totalLab) - $totalRefund;
+
+        $netCash = ($totalCashService + $totallabCash) - $totalCostCash - $totalCashRefund;
+        $netBank = ($totalBankService + $totalLabBank) - $totalCostBank - $totalBankRefund;
 
         $expenses = [
             'total_cash_expenses' => (float) $totalCostCash,
