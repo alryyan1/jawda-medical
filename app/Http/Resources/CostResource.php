@@ -24,6 +24,8 @@ class CostResource extends JsonResource
             'amount_bankak' => (float) $this->amount_bankak, // Bank portion
             'cost_category_id' => $this->cost_category_id,
             'cost_category_name' => $this->whenLoaded('costCategory', $this->costCategory?->name),
+            'employee_id' => $this->employee_id,
+            'employee_name' => $this->whenLoaded('employee', $this->employee?->name),
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),
         ];

@@ -4883,6 +4883,38 @@ class ReportController extends Controller
             ->header('Content-Disposition', "inline; filename=\"{$result['filename']}\"");
     }
 
+    /**
+     * Generate Shift Patients Discount PDF Report for Web (opens in new tab)
+     */
+    public function generateShiftPatientsDiscountPdfWeb(Request $request)
+    {
+        $result = \App\Services\Pdf\ShiftPatientsDiscountReport::generateFromRequest($request);
+
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], $result['status']);
+        }
+
+        return response($result['content'], 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$result['filename']}\"");
+    }
+
+    /**
+     * Generate Shift Refunds PDF Report for Web (opens in new tab)
+     */
+    public function generateShiftRefundsPdfWeb(Request $request)
+    {
+        $result = \App\Services\Pdf\ShiftRefundReport::generateFromRequest($request);
+
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], $result['status']);
+        }
+
+        return response($result['content'], 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$result['filename']}\"");
+    }
+
     // Ensure MyCustomTCPDF has drawTextWatermark and drawReportSignatures methods, or define them here
     // ... other helper methods like drawReportSignatures ...
 }

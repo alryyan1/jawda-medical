@@ -381,10 +381,11 @@ class CashReconciliationReport
             $this->pdf->SetFont('arial', 'B', 11);
             $this->pdf->SetFillColor(240, 240, 240);
             $this->pdf->SetTextColor(0, 0, 0);
-            $this->pdf->Cell($usableWidth * 0.4, 8, 'الوصف', 1, 0, 'C', true);
-            $this->pdf->Cell($usableWidth * 0.2, 8, 'النقدي', 1, 0, 'C', true);
-            $this->pdf->Cell($usableWidth * 0.2, 8, 'البنكي', 1, 0, 'C', true);
-            $this->pdf->Cell($usableWidth * 0.2, 8, 'المجموع', 1, 1, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.35, 8, 'الوصف', 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.2, 8, 'القسم', 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.15, 8, 'النقدي', 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.15, 8, 'البنكي', 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.15, 8, 'المجموع', 1, 1, 'C', true);
 
             $this->pdf->SetTextColor(0, 0, 0);
             $this->pdf->SetFont('arial', 'B', 10);
@@ -405,12 +406,16 @@ class CashReconciliationReport
                 } else {
                     $this->pdf->SetFillColor(255, 255, 255);
                 }
-                $this->pdf->Cell($usableWidth * 0.4, 7, $cost['description'], 1, 0, 'C', $rowFill);
+                $this->pdf->Cell($usableWidth * 0.35, 7, $cost['description'], 1, 0, 'C', $rowFill);
+                
+                $this->pdf->SetFont('arial', '', 9);
+                $this->pdf->Cell($usableWidth * 0.2, 7, $cost['employee']['department']['name'] ?? '-', 1, 0, 'C', $rowFill);
+                
                 $this->pdf->SetFont('arial', 'B', 10);
-                $this->pdf->Cell($usableWidth * 0.2, 7, $cost['amount'] > 0 ? number_format($cost['amount']) : '-', 1, 0, 'C', $rowFill);
-                $this->pdf->Cell($usableWidth * 0.2, 7, $cost['amount_bankak'] > 0 ? number_format($cost['amount_bankak']) : '-', 1, 0, 'C', $rowFill);
+                $this->pdf->Cell($usableWidth * 0.15, 7, $cost['amount'] > 0 ? number_format($cost['amount']) : '-', 1, 0, 'C', $rowFill);
+                $this->pdf->Cell($usableWidth * 0.15, 7, $cost['amount_bankak'] > 0 ? number_format($cost['amount_bankak']) : '-', 1, 0, 'C', $rowFill);
                 $this->pdf->SetFont('arial', 'B', 10);
-                $this->pdf->Cell($usableWidth * 0.2, 7, number_format($total), 1, 1, 'C', $rowFill);
+                $this->pdf->Cell($usableWidth * 0.15, 7, number_format($total), 1, 1, 'C', $rowFill);
                 $rowFill = !$rowFill;
             }
 
@@ -418,11 +423,11 @@ class CashReconciliationReport
             $this->pdf->SetFont('arial', 'B', 11);
             $this->pdf->SetFillColor(240, 245, 250);
             $this->pdf->SetTextColor(45, 55, 72);
-            $this->pdf->Cell($usableWidth * 0.4, 8, 'الإجمالي', 1, 0, 'R', true);
+            $this->pdf->Cell($usableWidth * 0.55, 8, 'الإجمالي', 1, 0, 'R', true);
             $this->pdf->SetFont('arial', 'B', 11);
-            $this->pdf->Cell($usableWidth * 0.2, 8, number_format($sumCash, 0), 1, 0, 'C', true);
-            $this->pdf->Cell($usableWidth * 0.2, 8, number_format($sumBank, 0), 1, 0, 'C', true);
-            $this->pdf->Cell($usableWidth * 0.2, 8, number_format($sumTotal, 0), 1, 1, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.15, 8, number_format($sumCash, 0), 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.15, 8, number_format($sumBank, 0), 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.15, 8, number_format($sumTotal, 0), 1, 1, 'C', true);
             $this->pdf->SetTextColor(0, 0, 0);
         } else {
             // Empty state with modern styling
@@ -547,7 +552,7 @@ class CashReconciliationReport
 
             // Fetch costs data
             try {
-                $costs = Cost::where('shift_id', $shiftId )->where('user_cost', $userId)->get();
+                $costs = Cost::with('employee.department')->where('shift_id', $shiftId )->where('user_cost', $userId)->get();
             } catch (\Exception $e) {
                 Log::error("Error fetching costs data: " . $e->getMessage());
                 $costs = collect([]);

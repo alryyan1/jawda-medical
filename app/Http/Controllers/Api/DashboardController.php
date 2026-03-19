@@ -10,6 +10,8 @@ use App\Models\DoctorVisit;
 use App\Models\LabRequest;
 use App\Models\RequestedService;
 use App\Models\RequestedServiceDeposit;
+use App\Models\ReturnedLabRequest;
+use App\Models\ReturnedRequestedService;
 use App\Models\Shift;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -224,17 +226,14 @@ class DashboardController extends Controller
         $labRevenueCash = (float) (clone $labRevenueBaseQuery)
             ->where('labrequests.is_bankak', 0)
             ->selectRaw('SUM(
-                labrequests.amount_paid 
-                
-                
+                CAST(labrequests.amount_paid as DECIMAL(15,2))
             ) as total_revenue')
             ->value('total_revenue') ?? 0;
 
         $labRevenueBank = (float) (clone $labRevenueBaseQuery)
             ->where('labrequests.is_bankak', 1)
             ->selectRaw('SUM(
-                labrequests.price 
-               
+                CAST(labrequests.amount_paid as DECIMAL(15,2))
             ) as total_revenue')
             ->value('total_revenue') ?? 0;
 
@@ -275,11 +274,55 @@ class DashboardController extends Controller
         $costsCash = (float) (clone $costsQuery)->sum('amount') ?? 0;
         $costsBank = (float) (clone $costsQuery)->sum('amount_bankak') ?? 0;
 
+        // Refunds (cash and bank)
+        $returnedLabQuery = ReturnedLabRequest::query();
+        $returnedServiceQuery = ReturnedRequestedService::query();
+
+        if ($targetShift) {
+            $returnedLabQuery->where('shift_id', $targetShift->id);
+            $returnedServiceQuery->where('shift_id', $targetShift->id);
+        } elseif ($date) {
+            $returnedLabQuery->whereDate('created_at', $date);
+            $returnedServiceQuery->whereDate('created_at', $date);
+        } elseif ($fromDate && $toDate) {
+            $returnedLabQuery->whereBetween('created_at', [$fromDate->copy()->startOfDay(), $toDate->copy()->endOfDay()]);
+            $returnedServiceQuery->whereBetween('created_at', [$fromDate->copy()->startOfDay(), $toDate->copy()->endOfDay()]);
+        }
+
+        $labRefundsCash = (float) (clone $returnedLabQuery)->where('returned_payment_method', 'cash')->sum('amount') ?? 0;
+        $labRefundsBank = (float) (clone $returnedLabQuery)->where('returned_payment_method', 'bank')->sum('amount') ?? 0;
+        $serviceRefundsCash = (float) (clone $returnedServiceQuery)->where('returned_payment_method', 'cash')->sum('amount') ?? 0;
+        $serviceRefundsBank = (float) (clone $returnedServiceQuery)->where('returned_payment_method', 'bank')->sum('amount') ?? 0;
+
+        $totalRefundsCash = $labRefundsCash + $serviceRefundsCash;
+        $totalRefundsBank = $labRefundsBank + $serviceRefundsBank;
+        $totalRefunds = $totalRefundsCash + $totalRefundsBank;
+
+        // Discounts
+        $labDiscounts = (float) (clone $labRevenueBaseQuery)
+            ->selectRaw('SUM(labrequests.price * labrequests.discount_per / 100) as total')
+            ->value('total') ?? 0;
+        
+        $serviceDiscountsQuery = RequestedService::query();
+        if ($targetShift) {
+            $serviceDiscountsQuery->whereHas('doctorVisit', fn($q) => $q->where('shift_id', $targetShift->id));
+        } elseif ($date) {
+            $serviceDiscountsQuery->whereDate('created_at', $date);
+        } elseif ($fromDate && $toDate) {
+            $serviceDiscountsQuery->whereBetween('created_at', [$fromDate->copy()->startOfDay(), $toDate->copy()->endOfDay()]);
+        }
+        $serviceDiscounts = (float) $serviceDiscountsQuery->selectRaw('SUM(discount + (price * count * discount_per / 100)) as total')
+            ->value('total') ?? 0;
+        $totalDiscounts = $labDiscounts + $serviceDiscounts;
+
         // Calculate totals
         $totalLabRevenue = $labRevenueCash + $labRevenueBank;
         $totalServicesRevenue = $servicesRevenueCash + $servicesRevenueBank;
         $totalCosts = $costsCash + $costsBank;
-        $net = ($totalLabRevenue + $totalServicesRevenue) - $totalCosts;
+        $net = ($totalLabRevenue + $totalServicesRevenue) - $totalCosts - $totalRefunds;
+
+        $netCash = ($labRevenueCash + $servicesRevenueCash) - $costsCash - $totalRefundsCash;
+        $netBank = ($labRevenueBank + $servicesRevenueBank) - $costsBank - $totalRefundsBank;
 
         // Patients Count
         $patientsCountQuery = DoctorVisit::query();
@@ -312,7 +355,11 @@ class DashboardController extends Controller
                     'bank' => round($costsBank, 2),
                     'total' => round($totalCosts, 2),
                 ],
+                'total_refunds' => round($totalRefunds, 2),
+                'total_discounts' => round($totalDiscounts, 2),
                 'net' => round($net, 2),
+                'net_cash' => round($netCash, 2),
+                'net_bank' => round($netBank, 2),
                 'patients_count' => $patientsCount,
             ]
         ]);

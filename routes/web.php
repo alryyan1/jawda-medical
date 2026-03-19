@@ -46,6 +46,8 @@ Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDo
 Route::get('/reports/lab-general/pdf', [ReportController::class, 'generateLabGeneralReportPdf']);
 // New: Lab shift PDF report (summary + details)
 Route::get('/reports/lab-shift/pdf', [ReportController::class, 'labShiftReportPdf']);
+Route::get('/reports/shift-patients-discount/pdf', [ReportController::class, 'generateShiftPatientsDiscountPdfWeb']);
+Route::get('/reports/shift-refunds/pdf', [ReportController::class, 'generateShiftRefundsPdfWeb']);
 Route::get('/reports/cash-reconciliation/pdf', [ReportController::class, 'generateCashReconciliationPdfWeb']);
 Route::get('/reports/cash-reconciliation/test', function() {
     return response()->json(['message' => 'Cash reconciliation route is working', 'timestamp' => now()]);

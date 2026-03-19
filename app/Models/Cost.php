@@ -59,6 +59,7 @@ class Cost extends Model
         'cost_category_id',
         'doctor_shift_id_for_sub_cost',
         'sub_service_cost_id',
+        'employee_id',
     ];
 
     /**
@@ -102,5 +103,13 @@ class Cost extends Model
     public function doctorShift()
     {
         return $this->belongsTo(DoctorShift::class);
+    }
+
+    /**
+     * Get the employee associated with this cost.
+     */
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
     }
 }
