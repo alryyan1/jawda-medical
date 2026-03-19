@@ -10,7 +10,7 @@ class EmployeeController extends Controller
 {
     public function index()
     {
-        return Employee::with('department')->orderBy('name')->get();
+        return Employee::with('department')->where('is_active', true)->orderBy('name')->get();
     }
 
     public function store(Request $request)
