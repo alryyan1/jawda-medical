@@ -4,6 +4,7 @@ namespace App\Services\Pdf;
 
 use App\Models\DoctorShift;
 use App\Models\DoctorVisit;
+use App\Models\Setting;
 use TCPDF;
 
 /**
@@ -29,7 +30,7 @@ class ClinicShiftReport extends TCPDF
         $this->setTitle('تقرير مناوبة طبيب #' . $this->doctorShift->id);
 
         // Margins
-        $this->setMargins(10, 25, 10); // L, T, R
+        $this->setMargins(10, 35, 10); // L, T, R
         $this->setHeaderMargin(5);
         $this->setFooterMargin(10);
 
@@ -53,21 +54,35 @@ class ClinicShiftReport extends TCPDF
      */
     public function Header()
     {
-        $this->setFont('arial', 'B', 16);
-        $this->SetTextColor(44, 62, 80); // Professional Dark Blue
+        $settings = Setting::first();
+        $logo_name = $settings?->header_base64;
+        $logo_path = public_path();
+
+        // Logo
+        if ($logo_name && file_exists($logo_path . '/' . $logo_name)) {
+            $this->Image($logo_path . '/' . $logo_name, $this->getPageWidth() - 40, 5, 30);
+        }
+
+        $this->SetY(10);
+        $this->setFont('arial', 'B', 18);
+        $this->SetTextColor(41, 98, 255); // Professional blue
         $this->Cell($this->pageUsableWidth, 10, 'التقرير المالي لمناوبة الطبيب', 0, 1, 'C');
 
-        $this->setFont('arial', '', 9);
-        $this->SetTextColor(0, 0, 0);
+        $this->setFont('arial', '', 10);
+        $this->SetTextColor(50, 50, 50);
 
         $colWidth = $this->pageUsableWidth / 4;
-        $this->Cell($colWidth, 6, 'التاريخ: ' . $this->doctorShift->created_at->format('Y-m-d'), 0, 0, 'R');
-        $this->Cell($colWidth, 6, 'المستخدم: ' . ($this->doctorShift->user->username ?? '-'), 0, 0, 'R');
-        $this->Cell($colWidth, 6, 'الطبيب: ' . ($this->doctorShift->doctor->name ?? '-'), 0, 0, 'R');
-        $this->Cell($colWidth, 6, 'وقت الفتح: ' . $this->doctorShift->created_at->format('h:i A'), 0, 1, 'R');
+        
+        $this->SetY(22);
+        // Add a light gray background for the header info block
+        $this->SetFillColor(248, 249, 250);
+        $this->SetDrawColor(220, 220, 220);
+        
+        $this->Cell($colWidth, 8, 'التاريخ: ' . $this->doctorShift->created_at->format('Y-m-d'), 'B', 0, 'R', true);
+        $this->Cell($colWidth, 8, 'المستخدم: ' . ($this->doctorShift->user->username ?? '-'), 'B', 0, 'R', true);
+        $this->Cell($colWidth, 8, 'الطبيب: ' . ($this->doctorShift->doctor->name ?? '-'), 'B', 0, 'R', true);
+        $this->Cell($colWidth, 8, 'وقت الفتح: ' . $this->doctorShift->created_at->format('h:i A'), 'B', 1, 'R', true);
 
-        $this->SetDrawColor(189, 195, 199);
-        $this->Line(10, $this->GetY(), 10 + $this->pageUsableWidth, $this->GetY());
         $this->Ln(2);
     }
 
@@ -76,10 +91,15 @@ class ClinicShiftReport extends TCPDF
      */
     public function Footer()
     {
-        $this->SetY(-12);
+        $this->SetY(-15);
+        
+        $this->SetDrawColor(220, 220, 220);
+        $this->Line(10, $this->GetY(), $this->getPageWidth() - 10, $this->GetY());
+        $this->Ln(2);
+
         $this->SetFont('arial', 'I', 8);
         $this->SetTextColor(127, 140, 141);
-        $this->Cell(0, 10, 'صفحة ' . $this->getAliasNumPage() . '/' . $this->getAliasNbPages(), 0, 0, 'C');
+        $this->Cell(0, 10, 'صفحة ' . $this->getAliasNumPage() . ' من ' . $this->getAliasNbPages(), 0, 0, 'C');
         $this->Cell(0, 10, 'تم الإنشاء في: ' . date('Y-m-d H:i:s'), 0, 0, 'L');
     }
 
@@ -104,28 +124,36 @@ class ClinicShiftReport extends TCPDF
 
     protected function renderFinancialSummary()
     {
-        $this->setFont('arial', 'B', 10);
+        $this->setFont('arial', 'B', 12);
+        $this->SetFillColor(240, 244, 248); // Very light blue
         $this->SetDrawColor(189, 195, 199);
+        $this->SetTextColor(44, 62, 80);
 
         $visitsCount = $this->doctorShift->visits->where('only_lab', 0)->count();
         $cashCredit = $this->doctorShift->doctor_credit_cash();
         $companyCredit = $this->doctorShift->doctor_credit_company();
 
         $width = $this->pageUsableWidth / 3;
-        $this->Cell($width, 8, 'إجمالي المرضى: ' . $visitsCount, 1, 0, 'C', false);
-        $this->Cell($width, 8, 'استحقاق نقدي: ' . number_format($cashCredit, 1), 1, 0, 'C', false);
-        $this->Cell($width, 8, 'استحقاق تأمين: ' . number_format($companyCredit, 1), 1, 1, 'C', false);
-        $this->Ln(4);
+        
+        // Add slightly taller rows for better aesthetics
+        $this->Cell($width, 10, 'إجمالي المرضى: ' . $visitsCount, 1, 0, 'C', true);
+        $this->Cell($width, 10, 'استحقاق نقدي: ' . number_format($cashCredit, 1), 1, 0, 'C', true);
+        $this->Cell($width, 10, 'استحقاق تأمين: ' . number_format($companyCredit, 1), 1, 1, 'C', true);
+        $this->Ln(6);
     }
 
     protected function renderPatientsTable()
     {
-        $this->setFont('arial', 'B', 9);
-        $this->SetTextColor(0, 0, 0); // Changed to Black
+        $this->setFont('arial', 'B', 10);
+        
+        // Header colors
+        $this->SetFillColor(230, 235, 240); // Professional header gray-blue
+        $this->SetTextColor(44, 62, 80);
+        $this->SetDrawColor(200, 205, 210);
 
         // Table Columns
         $cols = [
-            ['w' => 12, 't' => 'رقم', 'a' => 'C'],
+            ['w' => 15, 't' => 'رقم', 'a' => 'C'],
             ['w' => 50, 't' => 'اسم المريض', 'a' => 'C'],
             ['w' => 35, 't' => 'الشركة', 'a' => 'C'],
             ['w' => 22, 't' => 'إجمالي', 'a' => 'C'],
@@ -139,23 +167,33 @@ class ClinicShiftReport extends TCPDF
         foreach (array_slice($cols, 0, -1) as $c) $sumW += $c['w'];
         $cols[count($cols) - 1]['w'] = $this->pageUsableWidth - $sumW;
 
-        // Header
+        // Draw Header
         foreach ($cols as $c) {
-            $this->Cell($c['w'], 8, $c['t'], 1, 0, 'C', false);
+            $this->Cell($c['w'], 9, $c['t'], 1, 0, 'C', true);
         }
         $this->Ln();
 
         // Data Rows
-        $this->setFont('arial', '', 8.5);
+        $this->setFont('arial', '', 9);
 
         $visits = $this->doctorShift->visits->reverse()->filter(fn($v) => $v->only_lab == 0);
 
+        $rowNum = 0;
+        $alternateFillColor1 = [255, 255, 255];
+        $alternateFillColor2 = [248, 249, 250];
+
         foreach ($visits as $visit) {
+            $rowNum++;
+            $currentFillColor = ($rowNum % 2 == 0) ? $alternateFillColor2 : $alternateFillColor1;
+            $this->SetFillColorArray($currentFillColor);
+            
             if ($visit->patient->company_id) {
                 $this->SetTextColor(192, 57, 43); // Alizarin Red for insurance
+            } else {
+                $this->SetTextColor(40, 40, 40); // Dark gray for regular text
             }
 
-            $h = 6;
+            $h = 7;
             $currentDoctor = $this->doctorShift->doctor;
 
             $rowData = [
@@ -168,31 +206,51 @@ class ClinicShiftReport extends TCPDF
                 number_format($currentDoctor->doctor_credit($visit), 1),
             ];
 
+            $startX = $this->GetX();
+            $startY = $this->GetY();
+            
+            // Calc max height for cell (services can take multiple lines)
+            $servicesText = ltrim($visit->services_concatinated(), " -");
+            $servicesLines = $this->getNumLines($servicesText, $cols[7]['w']);
+            $rowHeight = max($h, $servicesLines * 5) + 2;
+
+            // Check page break
+            if ($startY + $rowHeight > $this->getPageHeight() - $this->getMargins()['bottom']) {
+                $this->AddPage();
+                $startY = $this->GetY();
+                $startX = $this->GetX();
+            }
+
             foreach ($rowData as $i => $val) {
-                $this->Cell($cols[$i]['w'], $h, $val, 'LRB', 0, $cols[$i]['a'], false);
+                // If the value is a number, we might want to align it right
+                $align = in_array($i, [3, 4, 5, 6]) ? 'C' : $cols[$i]['a'];
+                $this->MultiCell($cols[$i]['w'], $rowHeight, $val, 'LRB', $align, true, 0, null, null, true, 0, false, true, $rowHeight, 'M');
             }
 
             // Services with dynamic height
-            $this->MultiCell($cols[7]['w'], $h, $visit->services_concatinated(), 'RB', 'R', false, 1, $this->GetX(), $this->GetY(), true, 0, false, true, $h, 'M');
+            $this->SetTextColor(80, 80, 80); // Lighter text for services
+            $this->MultiCell($cols[7]['w'], $rowHeight, $servicesText, 'RB', 'R', true, 1, null, null, true, 0, false, true, $rowHeight, 'M');
 
-            $this->SetTextColor(0, 0, 0);
+            $this->SetTextColor(40, 40, 40);
         }
 
         // Totals Row
-        $this->setFont('arial', 'B', 9);
-
+        $this->setFont('arial', 'B', 10);
+        $this->SetFillColor(230, 235, 240);
+        $this->SetTextColor(44, 62, 80);
+        
         $totalServices = $this->doctorShift->total_services();
         $totalPaid = $this->doctorShift->total_paid_services();
         $totalBank = $this->doctorShift->total_bank();
         $totalDoctor = $this->doctorShift->doctor_credit_cash() + $this->doctorShift->doctor_credit_company();
 
-        $this->Cell($cols[0]['w'] + $cols[1]['w'] + $cols[2]['w'], 8, 'الإجمالي العام للمناوبة', 1, 0, 'C', false);
-        $this->Cell($cols[3]['w'], 8, number_format($totalServices, 1), 1, 0, 'C', false);
-        $this->Cell($cols[4]['w'], 8, number_format($totalPaid - $totalBank, 1), 1, 0, 'C', false);
-        $this->Cell($cols[5]['w'], 8, number_format($totalBank, 1), 1, 0, 'C', false);
-        $this->Cell($cols[6]['w'], 8, number_format($totalDoctor, 1), 1, 0, 'C', false);
-        $this->Cell($cols[7]['w'], 8, '', 1, 1, 'C', false);
-        $this->Ln(5);
+        $this->Cell($cols[0]['w'] + $cols[1]['w'] + $cols[2]['w'], 9, 'الإجمالي العام للمناوبة', 1, 0, 'C', true);
+        $this->Cell($cols[3]['w'], 9, number_format($totalServices, 1), 1, 0, 'C', true);
+        $this->Cell($cols[4]['w'], 9, number_format($totalPaid - $totalBank, 1), 1, 0, 'C', true);
+        $this->Cell($cols[5]['w'], 9, number_format($totalBank, 1), 1, 0, 'C', true);
+        $this->Cell($cols[6]['w'], 9, number_format($totalDoctor, 1), 1, 0, 'C', true);
+        $this->Cell($cols[7]['w'], 9, '', 1, 1, 'C', true);
+        $this->Ln(8);
     }
 
     protected function renderServiceCosts()
@@ -205,24 +263,36 @@ class ClinicShiftReport extends TCPDF
             $this->AddPage();
         }
 
-        $this->setFont('arial', 'B', 12);
-        $this->SetTextColor(44, 62, 80);
-        $this->Cell(0, 10, 'تفصيل مصروفات الخدمات المستقطعة', 0, 1, 'R');
-        $this->Ln(1);
+        $this->setFont('arial', 'B', 14);
+        $this->SetTextColor(41, 98, 255); // Match header color
+        $this->Cell(0, 10, 'تفاصيل مصروفات الخدمات المستقطعة', 0, 1, 'R');
+        $this->Ln(2);
 
         $col1 = $this->pageUsableWidth * 0.75;
         $col2 = $this->pageUsableWidth * 0.25;
 
         $this->setFont('arial', 'B', 10);
-        $this->SetTextColor(0, 0, 0); // Changed to black
-        $this->Cell(30, 8, 'بيان مصروف الخدمة', 1, 0, 'C', false);
-        $this->Cell(30, 8, 'المبلغ الإجمالي', 1, 1, 'C', false);
+        $this->SetFillColor(240, 244, 248);
+        $this->SetTextColor(44, 62, 80);
+        $this->SetDrawColor(200, 205, 210);
 
-        $this->SetTextColor(0, 0, 0);
+        $this->Cell(40, 8, 'بيان مصروف الخدمة', 1, 0, 'C', true);
+        $this->Cell(40, 8, 'المبلغ الإجمالي', 1, 1, 'C', true);
+
+        $this->SetTextColor(40, 40, 40);
         $this->setFont('arial', '', 9);
+        
+        $totalCosts = 0;
         foreach ($costs as $cost) {
-            $this->Cell(30, 7, $cost['name'], 1, 0, 'C', false);
-            $this->Cell(30, 7, number_format($cost['amount'], 1), 1, 1, 'C', false);
+            $this->Cell(40, 8, $cost['name'], 1, 0, 'C', false);
+            $this->Cell(40, 8, number_format($cost['amount'], 1), 1, 1, 'C', false);
+            $totalCosts += $cost['amount'];
         }
+
+        // Add a total row for service costs
+        $this->setFont('arial', 'B', 10);
+        $this->SetFillColor(245, 245, 245);
+        $this->Cell(40, 8, 'الإجمالي', 1, 0, 'C', true);
+        $this->Cell(40, 8, number_format($totalCosts, 1), 1, 1, 'C', true);
     }
 }

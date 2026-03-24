@@ -13,6 +13,7 @@ class LabGeneralReport extends MyCustomTCPDF
 
     public function __construct($results, Request $request, $userRevenues)
     {
+        // Provide spaces as the logo parameter so it relies on default headers if available.
         parent::__construct('  ');
 
         $this->results = $results;
@@ -25,9 +26,9 @@ class LabGeneralReport extends MyCustomTCPDF
         $this->SetSubject('تقرير المختبر العام');
         $this->isLab = true; // Enable footer with page numbers
 
-        // Set margins (left, top, right)
+        // Set margins
         $this->SetMargins(15, 20, 15);
-        $this->SetAutoPageBreak(true, 20);
+        $this->SetAutoPageBreak(true, 15); // compact
     }
 
     public function generate(): string
@@ -35,82 +36,67 @@ class LabGeneralReport extends MyCustomTCPDF
         $request = $this->request;
         $results = $this->results;
 
-        // Add a page
         $this->AddPage('L', 'A4');
+        $availableWidth = 267;
 
-        // Calculate available width (A4 landscape = 297mm, minus margins = 267mm)
-        $availableWidth = 267; // 297 - 15 (left) - 15 (right)
-
-        // Set default font to Arial
         $this->SetFont('arial', '', 10);
-        $this->setAutoPageBreak(true, 40);
-        // Title with better styling
-        $this->SetFont('arial', 'B', 18);
-        $this->SetTextColor(0, 0, 0);
-        $this->Cell(0, 12, 'تقرير المختبر العام', 0, 1, 'C');
-        $this->Ln(3);
+        $this->setAutoPageBreak(true, 25);
         
-        // Add a decorative line under title
-        $this->SetDrawColor(70, 130, 180);
-        $this->SetLineWidth(0.1);
+        $this->SetFont('arial', 'B', 18);
+        $this->SetTextColor(41, 98, 255); // Professional blue
+        $this->Cell(0, 10, 'تقرير المختبر العام', 0, 1, 'C');
+        
+        $this->SetDrawColor(220, 220, 220);
+        $this->SetLineWidth(0.2);
         $this->Line(15, $this->GetY(), 282, $this->GetY());
-        $this->Ln(8);
+        $this->Ln(4);
 
-        // Report period with better styling
         $this->SetFont('arial', '', 10);
-        $this->SetTextColor(60, 60, 60);
+        $this->SetTextColor(80, 80, 80);
         
         $startTime = $request->get('start_time', '00:00');
         $endTime = $request->get('end_time', '23:59');
 
         if ($request->filled('date_from') && $request->filled('date_to')) {
-            $this->Cell(0, 8, 'فترة التقرير: من ' . $request->date_from . ' ' . $startTime . ' إلى ' . $request->date_to . ' ' . $endTime, 0, 1, 'R');
+            $this->Cell(0, 6, 'فترة التقرير: من ' . $request->date_from . ' ' . $startTime . ' إلى ' . $request->date_to . ' ' . $endTime, 0, 1, 'R');
         } elseif ($request->filled('date_from')) {
-            $this->Cell(0, 8, 'من تاريخ: ' . $request->date_from . ' ' . $startTime, 0, 1, 'R');
+            $this->Cell(0, 6, 'من تاريخ: ' . $request->date_from . ' ' . $startTime, 0, 1, 'R');
         } elseif ($request->filled('date_to')) {
-            $this->Cell(0, 8, 'إلى تاريخ: ' . $request->date_to . ' ' . $endTime, 0, 1, 'R');
+            $this->Cell(0, 6, 'إلى تاريخ: ' . $request->date_to . ' ' . $endTime, 0, 1, 'R');
         }
 
-        // Shift information
         if ($request->filled('shift_id')) {
-            $this->Cell(0, 8, 'المناوبة: ' . $request->shift_id, 0, 1, 'R');
+            $this->Cell(0, 6, 'المناوبة: ' . $request->shift_id, 0, 1, 'R');
         }
         
-        // Add generation date and time
         $this->SetFont('arial', 'I', 9);
-        $this->SetTextColor(100, 100, 100);
+        $this->SetTextColor(120, 120, 120);
         $this->Cell(0, 6, 'تم إنشاء التقرير في: ' . Carbon::now()->format('Y-m-d H:i:s'), 0, 1, 'R');
-        $this->Ln(8);
+        $this->Ln(6);
 
-        // User Revenue Section
+        // Render tables
         $this->renderUserRevenueSection($availableWidth);
-
         $this->AddPage();
-        
-        // Patient Details Section
         $this->renderPatientsTable($availableWidth, $results);
 
-        // Summary section with modern styling
-        $this->Ln(12);
-        $this->AddPage();
+        $this->Ln(8);
+        $this->AddPage('P', 'A4'); // For summary, portrait is nicer, or stick with L for consistency. Let's do L.
         $this->renderSummarySection($results);
 
-        // Output PDF as string
-        $filename = 'lab_general_report_' . date('Y-m-d_H-i-s') . '.pdf';
-        return $this->Output($filename, 'S');
+        return $this->Output('lab_general_report_' . date('Y-m-d_H-i-s') . '.pdf', 'S');
     }
 
     protected function renderUserRevenueSection(float $availableWidth): void
     {
         $this->SetFont('arial', 'B', 14);
-        $this->SetFillColor(70, 130, 180);
-        $this->SetTextColor(255, 255, 255);
-        $this->Cell(0, 10, 'ايراد حسب المستخدم', 0, 0, 'C', true);
+        $this->SetTextColor(41, 98, 255);
+        $this->Cell(0, 8, 'إيراد حسب المستخدم', 0, 1, 'R');
+        $this->Ln(2);
 
-        // headers
         $this->SetFont('arial', 'B', 10);
-        $this->SetFillColor(255, 255, 255);
-        $this->SetTextColor(0, 0, 0);
+        $this->SetFillColor(240, 244, 248);
+        $this->SetTextColor(44, 62, 80);
+        $this->SetDrawColor(220, 220, 220); // Border color
         
         $userColWidths = [
             $availableWidth * 0.25,
@@ -120,13 +106,14 @@ class LabGeneralReport extends MyCustomTCPDF
             $availableWidth * 0.15
         ];
         $userHeaders = ['اسم المستخدم', 'إجمالي المدفوع', 'إجمالي التخفيض', 'إجمالي كاش', 'إجمالي بنك'];
-        for ($i = 0; $i < count($userHeaders); $i++) {
-            $this->Cell($userColWidths[$i], 8, $userHeaders[$i], 0, 0, 'C', false);
+        
+        foreach ($userColWidths as $i => $w) {
+            $this->Cell($w, 8, $userHeaders[$i], 1, 0, 'C', true);
         }
         $this->Ln();
 
-        // data rows
-        $this->SetFont('arial', '', 9);
+        $this->SetFont('arial', '', 10);
+        
         $totalUserPaid = 0;
         $totalUserDiscount = 0;
         $totalUserCash = 0;
@@ -138,42 +125,47 @@ class LabGeneralReport extends MyCustomTCPDF
             $totalUserCash += $userRevenue->total_cash;
             $totalUserBank += $userRevenue->total_bank;
 
-            if ($index % 2 == 0) {
-                $this->SetFillColor(248, 249, 250);
-            } else {
-                $this->SetFillColor(255, 255, 255);
-            }
+            $fill = ($index % 2 == 0) ? [248, 249, 250] : [255, 255, 255];
+            $this->SetFillColorArray($fill);
+            $this->SetTextColor(0, 0, 0);
 
-            $this->Cell($userColWidths[0], 8, $userRevenue->user_name, 0, 0, 'C', true);
-            $this->Cell($userColWidths[1], 8, number_format($userRevenue->total_paid, 2), 0, 0, 'C', true);
-            $this->Cell($userColWidths[2], 8, number_format($userRevenue->total_discount, 2), 0, 0, 'C', true);
-            $this->Cell($userColWidths[3], 8, number_format($userRevenue->total_cash, 2), 0, 0, 'C', true);
-            $this->Cell($userColWidths[4], 8, number_format($userRevenue->total_bank, 2), 0, 0, 'C', true);
+            $this->Cell($userColWidths[0], 8, $userRevenue->user_name, 1, 0, 'C', true);
+            $this->Cell($userColWidths[1], 8, number_format($userRevenue->total_paid, 2), 1, 0, 'C', true);
+            $this->Cell($userColWidths[2], 8, number_format($userRevenue->total_discount, 2), 1, 0, 'C', true);
+            $this->Cell($userColWidths[3], 8, number_format($userRevenue->total_cash, 2), 1, 0, 'C', true);
+            
+            if ($userRevenue->total_bank > 0) {
+                $this->SetTextColor(220, 20, 60);
+            }
+            $this->Cell($userColWidths[4], 8, number_format($userRevenue->total_bank, 2), 1, 0, 'C', true);
             $this->Ln();
         }
 
-        // totals row
+        // totals row matched to #3498db (52, 152, 219)
         $this->SetFont('arial', 'B', 10);
-        $this->SetFillColor(188, 188, 188);
-        // $this->SetTextColor(255, 255, 255);
-        $this->Cell($userColWidths[0], 8, 'الإجمالي', 1, 0, 'C', true);
-        $this->Cell($userColWidths[1], 8, number_format($totalUserPaid, 2), 0, 0, 'C', true);
-        $this->Cell($userColWidths[2], 8, number_format($totalUserDiscount, 2), 0, 0, 'C', true);
-        $this->Cell($userColWidths[3], 8, number_format($totalUserCash, 2), 0, 0, 'C', true);
-        $this->Cell($userColWidths[4], 8, number_format($totalUserBank, 2), 0, 0, 'C', true);
+        $this->SetFillColor(52, 152, 219);
+        $this->SetTextColor(255, 255, 255);
+        $this->SetDrawColor(41, 128, 185);
+        
+        $this->Cell($userColWidths[0], 9, 'الإجمالي', 1, 0, 'C', true);
+        $this->Cell($userColWidths[1], 9, number_format($totalUserPaid, 2), 1, 0, 'C', true);
+        $this->Cell($userColWidths[2], 9, number_format($totalUserDiscount, 2), 1, 0, 'C', true);
+        $this->Cell($userColWidths[3], 9, number_format($totalUserCash, 2), 1, 0, 'C', true);
+        $this->Cell($userColWidths[4], 9, number_format($totalUserBank, 2), 1, 0, 'C', true);
         $this->Ln();
     }
 
     protected function renderPatientsTable(float $availableWidth, $results): void
     {
         $this->SetFont('arial', 'B', 14);
-        $this->SetFillColor(70, 130, 180);
-        $this->SetTextColor(255, 255, 255);
-        $this->Cell(0, 10, 'تفاصيل المرضى', 0, 1, 'C', true);
+        $this->SetTextColor(41, 98, 255);
+        $this->Cell(0, 8, 'تفاصيل المرضى', 0, 1, 'R');
+        $this->Ln(2);
         
-        $this->SetFont('arial', 'B', 10);
-        $this->SetFillColor(255, 255, 255);
-        $this->SetTextColor(0, 0, 0);
+        $this->SetFont('arial', 'B', 9);
+        $this->SetFillColor(240, 244, 248);
+        $this->SetTextColor(44, 62, 80);
+        $this->SetDrawColor(220, 220, 220);
 
         $headers = [
             'رقم الزيارة', 'اسم المريض', 'الطبيب', 'إجمالي المبلغ', 'المدفوع', 'الخصم', 'المبلغ البنك', 'الشركة', 'التحاليل'
@@ -182,26 +174,26 @@ class LabGeneralReport extends MyCustomTCPDF
             $availableWidth * 0.08,
             $availableWidth * 0.15,
             $availableWidth * 0.12,
-            $availableWidth * 0.10,
-            $availableWidth * 0.10,
+            $availableWidth * 0.09,
+            $availableWidth * 0.09,
             $availableWidth * 0.08,
-            $availableWidth * 0.10,
+            $availableWidth * 0.09,
             $availableWidth * 0.12,
-            $availableWidth * 0.15
+            $availableWidth * 0.18
         ];
 
+        // Ensure widths add up exactly.
         $totalWidth = array_sum($colWidths);
-        if (abs($totalWidth - $availableWidth) > 1) {
+        if (abs($totalWidth - $availableWidth) > 0.1) {
             $colWidths[8] += ($availableWidth - $totalWidth);
         }
 
-        for ($i = 0; $i < count($headers); $i++) {
-            $this->Cell($colWidths[$i], 10, $headers[$i], 0, 0, 'C', false);
+        foreach ($colWidths as $i => $w) {
+            $this->Cell($w, 8, $headers[$i], 1, 0, 'C', true);
         }
         $this->Ln();
 
         $this->SetFont('arial', '', 9);
-        $this->SetTextColor(0, 0, 0);
 
         $totalLabAmount = 0;
         $totalPaid = 0;
@@ -214,87 +206,77 @@ class LabGeneralReport extends MyCustomTCPDF
             $totalDiscount += $patient->discount;
             $totalBank += $patient->total_amount_bank;
 
-            if ($index % 2 == 0) {
-                $this->SetFillColor(248, 249, 250);
-            } else {
-                $this->SetFillColor(255, 255, 255);
-            }
-
+            $fillColor = ($index % 2 == 0) ? [248, 249, 250] : [255, 255, 255];
             $hasDiscount = $patient->discount > 0;
             if ($hasDiscount) {
-                $this->SetFillColor(255, 248, 220);
+                $fillColor = [255, 248, 220]; // Light amber alert
             }
 
-            $this->Cell($colWidths[0], 8, $patient->doctorvisit_id, 0, 0, 'C', true);
-            $this->Cell($colWidths[1], 8, $patient->name, 0, 0, 'C', true);
-            $this->Cell($colWidths[2], 8, $patient->doctor_name, 0, 0, 'C', true,'',true);
-            $this->Cell($colWidths[3], 8, number_format($patient->total_lab_amount, 2), 0, 0, 'C', true);
-            $this->Cell($colWidths[4], 8, number_format($patient->total_paid_for_lab, 2), 0, 0, 'C', true);
-            if ($hasDiscount) {
-                $this->SetTextColor(255, 140, 0);
-            }
-            $this->Cell($colWidths[5], 8, number_format($patient->discount, 2), 0, 0, 'C', true);
-            $this->SetTextColor(0, 0, 0);
-            if ($patient->total_amount_bank > 0) {
-                $this->SetTextColor(220, 20, 60);
-            }
-            $this->Cell($colWidths[6], 8, number_format($patient->total_amount_bank, 2), 0, 0, 'C', true);
-            $this->SetTextColor(0, 0, 0);
-            $this->Cell($colWidths[7], 8, $patient->company_name ?: '-', 0, 0, 'C', true);
-            
-            $currentY = $this->GetY();
-            $this->MultiCell($colWidths[8], 8, $patient->main_tests_names, 0, 'C', true);
-            $newY = $this->GetY();
-            $this->SetXY($this->GetX() + $colWidths[8], $currentY);
+            $this->SetFillColorArray($fillColor);
+            $this->SetTextColor(40, 40, 40);
 
-            if ($newY > $currentY + 8) {
-                $rowHeight = $newY - $currentY;
-                $this->SetXY(15, $currentY);
-                    $this->Cell($colWidths[0], $rowHeight, $patient->doctorvisit_id, 0, 0, 'C', true);
-                $this->Cell($colWidths[1], $rowHeight, $patient->name, 0, 0, 'C', true);
-                $this->Cell($colWidths[2], $rowHeight, $patient->doctor_name, 0, 0, 'C', true);
-                $this->Cell($colWidths[3], $rowHeight, number_format($patient->total_lab_amount, 2), 0, 0, 'C', true);
-                $this->Cell($colWidths[4], $rowHeight, number_format($patient->total_paid_for_lab, 2), 0, 0, 'C', true);
-                if ($hasDiscount) {
-                    $this->SetTextColor(255, 140, 0);
-                }
-                $this->Cell($colWidths[5], $rowHeight, number_format($patient->discount, 2), 1, 0, 'C', true);
-                $this->SetTextColor(0, 0, 0);
-                if ($patient->total_amount_bank > 0) {
-                    $this->SetTextColor(220, 20, 60);
-                }
-                $this->Cell($colWidths[6], $rowHeight, number_format($patient->total_amount_bank, 2), 1, 0, 'C', true);
-                $this->SetTextColor(0, 0, 0);
-                $this->Cell($colWidths[7], $rowHeight, $patient->company_name ?: '-', 1, 0, 'C', true);
-                $this->SetXY(15 + array_sum(array_slice($colWidths, 0, 8)), $currentY);
-                $this->MultiCell($colWidths[8], 8, $patient->main_tests_names, 1, 'C', true);
+            $rowData = [
+                $patient->doctorvisit_id,
+                $patient->name,
+                $patient->doctor_name,
+                number_format($patient->total_lab_amount, 2),
+                number_format($patient->total_paid_for_lab, 2),
+                number_format($patient->discount, 2),
+                number_format($patient->total_amount_bank, 2),
+                $patient->company_name ?: '-',
+            ];
+
+            // Calc height required for tests column
+            $testsText = trim((string)$patient->main_tests_names);
+            $lines = $this->getNumLines($testsText, $colWidths[8]);
+            $h = 7;
+            $rowHeight = max($h, $lines * 5) + 2;
+
+            if ($this->GetY() + $rowHeight > $this->getPageHeight() - $this->getMargins()['bottom']) {
+                $this->AddPage();
             }
-            
-            $this->Ln();
+
+            foreach ($rowData as $i => $val) {
+                if ($i == 5 && $hasDiscount) {
+                    $this->SetTextColor(255, 140, 0); // Orange
+                } elseif ($i == 6 && $patient->total_amount_bank > 0) {
+                    $this->SetTextColor(220, 20, 60); // Red
+                } else {
+                    $this->SetTextColor(40, 40, 40); // Standard
+                }
+                
+                $this->MultiCell($colWidths[$i], $rowHeight, $val, 1, 'C', true, 0, null, null, true, 0, false, true, $rowHeight, 'M');
+            }
+
+            $this->SetTextColor(80, 80, 80);
+            $this->MultiCell($colWidths[8], $rowHeight, $testsText, 1, 'R', true, 1, null, null, true, 0, false, true, $rowHeight, 'M');
         }
 
         // Totals row
         $this->SetFont('arial', 'B', 10);
-        $this->SetFillColor(50, 50, 50);
+        $this->SetFillColor(52, 152, 219);
         $this->SetTextColor(255, 255, 255);
-        $this->Cell($colWidths[0] + $colWidths[1] + $colWidths[2], 10, 'الإجمالي', 0, 0, 'C', true);
-        $this->Cell($colWidths[3], 10, number_format($totalLabAmount, 2), 0, 0, 'C', true);
-        $this->Cell($colWidths[4], 10, number_format($totalPaid, 2), 0, 0, 'C', true);
-        $this->Cell($colWidths[5], 10, number_format($totalDiscount, 2), 0, 0, 'C', true);
-        $this->Cell($colWidths[6], 10, number_format($totalBank, 2), 0, 0, 'C', true);
-        $this->Cell($colWidths[7] + $colWidths[8], 10, '', 0, 0, 'C', true);
+        $this->SetDrawColor(41, 128, 185);
+
+        $this->Cell($colWidths[0] + $colWidths[1] + $colWidths[2], 9, 'الإجمالي', 1, 0, 'C', true);
+        $this->Cell($colWidths[3], 9, number_format($totalLabAmount, 2), 1, 0, 'C', true);
+        $this->Cell($colWidths[4], 9, number_format($totalPaid, 2), 1, 0, 'C', true);
+        $this->Cell($colWidths[5], 9, number_format($totalDiscount, 2), 1, 0, 'C', true);
+        $this->Cell($colWidths[6], 9, number_format($totalBank, 2), 1, 0, 'C', true);
+        $this->Cell($colWidths[7] + $colWidths[8], 9, '', 1, 0, 'C', true);
         $this->Ln();
     }
 
     protected function renderSummarySection($results): void
     {
         $this->SetFont('arial', 'B', 14);
-        $this->SetFillColor(70, 130, 180);
-        $this->SetTextColor(255, 255, 255);
-        $this->Cell(0, 10, 'ملخص التقرير', 0, 1, 'C', true);
+        $this->SetTextColor(41, 98, 255);
+        $this->Cell(0, 8, 'ملخص التقرير', 0, 1, 'R');
+        $this->Ln(2);
         
-        $this->SetFont('arial', '', 11);
-        $this->SetTextColor(0, 0, 0);
+        $this->SetFont('arial', 'B', 11);
+        $this->SetTextColor(44, 62, 80);
+        $this->SetDrawColor(220, 220, 220);
 
         $totalLabAmount = $results->sum('total_lab_amount');
         $totalPaid = $results->sum('total_paid_for_lab');
@@ -302,22 +284,22 @@ class LabGeneralReport extends MyCustomTCPDF
         $totalBank = $results->sum('total_amount_bank');
 
         $summaryItems = [
-            'إجمالي المرضى: ' . $results->count(),
-            'إجمالي مبلغ المختبر: ' . number_format($totalLabAmount, 2) . ' ',
-            'إجمالي المدفوع: ' . number_format($totalPaid, 2) . ' ',
-            'إجمالي الخصم: ' . number_format($totalDiscount, 2) . ' ',
-            'إجمالي المبلغ البنك: ' . number_format($totalBank, 2) . ' '
+            'إجمالي المرضى' => $results->count(),
+            'إجمالي مبلغ المختبر' => number_format($totalLabAmount, 2),
+            'إجمالي المدفوع' => number_format($totalPaid, 2),
+            'إجمالي الخصم' => number_format($totalDiscount, 2),
+            'إجمالي المبلغ البنك' => number_format($totalBank, 2)
         ];
         
-        foreach ($summaryItems as $index => $item) {
-            if ($index % 2 == 0) {
-                $this->SetFillColor(248, 249, 250);
-            } else {
-                $this->SetFillColor(255, 255, 255);
-            }
-            $this->Cell(0, 8, $item, 0, 0, 'R', true);
+        $i = 0;
+        foreach ($summaryItems as $label => $val) {
+            $fill = ($i % 2 == 0) ? [248, 249, 250] : [255, 255, 255];
+            $this->SetFillColorArray($fill);
+            
+            // Render label on right, value on left. Or right-aligned.
+            $this->Cell(80, 10, $label, 1, 0, 'R', true);
+            $this->Cell(60, 10, $val, 1, 1, 'C', true);
+            $i++;
         }
     }
 }
-
-

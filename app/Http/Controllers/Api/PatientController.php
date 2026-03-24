@@ -37,7 +37,6 @@ use App\Models\Company;
 use App\Services\RequestedServiceHelper;
 use Illuminate\Support\Facades\Http as HttpClient;
 use App\Jobs\EmitPatientRegisteredJob;
-use App\Jobs\SendWelcomeSmsJob;
 use App\Models\Setting;
 use App\Services\UltramsgService;
 use App\Jobs\SendAuthWhatsappMessage;
@@ -259,21 +258,7 @@ class PatientController extends Controller
 
             // Queue non-blocking actions after successful commit
             DB::afterCommit(function () use ($patient) {
-                $settings = Setting::first();
-
-                $hasPhone = is_string($patient->phone) ? trim($patient->phone) !== '' : !empty($patient->phone);
-                $welcomeOn = (bool) ($settings?->send_welcome_message ?? false);
-
-                if ($hasPhone && $welcomeOn) {
-                    SendWelcomeSmsJob::dispatch($patient->id, (string)$patient->phone, (string)$patient->name);
-                }
-                Log::info($settings);
-                Log::info(sprintf(
-                    'Welcome SMS check -> hasPhone: %s, welcomeOn: %s, phone: "%s"',
-                    $hasPhone ? 'true' : 'false',
-                    $welcomeOn ? 'true' : 'false',
-                    (string) $patient->phone
-                ));
+                EmitPatientRegisteredJob::dispatch($patient->id);
             });
 
             return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file', 'sampleCollectedBy']));
@@ -1549,9 +1534,6 @@ class PatientController extends Controller
             // Queue non-blocking actions after successful commit
             DB::afterCommit(function () use ($newPatient) {
                 EmitPatientRegisteredJob::dispatch($newPatient->id);
-                if (!empty($newPatient->phone)) {
-                    SendWelcomeSmsJob::dispatch($newPatient->id, $newPatient->phone, $newPatient->name);
-                }
             });
 
             // Load the doctorVisit relationship for the new patient
