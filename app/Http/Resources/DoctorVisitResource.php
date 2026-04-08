@@ -250,6 +250,8 @@ class DoctorVisitResource extends JsonResource
                     'amount_paid' => (float) ($service->amount_paid ?? 0),
                     'is_paid' => (bool) ($service->is_paid ?? false),
                     'done' => (bool) ($service->done ?? false),
+                    'done_by_user_name' => $service->doneByUser?->name,
+                    'done_at' => $service->done_at?->toIso8601String(),
                 ];
             });
         });

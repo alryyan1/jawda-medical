@@ -75,6 +75,8 @@ class SettingResource extends JsonResource
             'settings_enable_Sms_front' => (bool) $this->settings_enable_Sms_front,
             'prevent_backdated_entry' => (bool) $this->prevent_backdated_entry,
             'whatsapp_number' => $this->whatsapp_number,
+            'whatsapp_result_template_name' => $this->whatsapp_result_template_name,
+            'whatsapp_result_language_code' => $this->whatsapp_result_language_code,
             'pdf_header_type' => $this->pdf_header_type,
             'pdf_header_logo_position' => $this->pdf_header_logo_position,
             'pdf_header_logo_width' => (int) $this->pdf_header_logo_width,

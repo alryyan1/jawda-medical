@@ -103,6 +103,7 @@ class VisitServiceController extends Controller
                 'depositUser:id,name',
                 'performingDoctor:id,name',
                 'costBreakdown.subServiceCost', // Eager load actual cost breakdown
+                'doneByUser:id,name',
             ])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -314,6 +315,7 @@ class VisitServiceController extends Controller
             'endurance' => 'sometimes|numeric|min:0', // Allow updating endurance if rules permit
             // Add other editable fields like 'doctor_note', 'nurse_note', 'approval'
             'approval' => 'sometimes|boolean',
+            'done' => 'sometimes|boolean',
             'doctor_note' => 'nullable|string|max:1000',
             'nurse_note' => 'nullable|string|max:1000',
         ]);
@@ -345,7 +347,17 @@ class VisitServiceController extends Controller
         }
 
 
+        if (\array_key_exists('done', $validated)) {
+            if ($validated['done']) {
+                $validated['done_by_user_id'] = Auth::id();
+                $validated['done_at'] = now();
+            } else {
+                $validated['done_by_user_id'] = null;
+                $validated['done_at'] = null;
+            }
+        }
+
         $requestedService->update($validated);
-        return new RequestedServiceResource($requestedService->load(['service.serviceGroup', 'requestingUser']));
+        return new RequestedServiceResource($requestedService->load(['service.serviceGroup', 'requestingUser', 'doneByUser']));
     }
 }

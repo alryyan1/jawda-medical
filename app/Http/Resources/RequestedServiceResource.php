@@ -24,6 +24,8 @@ class RequestedServiceResource extends JsonResource {
             'doctor_note' => $this->doctor_note,
             'nurse_note' => $this->nurse_note,
             'done' => (bool) $this->done,
+            'done_by_user' => new UserStrippedResource($this->whenLoaded('doneByUser')),
+            'done_at' => $this->done_at?->toIso8601String(),
             'approval' => (bool) $this->approval,
             'created_at' => $this->created_at?->toIso8601String(),
             'returned_refunds' => ReturnedRequestedServiceResource::collection($this->whenLoaded('returnedRefunds')),

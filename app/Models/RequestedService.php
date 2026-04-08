@@ -91,6 +91,8 @@ class RequestedService extends Model
         'doctor_note',
         'nurse_note',
         'done',
+        'done_by_user_id',
+        'done_at',
         'approval',
     ];
 
@@ -104,6 +106,7 @@ class RequestedService extends Model
         'bank' => 'boolean',
         'count' => 'integer',
         'done' => 'boolean',
+        'done_at' => 'datetime',
         'approval' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -130,6 +133,11 @@ class RequestedService extends Model
     public function depositUser() // User who made the last/main deposit perhaps
     {
         return $this->belongsTo(User::class, 'user_deposited');
+    }
+
+    public function doneByUser()
+    {
+        return $this->belongsTo(User::class, 'done_by_user_id');
     }
 
     public function performingDoctor()
