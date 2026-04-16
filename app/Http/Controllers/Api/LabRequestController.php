@@ -1034,6 +1034,7 @@ class LabRequestController extends Controller
                         'device_id' => $dnr->device_id,
                         'device_name' => $dnr->device->name ?? null,
                         'normal_range' => $dnr->normal_range,
+                        'is_default' => (bool) $dnr->is_default,
                     ])->filter(fn($dnr) => $dnr['normal_range'] !== '')->values()->all(),
                     'result_id' => $existingResult->id ?? null,
                     'result_value' => $existingResult->result ?? null,
