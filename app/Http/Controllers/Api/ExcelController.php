@@ -66,11 +66,13 @@ class ExcelController extends Controller
         })->whereBetween('created_at', [$startDate, $endDate])->get();
         
         $count = $patients->count() + 6;
-        // Dynamic service-group columns will start after our fixed columns (C..J), so from K onward
-        $letters = ['K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+        // Dynamic service-group columns start at K (col 11), after fixed cols C(3)..J(10).
+        // Use Coordinate::stringFromColumnIndex so AA, AB… work when groups exceed 16.
+        $colIdx = fn(int $offset) => \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($offset);
+        $fixedEnd = 10; // J
         $start_col_name = 'C';
-        $end_col_name = $letters[$serviceGroups->count()];
-        $last_col_name = $letters[$serviceGroups->count() + 1];
+        $end_col_name   = $colIdx($fixedEnd + $serviceGroups->count());      // التحمل
+        $last_col_name  = $colIdx($fixedEnd + $serviceGroups->count() + 1);  // الإجمالي
 
         $spreadsheet->getProperties()->setTitle('مطالبه التامين');
         $spreadsheet->getActiveSheet()->mergeCells('F2:I2');
@@ -147,7 +149,7 @@ class ExcelController extends Controller
         // Add service group headers and formulas
         $index = 0;
         foreach ($serviceGroups as $service_group) {
-            $letter = $letters[$index];
+            $letter = $colIdx($fixedEnd + 1 + $index);
             $spreadsheet->getActiveSheet()->setCellValue($letter . "5", $service_group->name);
             $spreadsheet->getActiveSheet()->setCellValue($letter . $count + 1, "=SUM($letter" . "6:" . $letter . "$count)");
             $spreadsheet->getActiveSheet()->getStyle($letter . $count + 1)->getFont()->setSize(20);
@@ -193,7 +195,7 @@ class ExcelController extends Controller
 
                 // Set comment for services
                 if ($total > 0) {
-                    $comment = $spreadsheet->getActiveSheet()->getComment($letters[$innerIndex] . $startRow + $index);
+                    $comment = $spreadsheet->getActiveSheet()->getComment($colIdx($fixedEnd + 1 + $innerIndex) . $startRow + $index);
                     $comment->getText()->createTextRun($patient->services_concatinated());
                     $comment->setAuthor('Ryan');
                 }

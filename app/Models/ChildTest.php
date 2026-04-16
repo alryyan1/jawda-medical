@@ -94,4 +94,9 @@ class ChildTest extends Model
     {
         return $this->hasMany(ChildTestOption::class);
     }
+
+    public function deviceNormalRanges()
+    {
+        return $this->hasMany(DeviceChildTestNormalRange::class, 'child_test_id');
+    }
 }

@@ -628,7 +628,7 @@ class LabRequestController extends Controller
      */
     public function availableTestsForVisit(Request $request, DoctorVisit $visit)
     {
-        $requestedTestIds = $visit->patient()->pluck('main_test_id')->toArray();
+        $requestedTestIds = $visit->labRequests()->pluck('main_test_id')->toArray();
         $availableTests = MainTest::where('available', true)
             ->whereNotIn('id', $requestedTestIds)
             ->orderBy('main_test_name')
@@ -833,7 +833,7 @@ class LabRequestController extends Controller
                     return [(int) $key => (float) $value];
                 });
             foreach ($validated['main_test_ids'] as $mainTestId) {
-                $mainTest = MainTest::with('childTests.unit')->find($mainTestId); // Eager load child tests and their units
+                $mainTest = MainTest::with(['childTests.unit', 'childTests.deviceNormalRanges' => fn($q) => $q->where('is_default', true)])->find($mainTestId);
                 if (!$mainTest)
                     continue;
 
@@ -933,7 +933,9 @@ class LabRequestController extends Controller
                             'child_test_id' => $childTest->id,
                             'result' => '', // Initial empty result
                             // Capture normal range and unit AT THE TIME OF REQUEST
-                            'normal_range' => $childTest->normalRange ?? ($childTest->low !== null && $childTest->upper !== null ? $childTest->low . ' - ' . $childTest->upper : null),
+                            'normal_range' => $childTest->deviceNormalRanges->firstWhere('is_default', true)?->normal_range
+                                ?? $childTest->normalRange
+                                ?? ($childTest->low !== null && $childTest->upper !== null ? $childTest->low . ' - ' . $childTest->upper : null),
                             'unit_id' => $childTest->unit?->id, // From eager loaded unit
                             'created_at' => now(),
                             'updated_at' => now(),
@@ -990,7 +992,8 @@ class LabRequestController extends Controller
                     'childTests' => fn($q_ct) => $q_ct->orderBy('test_order')->orderBy('child_test_name'),
                     'childTests.unit:id,name',
                     'childTests.childGroup:id,name',
-                    'childTests.options:id,child_test_id,name'
+                    'childTests.options:id,child_test_id,name',
+                    'childTests.deviceNormalRanges.device:id,name'
                 ]);
             },
             'results.childTest:id,child_test_name', // Needed to map existing results to child tests
@@ -1026,6 +1029,12 @@ class LabRequestController extends Controller
                     'child_group_name' => $childTest->childGroup->name ?? null,
                     'child_group' => $childTest->childGroup ? ['id' => $childTest->childGroup->id, 'name' => $childTest->childGroup->name] : null,
                     'options' => $childTest->options->map(fn($opt) => ['id' => $opt->id, 'name' => $opt->name, 'child_test_id' => $opt->child_test_id])->all(),
+                    'device_normal_ranges' => $childTest->deviceNormalRanges->map(fn($dnr) => [
+                        'id' => $dnr->id,
+                        'device_id' => $dnr->device_id,
+                        'device_name' => $dnr->device->name ?? null,
+                        'normal_range' => $dnr->normal_range,
+                    ])->filter(fn($dnr) => $dnr['normal_range'] !== '')->values()->all(),
                     'result_id' => $existingResult->id ?? null,
                     'result_value' => $existingResult->result ?? null,
                     'result_flags' => $existingResult->flags ?? null,

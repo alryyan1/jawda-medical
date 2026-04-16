@@ -48,6 +48,7 @@ use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PatientController;
+use App\Http\Controllers\Api\PatientMedicalHistoryController;
 use App\Http\Controllers\Api\PdfSettingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RequestedServiceCostController;
@@ -243,6 +244,8 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/clinic-active-patients', [ClinicWorkspaceController::class, 'getActivePatients']);
   Route::get('/admission-patients-by-date', [ClinicWorkspaceController::class, 'getAdmissionPatientsByDate']);
   Route::get('/patients/{patient}/admission', [AdmissionController::class, 'getPatientActiveAdmission']);
+  Route::get('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'show']);
+  Route::put('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'update']);
 
   // Doctor Visits
   Route::put('/doctor-visits/{doctorVisit}/status', [DoctorVisitController::class, 'updateStatus']);
@@ -855,12 +858,15 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/visits/{doctorvisit}/lab-barcode/pdf', [ReportController::class, 'printBarcodeWithViewer']);
   // Devices
   Route::get('/devices-list', [DeviceController::class, 'indexList']);
-  Route::post('/devices', [DeviceController::class, 'store']); // If you add device creation dialog
+  Route::post('/devices', [DeviceController::class, 'store']);
+  Route::put('/devices/{device}', [DeviceController::class, 'update']);
+  Route::delete('/devices/{device}', [DeviceController::class, 'destroy']);
   // NEW route for lab reception queue
   Route::get('/lab/reception-queue', [LabRequestController::class, 'getNewlyRegisteredLabPendingQueue']);
   // Device Specific Normal Ranges for Child Tests
   Route::get('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'getNormalRange']);
   Route::post('/child-tests/{child_test}/devices/{device}/normal-range', [DeviceChildTestNormalRangeController::class, 'storeOrUpdateNormalRange']);
+  Route::get('/child-tests/{child_test}/device-normal-ranges', [DeviceChildTestNormalRangeController::class, 'listForChildTest']);
   Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
   Route::get('/visits/{visit}/lab-invoice/pdf', [ReportController::class, 'generateLabInvoicePdf']);
   Route::get('/visits/{visit}/lab-sample-labels/pdf', [ReportController::class, 'generateLabSampleLabelPdf']);
