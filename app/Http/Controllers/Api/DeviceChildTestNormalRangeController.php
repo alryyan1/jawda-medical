@@ -34,7 +34,7 @@ class DeviceChildTestNormalRangeController extends Controller
     public function storeOrUpdateNormalRange(Request $request, ChildTest $childTest, Device $device)
     {
         $validated = $request->validate([
-            'normal_range' => 'required|string|max:255',
+            'normal_range' => 'required|string',
             'is_default'   => 'sometimes|boolean',
         ]);
 
