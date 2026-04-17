@@ -103,6 +103,9 @@ class MainTestController extends Controller
             'is_special_test' => 'sometimes|boolean',
             'conditions' => 'sometimes|string',
             'timer' => 'sometimes|integer',
+            'hide_unit' => 'sometimes|boolean',
+            'allow_sorting' => 'sometimes|boolean',
+            'default_comment' => 'sometimes|nullable|string',
         ]);
         if ($request->has('is_special_test')) {
             $validatedData['is_special_test'] = (bool) $request->boolean('is_special_test');
@@ -112,6 +115,12 @@ class MainTestController extends Controller
         }
         if ($request->has('timer')) {
             $validatedData['timer'] = $request->timer;
+        }
+        if ($request->has('hide_unit')) {
+            $validatedData['hide_unit'] = (bool) $request->boolean('hide_unit');
+        }
+        if ($request->has('allow_sorting')) {
+            $validatedData['allow_sorting'] = (bool) $request->boolean('allow_sorting');
         }
         $mainTest = MainTest::create($validatedData);
         return new MainTestResource($mainTest->load('container'));
@@ -136,6 +145,8 @@ class MainTestController extends Controller
             'conditions' => 'sometimes|string',
             'timer' => 'sometimes|integer',
             'hide_unit' => 'sometimes|boolean',
+            'allow_sorting' => 'sometimes|boolean',
+            'default_comment' => 'sometimes|nullable|string',
         ]);
         if ($request->has('is_special_test')) {
             $validatedData['is_special_test'] = (bool) $request->boolean('is_special_test');
@@ -148,6 +159,9 @@ class MainTestController extends Controller
         }
         if ($request->has('hide_unit')) {
             $validatedData['hide_unit'] = (bool) $request->boolean('hide_unit');
+        }
+        if ($request->has('allow_sorting')) {
+            $validatedData['allow_sorting'] = (bool) $request->boolean('allow_sorting');
         }
         $mainTest->update($validatedData);
         return new MainTestResource($mainTest->load('container'));

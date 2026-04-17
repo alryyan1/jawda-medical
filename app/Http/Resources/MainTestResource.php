@@ -25,6 +25,8 @@ class MainTestResource extends JsonResource
             'conditions' => $this->conditions,
             'timer' => $this->timer,
             'hide_unit' => (bool) $this->hide_unit,
+            'allow_sorting' => (bool) $this->allow_sorting,
+            'default_comment' => $this->default_comment,
             'child_tests' => ChildTestResource::collection($this->whenLoaded('childTests')),
 
             // Include timestamps if your model has them

@@ -27,6 +27,7 @@ class LabRequestResource extends JsonResource
             'discount_per' => (int) $this->discount_per,
             'is_bankak' => (bool) $this->is_bankak,
             'comment' => $this->comment, // Comment for the LabRequest itself
+            'image_url' => $this->image_path ? asset('storage/' . $this->image_path) : null,
             'user_requested' => $this->user_requested,
             'requesting_user_name' => $this->whenLoaded('requestingUser', optional($this->requestingUser)->name),
             'user_deposited' => $this->user_deposited,

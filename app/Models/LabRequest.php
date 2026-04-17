@@ -71,6 +71,7 @@ class LabRequest extends Model
         'discount_per',
         'is_bankak',
         'comment',
+        'image_path',
         'user_requested',
         'user_deposited',
         'approve', // Overall authorization flag for the request

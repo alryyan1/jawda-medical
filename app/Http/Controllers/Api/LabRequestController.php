@@ -31,6 +31,8 @@ use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log; // For logging errors
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class LabRequestController extends Controller
 {
@@ -1794,5 +1796,36 @@ class LabRequestController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function uploadImage(Request $request, LabRequest $labRequest)
+    {
+        $request->validate([
+            'image' => 'required|file|mimes:jpg,jpeg,png,webp|max:5120',
+        ]);
+
+        if ($labRequest->image_path) {
+            Storage::delete('public/' . $labRequest->image_path);
+        }
+
+        $ext      = $request->file('image')->getClientOriginalExtension();
+        $filename = Str::uuid() . '.' . $ext;
+        $request->file('image')->storeAs('public/lab-images', $filename);
+
+        $labRequest->update(['image_path' => 'lab-images/' . $filename]);
+
+        return response()->json([
+            'image_url' => asset('storage/lab-images/' . $filename),
+        ]);
+    }
+
+    public function removeImage(LabRequest $labRequest)
+    {
+        if ($labRequest->image_path) {
+            Storage::delete('public/' . $labRequest->image_path);
+            $labRequest->update(['image_path' => null]);
+        }
+
+        return response()->json(['message' => 'removed']);
     }
 }

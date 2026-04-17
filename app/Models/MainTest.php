@@ -53,6 +53,8 @@ class MainTest extends Model
         'conditions',
         'timer',
         'hide_unit',
+        'allow_sorting',
+        'default_comment',
     ];
 
     protected $casts = [
@@ -64,6 +66,7 @@ class MainTest extends Model
         'conditions' => 'string',
         'timer' => 'integer',
         'hide_unit' => 'boolean',
+        'allow_sorting' => 'boolean',
     ];
 
     // Timestamps are NOT in your main_tests schema by default. If you added them:

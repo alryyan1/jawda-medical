@@ -7,7 +7,6 @@ use App\Models\Package;
 use App\Models\Setting;
 use App\Mypdf\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class LabResultReport
 {
@@ -452,6 +451,8 @@ class LabResultReport
             $this->renderComments($pdf, $m_test, $page_width);
             $this->addVerticalSpacing($pdf, $this->smallSpacing);
 
+            $this->renderLabRequestImage($pdf, $m_test, $page_width);
+
             $this->renderOrganisms($pdf, $m_test, $col_number, $column_width ?? 0);
             $this->addVerticalSpacing($pdf, $this->sectionSpacing);
         }
@@ -499,7 +500,21 @@ class LabResultReport
         $index_to_start_new_column = 0;
         $children_count_with_result_empty = 0;
 
-        foreach ($m_test->results as $result) {
+        $results = $m_test->results;
+        if ($m_test->mainTest?->allow_sorting) {
+            $childTestIds = \App\Models\ChildTest::whereIn('id', $results->pluck('child_test_id')->filter())
+                ->orderByRaw('(test_order IS NULL OR test_order = 0) ASC, test_order ASC, child_test_name ASC')
+                ->pluck('id')
+                ->toArray();
+
+            $byChildTestId = $results->keyBy('child_test_id');
+            $results = collect($childTestIds)
+                ->map(fn($id) => $byChildTestId->get($id))
+                ->filter()
+                ->values();
+        }
+
+        foreach ($results as $result) {
             if ($result->result == '') {
                 $children_count_with_result_empty++;
                 continue;
@@ -1310,24 +1325,61 @@ class LabResultReport
      */
     private function renderComments($pdf, $m_test, $page_width): void
     {
-        if (str_word_count($m_test->comment) > 0) {
-            // Ensure there is room for the comment label and content
-            $estimated = $this->measureTextHeight($pdf, $page_width, (string)$m_test->comment, $this->baseLineHeight) + $this->headerSpacing + $this->smallSpacing;
-            $this->ensureSpaceFor($pdf, $estimated);
-            $pdf->SetFont('arial', 'u', 14, '', true);
-            $pdf->resetColumns();
-            if ($m_test->mainTest->divided == 1) {
-                $pdf->Ln(15);
-            } else {
-
-                $pdf->Ln(5);
-            }
-            $pdf->cell(20, 5, "Comment", 0, 1, 'C'); // bcforh
-            $y = $pdf->GetY();
-            $pdf->SetFont('arial', 'b', 12, '', true);
-            $pdf->MultiCell($page_width, 5, "♠ " . $m_test->comment, 0, "", 0);
-            $pdf->SetFont('arial', '', 12, '', true);
+        // Collect comment lines: per-request comment first, then default_comment from MainTest
+        $lines = [];
+        if (str_word_count((string) $m_test->comment) > 0) {
+            $lines[] = $m_test->comment;
         }
+        $defaultComment = trim((string) ($m_test->mainTest->default_comment ?? ''));
+        if ($defaultComment !== '') {
+            $lines[] = $defaultComment;
+        }
+
+        if (empty($lines)) {
+            return;
+        }
+
+        $combined = implode("\n", $lines);
+        $estimated = $this->measureTextHeight($pdf, $page_width, $combined, $this->baseLineHeight) + $this->headerSpacing + $this->smallSpacing;
+        $this->ensureSpaceFor($pdf, $estimated);
+        $pdf->SetFont('arial', 'u', 14, '', true);
+        $pdf->resetColumns();
+        if ($m_test->mainTest->divided == 1) {
+            $pdf->Ln(15);
+        } else {
+            $pdf->Ln(5);
+        }
+        $pdf->cell(20, 5, "Comment", 0, 1, 'C');
+        $pdf->SetFont('arial', 'b', 12, '', true);
+        $pdf->MultiCell($page_width, 5, "♠ " . $combined, 0, "", 0);
+        $pdf->SetFont('arial', '', 12, '', true);
+    }
+
+    /**
+     * Render attached image for a lab request (if any)
+     */
+    private function renderLabRequestImage($pdf, $m_test, $page_width): void
+    {
+        if (empty($m_test->image_path)) {
+            return;
+        }
+
+        $imgPath = storage_path('app/public/' . $m_test->image_path);
+        if (!file_exists($imgPath)) {
+            return;
+        }
+
+        [$iw, $ih] = getimagesize($imgPath);
+        $maxW  = $page_width * 0.7;
+        $maxH  = 80;
+        $scale = min($maxW / $iw, $maxH / $ih, 1);
+        $w     = $iw * $scale;
+        $h     = $ih * $scale;
+
+        $this->ensureSpaceFor($pdf, $h + $this->sectionSpacing);
+        $x = PDF_MARGIN_LEFT + ($page_width - $w) / 2;
+        $pdf->Image($imgPath, $x, $pdf->GetY(), $w, $h, '', '', '', true, 150);
+        $pdf->Ln($h + $this->smallSpacing);
     }
 
     /**

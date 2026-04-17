@@ -503,6 +503,8 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/labrequests/{labrequest}/pay', [LabRequestController::class, 'recordPayment']);
   Route::post('/labrequests/{labrequest}/refunds', [ReturnedLabRequestController::class, 'store']);
   Route::post('/labrequests/{labrequest}/authorize', [LabRequestController::class, 'authorizeResults']);
+  Route::post('/labrequests/{labRequest}/upload-image', [LabRequestController::class, 'uploadImage']);
+  Route::delete('/labrequests/{labRequest}/remove-image', [LabRequestController::class, 'removeImage']);
 
   Route::get('/lab/ready-for-print-queue', [LabRequestController::class, 'getLabReadyForPrintQueue']);
   Route::get('/lab/unfinished-results-queue', [LabRequestController::class, 'getLabUnfinishedResultsQueue']);
