@@ -132,13 +132,24 @@ class ClinicShiftReport extends TCPDF
         $visitsCount = $this->doctorShift->visits->where('only_lab', 0)->count();
         $cashCredit = $this->doctorShift->doctor_credit_cash();
         $companyCredit = $this->doctorShift->doctor_credit_company();
+        $totalPaid = $this->doctorShift->total_paid_services();
+        $serviceCosts = array_sum(array_column($this->doctorShift->shift_service_costs(), 'amount'));
+        $netCenter = $totalPaid - $cashCredit - $companyCredit - $serviceCosts;
 
-        $width = $this->pageUsableWidth / 3;
-        
-        // Add slightly taller rows for better aesthetics
+        $width = $this->pageUsableWidth / 4;
+
         $this->Cell($width, 10, 'إجمالي المرضى: ' . $visitsCount, 1, 0, 'C', true);
         $this->Cell($width, 10, 'استحقاق نقدي: ' . number_format($cashCredit, 1), 1, 0, 'C', true);
-        $this->Cell($width, 10, 'استحقاق تأمين: ' . number_format($companyCredit, 1), 1, 1, 'C', true);
+        $this->Cell($width, 10, 'استحقاق تأمين: ' . number_format($companyCredit, 1), 1, 0, 'C', true);
+
+        // Net center cell with highlighted green background
+        $this->SetFillColor(39, 174, 96);
+        $this->SetTextColor(255, 255, 255);
+        $this->Cell($width, 10, 'صافي المركز: ' . number_format($netCenter, 1), 1, 1, 'C', true);
+
+        // Reset colors
+        $this->SetFillColor(240, 244, 248);
+        $this->SetTextColor(44, 62, 80);
         $this->Ln(6);
     }
 
@@ -154,12 +165,13 @@ class ClinicShiftReport extends TCPDF
         // Table Columns
         $cols = [
             ['w' => 15, 't' => 'رقم', 'a' => 'C'],
-            ['w' => 50, 't' => 'اسم المريض', 'a' => 'C'],
-            ['w' => 35, 't' => 'الشركة', 'a' => 'C'],
-            ['w' => 22, 't' => 'إجمالي', 'a' => 'C'],
-            ['w' => 22, 't' => 'نقداً', 'a' => 'C'],
-            ['w' => 22, 't' => 'بنك', 'a' => 'C'],
-            ['w' => 25, 't' => 'حصة الطبيب', 'a' => 'C'],
+            ['w' => 45, 't' => 'اسم المريض', 'a' => 'C'],
+            ['w' => 30, 't' => 'الشركة', 'a' => 'C'],
+            ['w' => 20, 't' => 'إجمالي', 'a' => 'C'],
+            ['w' => 20, 't' => 'نقداً', 'a' => 'C'],
+            ['w' => 20, 't' => 'بنك', 'a' => 'C'],
+            ['w' => 22, 't' => 'حصة الطبيب', 'a' => 'C'],
+            ['w' => 22, 't' => 'صافي المركز', 'a' => 'C'],
             ['w' => 0,  't' => 'الخدمات *', 'a' => 'C'],
         ];
 
@@ -196,6 +208,9 @@ class ClinicShiftReport extends TCPDF
             $h = 7;
             $currentDoctor = $this->doctorShift->doctor;
 
+            $doctorCredit = $currentDoctor->doctor_credit($visit);
+            $netCenter = $visit->total_paid_services() - $doctorCredit;
+
             $rowData = [
                 $visit->number,
                 $visit->patient->name ?? '-',
@@ -203,33 +218,31 @@ class ClinicShiftReport extends TCPDF
                 number_format($visit->total_services($currentDoctor), 1),
                 number_format($visit->total_paid_services() - $visit->bankak_service(), 1),
                 number_format($visit->bankak_service(), 1),
-                number_format($currentDoctor->doctor_credit($visit), 1),
+                number_format($doctorCredit, 1),
+                number_format($netCenter, 1),
             ];
 
-            $startX = $this->GetX();
             $startY = $this->GetY();
-            
+
             // Calc max height for cell (services can take multiple lines)
             $servicesText = ltrim($visit->services_concatinated(), " -");
-            $servicesLines = $this->getNumLines($servicesText, $cols[7]['w']);
+            $servicesLines = $this->getNumLines($servicesText, $cols[8]['w']);
             $rowHeight = max($h, $servicesLines * 5) + 2;
 
             // Check page break
             if ($startY + $rowHeight > $this->getPageHeight() - $this->getMargins()['bottom']) {
                 $this->AddPage();
                 $startY = $this->GetY();
-                $startX = $this->GetX();
             }
 
             foreach ($rowData as $i => $val) {
-                // If the value is a number, we might want to align it right
-                $align = in_array($i, [3, 4, 5, 6]) ? 'C' : $cols[$i]['a'];
+                $align = in_array($i, [3, 4, 5, 6, 7]) ? 'C' : $cols[$i]['a'];
                 $this->MultiCell($cols[$i]['w'], $rowHeight, $val, 'LRB', $align, true, 0, null, null, true, 0, false, true, $rowHeight, 'M');
             }
 
             // Services with dynamic height
             $this->SetTextColor(80, 80, 80); // Lighter text for services
-            $this->MultiCell($cols[7]['w'], $rowHeight, $servicesText, 'RB', 'R', true, 1, null, null, true, 0, false, true, $rowHeight, 'M');
+            $this->MultiCell($cols[8]['w'], $rowHeight, $servicesText, 'RB', 'R', true, 1, null, null, true, 0, false, true, $rowHeight, 'M');
 
             $this->SetTextColor(40, 40, 40);
         }
@@ -243,13 +256,15 @@ class ClinicShiftReport extends TCPDF
         $totalPaid = $this->doctorShift->total_paid_services();
         $totalBank = $this->doctorShift->total_bank();
         $totalDoctor = $this->doctorShift->doctor_credit_cash() + $this->doctorShift->doctor_credit_company();
+        $totalNetCenter = $totalPaid - $totalDoctor;
 
         $this->Cell($cols[0]['w'] + $cols[1]['w'] + $cols[2]['w'], 9, 'الإجمالي العام للمناوبة', 1, 0, 'C', true);
         $this->Cell($cols[3]['w'], 9, number_format($totalServices, 1), 1, 0, 'C', true);
         $this->Cell($cols[4]['w'], 9, number_format($totalPaid - $totalBank, 1), 1, 0, 'C', true);
         $this->Cell($cols[5]['w'], 9, number_format($totalBank, 1), 1, 0, 'C', true);
         $this->Cell($cols[6]['w'], 9, number_format($totalDoctor, 1), 1, 0, 'C', true);
-        $this->Cell($cols[7]['w'], 9, '', 1, 1, 'C', true);
+        $this->Cell($cols[7]['w'], 9, number_format($totalNetCenter, 1), 1, 0, 'C', true);
+        $this->Cell($cols[8]['w'], 9, '', 1, 1, 'C', true);
         $this->Ln(8);
     }
 

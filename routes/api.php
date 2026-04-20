@@ -130,15 +130,6 @@ Route::post('/hl7-client/toggle', [\App\Http\Controllers\Api\HL7ClientController
 // Public PDF route for Doctors List (opens in new tab)
 Route::get('/reports/doctors-list/pdf', [ReportController::class, 'exportDoctorsListToPdf']);
 
-/*
-|--------------------------------------------------------------------------
-| Queue Worker Routes (No Authentication Required)
-|--------------------------------------------------------------------------
-*/
-Route::get('/queue-worker/status', [\App\Http\Controllers\Api\QueueWorkerController::class, 'status']);
-Route::post('/queue-worker/start', [\App\Http\Controllers\Api\QueueWorkerController::class, 'start']);
-Route::post('/queue-worker/stop', [\App\Http\Controllers\Api\QueueWorkerController::class, 'stop']);
-Route::post('/queue-worker/toggle', [\App\Http\Controllers\Api\QueueWorkerController::class, 'toggle']);
 Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
 Route::apiResource('main-tests', MainTestController::class);
 Route::get('/visits/{visit}/lab-requests', [LabRequestController::class, 'indexForVisit']);
