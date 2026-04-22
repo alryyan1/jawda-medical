@@ -124,6 +124,8 @@ class Setting extends Model
         'lab_name',
         'hospital_name',
         'firestore_result_collection',
+        'firebase_upload_target',
+        'block_auth_on_empty_results',
         'disable_doctor_service_check',
         'phone',
         'gov',
@@ -199,6 +201,8 @@ class Setting extends Model
         'is_footer' => 'boolean',
         'is_logo' => 'boolean',
         'firestore_result_collection' => 'string',
+        'firebase_upload_target' => 'string',
+        'block_auth_on_empty_results' => 'boolean',
         'disable_doctor_service_check' => 'boolean',
         'gov' => 'boolean', // Or 'integer' if it's an ID to a govs table
         'country' => 'boolean', // Or 'integer' if it's an ID to a countries table

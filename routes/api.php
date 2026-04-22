@@ -274,6 +274,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']);
   Route::get('/service-groups-with-services', [ServiceGroupController::class, 'getGroupsWithServices']);
   Route::apiResource('services', ServiceController::class);
+  Route::get('services/{service}/price-history', [ServiceController::class, 'priceHistory']);
 
   /*
     |--------------------------------------------------------------------------

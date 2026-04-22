@@ -2,7 +2,9 @@
 namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Service;
+use App\Models\ServicePriceHistory;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Resources\ServiceResource;
 use App\Http\Resources\ServiceCollection; // If you create one for pagination
 use Illuminate\Support\Facades\DB;
@@ -56,8 +58,34 @@ class ServiceController extends Controller
             'activate' => 'sometimes|required|boolean',
             'variable' => 'sometimes|required|boolean',
         ]);
+        if (isset($validatedData['price']) && (float) $validatedData['price'] !== (float) $service->price) {
+            ServicePriceHistory::create([
+                'service_id' => $service->id,
+                'user_id'    => Auth::id(),
+                'old_price'  => $service->price,
+                'new_price'  => $validatedData['price'],
+            ]);
+        }
+
         $service->update($validatedData);
         return new ServiceResource($service->load('serviceGroup'));
+    }
+
+    public function priceHistory(Service $service)
+    {
+        $history = ServicePriceHistory::where('service_id', $service->id)
+            ->with('user:id,name')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn($h) => [
+                'id'         => $h->id,
+                'old_price'  => (float) $h->old_price,
+                'new_price'  => (float) $h->new_price,
+                'user_name'  => $h->user?->name ?? 'غير معروف',
+                'changed_at' => $h->created_at->format('Y-m-d H:i'),
+            ]);
+
+        return response()->json($history);
     }
 
     public function destroy(Service $service)

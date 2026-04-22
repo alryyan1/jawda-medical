@@ -845,7 +845,7 @@ class LabRequestController extends Controller
                     continue;
                 }
                 if ($mainTest->available == false) {
-                    return response()->json(['message' => 'الفحص غير متوفر.'], 400);
+                    return response()->json(['message' => 'الفحص غير متوفر.'.$mainTest->main_test_name], 400);
                 }
 
                 // Prefer override price if provided (e.g., from an Offer's per-test price)

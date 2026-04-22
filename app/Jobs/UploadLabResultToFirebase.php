@@ -82,18 +82,43 @@ class UploadLabResultToFirebase implements ShouldQueue
                 return;
             }
 
-            // Generate filename
+            // Determine upload targets from settings
+            $settings = \App\Models\Setting::first();
+            $uploadTarget = $settings->firebase_upload_target ?? 'sales';
+            $targets = $uploadTarget === 'both' ? ['sales', 'hospital'] : [$uploadTarget];
+
             $filename = "result.pdf";
             $firebasePath = "results/{$this->hospitalName}/{$this->visitId}/{$filename}";
 
-            // Delete old file if it exists
-            $this->deleteOldFileFromFirebase($firebasePath);
+            $downloadUrl = null;
 
-            // Upload to Firebase using HTTP API
-            $downloadUrl = $this->uploadToFirebase($pdfContent, $firebasePath);
+            foreach ($targets as $target) {
+                $serviceAccountPath = $target === 'hospital'
+                    ? storage_path('app/hospital-firebase-service-account.json')
+                    : config('firebase.service_account_path');
 
-            // Store download URL in Firestore
-            $this->storeResultUrlInFirestore($this->visitId, $downloadUrl, $patient->name, $patient->phone ?? '');
+                $projectId = $target === 'hospital'
+                    ? $this->getProjectIdFromServiceAccount($serviceAccountPath)
+                    : config('firebase.project_id');
+
+                $storageBucket = $target === 'hospital'
+                    ? $this->getStorageBucketFromServiceAccount($serviceAccountPath, $projectId)
+                    : config('firebase.storage_bucket');
+
+                Log::info("Uploading to Firebase target: {$target}, project: {$projectId}");
+
+                $url = $this->uploadToFirebaseTarget($pdfContent, $firebasePath, $serviceAccountPath, $storageBucket, $projectId);
+
+                if ($target === 'sales') {
+                    $downloadUrl = $url;
+                    $this->storeResultUrlInFirestore($this->visitId, $url, $patient->name, $patient->phone ?? '', $serviceAccountPath, $projectId);
+                }
+            }
+
+            // Use sales URL if available, otherwise hospital URL
+            if (!$downloadUrl) {
+                $downloadUrl = $url ?? '';
+            }
 
             // Update patient with result_url
             $patient->update(['result_url' => $downloadUrl]);
@@ -164,114 +189,90 @@ class UploadLabResultToFirebase implements ShouldQueue
     }
 
     /**
-     * Delete old file from Firebase Storage if it exists
+     * Upload to a specific Firebase target (sales or hospital).
      */
-    private function deleteOldFileFromFirebase(string $firebasePath): void
-    {
-        // Check if Firebase service account file exists
-        $serviceAccountPath = config('firebase.service_account_path');
-
+    private function uploadToFirebaseTarget(
+        string $fileContent,
+        string $firebasePath,
+        string $serviceAccountPath,
+        string $storageBucket,
+        string $projectId
+    ): string {
         if (!file_exists($serviceAccountPath)) {
-            throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}. Please configure Firebase properly.");
+            throw new \Exception("Firebase service account not found: {$serviceAccountPath}");
         }
 
-        // Initialize Firebase
-        $firebase = $this->initializeFirebase();
-        $storage = $firebase->createStorage();
-        $bucketName = config('firebase.storage_bucket');
-        $bucket = $storage->getBucket($bucketName);
+        $factory = (new Factory)
+            ->withServiceAccount($serviceAccountPath)
+            ->withProjectId($projectId);
 
-        // Check if file exists and delete it
-        $object = $bucket->object($firebasePath);
-        if ($object->exists()) {
-            $object->delete();
-            Log::info("Deleted old file from Firebase Storage", [
-                'firebase_path' => $firebasePath
-            ]);
-        } else {
-            Log::info("No old file found to delete", [
-                'firebase_path' => $firebasePath
-            ]);
-        }
-    }
+        $storage = $factory->createStorage();
+        $bucket = $storage->getBucket($storageBucket);
 
-    /**
-     * Upload file to Firebase Storage using Firebase Admin SDK
-     */
-    private function uploadToFirebase(string $fileContent, string $firebasePath): string
-    {
-        // Check if Firebase service account file exists
-        $serviceAccountPath = config('firebase.service_account_path');
+        Log::info("Using Firebase bucket: {$storageBucket}");
 
-        if (!file_exists($serviceAccountPath)) {
-            throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}. Please configure Firebase properly.");
+        try {
+            $existing = $bucket->object($firebasePath);
+            if ($existing->exists()) {
+                $existing->delete();
+            }
+        } catch (\Throwable $e) {
+            // ignore if not found
         }
 
-        // Initialize Firebase
-        $firebase = $this->initializeFirebase();
-        $storage = $firebase->createStorage();
-
-        // Debug: Log the bucket name being used
-        $bucketName = config('firebase.storage_bucket');
-        Log::info("Using Firebase bucket: " . $bucketName);
-
-        $bucket = $storage->getBucket($bucketName); // Use specific bucket
-
-        // Upload file to Firebase Storage
         $object = $bucket->upload($fileContent, [
             'name' => $firebasePath,
             'metadata' => [
                 'contentType' => 'application/pdf',
                 'cacheControl' => 'public, max-age=31536000',
-            ]
+            ],
         ]);
-        $object->acl()->add('allUsers', 'READER');
-        // Public URL
-        $publicUrl = self::generatePublicUrl($firebasePath);
 
-        return $publicUrl;
+        try {
+            $object->acl()->add('allUsers', 'READER');
+        } catch (\Throwable $e) {
+            // uniform bucket-level access may be enabled
+        }
+
+        return "https://storage.googleapis.com/{$storageBucket}/{$firebasePath}";
     }
 
+    /**
+     * Read project_id from a service account JSON file.
+     */
+    private function getProjectIdFromServiceAccount(string $path): string
+    {
+        $data = json_decode(file_get_contents($path), true);
+        return $data['project_id'] ?? '';
+    }
 
     /**
-     * Generate public URL for Firebase Storage object
-     *
-     * @param string $firebasePath
-     * @return string
+     * Derive the default storage bucket name from a project ID.
+     */
+    private function getStorageBucketFromServiceAccount(string $path, string $projectId): string
+    {
+        return "{$projectId}.firebasestorage.app";
+    }
+
+    /**
+     * Generate public URL for Firebase Storage object (sales project, kept for backward compat).
      */
     public static function generatePublicUrl(string $firebasePath): string
     {
-        // Check if Firebase service account file exists
         $serviceAccountPath = config('firebase.service_account_path');
 
         if (!file_exists($serviceAccountPath)) {
-            throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}. Please configure Firebase properly.");
+            throw new \Exception("Firebase service account file not found at: {$serviceAccountPath}.");
         }
 
-        // Initialize Firebase
         $factory = (new Factory)
             ->withServiceAccount($serviceAccountPath)
             ->withProjectId(config('firebase.project_id'));
 
         $storage = $factory->createStorage();
-        $bucketName = config('firebase.storage_bucket');
-        $bucket = $storage->getBucket($bucketName);
+        $bucket = $storage->getBucket(config('firebase.storage_bucket'));
 
         return "https://storage.googleapis.com/" . $bucket->name() . "/" . $firebasePath;
-    }
-
-    /**
-     * Initialize Firebase Admin SDK
-     */
-    private function initializeFirebase()
-    {
-        $serviceAccountPath = config('firebase.service_account_path');
-
-        $factory = (new Factory)
-            ->withServiceAccount($serviceAccountPath)
-            ->withProjectId(config('firebase.project_id'));
-
-        return $factory;
     }
 
     /**
@@ -286,10 +287,11 @@ class UploadLabResultToFirebase implements ShouldQueue
      * @param string $patientPhone
      * @return void
      */
-    private function storeResultUrlInFirestore(int $doctorVisitId, string $resultUrl, string $patientName, string $patientPhone): void
+    private function storeResultUrlInFirestore(int $doctorVisitId, string $resultUrl, string $patientName, string $patientPhone, ?string $serviceAccountPath = null, ?string $projectId = null): void
     {
         try {
-            $projectId = config('firebase.project_id');
+            $serviceAccountPath = $serviceAccountPath ?? config('firebase.service_account_path');
+            $projectId = $projectId ?? config('firebase.project_id');
             if (!$projectId) {
                 Log::warning('Firebase project ID not configured for Firestore update');
                 return;
