@@ -2,17 +2,9 @@
 
 use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\ReportController;
-use App\Http\Controllers\Api\WhatsAppCloudApiController;
-use App\Http\Controllers\LabResultController;
 use App\Http\Controllers\WebHookController;
-use App\Models\DoctorShift;
-use App\Models\Hl7Message;
-use App\Models\Patient;
-use App\Models\Shift;
-use App\Services\HL7\Devices\SysmexCbcInserter;
-use App\Services\HL7\Devices\ZybioHandler;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\InsuranceReportController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,120 +16,38 @@ use App\Http\Controllers\InsuranceReportController;
 | be assigned to the "web" middleware group. Make something great!
 |
 */
-// http://127.0.0.1/jawda-medical/public/reports/clinic-shift-summary/pdf?shift=2
-// http://192.168.100.12/jawda-medical/public/api/reports/clinic-shift-summary/pdf?shift=201
-Route::get('/api/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
-Route::get('/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
-Route::get('/reports/clinic-report-old/pdf', [ReportController::class, 'clinicReport_old']);
-// reports/doctor-shifts/10/financial-summary/pdf
-Route::get('/reports/doctor-shifts/{doctor}/financial-summary/pdf', [ReportController::class, 'clinicReport']);
-   Route::get('/reports/company/{company}/service-contracts/pdf', [ReportController::class, 'generateCompanyServiceContractPdf']);
-    Route::get('/reports/company/{company}/test-contracts/pdf', [ReportController::class, 'generateCompanyMainTestContractPdf']);
-    Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
 
-Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
-// Insurance report (web)
-Route::get('/reports/insurance/pdf', [InsuranceReportController::class, 'insuranceReport']);
 Route::get('/', function () {
     return view('welcome');
 });
+
+// PDF Report Routes
+Route::get('/api/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
+Route::get('/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
+Route::get('/reports/doctor-shifts/{doctor}/financial-summary/pdf', [ReportController::class, 'clinicReport']);
+Route::get('/reports/company/{company}/service-contracts/pdf', [ReportController::class, 'generateCompanyServiceContractPdf']);
+Route::get('/reports/company/{company}/test-contracts/pdf', [ReportController::class, 'generateCompanyMainTestContractPdf']);
+Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
 Route::get('/reports/doctor-shifts/pdf', [ReportController::class, 'doctorShiftsReportPdf']);
+Route::get('/reports/insurance/pdf', [InsuranceReportController::class, 'insuranceReport']);
 Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
 Route::get('/reports/lab-general/pdf', [ReportController::class, 'generateLabGeneralReportPdf']);
-// New: Lab shift PDF report (summary + details)
 Route::get('/reports/lab-shift/pdf', [ReportController::class, 'labShiftReportPdf']);
 Route::get('/reports/shift-patients-discount/pdf', [ReportController::class, 'generateShiftPatientsDiscountPdfWeb']);
 Route::get('/reports/shift-refunds/pdf', [ReportController::class, 'generateShiftRefundsPdfWeb']);
 Route::get('/reports/cash-reconciliation/pdf', [ReportController::class, 'generateCashReconciliationPdfWeb']);
-Route::get('/reports/cash-reconciliation/test', function() {
-    return response()->json(['message' => 'Cash reconciliation route is working', 'timestamp' => now()]);
-});
-Route::get('/reports/cash-reconciliation/shifts', function() {
-    $shifts = \App\Models\Shift::orderBy('id', 'desc')->limit(10)->get(['id', 'name', 'created_at']);
-    return response()->json(['shifts' => $shifts]);
-});
-Route::get('/test/{phoneNumber?}', [WhatsAppCloudApiController::class, 'testGetResultUrlByPhone'])->defaults('phoneNumber', '249991961111');
-///api/visits/10664/lab-report/pdf
-Route::get('/visits/{visit}/lab-report/pdf', [ReportController::class, 'result']);
-// Route::get('/visits/{doctorvisit}/lab-report/pdf', [ReportController::class, 'generateLabVisitReportPdf']);
-Route::get('/visits/{id}/lab-report-old/pdf', [ReportController::class, 'result']);
-
-Route::get('/reports/doctor-shifts/test',function(){
-    $doctorShifts = DoctorShift::whereRaw('Date(created_at) between ? and ?', ['2025-06-24','2025-06-24'])->get();
-    return $doctorShifts;
-});
 Route::get('/reports/companies/pdf', [CompanyReportController::class, 'exportAllCompaniesPdf']);
+Route::get('/visits/{visit}/lab-report/pdf', [ReportController::class, 'result']);
+
+// Excel
+Route::get('/excel/reclaim', [\App\Http\Controllers\Api\ExcelController::class, 'reclaim']);
+
+// Webhooks
 Route::get('/webhook', [WebHookController::class, 'webhook']);
 Route::post('/webhook', [WebHookController::class, 'webhook']);
 
-// Excel reclaim route for web access
-Route::get('/excel/reclaim', [\App\Http\Controllers\Api\ExcelController::class, 'reclaim']);
-
-//send from firebase storage using visit_id and settings.storage_name
+// WhatsApp / Ultramsg
 Route::get('/ultramsg/send-document-from-firebase', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFirebase']);
 
-//phpinfo
-Route::get('/phpinfo', function () {
-    phpinfo();
-});
-
-// Test send text message online
-Route::get('/ultramsg/send-text-message-online', function () {
-    $service = new \App\Services\UltramsgService();
-    $settings = \App\Models\Setting::first();
-
-    $response = $service->sendTextMessageOnline(
-        $settings->ultramsg_instance_id,
-        $settings->ultramsg_token,
-        '249991961111',
-        'Hello, this is a test message'
-    );
-
-    // Return the actual JSON/body from Ultramsg instead of the Response object metadata
-    return response()->json([
-        'status' => $response->status(),
-        'body'   => $response->json() ?? $response->body(),
-    ]);
-});
-
-// Simple page to check Firebase configuration & connection
+// Firebase debug
 Route::get('/firebase-check', [\App\Http\Controllers\FirebaseDebugController::class, 'index']);
-
-Route::get('/hl7', function () {
-    // return 123;
-    //get hl7 message from hl7_messages table
-    $hl7Message = Hl7Message::find(1);
-    $hl  = preg_replace('/\s+/', '', $hl7Message->raw_message);
-    $row = substr($hl,strpos($hl,'MSH'));
-    // $correctedMessage = ZybioHandler::correctHl7MessageFormat($hl7Message->raw_message);
-
-    // $hl7Message = new Aranyasen\Hl7\Message($correctedMessage);
-    // $msh = $hl7Message->getSegmentByIndex(0);
-    // return $msh->getField(49);
-    $hl7Message = new Aranyasen\HL7\Message($row);
-    dd($hl7Message);
-    
-    // return $hl7Message;
-    // return $hl7Message;
-    // $removed_white_space = preg_replace('/\s+/', '', $hl7Message);
-    // var_dump($hl7Message->raw_message);
-    //parse hl7 message using aranyasen/hl7
-    // return $removed_white_space;
-    $hl7Message = new  Aranyasen\HL7\Message($hl7Message);
-    dd($hl7Message);
-    $msh = $hl7Message->getSegmentByIndex(0);
-    // return $msh->getField(33); patient id for akon
-    // return $msh->getFields();
-    // return $msh->getField(25); //patient id for bc6800
-
-    // return $hl7Message->getSegmentsByName('MSH');
-
-    //get msh segment
-    // $msh = $hl7Message->getSegments();
-    //get msh fields
-    // $mshFields = $msh->getFields();
-    //get msh fields
-    // return $hl7Message;
-
-    
-});

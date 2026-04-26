@@ -13,6 +13,21 @@ class StorePatientRequest extends FormRequest
         return true; // Or add specific authorization logic
     }
 
+    /**
+     * Prepare the data for validation.
+     * This runs BEFORE the rules() method.
+     */
+    protected function prepareForValidation(): void
+    {
+        $phone = $this->input('phone');
+
+        // If the phone number exists and starts with 249, remove the first 3 characters
+        if ($phone && str_starts_with($phone, '249')) {
+            $this->merge([
+                'phone' => substr($phone, 3),
+            ]);
+        }
+    }
     public function rules(): array
     {
         return [
@@ -58,7 +73,7 @@ class StorePatientRequest extends FormRequest
             'insurance_no.max' => 'رقم التأمين يجب أن يكون أقصر من 255 حرف.',
             'guarantor.max' => 'الموظف المؤمن عليه يجب أن يكون أقصر من 255 حرف.',
             'notes.max' => 'الملاحظات يجب أن يكون أقصر من 1000 حرف.',
-            
+
             // ... other custom messages
         ];
     }
