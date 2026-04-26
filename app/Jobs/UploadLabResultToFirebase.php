@@ -59,9 +59,12 @@ class UploadLabResultToFirebase implements ShouldQueue
                 return;
             }
 
-            // Log if patient already has result_url (we will overwrite it)
+            // If patient already has a result_url, clear it from Firestore before re-uploading
+            // so clients don't read a stale URL while the new PDF is being written.
+            // Firebase Storage deletion is handled inside uploadToFirebaseTarget().
             if ($patient->result_url) {
-                Log::info("Patient {$this->patientId} already has result_url, will overwrite: {$patient->result_url}");
+                Log::info("Patient {$this->patientId} already has result_url, clearing Firestore URL before re-upload: {$patient->result_url}");
+                $this->clearResultUrlInFirestore($this->visitId);
             }
 
             // Get doctor visit
@@ -487,6 +490,62 @@ class UploadLabResultToFirebase implements ShouldQueue
             'patient:' . $this->patientId,
             'visit:' . $this->visitId,
         ];
+    }
+
+    /**
+     * Clear the result_url field in Firestore before a re-upload so clients
+     * never read a stale URL while the new PDF is being written to Storage.
+     */
+    private function clearResultUrlInFirestore(int $doctorVisitId): void
+    {
+        try {
+            $projectId = config('firebase.project_id');
+            if (!$projectId) {
+                Log::warning('clearResultUrlInFirestore: Firebase project ID not configured');
+                return;
+            }
+
+            $accessToken = FirebaseService::getAccessToken();
+            if (!$accessToken) {
+                Log::warning('clearResultUrlInFirestore: Could not obtain Firebase access token');
+                return;
+            }
+
+            $settings = Setting::first();
+            $collection = $settings->firestore_result_collection;
+            if (!$collection) {
+                Log::warning('clearResultUrlInFirestore: firestore_result_collection not set in settings');
+                return;
+            }
+
+            $documentId = (string) $doctorVisitId;
+            $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}/{$documentId}";
+
+            // PATCH with updateMask clears only result_url, leaving all other fields intact.
+            $response = Http::withToken($accessToken)->patch(
+                $url . '?updateMask.fieldPaths=result_url',
+                ['fields' => ['result_url' => ['nullValue' => null]]]
+            );
+
+            if ($response->successful()) {
+                Log::info("Cleared result_url from Firestore before re-upload", [
+                    'collection' => $collection,
+                    'document_id' => $documentId,
+                ]);
+            } else {
+                Log::warning("clearResultUrlInFirestore: PATCH returned non-success", [
+                    'collection' => $collection,
+                    'document_id' => $documentId,
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                ]);
+            }
+        } catch (\Exception $e) {
+            // Non-fatal — log and continue with the upload.
+            Log::warning("clearResultUrlInFirestore failed: " . $e->getMessage(), [
+                'doctor_visit_id' => $doctorVisitId,
+            ]);
+        }
     }
 
     /**
