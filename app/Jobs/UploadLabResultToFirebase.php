@@ -227,7 +227,7 @@ class UploadLabResultToFirebase implements ShouldQueue
             'name' => $firebasePath,
             'metadata' => [
                 'contentType' => 'application/pdf',
-                'cacheControl' => 'public, max-age=31536000',
+                'cacheControl' => 'no-cache, no-store, must-revalidate',
             ],
         ]);
 
@@ -237,7 +237,9 @@ class UploadLabResultToFirebase implements ShouldQueue
             // uniform bucket-level access may be enabled
         }
 
-        return "https://storage.googleapis.com/{$storageBucket}/{$firebasePath}";
+        // Append a version timestamp so the stored URL changes on every re-upload,
+        // ensuring patient.result_url is always updated and clients bypass their cache.
+        return "https://storage.googleapis.com/{$storageBucket}/{$firebasePath}?v=" . time();
     }
 
     /**
