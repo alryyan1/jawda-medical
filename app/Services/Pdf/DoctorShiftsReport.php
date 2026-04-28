@@ -163,16 +163,16 @@ class DoctorShiftsReport
      */
     private function setupTable(MyCustomTCPDF $pdf, string $defaultFont, bool $isRTL): void
     {
-        $headers = ['Specialist', 'Doctor', 'Patients', 'Total Paid', 'Total Entl.', 'Cash Entl.', 'Ins. Entl.', 'Net'];
+        $headers = ['Specialist', 'Doctor', 'Patients', 'Total Paid', 'Returns', 'Total Entl.', 'Cash Entl.', 'Ins. Entl.', 'Net'];
 
         if ($isRTL) {
-            $headers = ['التخصص', 'الطبيب', 'عدد المرضى', 'إجمالي المدفوع', 'إجمالي المستحق', 'استحقاق (كاش)', 'استحقاق (تأمين)', 'الصافي'];
+            $headers = ['التخصص', 'الطبيب', 'عدد المرضى', 'إجمالي المدفوع', 'المسترد', 'إجمالي المستحق', 'استحقاق (كاش)', 'استحقاق (تأمين)', 'الصافي'];
         }
 
         $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-        $colWidths = [45, 60, 25, 35, 35, 35, 20, 20];
+        $colWidths = [40, 50, 20, 30, 25, 30, 30, 30, 20];
         $colWidths[count($colWidths) - 1] = $pageUsableWidth - \array_sum(\array_slice($colWidths, 0, -1));
-        $alignments = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'];
+        $alignments = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'];
 
         $pdf->SetTableDefinition($headers, $colWidths, $alignments);
         $pdf->DrawTableHeader(null, null, null, 6);
@@ -191,10 +191,10 @@ class DoctorShiftsReport
         // Slightly larger font for readability
         $pdf->SetFont($pdf->getDefaultFontFamily(), '', 12);
         $fill = false;
-        $grandTotals = ['patients' => 0, 'total_paid' => 0, 'total_entl' => 0, 'cash_entl' => 0, 'ins_entl' => 0, 'net' => 0];
+        $grandTotals = ['patients' => 0, 'total_paid' => 0, 'returns' => 0, 'total_entl' => 0, 'cash_entl' => 0, 'ins_entl' => 0, 'net' => 0];
 
         $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-        $colWidths = [45, 60, 25, 35, 35, 35, 20, 20];
+        $colWidths = [40, 50, 20, 30, 25, 30, 30, 30, 20];
         $colWidths[count($colWidths) - 1] = $pageUsableWidth - \array_sum(\array_slice($colWidths, 0, -1));
 
         $pdf->SetFillColor(246, 248, 252);
@@ -205,13 +205,14 @@ class DoctorShiftsReport
             $staticWage  = (!$ds->status && $ds->doctor) ? (float) $ds->doctor->static_wage : 0;
             $totalEntl   = $cashEntl + $insEntl + $staticWage;
             
-            // Total paid is now net of returns for consistency
-            $totalPaid     = $ds->total_paid_services() - $ds->total_returns();
+            $totalPaid     = $ds->total_paid_services();
+            $totalReturns  = $ds->total_returns();
             $net           = $ds->hospital_credit();
             $patientsCount = $ds->visits->count();
 
             $grandTotals['patients']   += $patientsCount;
             $grandTotals['total_paid'] += $totalPaid;
+            $grandTotals['returns']    += $totalReturns;
             $grandTotals['net']        += $net;
             $grandTotals['total_entl'] += $totalEntl;
             $grandTotals['cash_entl']  += $cashEntl;
@@ -222,6 +223,7 @@ class DoctorShiftsReport
                 $ds->doctor?->name ?? 'N/A',
                 $patientsCount,
                 number_format($totalPaid, 2),
+                number_format($totalReturns, 2),
                 number_format($totalEntl, 2),
                 number_format($cashEntl, 2),
                 number_format($insEntl, 2),
@@ -249,13 +251,14 @@ class DoctorShiftsReport
     {
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
         
-        // Grand Totals Row - Updated for new column structure
+        // Grand Totals Row - Updated for new column structure (9 columns)
         $pdf->SetFont($pdf->getDefaultFontFamily(), 'B', 14);
         $summaryRowData = [
             ($isRTL ? 'الإجمالي العام' : 'Grand Total:'),
             '',
             $grandTotals['patients'],
             number_format($grandTotals['total_paid'], 2),
+            number_format($grandTotals['returns'], 2),
             number_format($grandTotals['total_entl'], 2),
             number_format($grandTotals['cash_entl'], 2),
             number_format($grandTotals['ins_entl'], 2),
@@ -263,10 +266,10 @@ class DoctorShiftsReport
         ];
 
         $pageUsableWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-        $colWidths = [45, 60, 25, 35, 35, 35, 20, 36];
+        $colWidths = [40, 50, 20, 30, 25, 30, 30, 30, 20];
         $colWidths[count($colWidths) - 1] = $pageUsableWidth - \array_sum(\array_slice($colWidths, 0, -1));
 
-        $summaryAligns = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'];
+        $summaryAligns = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'];
         $pdf->DrawTableRow($summaryRowData, $colWidths, $summaryAligns, true, 7);
     }
 
