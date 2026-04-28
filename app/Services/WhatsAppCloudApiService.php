@@ -114,7 +114,7 @@ class WhatsAppCloudApiService
      * @param string|null $phoneNumberId Optional phone number ID (overrides default)
      * @return array{success: bool, data: mixed, error?: string, message_id?: string}
      */
-    public function sendTemplateMessage(
+public function sendTemplateMessage(
         string $to,
         string $templateName,
         string $languageCode = 'en_US',
@@ -153,7 +153,13 @@ class WhatsAppCloudApiService
         }
 
         try {
-            $response = Http::withToken($accessToken)
+            $response = Http::withOptions([
+                    'curl' => [
+                        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4, // Forces IPv4 resolution
+                    ],
+                ])
+                ->timeout(30) // Increases timeout to 30 seconds to prevent error 28
+                ->withToken($accessToken)
                 ->asJson()
                 ->post($endpoint, $payload);
 

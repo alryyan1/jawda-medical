@@ -789,6 +789,17 @@ class PatientController extends Controller
         if ($patient->user_id != Auth::id()) {
             return response()->json(['message' => 'لا يمكنك تحديث بيانات هذا المريض.'], 403);
         }
+
+        if (isset($validatedData['name']) && $validatedData['name'] !== $patient->name) {
+            $similarity = $this->calculateNameSimilarity($patient->name, $validatedData['name']);
+            if ($similarity < 60) { // Allow up to 40% change in the name
+                return response()->json([
+                    'message' => 'لا يمكن تغيير الاسم بأكثر من 40% من الاسم الأصلي.',
+                    'errors' => ['name' => ['لا يمكن تغيير الاسم بأكثر من 40% من الاسم الأصلي.']],
+                ], 422);
+            }
+        }
+
         Log::info('Updating patient:  ' . $patient->id . ' with data: ' . json_encode($request->all()));
         // Exclude fields that are managed by other processes or shouldn't be mass updated here
         // For example, financial or specific clinical flags related to visits.
@@ -1955,5 +1966,74 @@ class PatientController extends Controller
             'data' => $responseData,
             'message' => $message,
         ], $response->status());
+    }
+
+    private function calculateNameSimilarity($oldName, $newName)
+    {
+        $oldName = $this->normalizeArabicText($oldName);
+        $newName = $this->normalizeArabicText($newName);
+
+        $oldWords = explode(' ', $oldName);
+        $newWords = explode(' ', $newName);
+
+        $matchedWords = 0;
+
+        foreach ($oldWords as $oldWord) {
+            foreach ($newWords as $key => $newWord) {
+                $distance = $this->mb_levenshtein($oldWord, $newWord);
+                $wordLen = mb_strlen($oldWord, 'UTF-8');
+                $changeRatio = $wordLen > 0 ? ($distance / $wordLen) : 1;
+
+                if ($changeRatio <= 0.25) {
+                    $matchedWords++;
+                    unset($newWords[$key]);
+                    break;
+                }
+            }
+        }
+
+        $maxWords = max(\count($oldWords), \count(explode(' ', $newName)));
+        if ($maxWords === 0) return 0;
+
+        return ($matchedWords / $maxWords) * 100;
+    }
+
+    private function normalizeArabicText($text)
+    {
+        $text = trim($text);
+        $text = preg_replace('/\s+/', ' ', $text);
+        $text = preg_replace('/[أإآ]/u', 'ا', $text);
+        $text = preg_replace('/ة/u', 'ه', $text);
+        $text = preg_replace('/[ىي]/u', 'ي', $text);
+        return $text;
+    }
+
+    private function mb_levenshtein($str1, $str2)
+    {
+        $length1 = mb_strlen($str1, 'UTF-8');
+        $length2 = mb_strlen($str2, 'UTF-8');
+
+        if ($length1 == 0) return $length2;
+        if ($length2 == 0) return $length1;
+
+        $s1 = mb_str_split($str1, 1, 'UTF-8');
+        $s2 = mb_str_split($str2, 1, 'UTF-8');
+
+        $d = [];
+        for ($i = 0; $i <= $length1; $i++) $d[$i][0] = $i;
+        for ($j = 0; $j <= $length2; $j++) $d[0][$j] = $j;
+
+        for ($i = 1; $i <= $length1; $i++) {
+            for ($j = 1; $j <= $length2; $j++) {
+                $cost = ($s1[$i - 1] === $s2[$j - 1]) ? 0 : 1;
+                $d[$i][$j] = min(
+                    $d[$i - 1][$j] + 1,
+                    $d[$i][$j - 1] + 1,
+                    $d[$i - 1][$j - 1] + $cost
+                );
+            }
+        }
+
+        return $d[$length1][$length2];
     }
 }
