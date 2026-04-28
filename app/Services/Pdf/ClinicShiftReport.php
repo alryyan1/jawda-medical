@@ -132,9 +132,7 @@ class ClinicShiftReport extends TCPDF
         $visitsCount = $this->doctorShift->visits->where('only_lab', 0)->count();
         $cashCredit = $this->doctorShift->doctor_credit_cash();
         $companyCredit = $this->doctorShift->doctor_credit_company();
-        $totalPaid = $this->doctorShift->total_paid_services();
-        $serviceCosts = array_sum(array_column($this->doctorShift->shift_service_costs(), 'amount'));
-        $netCenter = $totalPaid - $cashCredit - $companyCredit - $serviceCosts;
+        $netCenter = $this->doctorShift->hospital_credit();
 
         $width = $this->pageUsableWidth / 4;
 
