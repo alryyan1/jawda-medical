@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Shift;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use App\Http\Resources\ShiftResource;
 use App\Models\DoctorShift;
@@ -128,7 +129,9 @@ class ShiftController extends Controller
             ->orderBy('closed_at', 'desc')
             ->first();
 
-        if ($lastClosedShift && !Auth::user()->hasRole('admin')) {
+        $enforceShiftHours = (bool) optional(Setting::first())->enforce_shift_hours;
+
+        if ($enforceShiftHours && $lastClosedShift && !Auth::user()->hasRole('admin')) {
             $hoursSinceLastShift = Carbon::now()->diffInHours($lastClosedShift->created_at);
             if ($hoursSinceLastShift < 6) {
                 $remainingHours = 6 - $hoursSinceLastShift;
@@ -359,7 +362,8 @@ class ShiftController extends Controller
         // Enforce minimum 6 hours since this shift was opened
         $openedAt = $shift->created_at;
         $hoursOpen = $openedAt ? Carbon::parse($openedAt)->diffInHours(Carbon::now()) : 0;
-        if ($hoursOpen < 6 && !Auth::user()->hasRole('admin')) {
+        $enforceShiftHours = (bool) optional(Setting::first())->enforce_shift_hours;
+        if ($enforceShiftHours && $hoursOpen < 6 && !Auth::user()->hasRole('admin')) {
             $remainingHours = 6 - $hoursOpen;
             return response()->json([
                 'message' => "لا يمكن إغلاق الوردية قبل مرور 6 ساعات من فتحها. الوقت المتبقي: {$remainingHours} ساعة.",

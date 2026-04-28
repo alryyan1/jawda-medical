@@ -915,7 +915,7 @@ class WhatsAppCloudApiController extends Controller
     protected function sendTextToUser(string $to, string $text, $phoneNumberId = null): void
     {
         try {
-            $result = $this->whatsappService->sendTextMessage($to, $text, null, $phoneNumberId);
+            $result = $this->whatsappService->sendTextMessagehif($to, $text, null, $phoneNumberId);
 
             if ($result['success']) {
                 Log::info('WhatsApp Cloud API: Text message sent successfully to user.', [

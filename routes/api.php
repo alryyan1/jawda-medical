@@ -719,6 +719,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/whatsapp/messages', [\App\Http\Controllers\Api\WhatsAppMessageController::class, 'store']);
   Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
   Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
+  Route::put('/doctor-shifts/{doctorShift}/reopen', [DoctorShiftController::class, 'reopen']);
 
   Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
 

@@ -76,6 +76,7 @@ class SettingResource extends JsonResource
             'storage_name' => $this->storage_name,
             'settings_enable_Sms_front' => (bool) $this->settings_enable_Sms_front,
             'prevent_backdated_entry' => (bool) $this->prevent_backdated_entry,
+            'enforce_shift_hours' => (bool) $this->enforce_shift_hours,
             'whatsapp_number' => $this->whatsapp_number,
             'payment_cancellation_phone' => $this->payment_cancellation_phone,
             'shift_summary_phone' => $this->shift_summary_phone,

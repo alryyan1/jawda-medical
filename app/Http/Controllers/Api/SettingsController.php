@@ -140,6 +140,7 @@ class SettingsController extends Controller
             'show_logo_only_whatsapp' => 'sometimes|boolean',
             'settings_enable_Sms_front' => 'sometimes|boolean',
             'prevent_backdated_entry' => 'sometimes|boolean',
+            'enforce_shift_hours' => 'sometimes|boolean',
             'whatsapp_number' => 'nullable|string|max:20',
             'pdf_header_type' => 'nullable|string|in:logo,full_width,none',
             'pdf_header_logo_position' => 'nullable|string',

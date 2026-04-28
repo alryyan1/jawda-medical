@@ -564,6 +564,17 @@ class DoctorShiftController extends Controller
 
         return new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift']));
     }
-    // You might add show, update, destroy for full CRUD management of DoctorShift records if needed.
-    // For 'update', you might allow changing financial proof flags, notes, etc.
+    public function reopen(Request $request, DoctorShift $doctorShift)
+    {
+        if ($doctorShift->status) {
+            return response()->json(['message' => 'المناوبة مفتوحة بالفعل.'], 400);
+        }
+
+        $doctorShift->update([
+            'status' => true,
+            'end_time' => null,
+        ]);
+
+        return new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift']));
+    }
 }
