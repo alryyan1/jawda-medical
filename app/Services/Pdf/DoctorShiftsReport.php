@@ -204,7 +204,9 @@ class DoctorShiftsReport
             $insEntl     = $ds->doctor_credit_company();
             $staticWage  = (!$ds->status && $ds->doctor) ? (float) $ds->doctor->static_wage : 0;
             $totalEntl   = $cashEntl + $insEntl + $staticWage;
-            $totalPaid     = $ds->total_paid_services();
+            
+            // Total paid is now net of returns for consistency
+            $totalPaid     = $ds->total_paid_services() - $ds->total_returns();
             $net           = $ds->hospital_credit();
             $patientsCount = $ds->visits->count();
 
