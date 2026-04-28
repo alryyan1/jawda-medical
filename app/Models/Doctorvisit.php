@@ -375,9 +375,26 @@ TEXT;
      * Total collected for this visit - doctor's share for this visit.
      * The service costs are general clinic expenses, not subtracted per visit for hospital credit *from this visit*.
      */
-    public function hospital_credit()
+    /**
+     * Hospital's net credit from this visit.
+     * Total collected - (Returns + Doctor's share + Service costs).
+     */
+    public function hospital_credit(): float
     {
-        return ($this->total_paid_services() - $this->totalServiceCosts($this->patient->doctor)) - ($this->doctorShift->doctor->doctor_credit($this));
+        $totalReturns = 0;
+        
+        // Ensure relations are loaded for performance and accuracy
+        $this->loadMissing(['requestedServices.returnedRefunds', 'requestedServices.requestedServiceCosts.serviceCost']);
+        
+        foreach ($this->requestedServices as $rs) {
+            $totalReturns += (float) $rs->returnedRefunds->sum('amount');
+        }
+
+        $grossPaid = (float) $this->total_paid_services();
+        $serviceCosts = (float) $this->totalServiceCosts($this->doctor);
+        $doctorCredit = (float) ($this->doctorShift->doctor->doctor_credit($this) ?? 0);
+
+        return $grossPaid - $totalReturns - $serviceCosts - $doctorCredit;
     }
   /**
      * Calculate total value of services (and lab tests if they are services) for this visit,
