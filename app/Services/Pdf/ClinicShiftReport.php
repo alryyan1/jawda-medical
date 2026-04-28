@@ -164,14 +164,16 @@ class ClinicShiftReport extends TCPDF
 
         // Table Columns
         $cols = [
-            ['w' => 15, 't' => 'رقم', 'a' => 'C'],
-            ['w' => 45, 't' => 'اسم المريض', 'a' => 'C'],
-            ['w' => 30, 't' => 'الشركة', 'a' => 'C'],
-            ['w' => 20, 't' => 'إجمالي', 'a' => 'C'],
-            ['w' => 20, 't' => 'نقداً', 'a' => 'C'],
-            ['w' => 20, 't' => 'بنك', 'a' => 'C'],
-            ['w' => 22, 't' => 'حصة الطبيب', 'a' => 'C'],
-            ['w' => 22, 't' => 'صافي المركز', 'a' => 'C'],
+            ['w' => 12, 't' => 'رقم', 'a' => 'C'],
+            ['w' => 38, 't' => 'اسم المريض', 'a' => 'C'],
+            ['w' => 25, 't' => 'الشركة', 'a' => 'C'],
+            ['w' => 18, 't' => 'إجمالي', 'a' => 'C'],
+            ['w' => 18, 't' => 'نقداً', 'a' => 'C'],
+            ['w' => 18, 't' => 'بنك', 'a' => 'C'],
+            ['w' => 18, 't' => 'مردود كاش', 'a' => 'C'],
+            ['w' => 18, 't' => 'مردود بنك', 'a' => 'C'],
+            ['w' => 20, 't' => 'حصة الطبيب', 'a' => 'C'],
+            ['w' => 20, 't' => 'صافي المركز', 'a' => 'C'],
             ['w' => 0,  't' => 'الخدمات *', 'a' => 'C'],
         ];
 
@@ -209,7 +211,34 @@ class ClinicShiftReport extends TCPDF
             $currentDoctor = $this->doctorShift->doctor;
 
             $doctorCredit = $currentDoctor->doctor_credit($visit);
-            $netCenter = $visit->total_paid_services() - $doctorCredit;
+            
+            $returnedCash = 0;
+            $returnedBank = 0;
+            $servicesHtml = '';
+            
+            foreach($visit->requestedServices as $idx => $rs) {
+                $isReturned = $rs->returnedRefunds->isNotEmpty();
+                $serviceName = $rs->service?->name ?? 'خدمة غير معروفة';
+                
+                if ($isReturned) {
+                    $servicesHtml .= '<del>' . $serviceName . '</del>';
+                    foreach($rs->returnedRefunds as $refund) {
+                        if ($refund->returned_payment_method === 'cash') {
+                            $returnedCash += (float)$refund->amount;
+                        } else {
+                            $returnedBank += (float)$refund->amount;
+                        }
+                    }
+                } else {
+                    $servicesHtml .= $serviceName;
+                }
+                
+                if ($idx < count($visit->requestedServices) - 1) {
+                    $servicesHtml .= ' - ';
+                }
+            }
+
+            $netCenter = ($visit->total_paid_services() - ($returnedCash + $returnedBank)) - $doctorCredit;
 
             $rowData = [
                 $visit->number,
@@ -218,15 +247,17 @@ class ClinicShiftReport extends TCPDF
                 number_format($visit->total_services($currentDoctor), 1),
                 number_format($visit->total_paid_services() - $visit->bankak_service(), 1),
                 number_format($visit->bankak_service(), 1),
+                number_format($returnedCash, 1),
+                number_format($returnedBank, 1),
                 number_format($doctorCredit, 1),
                 number_format($netCenter, 1),
             ];
 
             $startY = $this->GetY();
 
-            // Calc max height for cell (services can take multiple lines)
-            $servicesText = ltrim($visit->services_concatinated(), " -");
-            $servicesLines = $this->getNumLines($servicesText, $cols[8]['w']);
+            // Calc max height for cell
+            $servicesTextForHeight = strip_tags($servicesHtml);
+            $servicesLines = $this->getNumLines($servicesTextForHeight, $cols[10]['w']);
             $rowHeight = max($h, $servicesLines * 5) + 2;
 
             // Check page break
@@ -236,13 +267,21 @@ class ClinicShiftReport extends TCPDF
             }
 
             foreach ($rowData as $i => $val) {
-                $align = in_array($i, [3, 4, 5, 6, 7]) ? 'C' : $cols[$i]['a'];
+                $align = in_array($i, [3, 4, 5, 6, 7, 8, 9]) ? 'C' : $cols[$i]['a'];
                 $this->MultiCell($cols[$i]['w'], $rowHeight, $val, 'LRB', $align, true, 0, null, null, true, 0, false, true, $rowHeight, 'M');
             }
 
-            // Services with dynamic height
-            $this->SetTextColor(80, 80, 80); // Lighter text for services
-            $this->MultiCell($cols[8]['w'], $rowHeight, $servicesText, 'RB', 'R', true, 1, null, null, true, 0, false, true, $rowHeight, 'M');
+            // Services with dynamic height and HTML support for strikethrough
+            $this->SetTextColor(80, 80, 80); 
+            $currentX = $this->GetX();
+            $currentY = $this->GetY();
+            
+            // Draw background and border first for the services cell
+            $this->Cell($cols[10]['w'], $rowHeight, '', 'RB', 0, 'R', true);
+            
+            // Now write HTML content over it
+            $this->SetXY($currentX, $currentY);
+            $this->writeHTMLCell($cols[10]['w'], $rowHeight, $currentX, $currentY, $servicesHtml, 0, 1, false, true, 'R', true);
 
             $this->SetTextColor(40, 40, 40);
         }
@@ -255,16 +294,33 @@ class ClinicShiftReport extends TCPDF
         $totalServices = $this->doctorShift->total_services();
         $totalPaid = $this->doctorShift->total_paid_services();
         $totalBank = $this->doctorShift->total_bank();
+        
+        $totalReturnedCash = 0;
+        $totalReturnedBank = 0;
+        foreach($visits as $v) {
+            foreach($v->requestedServices as $rs) {
+                foreach($rs->returnedRefunds as $refund) {
+                    if ($refund->returned_payment_method === 'cash') {
+                        $totalReturnedCash += (float)$refund->amount;
+                    } else {
+                        $totalReturnedBank += (float)$refund->amount;
+                    }
+                }
+            }
+        }
+
         $totalDoctor = $this->doctorShift->doctor_credit_cash() + $this->doctorShift->doctor_credit_company();
-        $totalNetCenter = $totalPaid - $totalDoctor;
+        $totalNetCenter = ($totalPaid - ($totalReturnedCash + $totalReturnedBank)) - $totalDoctor;
 
         $this->Cell($cols[0]['w'] + $cols[1]['w'] + $cols[2]['w'], 9, 'الإجمالي العام للمناوبة', 1, 0, 'C', true);
         $this->Cell($cols[3]['w'], 9, number_format($totalServices, 1), 1, 0, 'C', true);
         $this->Cell($cols[4]['w'], 9, number_format($totalPaid - $totalBank, 1), 1, 0, 'C', true);
         $this->Cell($cols[5]['w'], 9, number_format($totalBank, 1), 1, 0, 'C', true);
-        $this->Cell($cols[6]['w'], 9, number_format($totalDoctor, 1), 1, 0, 'C', true);
-        $this->Cell($cols[7]['w'], 9, number_format($totalNetCenter, 1), 1, 0, 'C', true);
-        $this->Cell($cols[8]['w'], 9, '', 1, 1, 'C', true);
+        $this->Cell($cols[6]['w'], 9, number_format($totalReturnedCash, 1), 1, 0, 'C', true);
+        $this->Cell($cols[7]['w'], 9, number_format($totalReturnedBank, 1), 1, 0, 'C', true);
+        $this->Cell($cols[8]['w'], 9, number_format($totalDoctor, 1), 1, 0, 'C', true);
+        $this->Cell($cols[9]['w'], 9, number_format($totalNetCenter, 1), 1, 0, 'C', true);
+        $this->Cell($cols[10]['w'], 9, '', 1, 1, 'C', true);
         $this->Ln(8);
     }
 
