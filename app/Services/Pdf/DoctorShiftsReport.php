@@ -230,10 +230,12 @@ class DoctorShiftsReport
                 number_format($net, 2),
             ];
 
-            foreach ($rowData as $i => $cell) {
-                $pdf->Cell($colWidths[$i], 7, $cell, 1, 0, 'C', $fill);
-            }
-            $pdf->Ln(7);
+            // Add navigation link for the doctor's name
+            $links = [
+                1 => url('/reports/clinic-report-old/pdf?doctor_shift_id=' . $ds->id)
+            ];
+
+            $pdf->DrawTableRow($rowData, $colWidths, null, $fill, 7, 10, $links);
             $fill = !$fill;
         }
 

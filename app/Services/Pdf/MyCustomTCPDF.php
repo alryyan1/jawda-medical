@@ -356,7 +356,7 @@ class MyCustomTCPDF extends TCPDF
         $this->Ln($lineHeight);
     }
 
-    public function DrawTableRow(array $rowData, array $widths = null, array $alignments = null, bool $fill = false, int $baseLineHeight = 6,$fontSize = 10)
+    public function DrawTableRow(array $rowData, array $widths = null, array $alignments = null, bool $fill = false, int $baseLineHeight = 6, $fontSize = 10, array $links = [])
     {
         $_widths = $widths ?? $this->tableWidths;
         $_alignments = $alignments ?? $this->tableAlignments;
@@ -371,10 +371,10 @@ class MyCustomTCPDF extends TCPDF
         $this->SetDrawColor(150,150,150); // Lighter border for data rows
         $this->SetLineWidth(0.1);
 
-        // Calculate max number of lines needed for this row to determine dynamic row height
+        // Calculate max number of lines needed for this row
         $maxLines = 1;
         foreach ($rowData as $key => $data) {
-            if (isset($_widths[$key])) { // Ensure width is defined
+            if (isset($_widths[$key])) {
                 $numLines = $this->getNumLines((string)$data, $_widths[$key]);
                 if ($numLines > $maxLines) {
                     $maxLines = $numLines;
@@ -382,37 +382,41 @@ class MyCustomTCPDF extends TCPDF
             }
         }
         $rowHeight = $baseLineHeight * $maxLines;
-        // Add a little padding if more than one line
         if ($maxLines > 1) {
-            $rowHeight += ($maxLines * 0.5); // Small vertical padding per extra line
+            $rowHeight += ($maxLines * 0.5);
         }
 
-
-        // Check for page break: if current Y + rowHeight > page break margin
+        // Check for page break
         $pageBreakTrigger = $this->getPageHeight() - $this->getBreakMargin();
         if ($this->GetY() + $rowHeight > $pageBreakTrigger) {
-            $this->AddPage($this->CurOrientation); // This will call Header()
-            $this->DrawTableHeader(); // Re-draw table header using stored definitions
-            // Font for data rows might need to be reset if Header changes it significantly
-            $this->SetFont($this->defaultFont, '', 7);
-            $this->SetFillColor($fill ? 240 : 255, $fill ? 240 : 255, $fill ? 240 : 255); // Re-apply fill for this row
+            $this->AddPage($this->CurOrientation);
+            $this->DrawTableHeader();
+            $this->SetFont($this->defaultFont, '', $fontSize);
+            $this->SetFillColor($fill ? 240 : 255, $fill ? 240 : 255, $fill ? 240 : 255);
             $this->SetTextColor(0);
             $this->SetDrawColor(150,150,150);
             $this->SetLineWidth(0.1);
         }
 
-        $currentX = $this->GetX(); // GetX() gives current X based on L/R margin
+        $currentX = $this->GetX();
         $currentY = $this->GetY();
 
         foreach ($rowData as $key => $data) {
-            if (isset($_widths[$key])) { // Ensure width is defined for this cell
+            if (isset($_widths[$key])) {
                 $align = $_alignments[$key] ?? ($this->getRTL() ? 'R' : 'L');
-                // If data is purely numeric, consider centering or right-aligning for LTR
                 if (is_numeric($data) && !is_string($data) && !$this->getRTL()) $align = 'R';
                 else if (is_numeric($data) && !is_string($data) && $this->getRTL()) $align = 'L';
 
+                $text = (string)$data;
+                $isHtml = false;
+                
+                // If there's a link for this cell, wrap text in <a> tag
+                if (isset($links[$key]) && !empty($links[$key])) {
+                    $text = '<a href="' . $links[$key] . '" style="text-decoration:none; color:blue;">' . $text . '</a>';
+                    $isHtml = true;
+                }
 
-                $this->MultiCell($_widths[$key], $rowHeight, (string)$data, 1, 'C', $fill, 0, $currentX, $currentY, true, 0, false, true, $rowHeight, 'M');
+                $this->MultiCell($_widths[$key], $rowHeight, $text, 1, 'C', $fill, 0, $currentX, $currentY, true, 0, $isHtml, true, $rowHeight, 'M');
                 $currentX += $_widths[$key];
             }
         }
