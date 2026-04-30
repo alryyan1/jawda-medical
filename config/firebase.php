@@ -16,6 +16,12 @@ return [
     // Newer Firebase projects use .firebasestorage.app; legacy use .appspot.com
     'storage_bucket' => env('FIREBASE_STORAGE_BUCKET', 'sales-9e9b8.firebasestorage.app'),
     'api_key' => env('FIREBASE_API_KEY'),
+
+    'hospital' => [
+        'project_id' => env('HOSPITAL_FIREBASE_PROJECT_ID', 'hospitalapp-681f1'),
+        'api_key' => env('HOSPITAL_FIREBASE_API_KEY'),
+        'service_account_path' => env('HOSPITAL_FIREBASE_SERVICE_ACCOUNT_PATH', storage_path('app/hospital-firebase-service-account.json')),
+    ],
     
     /*
     |--------------------------------------------------------------------------

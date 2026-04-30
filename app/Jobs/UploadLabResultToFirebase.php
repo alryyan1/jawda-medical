@@ -144,9 +144,7 @@ class UploadLabResultToFirebase implements ShouldQueue
                         'patient_id' => (int) $patient->id,
                     ]);
                     $firestoreResponse = $firestoreController->updateFirestoreDocument($firestoreRequest);
-                    Log::info('Triggered Firestore update from job', [
-                        'status' => method_exists($firestoreResponse, 'status') ? $firestoreResponse->status() : null,
-                    ]);
+                  
 
                     // Send completion notification after successful Firestore update
                     try {

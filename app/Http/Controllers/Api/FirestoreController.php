@@ -9,8 +9,33 @@ use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\ServiceAccount;
 
+use App\Models\Setting;
+
 class FirestoreController extends Controller
 {
+    /**
+     * Get Firebase configuration based on settings
+     */
+    private function getFirebaseConfig()
+    {
+        $settings = Setting::instance();
+        $source = $settings->lab_to_lab_firebase_source ?? 'sales';
+
+        if ($source === 'hospital') {
+            return [
+                'project_id' => config('firebase.hospital.project_id'),
+                'service_account_path' => config('firebase.hospital.service_account_path'),
+                'api_key' => config('firebase.hospital.api_key'),
+            ];
+        }
+
+        return [
+            'project_id' => config('firebase.project_id'),
+            'service_account_path' => config('firebase.service_account_path'),
+            'api_key' => config('firebase.api_key'),
+        ];
+    }
+
     /**
      * Update Firestore document directly from backend using REST API
      * This endpoint handles the complete Firestore update process
@@ -29,8 +54,11 @@ class FirestoreController extends Controller
             $pdfUrl = $validated['pdf_url'];
             $patientId = $validated['patient_id'];
 
-            // Get Firebase project ID from config
-            $projectId = config('firebase.project_id');
+            // Get Firebase config
+            $fbConfig = $this->getFirebaseConfig();
+            $projectId = $fbConfig['project_id'];
+            $serviceAccountPath = $fbConfig['service_account_path'];
+
             if (!$projectId) {
                 return response()->json([
                     'success' => false,
@@ -52,7 +80,6 @@ class FirestoreController extends Controller
             ];
 
             // Get access token using Firebase Admin SDK
-            $serviceAccountPath = config('firebase.service_account_path');
             if (!file_exists($serviceAccountPath)) {
                 return response()->json([
                     'success' => false,
@@ -68,7 +95,7 @@ class FirestoreController extends Controller
             $customToken = $auth->createCustomToken('firebase-service-account');
             
             // Exchange custom token for access token
-            $accessToken = $this->exchangeCustomTokenForAccessToken($customToken->toString());
+            $accessToken = $this->exchangeCustomTokenForAccessToken($customToken->toString(), $fbConfig['api_key']);
             
             if (!$accessToken) {
                 return response()->json([
@@ -140,10 +167,11 @@ class FirestoreController extends Controller
     /**
      * Exchange custom token for access token
      */
-    private function exchangeCustomTokenForAccessToken($customToken)
+    private function exchangeCustomTokenForAccessToken($customToken, $apiKey = null)
     {
         try {
-            $response = Http::post('https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=' . config('firebase.api_key'), [
+            $key = $apiKey ?: config('firebase.api_key');
+            $response = Http::post('https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=' . $key, [
                 'token' => $customToken,
                 'returnSecureToken' => true
             ]);
@@ -175,8 +203,10 @@ class FirestoreController extends Controller
             $labToLabObjectId = $validated['lab_to_lab_object_id'];
             $pdfUrl = $validated['pdf_url'];
 
-            // Get Firebase project ID from config
-            $projectId = config('firebase.project_id');
+            // Get Firebase config
+            $fbConfig = $this->getFirebaseConfig();
+            $projectId = $fbConfig['project_id'];
+
             if (!$projectId) {
                 return response()->json([
                     'success' => false,
