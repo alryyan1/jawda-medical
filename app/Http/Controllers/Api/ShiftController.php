@@ -86,6 +86,24 @@ class ShiftController extends Controller
         return ShiftResource::collection($shifts);
     }
     /**
+     * Return all shifts as a flat array (no pagination) — used for filter dropdowns.
+     */
+    public function getAllShifts(Request $request)
+    {
+        $query = Shift::select('id', 'created_at', 'is_closed')
+            ->latest('created_at');
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        return response()->json($query->get());
+    }
+
+    /**
      * Get the current open shift, if any.
      * This is useful for the frontend to know which shift operations are happening under.
      */

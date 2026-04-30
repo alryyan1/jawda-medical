@@ -125,6 +125,7 @@ class Setting extends Model
         'hospital_name',
         'firestore_result_collection',
         'firebase_upload_target',
+        'lab_to_lab_firebase_source',
         'block_auth_on_empty_results',
         'disable_doctor_service_check',
         'phone',
@@ -207,6 +208,7 @@ class Setting extends Model
         'is_logo' => 'boolean',
         'firestore_result_collection' => 'string',
         'firebase_upload_target' => 'string',
+        'lab_to_lab_firebase_source' => 'string',
         'block_auth_on_empty_results' => 'boolean',
         'disable_doctor_service_check' => 'boolean',
         'gov' => 'boolean', // Or 'integer' if it's an ID to a govs table

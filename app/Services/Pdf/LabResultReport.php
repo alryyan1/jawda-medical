@@ -95,7 +95,7 @@ class LabResultReport
         }
 
         if ($watermarkPath) {
-            $pdf->SetAlpha(0.15); // Slightly lighter watermark
+            $pdf->SetAlpha(0.9); // Slightly lighter watermark
             // Fit watermark reasonably in center area
             $pdf->Image(
                 $watermarkPath,
@@ -1047,7 +1047,7 @@ class LabResultReport
         $pdf->SetDrawColor(220, 220, 220);
         $pdf->SetTextColor(52, 58, 64);
 
-        $headerHeight = 9;
+        $headerHeight = 5;
         $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 2, '1111', 'DF');
         $pdf->Cell($page_width, $headerHeight, "STATISTICS ", 0, 1, 'L', 1);
 

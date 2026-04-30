@@ -142,6 +142,8 @@ class SettingsController extends Controller
             'prevent_backdated_entry' => 'sometimes|boolean',
             'enforce_shift_hours' => 'sometimes|boolean',
             'whatsapp_number' => 'nullable|string|max:20',
+            'firebase_upload_target' => 'sometimes|string|in:sales,hospital,both',
+            'lab_to_lab_firebase_source' => 'sometimes|string|in:sales,hospital',
             'pdf_header_type' => 'nullable|string|in:logo,full_width,none',
             'pdf_header_logo_position' => 'nullable|string',
             'pdf_header_logo_width' => 'nullable|integer',

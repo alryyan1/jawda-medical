@@ -26,6 +26,7 @@ class SettingResource extends JsonResource
             'hospital_name' => $this->hospital_name,
             'firestore_result_collection' => $this->firestore_result_collection,
             'firebase_upload_target' => $this->firebase_upload_target ?? 'sales',
+            'lab_to_lab_firebase_source' => $this->lab_to_lab_firebase_source ?? 'sales',
             'block_auth_on_empty_results' => $this->block_auth_on_empty_results ?? true,
             'disable_doctor_service_check' => (bool) $this->disable_doctor_service_check,
             'phone' => $this->phone,

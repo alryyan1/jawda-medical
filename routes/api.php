@@ -202,6 +202,7 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
   // General Shifts
+  Route::get('/shifts/all', [ShiftController::class, 'getAllShifts']);
   Route::get('/shifts/current-open', [ShiftController::class, 'getCurrentOpenShift']);
   Route::get('/shifts/current-shift', [ShiftController::class, 'getCurrentShift']);
   Route::post('/shifts/open', [ShiftController::class, 'openShift']);
