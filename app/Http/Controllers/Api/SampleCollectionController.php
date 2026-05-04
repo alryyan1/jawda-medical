@@ -34,10 +34,9 @@ class SampleCollectionController extends Controller
     {
         $request->validate([
             'shift_id' => 'nullable|integer|exists:shifts,id',
-            
             'search' => 'nullable|string|max:100',
+            'visit_id' => 'nullable|integer',
             'page' => 'nullable|integer|min:1',
-           
         ]);
 
 
@@ -60,18 +59,17 @@ class SampleCollectionController extends Controller
            
             // Count of lab requests that need a sample for this visit
             ->withCount(['patientLabRequests as test_count']);
-       
-                $shift = Shift::max('id');
-            $query->where('doctorvisits.shift_id', $shift);
-        
 
-        if ($request->filled('search')) {
-            // ... (search logic similar to LabRequestController@getLabPendingQueue) ...
-            $searchTerm = $request->search;
-            $query->where(function ($q_search) use ($searchTerm) {
-                $q_search->where('patients.name', 'LIKE', "%{$searchTerm}%")
-                         ->orWhere('doctorvisits.id', $searchTerm);
-            });
+        if ($request->filled('visit_id')) {
+            $query->where('doctorvisits.id', $request->visit_id);
+        } else {
+            $shift = Shift::max('id');
+            $query->where('doctorvisits.shift_id', $shift);
+
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                $query->where('patients.name', 'LIKE', "%{$searchTerm}%");
+            }
         }
         
         $query->having('test_count', '>', 0); // Ensure visit still has samples to be collected
