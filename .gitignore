@@ -22,5 +22,7 @@ yarn-error.log
 /service workers/pinggy/daemon/
 realtime-events/daemon
 /config
+!config/backup.php
+!config/database.php
 storage
 /storage/firebase-service-account.json
