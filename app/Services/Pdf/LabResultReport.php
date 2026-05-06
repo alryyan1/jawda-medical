@@ -95,7 +95,7 @@ class LabResultReport
         }
 
         if ($watermarkPath) {
-            $pdf->SetAlpha(0.9); // Slightly lighter watermark
+            $pdf->SetAlpha(0.1); // Slightly lighter watermark
             // Fit watermark reasonably in center area
             $pdf->Image(
                 $watermarkPath,

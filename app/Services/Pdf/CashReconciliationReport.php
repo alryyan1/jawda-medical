@@ -262,8 +262,8 @@ class CashReconciliationReport
         $rowFill = !$rowFill;
 
         // Net balance row - emphasized (after deducting refunds)
-        $netCashAfterRefund = ($incomeData->net_cash ?? 0) - $totalCashRefund;
-        $netBankAfterRefund = ($incomeData->net_bank ?? 0) - $totalBankRefund;
+        $netCashAfterRefund = ($incomeData->net_cash ?? 0) ;
+        $netBankAfterRefund = ($incomeData->net_bank ?? 0) ;
         $this->pdf->SetFont('arial', 'B', 11);
         $this->pdf->SetFillColor(240, 245, 250);
         $this->pdf->SetTextColor(45, 55, 72);
