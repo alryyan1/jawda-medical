@@ -740,6 +740,46 @@ class PatientController extends Controller
             return response()->json(['message' => 'فشل إنشاء الزيارة الجديدة من السجل.', 'error' => 'خطأ داخلي.' . $e->getMessage()], 500);
         }
     }
+    public function searchAdmissionPatients(Request $request)
+    {
+        $searchTerm = $request->validate([
+            'term' => 'required|string|min:2',
+        ])['term'];
+
+        $patients = Patient::query()
+            ->whereHas('admissions')
+            ->where(function ($q) use ($searchTerm) {
+                $q->where('name', 'LIKE', "%{$searchTerm}%")
+                  ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+            })
+            ->with(['admissions' => function ($q) {
+                $q->orderBy('created_at', 'desc')->limit(1);
+            }])
+            ->limit(20)
+            ->get();
+
+        return response()->json([
+            'data' => $patients->map(function ($patient) {
+                $lastAdmission = $patient->admissions->first();
+                return [
+                    'id'                     => $patient->id,
+                    'name'                   => $patient->name,
+                    'phone'                  => $patient->phone,
+                    'gender'                 => $patient->gender,
+                    'age_year'               => $patient->age_year,
+                    'patient_id'             => $patient->id,
+                    'last_visit_id'          => $lastAdmission?->id,
+                    'last_visit_date'        => $lastAdmission?->admission_date?->toDateString(),
+                    'last_visit_doctor_name' => null,
+                    'last_visit_doctor_id'   => $lastAdmission?->doctor_id,
+                    'last_visit_file_id'     => null,
+                    'last_visit_company_name'=> null,
+                    'last_visit_company_id'  => null,
+                ];
+            }),
+        ]);
+    }
+
     public function searchExisting(Request $request)
     {
         $searchTerm = $request->validate([

@@ -230,6 +230,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/patients/recent-lab-activity', [PatientController::class, 'getRecentLabActivityPatients']);
 
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
+  Route::get('/patients/search-admission-patients', [PatientController::class, 'searchAdmissionPatients']);
   Route::post('/patients/{doctorVisit}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
   // Patients
   Route::apiResource('patients', PatientController::class);
@@ -671,6 +672,7 @@ Route::middleware('auth:sanctum')->group(function () {
     */
   // Existing search and store-from-history routes for patients
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
+  Route::get('/patients/search-admission-patients', [PatientController::class, 'searchAdmissionPatients']);
   Route::post('/patients/{patient}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
 
   // NEW: Route for patient visit history

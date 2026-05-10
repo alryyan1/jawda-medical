@@ -142,10 +142,10 @@ class FirebaseService
     /**
      * Obtain a Firebase access token using the service account for FCM HTTP v1 API
      */
-    public static function getAccessToken(): ?string
+    public static function getAccessToken(?string $serviceAccountPath = null): ?string
     {
         try {
-            $serviceAccountPath = config('firebase.service_account_path');
+            $serviceAccountPath ??= config('firebase.service_account_path');
             if (!file_exists($serviceAccountPath)) {
                 Log::warning('Firebase service account file not found', ['path' => $serviceAccountPath]);
                 return null;
@@ -287,18 +287,26 @@ class FirebaseService
     }
 
     /**
-     * Update Firestore document field
+     * Update Firestore document field.
+     * Pass $project = 'hospital' to target the hospital Firebase project.
      */
-    public static function updateFirestoreDocument(string $collection, string $documentId, array $fields): bool
+    public static function updateFirestoreDocument(string $collection, string $documentId, array $fields, ?string $project = 'hospital'): bool
     {
         try {
-            $projectId = config('firebase.project_id');
+            if ($project === 'hospital') {
+                $projectId = config('firebase.hospital.project_id');
+                $serviceAccountPath = config('firebase.hospital.service_account_path');
+            } else {
+                $projectId = config('firebase.project_id');
+                $serviceAccountPath = config('firebase.service_account_path');
+            }
+
             if (!$projectId) {
                 Log::warning('Firebase project ID not configured');
                 return false;
             }
 
-            $accessToken = self::getAccessToken();
+            $accessToken = self::getAccessToken($serviceAccountPath);
             if (!$accessToken) {
                 Log::warning('FCM access token unavailable for Firestore update');
                 return false;
