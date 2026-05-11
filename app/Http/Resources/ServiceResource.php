@@ -10,7 +10,7 @@ class ServiceResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'service_group_id' => $this->service_group_id,
-            'service_group_name' => $this->whenLoaded('serviceGroup', $this->serviceGroup->name),
+            'service_group_name' => $this->whenLoaded('serviceGroup', fn () => $this->serviceGroup->name),
             'service_group' => new ServiceGroupResource($this->whenLoaded('serviceGroup')),
             'price' => (float) $this->price, // Ensure it's a number
             'activate' => (bool) $this->activate,

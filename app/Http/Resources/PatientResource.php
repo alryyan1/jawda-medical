@@ -87,7 +87,13 @@ class PatientResource extends JsonResource
             // This is included because PatientController->store loads it for the response after registration.
             // This visit is the *initial* visit created during patient registration.
             'doctor_visit' => new DoctorVisitResource($this->whenLoaded('doctorVisit')),
-            'has_cbc' => $this->doctorVisit?->hasCbc(),
+            // has_cbc is injected by DoctorVisitResource (via withExists) to avoid
+            // per-row lazy loading of doctorVisit + a raw SQL query per visit.
+            // Falls back to calling hasCbc() only when used outside that context
+            // (e.g. single-patient registration response where doctorVisit is loaded).
+            'has_cbc' => isset($this->resource->has_cbc)
+                ? (bool) $this->resource->has_cbc
+                : ($this->whenLoaded('doctorVisit', fn () => $this->doctorVisit->hasCbc(), false)),
             'result_url' => $this->result_url,
             'doctor_in_patient' => $this?->doctor?->name,
 

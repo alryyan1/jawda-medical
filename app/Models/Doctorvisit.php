@@ -95,6 +95,7 @@ class DoctorVisit extends Model
         'is_new', // from original schema
         'number', // from original schema
         'only_lab', // from original schema
+        'is_online',
     ];
 
     protected $casts = [
@@ -102,6 +103,7 @@ class DoctorVisit extends Model
         // 'visit_time' => 'datetime:H:i:s', // If storing as TIME, Laravel might handle it without explicit cast. If DATETIME, use 'datetime'
         'is_new' => 'boolean',
         'only_lab' => 'boolean',
+        'is_online' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -110,6 +112,11 @@ class DoctorVisit extends Model
     public function patient()
     {
         return $this->belongsTo(Patient::class);
+    }
+
+    public function sysmexResults()
+    {
+        return $this->hasMany(SysmexResult::class, 'doctorvisit_id');
     }
 
     public function doctor()
@@ -449,9 +456,12 @@ TEXT;
     }
 
  
-    public function hasCbc()
+    public function hasCbc(): bool
     {
-        return SysmexResult::where('doctorvisit_id', '=', $this->id)->get()->count() > 0;
+        if ($this->relationLoaded('sysmexResults')) {
+            return $this->sysmexResults->isNotEmpty();
+        }
+        return $this->sysmexResults()->exists();
     }
     public function hasChemistry()
     {

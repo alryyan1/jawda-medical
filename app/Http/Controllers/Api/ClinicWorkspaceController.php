@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Admission;
 use App\Models\DoctorVisit;
 use App\Http\Resources\DoctorVisitResource;
+use App\Http\Resources\DoctorVisitListItemResource;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -19,16 +20,11 @@ class ClinicWorkspaceController extends Controller
         ]);
 
         $query = DoctorVisit::with([
-            'patient.subcompany',
-            'patient.company',
-            'patient.admission' => fn ($q) => $q->with(['ward', 'bed.room', 'bed']),
-            'doctor',
-            'requestedServices',
-            'patientLabRequests',
+            'patient.company',   // needed for company styling + filter
+            'requestedServices', // needed only for balance_due calculation
+            'patientLabRequests', // needed only for balance_due calculation
         ])
-            ->withCount('requestedServices'); // Add count of requested services
-                            // ->whereDate('visit_date', Carbon::today()) // Example: visits for today
-                            // ->whereNotIn('status', ['completed', 'cancelled']); // Example: not completed or cancelled
+            ->withCount('requestedServices');
 
         // Filter by general clinic shift (if your system has overarching shifts)
         if ($request->filled('clinic_shift_id')) {
@@ -57,22 +53,7 @@ class ClinicWorkspaceController extends Controller
 
         $activeVisits = $query->get();
 
-        // Attach requested surgeries summary to each patient's admission (single batch query)
-        $admissionIds = $activeVisits
-            ->pluck('patient.admission.id')
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-        $summaries = Admission::getRequestedSurgeriesSummariesFor($admissionIds);
-        foreach ($activeVisits as $visit) {
-            $admission = $visit->patient?->admission;
-            if ($admission && isset($summaries[$admission->id])) {
-                $admission->setAttribute('requested_surgeries_summary', $summaries[$admission->id]);
-            }
-        }
-
-        return DoctorVisitResource::collection($activeVisits);
+        return DoctorVisitListItemResource::collection($activeVisits);
     }
 
     /**

@@ -15,11 +15,8 @@ class DoctorVisitResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        // Calculate financial totals once
-        $financialSummary = $this->calculateFinancialSummary();
-        
-        // Cache company status to avoid multiple checks
         $isCompanyPatient = !empty($this->patient?->company_id);
+        $financialSummary = $this->calculateFinancialSummary($isCompanyPatient);
 
         return [
             'id' => $this->id,
@@ -34,37 +31,44 @@ class DoctorVisitResource extends JsonResource
             'visit_notes' => $this->visit_notes,
             'is_new' => (bool) $this->is_new,
             'only_lab' => (bool) $this->only_lab,
+            'is_online' => (bool) $this->is_online,
             'requested_services_count' => $this->requested_services_count,
-            
+
             // Patient information
             'patient_id' => $this->patient_id,
-            'patient' => new PatientResource($this->whenLoaded('patient',function() {
-                return $this->patient->load(['user', 'sampleCollectedBy']);
+            'patient' => new PatientResource($this->whenLoaded('patient', function () {
+                // Inject has_cbc from the visit-level withExists so PatientResource
+                // never needs to lazy-load doctorVisit or call hasCbc() per row.
+                $this->patient->has_cbc = (bool) ($this->has_cbc ?? false);
+                return $this->patient;
             })),
-            'patient_subcompany' => $this->whenLoaded('patient', function() {
+            'patient_subcompany' => $this->whenLoaded('patient', function () {
                 return $this->patient->subcompany;
             }),
-            
+
             // Doctor information
             'doctor_id' => $this->doctor_id ?? $this->patient?->doctor_id,
-            'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor') ? $this->doctor : ($this->whenLoaded('patient.doctor') ? $this->patient->doctor : null)),
+            'doctor' => new DoctorStrippedResource($this->relationLoaded('doctor') ? $this->doctor : ($this->patient?->relationLoaded('doctor') ? $this->patient->doctor : null)),
             'doctor_name' => $this->getDoctorName(),
-             
+
             // User information
             'user_id' => $this->user_id,
             'created_by_user' => new UserStrippedResource($this->whenLoaded('createdByUser')),
-            
+
             // Shift information
             'shift_id' => $this->shift_id,
             'general_shift_details' => new ShiftResource($this->whenLoaded('generalShift')),
             'doctor_shift_id' => $this->doctor_shift_id,
             'doctor_shift_details' => new DoctorShiftResource($this->whenLoaded('doctorShift')),
-            'total_services_amount' => $this->total_services(),
-            'total_services_paid' => $this->total_paid_services(),
-            'total_lab_value_will_pay' => $this->patient->total_lab_value_will_pay() - $this->patient->discountAmount(),
-            'lab_paid' => $this->patient->paid_lab(),
+
+            // Service totals (computed in single pass inside calculateFinancialSummary)
+            'total_services_amount' => $financialSummary['total_services_amount'],
+            'total_services_paid' => $financialSummary['total_paid'],
+            'total_lab_value_will_pay' => $financialSummary['total_lab_value_will_pay'],
+            'lab_paid' => $financialSummary['lab_paid'],
+
             // Financial summary
-            'total_lab_amount' =>  $financialSummary['total_lab_amount'],
+            'total_lab_amount' => $financialSummary['total_lab_amount'],
             'total_paid' => $financialSummary['total_paid'],
             'total_discount' => $financialSummary['total_discount'],
             'balance_due' => $financialSummary['balance_due'],
@@ -72,75 +76,85 @@ class DoctorVisitResource extends JsonResource
             'total_lab_discount' => $financialSummary['total_lab_discount'],
             'total_lab_endurance' => $financialSummary['total_lab_endurance'],
             'total_lab_balance' => $financialSummary['total_lab_balance'],
+
             // Related resources
             'requested_services' => RequestedServiceResource::collection($this->whenLoaded('requestedServices')),
             'lab_requests' => LabRequestResource::collection($this->whenLoaded('patientLabRequests')),
             'requested_services_summary' => $this->getRequestedServicesSummary(),
-            
+
             // Timestamps
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
-            'company_relation' => $this->patient?->companyRelation,
+            'company_relation' => $this->whenLoaded('patient', fn () => $this->patient->companyRelation),
             'result_auth' => $this->patient?->result_auth,
             'auth_date' => $this->patient?->auth_date,
-            // 'doctor_in_patient' => $this->patient?->doctor->name,
-
         ];
     }
 
     /**
-     * Calculate financial summary for the visit
-     *
-     * @return array
+     * Single-pass financial calculation over requestedServices and patientLabRequests.
+     * Eliminates the 3 separate iterations that existed before.
      */
-    public function calculateFinancialSummary(): array
+    public function calculateFinancialSummary(bool $isCompanyPatient = false): array
     {
         $totalAmount = 0;
         $totalPaid = 0;
         $totalDiscount = 0;
-        $isCompanyPatient = !empty($this->patient?->company_id);
         $totalEndurance = 0;
+        $totalServicesAmount = 0;
         $totalLabAmount = 0;
         $totalLabPaid = 0;
         $totalLabDiscount = 0;
         $totalLabEndurance = 0;
         $totalLabBalance = 0;
-        $totalServicesAmount = 0;
+        $totalLabValueWillPay = 0;
+        $labPaid = 0;
 
-        // Calculate from requested services
+        // Single pass over requestedServices (replaces 3 separate loops)
         if ($this->relationLoaded('requestedServices')) {
             foreach ($this->requestedServices as $service) {
-                $serviceCalculation = $this->calculateServiceFinancials($service, $isCompanyPatient);
-                $totalAmount += $serviceCalculation['net_payable'];
-                $totalPaid += $serviceCalculation['amount_paid'];
-                $totalDiscount += $serviceCalculation['discount'];
-                $totalServicesAmount += $serviceCalculation['net_payable'];
+                $calc = $this->calculateServiceFinancials($service, $isCompanyPatient);
+                $totalAmount += $calc['net_payable'];
+                $totalPaid += $calc['amount_paid'];
+                $totalDiscount += $calc['discount'];
+                $totalServicesAmount += (float) ($service->price ?? 0) * (int) ($service->count ?? 1);
             }
         }
 
-        // Calculate from lab requests
+        // Single pass over patientLabRequests (replaces 3 separate patient->labrequests loops)
         if ($this->relationLoaded('patientLabRequests')) {
             foreach ($this->patientLabRequests as $labRequest) {
-                $labCalculation = $this->calculateLabRequestFinancials($labRequest, $isCompanyPatient);
+                $calc = $this->calculateLabRequestFinancials($labRequest, $isCompanyPatient);
+                $totalLabAmount += $calc['price'];
+                $totalLabPaid += $calc['amount_paid'];
+                $totalLabDiscount += $calc['discount'];
+                $totalLabEndurance += $calc['endurance'];
+                $totalLabBalance += $calc['balance'];
 
-              
-                $totalLabAmount += $labCalculation['price'];
-                $totalLabPaid += $labCalculation['amount_paid'];
-                $totalLabDiscount += $labCalculation['discount'];
-                $totalLabEndurance += $labCalculation['endurance'];
-                $totalLabBalance += $labCalculation['balance'];
+                // Replaces patient->total_lab_value_will_pay() and patient->discountAmount()
+                $totalLabValueWillPay += $isCompanyPatient
+                    ? $calc['endurance'] - $calc['discount']
+                    : $calc['price'] - $calc['discount'];
+
+                // Replaces patient->paid_lab() — only count paid requests
+                if (!empty($labRequest->is_paid)) {
+                    $labPaid += $calc['amount_paid'];
+                }
             }
         }
 
         return [
+            'total_services_amount' => round($totalServicesAmount, 2),
             'total_lab_amount' => round($totalLabAmount, 2),
             'total_paid' => round($totalPaid, 2),
             'total_discount' => round($totalDiscount, 2),
-            'balance_due' => round($isCompanyPatient ? $totalEndurance - $totalPaid : ($totalAmount- $totalDiscount )- $totalPaid, 2),
+            'balance_due' => round($isCompanyPatient ? $totalEndurance - $totalPaid : ($totalAmount - $totalDiscount) - $totalPaid, 2),
             'total_lab_paid' => round($totalLabPaid, 2),
             'total_lab_discount' => round($totalLabDiscount, 2),
             'total_lab_endurance' => round($totalLabEndurance, 2),
             'total_lab_balance' => round($totalLabBalance, 2),
+            'total_lab_value_will_pay' => round($totalLabValueWillPay, 2),
+            'lab_paid' => round($labPaid, 2),
         ];
     }
 

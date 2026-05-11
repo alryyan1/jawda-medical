@@ -20,13 +20,21 @@ class StorePatientRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $phone = $this->input('phone');
-
-        // If the phone number exists and starts with 249, remove the first 3 characters
+        if($phone == '249') {
+            $phone = '0';
+            $this->merge([
+                'phone' => $phone,
+            ]);
+        }else{
+               // If the phone number exists and starts with 249, remove the first 3 characters
         if ($phone && str_starts_with($phone, '249')) {
             $this->merge([
                 'phone' => substr($phone, 3),
             ]);
         }
+        }
+
+     
     }
     public function rules(): array
     {
@@ -49,6 +57,7 @@ class StorePatientRequest extends FormRequest
             'social_status' => ['nullable', Rule::in(['single', 'married', 'widowed', 'divorced'])],
             'income_source' => 'nullable|string|max:255',
             'from_addmission_page' => 'nullable|boolean',
+            'is_online' => 'nullable|boolean',
             // 'expire_date' => 'nullable|date_format:Y-m-d',
             // Additional fields that might come from the form to create the DoctorVisit
             // 'visit_type' => 'required|string|max:50', // e.g., "New", "Follow-up"
