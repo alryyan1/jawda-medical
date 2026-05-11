@@ -11,12 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('operation_items', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->enum('type', ['center', 'staff']);
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
+        Schema::table('labrequests', function (Blueprint $table) {
+            //done
+            $table->boolean('done')->default(false);
+
+
+
         });
     }
 
@@ -25,6 +25,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('operation_items');
+        Schema::table('labrequests', function (Blueprint $table) {
+            $table->dropColumn('done');
+
+
+        });
     }
 };
