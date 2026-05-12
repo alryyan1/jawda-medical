@@ -577,4 +577,20 @@ class DoctorShiftController extends Controller
 
         return new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift']));
     }
+
+    public function adjacent(DoctorShift $doctorShift)
+    {
+        $previousId = DoctorShift::where('doctor_id', $doctorShift->doctor_id)
+            ->where('id', '<', $doctorShift->id)
+            ->max('id');
+
+        $nextId = DoctorShift::where('doctor_id', $doctorShift->doctor_id)
+            ->where('id', '>', $doctorShift->id)
+            ->min('id');
+
+        return response()->json([
+            'previous_id' => $previousId,
+            'next_id' => $nextId,
+        ]);
+    }
 }
