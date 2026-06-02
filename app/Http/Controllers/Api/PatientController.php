@@ -836,12 +836,12 @@ class PatientController extends Controller
 
         if (isset($validatedData['name']) && $validatedData['name'] !== $patient->name) {
             $similarity = $this->calculateNameSimilarity($patient->name, $validatedData['name']);
-            if ($similarity < 60) { // Allow up to 40% change in the name
-                return response()->json([
-                    'message' => 'لا يمكن تغيير الاسم بأكثر من 40% من الاسم الأصلي.',
-                    'errors' => ['name' => ['لا يمكن تغيير الاسم بأكثر من 40% من الاسم الأصلي.']],
-                ], 422);
-            }
+            // if ($similarity < 60) { // Allow up to 40% change in the name
+            //     return response()->json([
+            //         'message' => 'لا يمكن تغيير الاسم بأكثر من 40% من الاسم الأصلي.',
+            //         'errors' => ['name' => ['لا يمكن تغيير الاسم بأكثر من 40% من الاسم الأصلي.']],
+            //     ], 422);
+            // }
         }
 
         Log::info('Updating patient:  ' . $patient->id . ' with data: ' . json_encode($request->all()));
