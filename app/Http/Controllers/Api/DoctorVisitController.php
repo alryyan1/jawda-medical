@@ -9,6 +9,7 @@ use App\Models\Doctor;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use App\Http\Resources\DoctorVisitResource;
+use App\Http\Resources\PatientVisitSummaryResource;
 use App\Models\DoctorShift;
 use App\Models\File;
 use Illuminate\Support\Facades\Auth;
@@ -58,6 +59,79 @@ class DoctorVisitController extends Controller
     //     $visits = $query->paginate($request->get('per_page', 15));
     //     return DoctorVisitResource::collection($visits);
     // }
+    /**
+     * GET /visits-summary
+     * Lean endpoint for the patients list page.
+     * Drops all joins not needed for the list (service names, test names,
+     * doctor-shift chain, admission, user) and loads only the financial
+     * columns needed to compute per-visit totals.
+     */
+    public function summaryIndex(Request $request)
+    {
+        $query = DoctorVisit::with([
+            'patient:id,name,phone,company_id',
+            'patient.company:id,name',
+            'doctor:id,name',
+            'requestedServices:id,doctorvisits_id,price,count,discount_per,discount,endurance,amount_paid',
+            // hasManyThrough JOINs patients → prefix id to avoid ambiguity; no doctorvisits_id column
+            'patientLabRequests' => fn ($q) => $q->select(
+                'labrequests.id',
+                'labrequests.price',
+                'labrequests.discount_per',
+                'labrequests.endurance',
+                'labrequests.amount_paid',
+                'labrequests.is_paid',
+            ),
+        ])
+        ->select('id', 'number', 'created_at', 'patient_id', 'doctor_id', 'doctor_shift_id', 'shift_id', 'status')
+        ->latest('created_at');
+
+        if ($request->filled('date_from') && $request->filled('date_to')) {
+            $query->whereBetween('created_at', [
+                Carbon::parse($request->date_from)->startOfDay(),
+                Carbon::parse($request->date_to)->endOfDay(),
+            ]);
+        } elseif ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+        } elseif ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        } else {
+            $query->whereDate('created_at', Carbon::today());
+        }
+
+        if ($request->filled('doctor_id')) {
+            $query->where('doctor_id', $request->doctor_id);
+        }
+        if ($request->filled('company_id')) {
+            $query->whereHas('patient', fn ($q) => $q->where('company_id', $request->company_id));
+        }
+        if ($request->filled('status') && $request->status !== 'all') {
+            $query->where('status', $request->status);
+        }
+        if ($request->filled('search')) {
+            $term = $request->search;
+            $query->whereHas('patient', fn ($q) =>
+                $q->where('name', 'LIKE', "%{$term}%")
+                  ->orWhere('phone', 'LIKE', "%{$term}%")
+                  ->orWhere('id', $term)
+            );
+        }
+        if ($request->filled('service_id')) {
+            $query->whereHas('requestedServices', fn ($q) =>
+                $q->where('service_id', $request->service_id)
+            );
+        }
+        if ($request->filled('diagnosis_user_id')) {
+            $query->whereHas('requestedServices.diagnosis', fn ($q) =>
+                $q->where('user_id', $request->diagnosis_user_id)
+            );
+        }
+
+        $visits = $query->paginate($request->get('per_page', 100));
+
+        return PatientVisitSummaryResource::collection($visits);
+    }
+
     public function index(Request $request)
     {
         $request->validate([
@@ -145,6 +219,16 @@ class DoctorVisitController extends Controller
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
                   ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
                   ->orWhere('id', $searchTerm);
+            });
+        }
+        if ($request->filled('service_id')) {
+            $query->whereHas('requestedServices', function ($q) use ($request) {
+                $q->where('service_id', $request->service_id);
+            });
+        }
+        if ($request->filled('diagnosis_user_id')) {
+            $query->whereHas('requestedServices.diagnosis', function ($q) use ($request) {
+                $q->where('user_id', $request->diagnosis_user_id);
             });
         }
 

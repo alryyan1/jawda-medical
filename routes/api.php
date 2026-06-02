@@ -86,6 +86,7 @@ use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\EmployeeExpenseController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\SmsController;
+use App\Http\Controllers\Api\RequestedServiceDiagnosisController;
 
 /*
 |--------------------------------------------------------------------------
@@ -152,6 +153,7 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
   Route::get('roles-list', [UserController::class, 'getRolesList']);
+  Route::get('users-list', [UserController::class, 'indexList']);
   Route::get('permissions-list', [RoleController::class, 'getPermissionsList']);
   // Specific routes must come before apiResource to avoid route model binding conflicts
   Route::get('/users/with-shift-transactions', [UserController::class, 'getUsersWithShiftTransactions']);
@@ -242,6 +244,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'update']);
 
   // Doctor Visits
+  Route::get('/visits-summary', [DoctorVisitController::class, 'summaryIndex']);
   Route::put('/doctor-visits/{doctorVisit}/status', [DoctorVisitController::class, 'updateStatus']);
   Route::apiResource('doctor-visits', DoctorVisitController::class);
 
@@ -251,6 +254,12 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/visits/{visit}/request-services', [VisitServiceController::class, 'addRequestedServices']);
   Route::put('/requested-services/{requestedService}', [VisitServiceController::class, 'updateRequestedService']);
   Route::delete('/visits/{visit}/requested-services/{requestedService}', [VisitServiceController::class, 'removeRequestedService']);
+
+  // Diagnosis routes
+  Route::get('/requested-services/{requestedService}/diagnosis', [RequestedServiceDiagnosisController::class, 'show']);
+  Route::post('/requested-services/{requestedService}/diagnosis', [RequestedServiceDiagnosisController::class, 'store']);
+  Route::put('/requested-service-diagnoses/{diagnosis}', [RequestedServiceDiagnosisController::class, 'update']);
+  Route::get('/requested-service-diagnoses/{diagnosis}/pdf', [RequestedServiceDiagnosisController::class, 'generatePdf']);
   Route::post('/requested-services/{requestedService}/deposits', [RequestedServiceDepositController::class, 'store']);
   Route::post('/requested-services/{requestedService}/refunds', [ReturnedRequestedServiceController::class, 'store']);
 
@@ -276,6 +285,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Services & Service Groups
   Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']);
   Route::get('/service-groups-with-services', [ServiceGroupController::class, 'getGroupsWithServices']);
+  Route::get('services-list', [ServiceController::class, 'indexList']);
   Route::apiResource('services', ServiceController::class);
   Route::get('services/{service}/price-history', [ServiceController::class, 'priceHistory']);
 

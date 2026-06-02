@@ -168,6 +168,11 @@ class RequestedService extends Model
     {
         return $this->hasMany(ReturnedRequestedService::class, 'requested_service_id');
     }
+
+    public function diagnosis()
+    {
+        return $this->hasOne(RequestedServiceDiagnosis::class, 'requested_service_id');
+    }
     public function totalDepositsBank()
     {
         return $this->deposits()->where('is_bank', 1)->sum('amount');

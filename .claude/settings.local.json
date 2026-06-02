@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir \"c:\\\\xampp\\\\htdocs\\\\jawda-medical\\\\database\\\\old_migrations\")",
+      "Bash(git commit -m ' *)"
+    ],
+    "additionalDirectories": [
+      "c:\\xampp\\htdocs\\jawda-medical\\database"
+    ]
+  }
+}

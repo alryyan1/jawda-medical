@@ -53,6 +53,14 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->lineHeight = 3.5;
     }
 
+    public function SetFont($family, $style = '', $size = 0, $fontfile = '', $subset = 'default', $out = true)
+    {
+        if (!str_contains($style, 'B')) {
+            $style = 'B' . $style;
+        }
+        parent::SetFont($family, $style, $size, $fontfile, $subset, $out);
+    }
+
     public function generate(): string
     {
         $this->AddPage();

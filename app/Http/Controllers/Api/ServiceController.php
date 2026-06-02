@@ -13,6 +13,16 @@ use Illuminate\Validation\Rule;
 
 class ServiceController extends Controller
 {
+    public function indexList()
+    {
+        $services = Service::select('id', 'name')
+            ->where('activate', true)
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['data' => $services]);
+    }
+
     public function index(Request $request)
     {
         $query = Service::with('serviceGroup'); // Eager load by default

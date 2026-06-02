@@ -176,13 +176,31 @@ class VisitServiceController extends Controller
                             } else {
                                 // return $company;
                                 //compnay relation
+                                $patient->load('subCompany'); // Ensure subCompany is loaded
                                 if ($patient->companyRelation != null) {
+                                    //add log here
+                                    Log::info("Patient has a company relation.");
                                     $companyRelation = $patient->companyRelation;
                                     $companyServiceEndurance = ($price * (float) ($companyRelation->service_endurance ?? 0)) / 100;
                                     $companyEnduranceAmount = $price - $companyServiceEndurance;
-                                } else {
-
-                                    $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
+                                } elseif ($patient->subCompany != null) {
+                                    Log::info("Patient does  have a subcompany , using subcompany default endurance.",[
+                                        'patient' => $patient,
+                                            'subCompany' => $patient->subCompany,
+                                    ]);
+                                        $subCompany = $patient->subCompany;
+                                        $companyServiceEndurance = ($price * (float) ($subCompany->service_endurance ?? 0)) / 100; 
+                                        Log::info("Subcompany endurance calculation", [
+                                            'price' => $price,
+                                            'subCompanyServiceEndurancePercentage' => $subCompany->service_endurance,
+                                            'calculatedSubCompanyServiceEndurance' => $companyServiceEndurance,
+                                        ]);
+                                        $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                }else{
+                                    Log::info("Patient does not have a company relation or subcompany, using company default endurance.",[
+                                        'patient0' => $patient,
+                                    ]);
+                                     $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
                                     $companyEnduranceAmount = $price - $companyServiceEndurance;
                                 }
                             }

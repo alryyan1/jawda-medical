@@ -303,9 +303,9 @@ class Patient extends Model
     /**
      * Get the subcompany associated with this patient.
      */
-    public function subcompany()
+    public function subCompany()
     {
-        return $this->belongsTo(Subcompany::class);
+        return $this->belongsTo(Subcompany::class, 'subcompany_id');
     }
 
     public function doctor()

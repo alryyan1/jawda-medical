@@ -162,9 +162,11 @@ class PatientController extends Controller
             }
             // $this->authorize('register insurance_patient');
         } else {
+            // return response()->json(['all permissions' => $user->getAllPermissions()], 200);
             if (!$user->can('تسجيل مريض كاش')) return response()->json(['message' => '  المستخدم ليس لديه صلاحية تسجيل مريض كاش .'], 400);
         }
         DB::beginTransaction();
+        // return $request->validated();
         try {
             // Check for existing patient with same phone number or identical name
             $existingPatient = null;
@@ -216,6 +218,7 @@ class PatientController extends Controller
                 'auth_date' => null,
             ]));
 
+
             // 3. Create the DoctorVisit record linked to this new Patient record and new File
             $doctorVisit = $patient->doctorVisit()->create([
                 'doctor_id' => $visitDoctorId,
@@ -230,6 +233,7 @@ class PatientController extends Controller
                 'is_new' => 1,
                 'number' => $queueNumber,
                 'queue_number' => $queueNumber,
+                'is_online' => $request->boolean('is_online'),
             ]);
 
             // 4. Auto-attach favorite service if user has a selection for this doctor

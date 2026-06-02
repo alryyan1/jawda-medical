@@ -15,6 +15,7 @@ class UserResource extends JsonResource
             'username' => $this->username,
             // 'email' => $this->email, // If you have it
             'doctor_id' => $this->doctor_id,
+            'doctor' => $this->whenLoaded('doctor'),
             'is_nurse' => (bool) $this->is_nurse,
             'user_money_collector_type' => $this->user_money_collector_type,
             'is_supervisor' => (bool) $this->is_supervisor,

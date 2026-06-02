@@ -142,6 +142,16 @@ class UserController extends Controller
     {
         return new UserResource($user->load('roles', 'permissions'));
     }
+    public function indexList()
+    {
+        $users = User::select('id', 'name')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['data' => $users]);
+    }
+
     public function index(Request $request)
     {
         // Validate per_page if you want to restrict its range
@@ -156,6 +166,7 @@ class UserController extends Controller
         $perPage = $request->input('per_page', 15); // Default to 15 items per page
 
         $query = User::with('roles'); // Eager load roles
+        $query->with('doctor'); // Eager load doctor relationship if needed
 
         // Optional: Search functionality
         if ($request->filled('search')) {

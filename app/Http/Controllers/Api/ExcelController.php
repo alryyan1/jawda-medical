@@ -29,195 +29,251 @@ class ExcelController extends Controller
     public function reclaim(Request $request)
     {
         $company = Company::find($request->query("company"));
-
         if (!$company) {
             return response()->json(['error' => 'Company not found'], 404);
         }
 
-        // Style headers
-        $headerStyle = [
-            'font' => [
-                'bold' => true,
-                'color' => ['rgb' => 'FFFFFF'],
-            ],
-            'fill' => [
-                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '1E90FF'],
-            ],
-            'alignment' => [
-                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
-                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
-            ],
-        ];
-        
-        $spreadsheet = new Spreadsheet();
-        $spreadsheet->getActiveSheet()->setRightToLeft(true);
-
-        // Get data
-        $first = $request->query('first');
-        $second = $request->query('second');
-        $startDate = Carbon::parse($first)->startOfDay();
-        $endDate = Carbon::parse($second)->endOfDay();
+        $first      = $request->query('first');
+        $second     = $request->query('second');
+        $startDate  = Carbon::parse($first)->startOfDay();
+        $endDate    = Carbon::parse($second)->endOfDay();
 
         $serviceGroups = ServiceGroup::all();
 
-        $patients = DoctorVisit::whereHas('patient', function ($q) use ($company) {
-            $q->where('company_id', '=', $company->id);
-        })->whereBetween('created_at', [$startDate, $endDate])->get();
-        
-        $count = $patients->count() + 6;
-        // Dynamic service-group columns start at K (col 11), after fixed cols C(3)..J(10).
-        // Use Coordinate::stringFromColumnIndex so AA, AB… work when groups exceed 16.
-        $colIdx = fn(int $offset) => \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($offset);
-        $fixedEnd = 10; // J
-        $start_col_name = 'C';
-        $end_col_name   = $colIdx($fixedEnd + $serviceGroups->count());      // التحمل
-        $last_col_name  = $colIdx($fixedEnd + $serviceGroups->count() + 1);  // الإجمالي
+        $visits = DoctorVisit::whereHas('patient', fn($q) => $q->where('company_id', $company->id))
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->with(['patient.subCompany', 'patient.companyRelation'])
+            ->get();
 
-        $spreadsheet->getProperties()->setTitle('مطالبه التامين');
-        $spreadsheet->getActiveSheet()->mergeCells('F2:I2');
-        $spreadsheet->getActiveSheet()->getStyle('F2')->getFont()->setSize(18);
-        $spreadsheet->getActiveSheet()->getStyle('F2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-        $spreadsheet->getActiveSheet()->getStyle('F2')->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
-        $spreadsheet->getActiveSheet()->setCellValue("F2", $company->name);
-        
-        $spreadsheet->getActiveSheet()->mergeCells('F3:I3');
-        $spreadsheet->getActiveSheet()->getStyle('F3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-        $spreadsheet->getActiveSheet()->getStyle('F3')->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
-        $carbon = Carbon::parse($first);
-        $spreadsheet->getActiveSheet()->setCellValue("F3", $carbon->monthName);
+        $colIdx = fn(int $n) => \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($n);
 
-        // Add borders
-        $spreadsheet->getActiveSheet()->getStyle("C5:$last_col_name" . $count)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-        $spreadsheet->getActiveSheet()->getStyle("C5:$last_col_name" . $count)->getBorders()->getAllBorders()->getColor()->setRGB('000000');
+        // ── Column layout ─────────────────────────────────────────────────
+        // C(3)..J(10) = 8 fixed columns
+        // K(11)..K+n-1 = service groups
+        // K+n          = التحمل  (endurance / patient co-pay)
+        // K+n+1        = صافي المطالبة  (net reclaim = lab + services − تحمل)
+        $fixedEnd        = 10; // J
+        $sgCount         = $serviceGroups->count();
+        $sgStartIdx      = $fixedEnd + 1;
+        $sgEndIdx        = $fixedEnd + $sgCount;
+        $enduranceIdx    = $sgEndIdx + 1;
+        $totalIdx        = $sgEndIdx + 2;
 
-        // Center alignment
-        $spreadsheet->getActiveSheet()->getStyle("C1:$last_col_name" . $count)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-        $spreadsheet->getActiveSheet()->getStyle("C1:$last_col_name" . $count)->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+        $sgStartCol      = $colIdx($sgStartIdx);
+        $sgEndCol        = $colIdx($sgEndIdx);
+        $enduranceCol    = $colIdx($enduranceIdx);
+        $totalCol        = $colIdx($totalIdx);
+        $firstCol        = 'C';
+        $lastCol         = $totalCol;
 
-        // Apply header style
-        $spreadsheet->getActiveSheet()->getStyle($start_col_name . '5:' . $end_col_name . '5')->applyFromArray($headerStyle);
+        // ── Row layout ────────────────────────────────────────────────────
+        $headerRow   = 5;
+        $dataStart   = 6;
+        $patientCount = $visits->count();
+        $dataEnd     = $dataStart + $patientCount - 1;
+        $totalsRow   = $dataEnd + 2; // one blank buffer
 
-        // Set column widths
-        $spreadsheet->getActiveSheet()->getColumnDimension('C')->setWidth(10);  // الرقم
-        $spreadsheet->getActiveSheet()->getColumnDimension('D')->setWidth(30);  // الاسم
-        $spreadsheet->getActiveSheet()->getColumnDimension('E')->setWidth(15);  // التاريخ
-        $spreadsheet->getActiveSheet()->getColumnDimension('F')->setWidth(20);  // رقم البطاقه
-        $spreadsheet->getActiveSheet()->getColumnDimension('G')->setWidth(20);  // المعمل (lab total)
-        $spreadsheet->getActiveSheet()->getColumnDimension('H')->setWidth(18);  // subcompany_id
-        $spreadsheet->getActiveSheet()->getColumnDimension('I')->setWidth(18);  // company_relation_id
-        $spreadsheet->getActiveSheet()->getColumnDimension('J')->setWidth(24);  // الضامن (guarantor)
+        // ── Spreadsheet setup ─────────────────────────────────────────────
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setRightToLeft(true);
+        $spreadsheet->getProperties()->setTitle('مطالبة التأمين - ' . $company->name);
 
-        // Add SUM formulas and styling
-        $spreadsheet->getActiveSheet()->setCellValue('G' . $count + 1, "=SUM(G4:G$count)");
-        $spreadsheet->getActiveSheet()->getStyle('G' . $count + 1)->getFont()->setSize(20);
+        // ── Title block ───────────────────────────────────────────────────
+        $sheet->mergeCells("C1:{$lastCol}1");
+        $sheet->setCellValue('C1', 'كشف مطالبة التأمين');
+        $sheet->getStyle('C1')->applyFromArray([
+            'font'      => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '1A3C6B']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+        $sheet->getRowDimension(1)->setRowHeight(26);
 
-        $sumCellStyle = [
-            'font' => [
-                'bold' => true,
-                'size' => 14,
-                'color' => ['rgb' => 'FF0000'],
-            ],
-            'alignment' => [
-                'horizontal' => Alignment::HORIZONTAL_CENTER,
-                'vertical' => Alignment::VERTICAL_CENTER,
-            ],
-            'fill' => [
-                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                'startColor' => ['rgb' => 'FFFF99'],
-            ],
-            'borders' => [
-                'allBorders' => [
-                    'borderStyle' => Border::BORDER_THICK,
-                    'color' => ['rgb' => '000000'],
-                ],
-            ],
+        $sheet->mergeCells("C2:{$lastCol}2");
+        $sheet->setCellValue('C2', $company->name);
+        $sheet->getStyle('C2')->applyFromArray([
+            'font'      => ['bold' => true, 'size' => 22, 'color' => ['rgb' => '1A3C6B']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'EBF3FB']],
+        ]);
+        $sheet->getRowDimension(2)->setRowHeight(36);
+
+        $sheet->mergeCells("C3:{$lastCol}3");
+        $sheet->setCellValue('C3', Carbon::parse($first)->format('Y-m-d') . '  —  ' . Carbon::parse($second)->format('Y-m-d'));
+        $sheet->getStyle('C3')->applyFromArray([
+            'font'      => ['size' => 11, 'color' => ['rgb' => '444444']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ]);
+        $sheet->getRowDimension(3)->setRowHeight(20);
+
+        $sheet->mergeCells("C4:{$lastCol}4");
+        $sheet->setCellValue('C4', 'عدد المرضى: ' . $patientCount);
+        $sheet->getStyle('C4')->applyFromArray([
+            'font'      => ['size' => 10, 'italic' => true, 'color' => ['rgb' => '777777']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        ]);
+        $sheet->getRowDimension(4)->setRowHeight(18);
+
+        // ── Header row ────────────────────────────────────────────────────
+        $headerStyle = [
+            'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E5799']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
         ];
-        $spreadsheet->getActiveSheet()->getStyle('G' . $count + 1)->applyFromArray($sumCellStyle);
-        $spreadsheet->getActiveSheet()->getStyle($last_col_name . $count + 1)->applyFromArray($sumCellStyle);
+        $sheet->getStyle("{$firstCol}{$headerRow}:{$lastCol}{$headerRow}")->applyFromArray($headerStyle);
+        $sheet->getRowDimension($headerRow)->setRowHeight(22);
 
-        // Set header names
-        $spreadsheet->getActiveSheet()->setCellValue("C5", "الرقم ");
-        $spreadsheet->getActiveSheet()->setCellValue("D5", "الاسم");
-        $spreadsheet->getActiveSheet()->setCellValue("E5", "التاريخ ");
-        $spreadsheet->getActiveSheet()->setCellValue("F5", "رقم البطاقه");
-        $spreadsheet->getActiveSheet()->setCellValue("G5", "المعمل");
-        $spreadsheet->getActiveSheet()->setCellValue("H5", "الشركة الفرعية");
-        $spreadsheet->getActiveSheet()->setCellValue("I5", "علاقة الشركة");
-        $spreadsheet->getActiveSheet()->setCellValue("J5", "الضامن");
+        $sheet->setCellValue("C{$headerRow}", 'م');
+        $sheet->setCellValue("D{$headerRow}", 'اسم المريض');
+        $sheet->setCellValue("E{$headerRow}", 'التاريخ');
+        $sheet->setCellValue("F{$headerRow}", 'رقم البطاقة');
+        $sheet->setCellValue("G{$headerRow}", 'المعمل');
+        $sheet->setCellValue("H{$headerRow}", 'الشركة الفرعية');
+        $sheet->setCellValue("I{$headerRow}", 'علاقة الشركة');
+        $sheet->setCellValue("J{$headerRow}", 'الضامن');
 
-        // Add service group headers and formulas
-        $index = 0;
-        foreach ($serviceGroups as $service_group) {
-            $letter = $colIdx($fixedEnd + 1 + $index);
-            $spreadsheet->getActiveSheet()->setCellValue($letter . "5", $service_group->name);
-            $spreadsheet->getActiveSheet()->setCellValue($letter . $count + 1, "=SUM($letter" . "6:" . $letter . "$count)");
-            $spreadsheet->getActiveSheet()->getStyle($letter . $count + 1)->getFont()->setSize(20);
-            $index++;
+        $i = 0;
+        foreach ($serviceGroups as $sg) {
+            $sheet->setCellValue($colIdx($sgStartIdx + $i) . $headerRow, $sg->name);
+            $i++;
         }
 
-        // Add totals
-        $spreadsheet->getActiveSheet()->setCellValue($end_col_name . $count + 1, "=SUM($end_col_name" . "6:" . $end_col_name . "$count)");
-        $spreadsheet->getActiveSheet()->setCellValue($end_col_name . "5", "التحمل");
-        $spreadsheet->getActiveSheet()->setCellValue($last_col_name . "5", "اجمالي");
-        $spreadsheet->getActiveSheet()->setCellValue($last_col_name . $count + 1, "=SUM($last_col_name" . "6:" . $last_col_name . "$count)");
+        // التحمل header — orange tint to distinguish
+        $sheet->setCellValue("{$enduranceCol}{$headerRow}", 'التحمل');
+        $sheet->getStyle("{$enduranceCol}{$headerRow}")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'C0392B']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
 
-        // Add patient data
+        // صافي المطالبة header — green tint
+        $sheet->setCellValue("{$totalCol}{$headerRow}", 'صافي المطالبة');
+        $sheet->getStyle("{$totalCol}{$headerRow}")->applyFromArray([
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '27AE60']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+
+        // ── Column widths ──────────────────────────────────────────────────
+        $sheet->getColumnDimension('C')->setWidth(7);
+        $sheet->getColumnDimension('D')->setWidth(28);
+        $sheet->getColumnDimension('E')->setWidth(14);
+        $sheet->getColumnDimension('F')->setWidth(18);
+        $sheet->getColumnDimension('G')->setWidth(14);
+        $sheet->getColumnDimension('H')->setWidth(20);
+        $sheet->getColumnDimension('I')->setWidth(20);
+        $sheet->getColumnDimension('J')->setWidth(20);
+        for ($c = $sgStartIdx; $c <= $sgEndIdx; $c++) {
+            $sheet->getColumnDimension($colIdx($c))->setWidth(15);
+        }
+        $sheet->getColumnDimension($enduranceCol)->setWidth(14);
+        $sheet->getColumnDimension($totalCol)->setWidth(18);
+
+        // ── Patient data rows ─────────────────────────────────────────────
         $patientsCells = [];
-        $index = 1;
-        $startRow = 5;
-        
-        foreach ($patients as $patient) {
-            $inner_array = [];
-            $inner_array[] = $index;
-            $inner_array[] = $patient->patient->name;
-            $inner_array[] = $patient->created_at->format('Y-m-d');
-            $inner_array[] = $patient->patient->insurance_no;
-            $inner_array[] = $patient->patient->total_lab_value_unpaid();
-            // New fixed columns (H, I, J)
-            $inner_array[] = $patient->patient->subcompany_id ?? '';
-            $inner_array[] = $patient->patient->company_relation_id ?? '';
-            $inner_array[] = $patient->patient->guarantor ?? '';
-            
-            // Set comment for Lab
-            $comment = $spreadsheet->getActiveSheet()->getComment('G' . $startRow + $index);
-            $comment->getText()->createTextRun($patient->patient->tests_concatinated());
-            $comment->setAuthor('Ryan');
+        $rowIdx = 1;
+        foreach ($visits as $visit) {
+            $dataRow = $dataStart + $rowIdx - 1;
+            $row = [];
+            $row[] = $rowIdx;
+            $row[] = $visit->patient->name;
+            $row[] = $visit->created_at->format('Y-m-d');
+            $row[] = $visit->patient->insurance_no ?? '';
+            $row[] = $visit->patient->total_lab_value_unpaid();
+            $row[] = $visit->patient->subCompany->name  ?? '';
+            $row[] = $visit->patient->companyRelation->name ?? '';
+            $row[] = $visit->patient->guarantor ?? '';
 
-            // Add sum formula for each patient across dynamic group columns (from K..end_col_name)
-            $st = $startRow + $index;
-            $groupStartCol = 'K';
-            $spreadsheet->getActiveSheet()->setCellValue($last_col_name . $st, "=SUM($groupStartCol$st:$end_col_name$st)");
+            // Lab comment
+            $labComment = $sheet->getComment("G{$dataRow}");
+            $labComment->getText()->createTextRun($visit->patient->tests_concatinated());
+            $labComment->setAuthor('System');
 
-            $innerIndex = 0;
-            foreach ($serviceGroups as $service_group) {
-                $total = $patient->total_services_according_to_service_group($service_group->id);
-
-                // Set comment for services
+            // Service groups
+            $sgIdx = 0;
+            foreach ($serviceGroups as $sg) {
+                $total = $visit->total_services_according_to_service_group($sg->id);
                 if ($total > 0) {
-                    $comment = $spreadsheet->getActiveSheet()->getComment($colIdx($fixedEnd + 1 + $innerIndex) . $startRow + $index);
-                    $comment->getText()->createTextRun($patient->services_concatinated());
-                    $comment->setAuthor('Ryan');
+                    $svcComment = $sheet->getComment($colIdx($sgStartIdx + $sgIdx) . $dataRow);
+                    $svcComment->getText()->createTextRun($visit->services_concatinated());
+                    $svcComment->setAuthor('System');
                 }
-                $inner_array[] = $total;
-                $innerIndex++;
+                $row[] = $total;
+                $sgIdx++;
             }
 
-            $inner_array[] = $patient->total_paid_services_insurance() + $patient->patient->paid_lab();
-            $patientsCells[] = $inner_array;
-            $index++;
-        }
-        
-        $spreadsheet->getActiveSheet()->fromArray($patientsCells, null, 'C6');
+            // التحمل = patient's endurance co-pay
+            $row[] = $visit->total_paid_services_insurance() + $visit->patient->paid_lab();
 
+            $patientsCells[] = $row;
+            $rowIdx++;
+        }
+
+        if (!empty($patientsCells)) {
+            $sheet->fromArray($patientsCells, null, 'C6');
+        }
+
+        // ── Per-row صافي المطالبة formula ──────────────────────────────────
+        // صافي = المعمل + مجموع الخدمات − التحمل
+        for ($r = $dataStart; $r <= $dataEnd; $r++) {
+            $sheet->setCellValue(
+                "{$totalCol}{$r}",
+                "=G{$r}+SUM({$sgStartCol}{$r}:{$sgEndCol}{$r})-{$enduranceCol}{$r}"
+            );
+        }
+
+        // ── Alternating row colours ────────────────────────────────────────
+        for ($r = $dataStart; $r <= $dataEnd; $r++) {
+            $rgb = ($r % 2 === 0) ? 'EFF6FF' : 'FFFFFF';
+            $sheet->getStyle("{$firstCol}{$r}:{$lastCol}{$r}")
+                ->getFill()->setFillType(Fill::FILL_SOLID)
+                ->getStartColor()->setRGB($rgb);
+        }
+
+        // ── Totals row ────────────────────────────────────────────────────
+        $totalsStyle = [
+            'font'      => ['bold' => true, 'size' => 12, 'color' => ['rgb' => 'CC0000']],
+            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF2CC']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM, 'color' => ['rgb' => '000000']]],
+        ];
+
+        $sheet->setCellValue("D{$totalsRow}", 'الإجمالي');
+        $sheet->getStyle("D{$totalsRow}")->applyFromArray($totalsStyle);
+
+        // SUM for المعمل + all service groups + التحمل + صافي المطالبة
+        $sumCols = ['G'];
+        for ($c = $sgStartIdx; $c <= $totalIdx; $c++) {
+            $sumCols[] = $colIdx($c);
+        }
+        foreach ($sumCols as $col) {
+            $sheet->setCellValue("{$col}{$totalsRow}", "=SUM({$col}{$dataStart}:{$col}{$dataEnd})");
+            $sheet->getStyle("{$col}{$totalsRow}")->applyFromArray($totalsStyle);
+        }
+        $sheet->getRowDimension($totalsRow)->setRowHeight(24);
+
+        // ── Borders & global alignment ────────────────────────────────────
+        $sheet->getStyle("{$firstCol}{$headerRow}:{$lastCol}{$totalsRow}")
+            ->getBorders()->getAllBorders()
+            ->setBorderStyle(Border::BORDER_THIN);
+
+        $sheet->getStyle("{$firstCol}1:{$lastCol}{$totalsRow}")
+            ->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER)
+            ->setVertical(Alignment::VERTICAL_CENTER);
+
+        // Name column right-aligned
+        $sheet->getStyle("D{$dataStart}:D{$dataEnd}")
+            ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+        // ── Output ────────────────────────────────────────────────────────
         $writer = new Xlsx($spreadsheet);
         $filename = 'insurance_reclaim_' . $company->name . '_' . date('Y-m-d') . '.xlsx';
-        
-        return response()->streamDownload(function() use ($writer) {
+
+        return response()->streamDownload(function () use ($writer) {
             $writer->save('php://output');
         }, $filename, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . urlencode($filename) . '"'
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="' . urlencode($filename) . '"',
         ]);
     }
 
