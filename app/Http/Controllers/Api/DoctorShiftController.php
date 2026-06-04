@@ -432,6 +432,8 @@ class DoctorShiftController extends Controller
             'end_time' => $doctorShift->end_time?->toIso8601String(),
             'status' => $doctorShift->status ? 'Open' : 'Closed',
             'total_patients' => $doctorShift->doctorVisits->count(),
+            'total_cash'=> $doctorShift->total_services_cash(),
+            'total_bank' => $doctorShift->total_bank(),
             'doctor_fixed_share_for_shift' => $doctor_fixed_share,
             'doctor_cash_share_total' => $doctor_cash_share_total,
             'total_doctor_share' => $total_doctor_share,

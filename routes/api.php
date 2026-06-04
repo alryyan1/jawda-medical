@@ -131,6 +131,9 @@ Route::post('/hl7-client/toggle', [\App\Http\Controllers\Api\HL7ClientController
 // Public PDF route for Doctors List (opens in new tab)
 Route::get('/reports/doctors-list/pdf', [ReportController::class, 'exportDoctorsListToPdf']);
 
+// Public route — doctor names are not sensitive; used for Finance settings mapping
+Route::get('/all-doctors', [DoctorController::class, 'allDoctors']);
+
 Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
 Route::apiResource('main-tests', MainTestController::class);
 Route::get('/visits/{visit}/lab-requests', [LabRequestController::class, 'indexForVisit']);

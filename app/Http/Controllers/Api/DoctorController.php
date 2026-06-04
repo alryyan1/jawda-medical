@@ -50,6 +50,21 @@ class DoctorController extends Controller
         //     ];
         // }));
     }
+    public function allDoctors()
+    {
+        $doctors = Doctor::with('specialist:id,name')
+                         ->orderBy('name')
+                         ->get(['id', 'name', 'specialist_id']);
+
+        return response()->json([
+            'data' => $doctors->map(fn($d) => [
+                'id'              => $d->id,
+                'name'            => $d->name,
+                'specialist_name' => $d->specialist?->name,
+            ]),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validatedData = $request->validate([
