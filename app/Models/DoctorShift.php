@@ -444,4 +444,202 @@ class DoctorShift extends Model
         return $total;
     }
 
+    /**
+     * Single-pass financial summary replacing doctor_credit_cash(), doctor_credit_company(),
+     * total_paid_services(), clinic_cash(), clinic_enurance(), clinic_bank(), total_bank().
+     *
+     * Optimisations vs. the individual methods:
+     *  - Two SQL aggregate queries replace loading every visit+service into PHP memory.
+     *  - Setting::first(), specificServices, and categoryServiceIds are resolved once.
+     *  - All required Eloquent relations are loaded in a single loadMissing() call.
+     *
+     * @return array{
+     *   total_paid_services: float,
+     *   clinic_cash:         float,
+     *   clinic_insurance:    float,
+     *   total_bank:          float,
+     *   doctor_credit_cash:       float,
+     *   doctor_credit_insurance:  float,
+     *   doctor_fixed_share:       float,
+     *   total_doctor_share:       float,
+     * }
+     */
+    public function financialSummaryFast(): array
+    {
+        // ── 1. Pure-SQL aggregates ────────────────────────────────────────────
+        $paid = DB::table('requested_services as rs')
+            ->join('doctorvisits as dv', 'dv.id', '=', 'rs.doctorvisits_id')
+            ->join('patients as p',      'p.id',  '=', 'dv.patient_id')
+            ->where('dv.doctor_shift_id', $this->id)
+            ->selectRaw('
+                COALESCE(SUM(rs.amount_paid), 0)                                              AS total_paid,
+                COALESCE(SUM(CASE WHEN p.company_id IS NOT NULL THEN rs.amount_paid ELSE 0 END), 0) AS insurance_paid
+            ')
+            ->first();
+
+        $bank = DB::table('requested_service_deposits as rsd')
+            ->join('requested_services as rs', 'rs.id', '=', 'rsd.requested_service_id')
+            ->join('doctorvisits as dv',        'dv.id', '=', 'rs.doctorvisits_id')
+            ->join('patients as p',             'p.id',  '=', 'dv.patient_id')
+            ->where('dv.doctor_shift_id', $this->id)
+            ->where('rsd.is_bank', 1)
+            ->selectRaw('
+                COALESCE(SUM(rsd.amount), 0)                                                      AS total_bank,
+                COALESCE(SUM(CASE WHEN p.company_id IS NULL THEN rsd.amount ELSE 0 END), 0)       AS cash_bank
+            ')
+            ->first();
+
+        $totalPaid     = (float) $paid->total_paid;
+        $insurancePaid = (float) $paid->insurance_paid;
+        $cashPaid      = $totalPaid - $insurancePaid;
+        $totalBank     = (float) $bank->total_bank;
+        $cashBank      = (float) $bank->cash_bank;
+        $clinicCash    = $cashPaid - $cashBank;
+
+        // ── 2. Doctor credits (PHP logic, one eager-load pass) ───────────────
+        $this->loadMissing([
+            'doctor.specificServices',
+            'doctor.category.services',
+            'visits.patient:id,company_id',
+            'visits.requestedServices.returnedRefunds',
+            'visits.requestedServices.requestedServiceCosts',
+        ]);
+
+        $doctor              = $this->doctor;
+        $disableCheck        = (bool) optional(Setting::first())->disable_doctor_service_check;
+        $individualServiceIds = $doctor->specificServices->pluck('id')->toArray();
+        $categoryServiceIds   = $doctor->category_id
+            ? ($doctor->category?->services->pluck('id')->toArray() ?? [])
+            : [];
+
+        $cashCredit      = 0.0;
+        $insuranceCredit = 0.0;
+        $visitIndex      = 0;
+
+        foreach ($this->visits as $visit) {
+            $visitIndex++;
+            if ($visitIndex < $doctor->start) {
+                continue;
+            }
+
+            $isInsurance = $visit->patient->company_id !== null;
+
+            foreach ($visit->requestedServices as $service) {
+                if ($service->doctor_id !== $doctor->id) {
+                    continue;
+                }
+                if ($service->returnedRefunds->isNotEmpty()) {
+                    continue;
+                }
+
+                $eligible = $disableCheck
+                    || in_array($service->service_id, $individualServiceIds)
+                    || in_array($service->service_id, $categoryServiceIds);
+
+                if (! $eligible) {
+                    continue;
+                }
+
+                if ($isInsurance) {
+                    $gross = (float) $service->price * $service->count;
+                    $cost  = $service->getTotalCostsForDoctor($doctor);
+                    $insuranceCredit += ($gross - $cost) * (float) $doctor->company_percentage / 100;
+                } else {
+                    $cashCredit += $this->calcServiceCreditInline($service, $doctor);
+                }
+            }
+        }
+
+        $fixedShare = (float) ($doctor->static_wage ?? 0);
+
+        return [
+            'total_paid_services'        => $totalPaid,
+            'clinic_cash'                => $clinicCash,
+            'clinic_insurance'           => $insurancePaid,
+            'total_bank'                 => $totalBank,
+            'doctor_credit_cash'         => $cashCredit,
+            'doctor_credit_insurance'    => $insuranceCredit,
+            'doctor_fixed_share'         => $fixedShare,
+            'total_doctor_share'         => $cashCredit + $insuranceCredit + $fixedShare,
+        ];
+    }
+
+    private function calcServiceCreditInline(RequestedService $service, Doctor $doctor): float
+    {
+        // 1. Category-service pivot
+        if ($doctor->category_id && $doctor->relationLoaded('category')) {
+            $catService = $doctor->category->services
+                ->first(fn ($s) => $s->id === $service->service_id);
+            if ($catService?->pivot) {
+                return $this->applyPivotRateInline($service, $catService->pivot, $doctor);
+            }
+        }
+
+        // 2. Individual doctor-service pivot
+        $docService = $doctor->specificServices
+            ->first(fn ($s) => $s->pivot->service_id === $service->service_id);
+        if ($docService?->pivot) {
+            return $this->applyPivotRateInline($service, $docService->pivot, $doctor);
+        }
+
+        // 3. Default percentage
+        $cost = $service->getTotalCostsForDoctor($doctor);
+        return ((float) $service->amount_paid - $cost) * (float) $doctor->cash_percentage / 100;
+    }
+
+    private function applyPivotRateInline(RequestedService $service, object $pivot, Doctor $doctor): float
+    {
+        if (($pivot->percentage ?? 0) > 0) {
+            return (float) $service->amount_paid * $pivot->percentage / 100;
+        }
+        if (($pivot->fixed ?? 0) > 0) {
+            return (float) $pivot->fixed * $service->count;
+        }
+        $cost = $service->getTotalCostsForDoctor($doctor);
+        return ((float) $service->amount_paid - $cost) * (float) $doctor->cash_percentage / 100;
+    }
+
+    /**
+     * Returns users who paid the doctor's entitlement (from costs table), grouped by user.
+     */
+    public function usersWhoPayedDoctor()
+    {
+        return DB::table('costs')
+            ->join('users', 'users.id', '=', 'costs.user_cost')
+            ->where('costs.doctor_shift_id', $this->id)
+            ->whereNotNull('costs.user_cost')
+            ->select(
+                'users.id',
+                'users.name',
+                DB::raw('SUM(costs.amount) as total_cash'),
+                DB::raw('SUM(costs.amount_bankak) as total_bank'),
+                DB::raw('SUM(costs.amount + costs.amount_bankak) as total')
+            )
+            ->groupBy('users.id', 'users.name')
+            ->get();
+    }
+
+    /**
+     * Returns all users who collected payments (deposits) from visits in this doctor shift,
+     * with their total cash and bank amounts.
+     */
+    public function usersPaymentSummary()
+    {
+        return DB::table('requested_service_deposits')
+            ->join('requested_services', 'requested_services.id', '=', 'requested_service_deposits.requested_service_id')
+            ->join('doctorvisits', 'doctorvisits.id', '=', 'requested_services.doctorvisits_id')
+            ->join('users', 'users.id', '=', 'requested_service_deposits.user_id')
+            ->where('doctorvisits.doctor_shift_id', $this->id)
+            ->whereNotNull('requested_service_deposits.user_id')
+            ->select(
+                'users.id',
+                'users.name',
+                DB::raw('SUM(CASE WHEN requested_service_deposits.is_bank = 0 THEN requested_service_deposits.amount ELSE 0 END) as total_cash'),
+                DB::raw('SUM(CASE WHEN requested_service_deposits.is_bank = 1 THEN requested_service_deposits.amount ELSE 0 END) as total_bank'),
+                DB::raw('SUM(requested_service_deposits.amount) as total')
+            )
+            ->groupBy('users.id', 'users.name')
+            ->get();
+    }
+
 }

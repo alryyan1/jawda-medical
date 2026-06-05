@@ -29,10 +29,13 @@ class DoctorShiftResource extends JsonResource
         $clinicInsurance = 0;
         
         if ($includeFinancials) {
-            $cashEntitlement = $this->doctor_credit_cash();
-            $insuranceEntitlement = $this->doctor_credit_company();
-            $totalIncome = $this->total_paid_services();
-            $clinicInsurance = $this->clinic_enurance();
+            /** @var \App\Models\DoctorShift $model */
+            $model = $this->resource;
+            $fin = $model->financialSummaryFast();
+            $cashEntitlement      = $fin['doctor_credit_cash'];
+            $insuranceEntitlement = $fin['doctor_credit_insurance'];
+            $totalIncome          = $fin['total_paid_services'];
+            $clinicInsurance      = $fin['clinic_insurance'];
         }
         
         $staticWageApplied = ($this->status == false && $this->doctor) ? (float)$this->doctor->static_wage : 0;

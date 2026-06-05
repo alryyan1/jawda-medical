@@ -144,7 +144,7 @@ class UserController extends Controller
     }
     public function indexList()
     {
-        $users = User::select('id', 'name')
+        $users = User::select('id', 'name', 'username')
             ->where('is_active', true)
             ->orderBy('name')
             ->get();

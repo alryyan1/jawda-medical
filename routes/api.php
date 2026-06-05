@@ -223,6 +223,8 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/doctor-shifts/{doctorShift}/financial-summary', [DoctorShiftController::class, 'showFinancialSummary']);
   Route::get('/doctor-shifts/{doctorShift}/shift-service-costs', [DoctorShiftController::class, 'shiftServiceCosts']);
   Route::get('/doctor-shifts/{doctorShift}/adjacent', [DoctorShiftController::class, 'adjacent']);
+  Route::get('/doctor-shifts/{doctorShift}/users-payment-summary', [DoctorShiftController::class, 'usersPaymentSummary']);
+  Route::get('/doctor-shifts/{doctorShift}/users-who-payed-doctor', [DoctorShiftController::class, 'usersWhoPayedDoctor']);
   Route::apiResource('doctor-shifts', DoctorShiftController::class)->except(['store', 'update']);
 
   /*

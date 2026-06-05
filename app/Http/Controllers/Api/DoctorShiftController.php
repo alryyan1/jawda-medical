@@ -296,11 +296,11 @@ class DoctorShiftController extends Controller
 
         // Only load heavy relations when financials are explicitly requested
         if ($request->boolean('include_financials')) {
-            $eagerLoad = array_merge($eagerLoad, [
-                'visits.patient.company',
-                'visits.requestedServices.service',
-                'visits.patientLabRequests.mainTest',
-            ]);
+            // $eagerLoad = array_merge($eagerLoad, [
+            //     'visits.patient.company',
+            //     'visits.requestedServices.service',
+            //     'visits.patientLabRequests.mainTest',
+            // ]);
         }
 
         $query = DoctorShift::with($eagerLoad)
@@ -401,44 +401,28 @@ class DoctorShiftController extends Controller
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
 
-        // Eager load necessary data
-        $doctorShift->load([
-            'doctor', // For doctor's percentages and static wage (if applicable per shift)
-            'generalShift', // For context
-            'doctorVisits' => function ($query) {
-                $query->with([
-                    'patient:id,name,company_id', // Include company_id to differentiate insurance
-                    'requestedServices' => function ($rsQuery) {
-                        $rsQuery->with('service'); // For service details if needed
-                    }
-                ])->orderBy('created_at');
-            }
-        ]);
+        $doctorShift->loadMissing('doctor');
 
         if (!$doctorShift->doctor) {
             return response()->json(['message' => 'Doctor details not found for this shift.'], 404);
         }
 
-        $doctor_cash_share_total = $doctorShift->doctor_credit_cash();
-        $doctor_insurance_share_total = $doctorShift->doctor_credit_company();
-        $doctor_fixed_share = $doctorShift->doctor->static_wage ?? 0;
-
-        $total_doctor_share = $doctor_cash_share_total + $doctor_insurance_share_total + $doctor_fixed_share;
+        $fin = $doctorShift->financialSummaryFast();
 
         $summary = [
-            'doctor_shift_id' => $doctorShift->id,
-            'doctor_name' => $doctorShift->doctor->name,
-            'start_time' => $doctorShift->start_time?->toIso8601String(),
-            'end_time' => $doctorShift->end_time?->toIso8601String(),
-            'status' => $doctorShift->status ? 'Open' : 'Closed',
-            'total_patients' => $doctorShift->doctorVisits->count(),
-            'total_cash'=> $doctorShift->clinic_cash(),
-            'total_bank' => $doctorShift->total_bank(),
-            'doctor_fixed_share_for_shift' => $doctor_fixed_share,
-            'doctor_cash_share_total' => $doctor_cash_share_total,
-            'total_doctor_share' => $total_doctor_share,
-            'doctor_insurance_share_total' => $doctor_insurance_share_total,
-            'patients_breakdown' => [],
+            'doctor_shift_id'             => $doctorShift->id,
+            'doctor_name'                 => $doctorShift->doctor->name,
+            'start_time'                  => $doctorShift->start_time?->toIso8601String(),
+            'end_time'                    => $doctorShift->end_time?->toIso8601String(),
+            'status'                      => $doctorShift->status ? 'Open' : 'Closed',
+            'total_patients'              => $doctorShift->visits()->count(),
+            'total_cash'                  => $fin['clinic_cash'],
+            'total_bank'                  => $fin['total_bank'],
+            'doctor_fixed_share_for_shift'=> $fin['doctor_fixed_share'],
+            'doctor_cash_share_total'     => $fin['doctor_credit_cash'],
+            'total_doctor_share'          => $fin['total_doctor_share'],
+            'doctor_insurance_share_total'=> $fin['doctor_credit_insurance'],
+            'patients_breakdown'          => [],
         ];
 
 
@@ -593,6 +577,20 @@ class DoctorShiftController extends Controller
         return response()->json([
             'previous_id' => $previousId,
             'next_id' => $nextId,
+        ]);
+    }
+
+    public function usersPaymentSummary(DoctorShift $doctorShift)
+    {
+        return response()->json([
+            'data' => $doctorShift->usersPaymentSummary(),
+        ]);
+    }
+
+    public function usersWhoPayedDoctor(DoctorShift $doctorShift)
+    {
+        return response()->json([
+            'data' => $doctorShift->usersWhoPayedDoctor(),
         ]);
     }
 }
