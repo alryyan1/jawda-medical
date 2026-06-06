@@ -219,6 +219,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/active-doctor-shifts', [DoctorShiftController::class, 'getActiveShifts']);
   Route::get('/doctors-with-shift-status', [DoctorShiftController::class, 'getDoctorsWithShiftStatus']);
   Route::post('/doctor-shifts/start', [DoctorShiftController::class, 'startShift']);
+  Route::post('/doctor-shifts/compute-snapshot-batch', [DoctorShiftController::class, 'computeSnapshotBatch']);
   Route::put('/doctor-shifts/{doctorShift}/end', [DoctorShiftController::class, 'endShift']);
   Route::get('/doctor-shifts/{doctorShift}/financial-summary', [DoctorShiftController::class, 'showFinancialSummary']);
   Route::get('/doctor-shifts/{doctorShift}/shift-service-costs', [DoctorShiftController::class, 'shiftServiceCosts']);

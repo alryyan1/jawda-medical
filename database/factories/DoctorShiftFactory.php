@@ -41,10 +41,6 @@ class DoctorShiftFactory extends Factory
             'status' => $status,
             'start_time' => $startTime,
             'end_time' => $endTime,
-            'is_cash_revenue_prooved' => $this->faker->boolean(20),
-            'is_cash_reclaim_prooved' => $this->faker->boolean(10),
-            'is_company_revenue_prooved' => $this->faker->boolean(15),
-            'is_company_reclaim_prooved' => $this->faker->boolean(5),
             'created_at' => $startTime ?? now(), // created_at can be same as start_time
             'updated_at' => $endTime ?? $startTime ?? now(),
         ];

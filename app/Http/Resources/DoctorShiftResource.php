@@ -31,11 +31,11 @@ class DoctorShiftResource extends JsonResource
         if ($includeFinancials) {
             /** @var \App\Models\DoctorShift $model */
             $model = $this->resource;
-            $fin = $model->financialSummaryFast();
+            $fin = $model->precomputedFinancials ?? $model->financialSummaryFast();
             $cashEntitlement      = $fin['doctor_credit_cash'];
             $insuranceEntitlement = $fin['doctor_credit_insurance'];
             $totalIncome          = $fin['total_paid_services'];
-            $clinicInsurance      = $fin['clinic_insurance'];
+            $clinicInsurance      = $fin['clinic_endurance'];
         }
         
         $staticWageApplied = ($this->status == false && $this->doctor) ? (float)$this->doctor->static_wage : 0;
@@ -72,11 +72,19 @@ class DoctorShiftResource extends JsonResource
             'insurance_entitlement' => round($insuranceEntitlement, 2),
             'static_wage_applied' => round($staticWageApplied, 2),
 
-            // Proofing Flags
-            'is_cash_revenue_prooved' => (bool) $this->is_cash_revenue_prooved,
-            'is_cash_reclaim_prooved' => (bool) $this->is_cash_reclaim_prooved,
-            'is_company_revenue_prooved' => (bool) $this->is_company_revenue_prooved,
-            'is_company_reclaim_prooved' => (bool) $this->is_company_reclaim_prooved,
+            // Snapshot columns (null for open/uncomputed shifts)
+            'snap_patients_count'              => $this->snap_patients_count,
+            'snap_total_paid'                  => $this->snap_total_paid,
+            'snap_total_cash_revenue'          => $this->snap_total_cash_revenue,
+            'snap_total_insurance_revenue'     => $this->snap_total_insurance_revenue,
+            'snap_total_insurance_services'    => $this->snap_total_insurance_services,
+            'snap_total_bank'                  => $this->snap_total_bank,
+            'snap_doctor_cash_percentage'      => $this->snap_doctor_cash_percentage,
+            'snap_doctor_insurance_percentage' => $this->snap_doctor_insurance_percentage,
+            'snap_doctor_cash_entitlement'     => $this->snap_doctor_cash_entitlement,
+            'snap_doctor_insurance_entitlement'=> $this->snap_doctor_insurance_entitlement,
+            'snap_doctor_fixed_entitlement'    => $this->snap_doctor_fixed_entitlement,
+            'snap_total_doctor_entitlement'    => $this->snap_total_doctor_entitlement,
 
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

@@ -12,7 +12,6 @@ use App\Http\Resources\DoctorVisitResource;
 use App\Models\DoctorVisit;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
 use App\Models\User;
 use Illuminate\Support\Facades\Http as HttpClient;
 use Illuminate\Support\Facades\Log;
@@ -286,24 +285,12 @@ class DoctorShiftController extends Controller
             // include_financials is handled by $request->boolean() - no strict validation needed
         ]);
 
-        // Base eager loading - lightweight relations only
-        $eagerLoad = [
-            'doctor',
-            'doctor.specialist:id,name',
-            'user:id,name,username',
-            'generalShift:id,created_at,closed_at',
-        ];
-
-        // Only load heavy relations when financials are explicitly requested
-        if ($request->boolean('include_financials')) {
-            // $eagerLoad = array_merge($eagerLoad, [
-            //     'visits.patient.company',
-            //     'visits.requestedServices.service',
-            //     'visits.patientLabRequests.mainTest',
-            // ]);
-        }
-
-        $query = DoctorShift::with($eagerLoad)
+        $query = DoctorShift::with([
+                'doctor',
+                'doctor.specialist:id,name',
+                'user:id,name,username',
+                'generalShift:id,created_at,closed_at',
+            ])
             ->withCount('doctorVisits as patients_count');
 
         // Filtering
@@ -357,8 +344,23 @@ class DoctorShiftController extends Controller
         }
         $query->orderBy('doctor_shifts.id', 'desc');
 
-        $perPage = $request->input('per_page', 15);
-        $doctorShifts = $query->paginate($perPage);
+        $perPage        = $request->input('per_page', 15);
+        $doctorShifts   = $query->paginate($perPage);
+
+        if ($request->boolean('include_financials')) {
+            foreach ($doctorShifts as $shift) {
+                $shift->precomputedFinancials = [
+                    'total_paid_services'     => (float) ($shift->snap_total_paid                  ?? 0),
+                    'clinic_cash'             => (float) ($shift->snap_total_cash_revenue           ?? 0),
+                    'clinic_endurance'        => (float) ($shift->snap_total_insurance_revenue      ?? 0),
+                    'total_bank'              => (float) ($shift->snap_total_bank                   ?? 0),
+                    'doctor_credit_cash'      => (float) ($shift->snap_doctor_cash_entitlement      ?? 0),
+                    'doctor_credit_insurance' => (float) ($shift->snap_doctor_insurance_entitlement ?? 0),
+                    'doctor_fixed_share'      => (float) ($shift->snap_doctor_fixed_entitlement     ?? 0),
+                    'total_doctor_share'      => (float) ($shift->snap_total_doctor_entitlement     ?? 0),
+                ];
+            }
+        }
 
         return DoctorShiftResource::collection($doctorShifts);
     }
@@ -513,43 +515,54 @@ class DoctorShiftController extends Controller
     // app/Http/Controllers/Api/DoctorShiftController.php
     public function updateProofingFlags(Request $request, DoctorShift $doctorShift)
     {
-        // $this->authorize('update_proofing_flags', $doctorShift); // Permission check
-
-        $validated = $request->validate([
-            'is_cash_revenue_prooved' => 'sometimes|boolean',
-            'is_cash_reclaim_prooved' => 'sometimes|boolean',
-            'is_company_revenue_prooved' => 'sometimes|boolean',
-            'is_company_reclaim_prooved' => 'sometimes|boolean',
+        $doctorShift->update([
+            'status'   => false,
+            'end_time' => Carbon::now(),
         ]);
 
-        // Check if is_cash_revenue_prooved is being set to true and close the shift
-        $shouldCloseShift = isset($validated['is_cash_reclaim_prooved']);
-        // return ['shouldCloseShift' => $shouldCloseShift];
-        if (isset($validated['is_cash_reclaim_prooved'])) {
-            // return response()->json(['message' => 'لا يمكن تغيير الحالة الى مغلقة لان المناوبة مفتوحة.'], 400);
-            // Close the doctor shift
-            $doctorShift->update([
-                ...$validated,
-                'status' => false,
-                'end_time' => Carbon::now(),
-            ]);
+        // Persist financial snapshot so future report queries read columns directly.
+        try {
+            $doctorShift->loadMissing('doctor');
+            $doctorShift->saveFinancialSnapshot();
+        } catch (\Exception $e) {
+            Log::warning('Failed to save financial snapshot for doctor shift ' . $doctorShift->id . ': ' . $e->getMessage());
+        }
 
-            // Emit realtime update event (fire-and-forget)
-            try {
-                $url = config('services.realtime.url') . '/emit/doctor-shift-closed';
-                HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
-                    ->post($url, [
-                        'doctor_shift' => (new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift'])))->resolve(),
-                    ]);
-            } catch (\Exception $e) {
-                Log::warning('Failed to emit doctor-shift-closed realtime event: ' . $e->getMessage());
-            }
-        } else {
-            $doctorShift->update($validated);
+        try {
+            $url = config('services.realtime.url') . '/emit/doctor-shift-closed';
+            HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                ->post($url, [
+                    'doctor_shift' => (new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift'])))->resolve(),
+                ]);
+        } catch (\Exception $e) {
+            Log::warning('Failed to emit doctor-shift-closed realtime event: ' . $e->getMessage());
         }
 
         return new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift']));
     }
+    public function computeSnapshotBatch(Request $request)
+    {
+        $request->validate([
+            'ids'   => 'required|array|min:1|max:200',
+            'ids.*' => 'integer|exists:doctor_shifts,id',
+        ]);
+
+        $processed = 0;
+        $errors    = [];
+
+        DoctorShift::with('doctor')->whereIn('id', $request->input('ids'))->each(function (DoctorShift $shift) use (&$processed, &$errors) {
+            try {
+                $shift->saveFinancialSnapshot();
+                $processed++;
+            } catch (\Exception $e) {
+                $errors[] = ['id' => $shift->id, 'error' => $e->getMessage()];
+                Log::warning("Snapshot failed for shift {$shift->id}: " . $e->getMessage());
+            }
+        });
+
+        return response()->json(['processed' => $processed, 'errors' => $errors]);
+    }
+
     public function reopen(Request $request, DoctorShift $doctorShift)
     {
         if ($doctorShift->status) {

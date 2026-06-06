@@ -19,10 +19,6 @@ use Illuminate\Support\Facades\DB;
  * @property \Illuminate\Support\Carbon|null $end_time Actual end time of the doctor working
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property bool $is_cash_revenue_prooved
- * @property bool $is_cash_reclaim_prooved
- * @property bool $is_company_revenue_prooved
- * @property bool $is_company_reclaim_prooved
  * @property-read \App\Models\Doctor $doctor
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorVisit> $doctorVisits
  * @property-read int|null $doctor_visits_count
@@ -40,10 +36,6 @@ use Illuminate\Support\Facades\DB;
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereDoctorId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereEndTime($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereIsCashReclaimProoved($value)
- * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereIsCashRevenueProoved($value)
- * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereIsCompanyReclaimProoved($value)
- * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereIsCompanyRevenueProoved($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereShiftId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereStartTime($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereStatus($value)
@@ -55,27 +47,46 @@ class DoctorShift extends Model
 {
     use HasFactory;
 
+    /** Pre-computed financials injected by the index controller to avoid per-shift queries. */
+    public ?array $precomputedFinancials = null;
+
     protected $fillable = [
-        'user_id',          // User who started/manages this specific doctor's shift
-        'shift_id',         // The general clinic shift ID
+        'user_id',
+        'shift_id',
         'doctor_id',
-        'status',           // true (active/open), false (closed)
+        'status',
         'start_time',
         'end_time',
-        'is_cash_revenue_prooved',
-        'is_cash_reclaim_prooved',
-        'is_company_revenue_prooved',
-        'is_company_reclaim_prooved',
+        'snap_patients_count',
+        'snap_total_paid',
+        'snap_total_cash_revenue',
+        'snap_total_insurance_revenue',
+        'snap_total_insurance_services',
+        'snap_total_bank',
+        'snap_doctor_cash_percentage',
+        'snap_doctor_insurance_percentage',
+        'snap_doctor_cash_entitlement',
+        'snap_doctor_insurance_entitlement',
+        'snap_doctor_fixed_entitlement',
+        'snap_total_doctor_entitlement',
     ];
 
     protected $casts = [
-        'status' => 'boolean',
-        'start_time' => 'datetime',
-        'end_time' => 'datetime',
-        'is_cash_revenue_prooved' => 'boolean',
-        'is_cash_reclaim_prooved' => 'boolean',
-        'is_company_revenue_prooved' => 'boolean',
-        'is_company_reclaim_prooved' => 'boolean',
+        'status'                           => 'boolean',
+        'start_time'                       => 'datetime',
+        'end_time'                         => 'datetime',
+        'snap_patients_count'              => 'integer',
+        'snap_total_paid'                  => 'decimal:2',
+        'snap_total_cash_revenue'          => 'decimal:2',
+        'snap_total_insurance_revenue'     => 'decimal:2',
+        'snap_total_insurance_services'    => 'decimal:2',
+        'snap_total_bank'                  => 'decimal:2',
+        'snap_doctor_cash_percentage'      => 'decimal:2',
+        'snap_doctor_insurance_percentage' => 'decimal:2',
+        'snap_doctor_cash_entitlement'     => 'decimal:2',
+        'snap_doctor_insurance_entitlement'=> 'decimal:2',
+        'snap_doctor_fixed_entitlement'    => 'decimal:2',
+        'snap_total_doctor_entitlement'    => 'decimal:2',
     ];
   
 
@@ -374,6 +385,17 @@ class DoctorShift extends Model
         }
         return $total_paid;
     }
+        public function total_services_insurance()
+    {
+        $total_paid = 0;
+        /** @var Doctorvisit $doctorvisit */
+        foreach ($this->visits as $doctorvisit) {
+            if ($doctorvisit->patient->company_id != null) {
+            $total_paid += $doctorvisit->total_services();
+            }
+        }
+        return $total_paid;
+    }
     public function total_services_cash()
     {
         $total_cash = 0;
@@ -456,7 +478,7 @@ class DoctorShift extends Model
      * @return array{
      *   total_paid_services: float,
      *   clinic_cash:         float,
-     *   clinic_insurance:    float,
+     *   clinic_endurance:    float,
      *   total_bank:          float,
      *   doctor_credit_cash:       float,
      *   doctor_credit_insurance:  float,
@@ -464,6 +486,30 @@ class DoctorShift extends Model
      *   total_doctor_share:       float,
      * }
      */
+    /**
+     * Compute financials and persist them as snapshot columns on this shift.
+     * Called once when the shift is closed.
+     */
+    public function saveFinancialSnapshot(): void
+    {
+        $fin = $this->financialSummaryFast();
+
+        $this->update([
+            'snap_patients_count'              => $this->visits()->count(),
+            'snap_total_paid'                  => $fin['total_paid_services'],
+            'snap_total_cash_revenue'          => $fin['clinic_cash'],
+            'snap_total_insurance_revenue'     => $fin['clinic_endurance'],
+            'snap_total_insurance_services'    => $this->total_services_insurance(),
+            'snap_total_bank'                  => $fin['total_bank'],
+            'snap_doctor_cash_percentage'      => $this->doctor?->cash_percentage ?? 0,
+            'snap_doctor_insurance_percentage' => $this->doctor?->company_percentage ?? 0,
+            'snap_doctor_cash_entitlement'     => $fin['doctor_credit_cash'],
+            'snap_doctor_insurance_entitlement'=> $fin['doctor_credit_insurance'],
+            'snap_doctor_fixed_entitlement'    => $fin['doctor_fixed_share'],
+            'snap_total_doctor_entitlement'    => $fin['total_doctor_share'],
+        ]);
+    }
+
     public function financialSummaryFast(): array
     {
         // ── 1. Pure-SQL aggregates ────────────────────────────────────────────
@@ -500,6 +546,7 @@ class DoctorShift extends Model
         $this->loadMissing([
             'doctor.specificServices',
             'doctor.category.services',
+            'doctor.doctorServiceCosts',
             'visits.patient:id,company_id',
             'visits.requestedServices.returnedRefunds',
             'visits.requestedServices.requestedServiceCosts',
@@ -555,7 +602,7 @@ class DoctorShift extends Model
         return [
             'total_paid_services'        => $totalPaid,
             'clinic_cash'                => $clinicCash,
-            'clinic_insurance'           => $insurancePaid,
+            'clinic_endurance'           => $insurancePaid,
             'total_bank'                 => $totalBank,
             'doctor_credit_cash'         => $cashCredit,
             'doctor_credit_insurance'    => $insuranceCredit,
@@ -564,7 +611,7 @@ class DoctorShift extends Model
         ];
     }
 
-    private function calcServiceCreditInline(RequestedService $service, Doctor $doctor): float
+    public function calcServiceCreditInline(RequestedService $service, Doctor $doctor): float
     {
         // 1. Category-service pivot
         if ($doctor->category_id && $doctor->relationLoaded('category')) {
@@ -587,7 +634,7 @@ class DoctorShift extends Model
         return ((float) $service->amount_paid - $cost) * (float) $doctor->cash_percentage / 100;
     }
 
-    private function applyPivotRateInline(RequestedService $service, object $pivot, Doctor $doctor): float
+    public function applyPivotRateInline(RequestedService $service, object $pivot, Doctor $doctor): float
     {
         if (($pivot->percentage ?? 0) > 0) {
             return (float) $service->amount_paid * $pivot->percentage / 100;
