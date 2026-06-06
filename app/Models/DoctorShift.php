@@ -689,4 +689,25 @@ class DoctorShift extends Model
             ->get();
     }
 
+    public function usersInsurancePaymentSummary()
+    {
+        return DB::table('requested_service_deposits')
+            ->join('requested_services', 'requested_services.id', '=', 'requested_service_deposits.requested_service_id')
+            ->join('doctorvisits', 'doctorvisits.id', '=', 'requested_services.doctorvisits_id')
+            ->join('patients', 'patients.id', '=', 'doctorvisits.patient_id')
+            ->join('users', 'users.id', '=', 'requested_service_deposits.user_id')
+            ->where('doctorvisits.doctor_shift_id', $this->id)
+            ->whereNotNull('requested_service_deposits.user_id')
+            ->whereNotNull('patients.company_id')
+            ->select(
+                'users.id',
+                'users.name',
+                DB::raw('SUM(CASE WHEN requested_service_deposits.is_bank = 0 THEN requested_service_deposits.amount ELSE 0 END) as total_cash'),
+                DB::raw('SUM(CASE WHEN requested_service_deposits.is_bank = 1 THEN requested_service_deposits.amount ELSE 0 END) as total_bank'),
+                DB::raw('SUM(requested_service_deposits.amount) as total')
+            )
+            ->groupBy('users.id', 'users.name')
+            ->get();
+    }
+
 }

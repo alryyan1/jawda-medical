@@ -411,6 +411,8 @@ class DoctorShiftController extends Controller
 
         $fin = $doctorShift->financialSummaryFast();
 
+        $doctorShift->loadMissing(['visits.requestedServices', 'visits.patient:id,company_id']);
+
         $summary = [
             'doctor_shift_id'             => $doctorShift->id,
             'doctor_name'                 => $doctorShift->doctor->name,
@@ -424,6 +426,7 @@ class DoctorShiftController extends Controller
             'doctor_cash_share_total'     => $fin['doctor_credit_cash'],
             'total_doctor_share'          => $fin['total_doctor_share'],
             'doctor_insurance_share_total'=> $fin['doctor_credit_insurance'],
+            'total_insurance_services'    => $doctorShift->total_services_insurance(),
             'patients_breakdown'          => [],
         ];
 
@@ -597,6 +600,13 @@ class DoctorShiftController extends Controller
     {
         return response()->json([
             'data' => $doctorShift->usersPaymentSummary(),
+        ]);
+    }
+
+    public function usersInsurancePaymentSummary(DoctorShift $doctorShift)
+    {
+        return response()->json([
+            'data' => $doctorShift->usersInsurancePaymentSummary(),
         ]);
     }
 
