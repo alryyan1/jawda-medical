@@ -86,6 +86,7 @@ class DoctorShiftResource extends JsonResource
             'snap_doctor_fixed_entitlement'    => $this->snap_doctor_fixed_entitlement,
             'snap_total_doctor_entitlement'    => $this->snap_total_doctor_entitlement,
 
+            'has_journal' => (bool) $this->has_journal,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             'doctor_visits_count' => $this->doctor_visits_count ?? $this->patients_count,

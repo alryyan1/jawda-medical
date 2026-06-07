@@ -548,6 +548,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::delete('/visits/{visit}/lab-requests/clear-pending', [LabRequestController::class, 'clearPendingRequests'])->middleware('auth:sanctum');
   Route::post('/labrequests/{labrequest}/unpay', [LabRequestController::class, 'unpay'])->middleware('auth:sanctum');
   Route::post('/costs', [CostController::class, 'store']); // For the dialog
+  Route::put('/costs/{cost}', [CostController::class, 'update']);
   Route::delete('/costs/{cost}', [CostController::class, 'destroy']); // For deleting costs
   // The route api/visits/48/lab-requests/batch-pay could not be found
   Route::post('/visits/{visit}/lab-requests/batch-pay', [LabRequestController::class, 'batchPayLabRequests'])->middleware('auth:sanctum');
@@ -741,6 +742,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
   Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
   Route::put('/doctor-shifts/{doctorShift}/reopen', [DoctorShiftController::class, 'reopen']);
+  Route::put('/doctor-shifts/{doctorShift}/mark-journal', [DoctorShiftController::class, 'markJournal']);
 
   Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
 

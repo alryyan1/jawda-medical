@@ -55,6 +55,7 @@ class DoctorShift extends Model
         'shift_id',
         'doctor_id',
         'status',
+        'has_journal',
         'start_time',
         'end_time',
         'snap_patients_count',
@@ -73,6 +74,7 @@ class DoctorShift extends Model
 
     protected $casts = [
         'status'                           => 'boolean',
+        'has_journal'                      => 'boolean',
         'start_time'                       => 'datetime',
         'end_time'                         => 'datetime',
         'snap_patients_count'              => 'integer',

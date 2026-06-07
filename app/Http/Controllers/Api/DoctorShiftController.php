@@ -616,4 +616,10 @@ class DoctorShiftController extends Controller
             'data' => $doctorShift->usersWhoPayedDoctor(),
         ]);
     }
+
+    public function markJournal(DoctorShift $doctorShift)
+    {
+        $doctorShift->update(['has_journal' => true]);
+        return response()->json(['success' => true, 'has_journal' => true]);
+    }
 }

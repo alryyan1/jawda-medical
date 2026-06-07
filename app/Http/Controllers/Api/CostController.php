@@ -132,6 +132,15 @@ class CostController extends Controller
         ]]);
     }
     
+    public function update(Request $request, Cost $cost)
+    {
+        $validated = $request->validate([
+            'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
+        ]);
+        $cost->update(['doctor_shift_id' => $validated['doctor_shift_id']]);
+        return new CostResource($cost->load(['costCategory', 'userCost:id,name', 'doctorShift.doctor']));
+    }
+
     public function destroy($id)
     {
         $cost = Cost::findOrFail($id);
