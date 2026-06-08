@@ -1352,6 +1352,973 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$fileName}\"");
     }
+
+    // ── Shift report stubs ── (fill in TCPDF logic)
+    private function resolveShift(Request $request): ?Shift
+    {
+        $shift = Shift::find($request->get('shift'));
+        return $shift;
+    }
+
+    private function shiftPdfResponse(MyCustomTCPDF $pdf, string $name): \Illuminate\Http\Response
+    {
+        $pdfContent = $pdf->Output($name, 'S');
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"{$name}\"");
+    }
+
+    public function shiftProfitLossPdf(Request $request)
+    {
+        $shift = $this->resolveShift($request);
+        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+
+        $shift->load(['cost', 'patients.patient', 'doctorShifts.visits']);
+
+        // ── Figures ───────────────────────────────────────────────
+        $clinicRevenue = (float) $shift->totalPaidService();
+        $labRevenue    = (float) $shift->paidLab();
+        $totalRevenue  = $clinicRevenue + $labRevenue;
+        $totalExpenses = $shift->cost->sum(fn($c) => (float)$c->amount + (float)$c->amount_bankak);
+        $netProfit     = $totalRevenue - $totalExpenses;
+        $isProfit      = $netProfit >= 0;
+
+        // ── PDF init (uses clinic header/footer from Setting model) ─
+        $filterLine = 'وردية رقم: ' . $shift->id
+            . '   |   تاريخ الفتح: ' . $shift->created_at->format('Y/m/d  H:i')
+            . ($shift->closed_at ? '   |   تاريخ الإغلاق: ' . $shift->closed_at->format('Y/m/d  H:i') : '');
+
+        $pdf = new MyCustomTCPDF('قائمة الدخل (الأرباح والخسائر)', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->SetAutoPageBreak(true, 25);
+        $pdf->SetFont('arial', '', 11);
+        $pdf->AddPage();
+
+        $margins = $pdf->getMargins();
+        $W  = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+        $c1 = $W * 0.68;
+        $c2 = $W * 0.32;
+
+        // ── Helpers (black & white, no fill colours) ─────────────
+        $line = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.2);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+        };
+
+        $thickLine = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.6);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+            $pdf->SetLineWidth(0.2);
+        };
+
+        $drawSectionTitle = function (string $title) use ($pdf, $W, $margins, $thickLine, $line) {
+            $pdf->Ln(5);
+            $thickLine();
+            $pdf->Ln(1);
+            $pdf->SetFont('arial', 'B', 12);
+            $pdf->Cell($W, 7, $title, 0, 1, 'C');
+            $line();
+            $pdf->Ln(1);
+        };
+
+        $drawColHeader = function () use ($pdf, $c1, $c2) {
+            $pdf->SetFont('arial', 'B', 10);
+            $pdf->Cell($c1, 6, 'البيان', 'B', 0, 'R');
+            $pdf->Cell($c2, 6, 'المبلغ', 'B', 1, 'C');
+        };
+
+        $drawRow = function (string $label, float $amount, bool $bold = false) use ($pdf, $c1, $c2) {
+            $pdf->SetFont('arial', $bold ? 'B' : '', 11);
+            $pdf->Cell($c1, 7, $label, 0, 0, 'R');
+            $pdf->Cell($c2, 7, number_format($amount, 2), 0, 1, 'C');
+        };
+
+        $drawTotalRow = function (string $label, float $amount) use ($pdf, $c1, $c2, $line, $thickLine) {
+            $line();
+            $pdf->Ln(1);
+            $pdf->SetFont('arial', 'B', 11);
+            $pdf->Cell($c1, 7, $label, 0, 0, 'R');
+            $pdf->Cell($c2, 7, number_format($amount, 2), 'B', 1, 'C');
+        };
+
+        // ── Report title ──────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 16);
+        $pdf->Cell($W, 9, 'قائمة الدخل', 0, 1, 'C');
+        $pdf->SetFont('arial', '', 9);
+        $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
+        $pdf->Ln(2);
+
+        // Double underline under title
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+        $pdf->Ln(5);
+
+        // ── REVENUE ───────────────────────────────────────────────
+        $drawSectionTitle('الإيرادات');
+        $drawColHeader();
+        $pdf->Ln(1);
+        $drawRow('إيرادات العيادات', $clinicRevenue);
+        $pdf->Ln(1);
+        $drawRow('إيرادات المختبر', $labRevenue);
+        $pdf->Ln(1);
+        $drawTotalRow('إجمالي الإيرادات', $totalRevenue);
+
+        // ── EXPENSES ──────────────────────────────────────────────
+        $drawSectionTitle('المصروفات');
+        $drawColHeader();
+        $pdf->Ln(1);
+        $drawRow('المصروفات', $totalExpenses);
+        $pdf->Ln(1);
+        $drawTotalRow('إجمالي المصروفات', $totalExpenses);
+
+        $pdf->Ln(8);
+
+        // ── NET PROFIT / LOSS — double-line convention ────────────
+        $netLabel = $isProfit ? 'صافي الربح' : 'صافي الخسارة';
+
+        $pdf->SetFont('arial', 'B', 12);
+        $pdf->Cell($c1, 7, $netLabel, 0, 0, 'R');
+        $pdf->Cell($c2, 7, number_format(abs($netProfit), 2), 0, 1, 'C');
+
+        // Bottom double-line (accounting standard)
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+        $pdf->SetLineWidth(0.2);
+
+        $pdf->Ln(16);
+
+        // ── Signature row ─────────────────────────────────────────
+        $sigW = $W / 3;
+        $pdf->SetFont('arial', '', 9);
+        $pdf->Cell($sigW, 5, 'المحاسب المسؤول', 0, 0, 'C');
+        $pdf->Cell($sigW, 5, 'مراجعة المدير',  0, 0, 'C');
+        $pdf->Cell($sigW, 5, 'الختم الرسمي',    0, 1, 'C');
+        $pdf->Ln(8);
+        $pdf->SetLineWidth(0.3);
+        $pdf->Line($margins['left'] + 5,           $pdf->GetY(), $margins['left'] + $sigW - 5,       $pdf->GetY());
+        $pdf->Line($margins['left'] + $sigW + 5,   $pdf->GetY(), $margins['left'] + 2*$sigW - 5,     $pdf->GetY());
+        $pdf->Line($margins['left'] + 2*$sigW + 5, $pdf->GetY(), $margins['left'] + 3*$sigW - 5,     $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+
+        return $this->shiftPdfResponse($pdf, 'ProfitLoss_Shift_' . $shift->id . '.pdf');
+    }
+
+    public function shiftRevenuePdf(Request $request)
+    {
+        $shift = $this->resolveShift($request);
+        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+
+        $shift->load(['doctorShifts.doctor.specialist', 'doctorShifts.visits.requestedServices', 'patients.patient']);
+
+        // ── Lab revenue ───────────────────────────────────────────
+        $labRevenue = (float) $shift->paidLab();
+
+        // ── Clinic revenue grouped by specialty ───────────────────
+        $bySpecialty = [];
+        foreach ($shift->doctorShifts as $ds) {
+            $specialtyName = $ds->doctor->specialist->name ?? 'غير محدد';
+            $amount = (float) $ds->total_paid_services();
+            if ($amount == 0) continue;
+            if (!isset($bySpecialty[$specialtyName])) {
+                $bySpecialty[$specialtyName] = 0;
+            }
+            $bySpecialty[$specialtyName] += $amount;
+        }
+        $clinicRevenue = array_sum($bySpecialty);
+        $grandTotal    = $labRevenue + $clinicRevenue;
+
+        // ── PDF setup ─────────────────────────────────────────────
+        $filterLine = 'وردية رقم: ' . $shift->id
+            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+
+        $pdf = new MyCustomTCPDF('تقرير الإيرادات', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->SetAutoPageBreak(true, 25);
+        $pdf->SetFont('arial', '', 11);
+        $pdf->AddPage();
+
+        $margins = $pdf->getMargins();
+        $W  = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+        $c1 = $W * 0.68;
+        $c2 = $W * 0.32;
+
+        // ── Helpers (B&W, no fill) ────────────────────────────────
+        $line = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.2);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+        };
+
+        $thickLine = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.6);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+            $pdf->SetLineWidth(0.2);
+        };
+
+        $drawSectionTitle = function (string $title) use ($pdf, $W, $thickLine, $line) {
+            $pdf->Ln(5);
+            $thickLine();
+            $pdf->Ln(1);
+            $pdf->SetFont('arial', 'B', 12);
+            $pdf->Cell($W, 7, $title, 0, 1, 'C');
+            $line();
+            $pdf->Ln(1);
+        };
+
+        $drawColHeader = function () use ($pdf, $c1, $c2) {
+            $pdf->SetFont('arial', 'B', 10);
+            $pdf->Cell($c1, 6, 'البيان', 'B', 0, 'R');
+            $pdf->Cell($c2, 6, 'المبلغ', 'B', 1, 'C');
+        };
+
+        $drawRow = function (string $label, float $amount) use ($pdf, $c1, $c2) {
+            $pdf->SetFont('arial', '', 11);
+            $pdf->Cell($c1, 7, $label, 0, 0, 'R');
+            $pdf->Cell($c2, 7, number_format($amount, 2), 0, 1, 'C');
+        };
+
+        $drawTotalRow = function (string $label, float $amount) use ($pdf, $c1, $c2, $line) {
+            $line();
+            $pdf->Ln(1);
+            $pdf->SetFont('arial', 'B', 11);
+            $pdf->Cell($c1, 7, $label, 0, 0, 'R');
+            $pdf->Cell($c2, 7, number_format($amount, 2), 'B', 1, 'C');
+        };
+
+        // ── Report title ──────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 16);
+        $pdf->Cell($W, 9, 'تقرير الإيرادات', 0, 1, 'C');
+        $pdf->SetFont('arial', '', 9);
+        $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
+        $pdf->Ln(2);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+        $pdf->Ln(5);
+
+        // ── 1. Lab revenue ────────────────────────────────────────
+        $drawSectionTitle('إيرادات المختبر');
+        $drawColHeader();
+        $pdf->Ln(1);
+        $drawRow('إجمالي المختبر', $labRevenue);
+        $pdf->Ln(1);
+        $drawTotalRow('إجمالي إيرادات المختبر', $labRevenue);
+
+        // ── 2. Clinic revenue by specialty ────────────────────────
+        $drawSectionTitle('إيرادات العيادات');
+        $drawColHeader();
+        $pdf->Ln(1);
+
+        if (empty($bySpecialty)) {
+            $pdf->SetFont('arial', '', 10);
+            $pdf->Cell($W, 7, 'لا توجد إيرادات عيادات لهذه الوردية', 0, 1, 'C');
+        } else {
+            foreach ($bySpecialty as $specialtyName => $amount) {
+                $drawRow($specialtyName, $amount);
+                $pdf->Ln(1);
+            }
+        }
+
+        $drawTotalRow('إجمالي إيرادات العيادات', $clinicRevenue);
+        $pdf->Ln(8);
+
+        // ── Grand total — double-line ─────────────────────────────
+        $pdf->SetFont('arial', 'B', 12);
+        $pdf->Cell($c1, 7, 'إجمالي الإيرادات الكلي', 0, 0, 'R');
+        $pdf->Cell($c2, 7, number_format($grandTotal, 2), 0, 1, 'C');
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+
+        return $this->shiftPdfResponse($pdf, 'Revenue_Shift_' . $shift->id . '.pdf');
+    }
+
+    public function shiftExpensesPdf(Request $request)
+    {
+        $shift = $this->resolveShift($request);
+        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+
+        $shift->load(['cost.costCategory', 'cost.userCost']);
+
+        $costs = $shift->cost;
+
+        // ── Totals ────────────────────────────────────────────────
+        $totalCash  = $costs->sum(fn($c) => (float) $c->amount);
+        $totalBank  = $costs->sum(fn($c) => (float) $c->amount_bankak);
+        $grandTotal = $totalCash + $totalBank;
+
+        // ── Group by category ─────────────────────────────────────
+        $byCategory = $costs->groupBy(fn($c) => $c->costCategory->name ?? 'عام');
+
+        // ── PDF ───────────────────────────────────────────────────
+        $filterLine = 'وردية رقم: ' . $shift->id
+            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+
+        $pdf = new MyCustomTCPDF('تقرير المصروفات', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->SetAutoPageBreak(true, 25);
+        $pdf->SetFont('arial', '', 10);
+        $pdf->AddPage();
+
+        $margins = $pdf->getMargins();
+        $W  = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+
+        // Column widths: #  |  الوصف  |  ملاحظة  |  المستخدم  |  نقدي  |  بنكي  |  الإجمالي
+        $wNo   = $W * 0.05;
+        $wDesc = $W * 0.25;
+        $wNote = $W * 0.17;
+        $wUser = $W * 0.15;
+        $wCash = $W * 0.13;
+        $wBank = $W * 0.13;
+        $wTot  = $W * 0.12;
+
+        // ── Helpers ───────────────────────────────────────────────
+        $line = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.2);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+        };
+
+        $thickLine = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.6);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+            $pdf->SetLineWidth(0.2);
+        };
+
+        $drawTableHeader = function () use ($pdf, $wNo, $wDesc, $wNote, $wUser, $wCash, $wBank, $wTot) {
+            $pdf->SetFont('arial', 'B', 9);
+            $pdf->Cell($wNo,   6, '#',        1, 0, 'C');
+            $pdf->Cell($wDesc, 6, 'الوصف',    1, 0, 'C');
+            $pdf->Cell($wNote, 6, 'ملاحظة',   1, 0, 'C');
+            $pdf->Cell($wUser, 6, 'المستخدم', 1, 0, 'C');
+            $pdf->Cell($wCash, 6, 'نقدي',     1, 0, 'C');
+            $pdf->Cell($wBank, 6, 'بنكي',     1, 0, 'C');
+            $pdf->Cell($wTot,  6, 'الإجمالي', 1, 1, 'C');
+        };
+
+        // ── Report title ──────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 16);
+        $pdf->Cell($W, 9, 'تقرير المصروفات', 0, 1, 'C');
+        $pdf->SetFont('arial', '', 9);
+        $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
+        $pdf->Ln(2);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+        $pdf->Ln(5);
+
+        // ── Summary box ───────────────────────────────────────────
+        $sw = $W / 3;
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->Cell($sw, 7, 'إجمالي نقدي: ' . number_format($totalCash, 2),  'B', 0, 'C');
+        $pdf->Cell($sw, 7, 'إجمالي بنكي: ' . number_format($totalBank, 2),  'B', 0, 'C');
+        $pdf->Cell($sw, 7, 'الإجمالي الكلي: ' . number_format($grandTotal, 2), 'B', 1, 'C');
+        $pdf->Ln(4);
+
+        // ── Per-category sections ─────────────────────────────────
+        foreach ($byCategory as $categoryName => $items) {
+            $catTotal = $items->sum(fn($c) => (float)$c->amount + (float)$c->amount_bankak);
+
+            // Category banner
+            $thickLine();
+            $pdf->Ln(1);
+            $pdf->SetFont('arial', 'B', 11);
+            $pdf->Cell($W - $wTot, 6, $categoryName, 0, 0, 'R');
+            $pdf->Cell($wTot,      6, number_format($catTotal, 2), 0, 1, 'C');
+            $line();
+            $pdf->Ln(1);
+
+            $drawTableHeader();
+
+            $i = 1;
+            foreach ($items as $cost) {
+                $rowTotal = (float)$cost->amount + (float)$cost->amount_bankak;
+                $pdf->SetFont('arial', '', 9);
+                $pdf->Cell($wNo,   6, $i++,                                  1, 0, 'C');
+                $pdf->Cell($wDesc, 6, $cost->description ?? '—',             1, 0, 'R');
+                $pdf->Cell($wNote, 6, $cost->comment     ?? '—',             1, 0, 'R');
+                $pdf->Cell($wUser, 6, $cost->userCost->name ?? '—',          1, 0, 'C');
+                $pdf->Cell($wCash, 6, number_format((float)$cost->amount, 2),         1, 0, 'C');
+                $pdf->Cell($wBank, 6, number_format((float)$cost->amount_bankak, 2),  1, 0, 'C');
+                $pdf->Cell($wTot,  6, number_format($rowTotal, 2),           1, 1, 'C');
+            }
+
+            // Category subtotal row
+            $pdf->SetFont('arial', 'B', 9);
+            $catCash = $items->sum(fn($c) => (float)$c->amount);
+            $catBank = $items->sum(fn($c) => (float)$c->amount_bankak);
+            $pdf->Cell($wNo + $wDesc + $wNote + $wUser, 6, 'المجموع', 1, 0, 'R');
+            $pdf->Cell($wCash, 6, number_format($catCash, 2),   1, 0, 'C');
+            $pdf->Cell($wBank, 6, number_format($catBank, 2),   1, 0, 'C');
+            $pdf->Cell($wTot,  6, number_format($catTotal, 2),  1, 1, 'C');
+
+            $pdf->Ln(3);
+        }
+
+        if ($costs->isEmpty()) {
+            $pdf->SetFont('arial', '', 10);
+            $pdf->Cell($W, 8, 'لا توجد مصروفات مسجلة لهذه الوردية', 0, 1, 'C');
+        }
+
+        // ── Grand total — double-line ─────────────────────────────
+        $pdf->Ln(4);
+        $pdf->SetFont('arial', 'B', 12);
+        $pdf->Cell($W - $wTot, 7, 'الإجمالي الكلي للمصروفات', 0, 0, 'R');
+        $pdf->Cell($wTot,      7, number_format($grandTotal, 2), 0, 1, 'C');
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+
+        return $this->shiftPdfResponse($pdf, 'Expenses_Shift_' . $shift->id . '.pdf');
+    }
+
+    public function shiftInsuranceStatsPdf(Request $request)
+    {
+        $shift = $this->resolveShift($request);
+        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+
+        $shift->load([
+            'patients.patient.company',
+            'patients.labRequests',
+            'patients.requestedServices',
+        ]);
+
+        // ── Aggregate per company ─────────────────────────────────
+        $companies = [];   // [ company_id => [ name, patients(Set), labClaim, serviceClaim ] ]
+
+        foreach ($shift->patients as $visit) {
+            $company = $visit->patient->company ?? null;
+            if (!$company) continue;
+
+            $cid = $company->id;
+            if (!isset($companies[$cid])) {
+                $companies[$cid] = [
+                    'name'         => $company->name,
+                    'patient_ids'  => [],
+                    'lab_claim'    => 0.0,
+                    'service_claim'=> 0.0,
+                ];
+            }
+
+            $companies[$cid]['patient_ids'][$visit->patient->id] = true;
+
+            foreach ($visit->labRequests as $lr) {
+                $companies[$cid]['lab_claim'] += (float) $lr->price * max(1, (int) $lr->count);
+            }
+            foreach ($visit->requestedServices as $rs) {
+                $companies[$cid]['service_claim'] += (float) $rs->price * max(1, (int) $rs->count);
+            }
+        }
+
+        // ── PDF ───────────────────────────────────────────────────
+        $filterLine = 'وردية رقم: ' . $shift->id
+            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+
+        $pdf = new MyCustomTCPDF('إحصائيات التأمين', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->SetAutoPageBreak(true, 25);
+        $pdf->SetFont('arial', '', 10);
+        $pdf->AddPage();
+
+        $margins = $pdf->getMargins();
+        $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+
+        // Column widths
+        $wNo      = $W * 0.05;
+        $wName    = $W * 0.25;
+        $wPat     = $W * 0.10;
+        $wLab     = $W * 0.20;
+        $wSvc     = $W * 0.20;
+        $wTotal   = $W * 0.20;
+
+        $line = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.2);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+        };
+
+        // ── Report title ──────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 16);
+        $pdf->Cell($W, 9, 'إحصائيات التأمين', 0, 1, 'C');
+        $pdf->SetFont('arial', '', 9);
+        $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
+        $pdf->Ln(2);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+        $pdf->Ln(5);
+
+        if (empty($companies)) {
+            $pdf->SetFont('arial', '', 11);
+            $pdf->Cell($W, 8, 'لا توجد مرضى تأمين في هذه الوردية', 0, 1, 'C');
+            return $this->shiftPdfResponse($pdf, 'InsuranceStats_Shift_' . $shift->id . '.pdf');
+        }
+
+        // ── Table header ──────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 9);
+        $pdf->Cell($wNo,    7, '#',                   1, 0, 'C');
+        $pdf->Cell($wName,  7, 'الشركة',              1, 0, 'C');
+        $pdf->Cell($wPat,   7, 'عدد المرضى',          1, 0, 'C');
+        $pdf->Cell($wLab,   7, 'مطالبة المختبر',      1, 0, 'C');
+        $pdf->Cell($wSvc,   7, 'مطالبة العيادات',     1, 0, 'C');
+        $pdf->Cell($wTotal, 7, 'الإجمالي',            1, 1, 'C');
+
+        // ── Rows ──────────────────────────────────────────────────
+        $totalPat = 0;
+        $totalLab = 0.0;
+        $totalSvc = 0.0;
+        $i = 1;
+
+        foreach ($companies as $data) {
+            $patCount = count($data['patient_ids']);
+            $rowTotal = $data['lab_claim'] + $data['service_claim'];
+            $totalPat += $patCount;
+            $totalLab += $data['lab_claim'];
+            $totalSvc += $data['service_claim'];
+
+            $pdf->SetFont('arial', '', 10);
+            $pdf->Cell($wNo,    6, $i++,                                   1, 0, 'C');
+            $pdf->Cell($wName,  6, $data['name'],                          1, 0, 'R');
+            $pdf->Cell($wPat,   6, $patCount,                              1, 0, 'C');
+            $pdf->Cell($wLab,   6, number_format($data['lab_claim'],   2), 1, 0, 'C');
+            $pdf->Cell($wSvc,   6, number_format($data['service_claim'],2), 1, 0, 'C');
+            $pdf->Cell($wTotal, 6, number_format($rowTotal,            2), 1, 1, 'C');
+        }
+
+        // ── Totals row ────────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->Cell($wNo + $wName, 7, 'الإجمالي',                         1, 0, 'R');
+        $pdf->Cell($wPat,         7, $totalPat,                           1, 0, 'C');
+        $pdf->Cell($wLab,         7, number_format($totalLab, 2),         1, 0, 'C');
+        $pdf->Cell($wSvc,         7, number_format($totalSvc, 2),         1, 0, 'C');
+        $pdf->Cell($wTotal,       7, number_format($totalLab + $totalSvc, 2), 1, 1, 'C');
+
+        // Double-line footer
+        $pdf->Ln(4);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+
+        return $this->shiftPdfResponse($pdf, 'InsuranceStats_Shift_' . $shift->id . '.pdf');
+    }
+
+    public function shiftLabStatsPdf(Request $request)
+    {
+        $shift = $this->resolveShift($request);
+        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+
+        $shift->load(['patients.labRequests.mainTest.package']);
+
+        // ── Aggregate ─────────────────────────────────────────────
+        // byPackage[ packageName ][ testId ] = [ name, orders, total ]
+        $byPackage = [];
+
+        foreach ($shift->patients as $visit) {
+            foreach ($visit->labRequests as $lr) {
+                if (!$lr->mainTest) continue;
+
+                $packageName = $lr->mainTest->package->package_name ?? 'غير مصنف';
+                $testId      = $lr->main_test_id;
+                $testName    = $lr->mainTest->main_test_name;
+                $qty         = max(1, (int) $lr->count);
+                $price       = (float) $lr->price;
+
+                if (!isset($byPackage[$packageName][$testId])) {
+                    $byPackage[$packageName][$testId] = [
+                        'name'   => $testName,
+                        'orders' => 0,
+                        'price'  => $price,
+                        'total'  => 0.0,
+                    ];
+                }
+
+                $byPackage[$packageName][$testId]['orders'] += $qty;
+                $byPackage[$packageName][$testId]['total']  += $price * $qty;
+            }
+        }
+
+        // Sort each package's tests by order count desc
+        foreach ($byPackage as $pkg => &$tests) {
+            uasort($tests, fn($a, $b) => $b['orders'] <=> $a['orders']);
+        }
+        unset($tests);
+
+        // ── PDF ───────────────────────────────────────────────────
+        $filterLine = 'وردية رقم: ' . $shift->id
+            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+
+        $pdf = new MyCustomTCPDF('إحصائيات التحاليل', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->SetAutoPageBreak(true, 25);
+        $pdf->SetFont('arial', '', 10);
+        $pdf->AddPage();
+
+        $margins = $pdf->getMargins();
+        $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+
+        // Column widths: # | اسم التحليل | الفئة | عدد الطلبات | السعر | الإجمالي
+        $wNo     = $W * 0.06;
+        $wName   = $W * 0.36;
+        $wOrders = $W * 0.14;
+        $wPrice  = $W * 0.22;
+        $wTotal  = $W * 0.22;
+
+        // ── Helpers ───────────────────────────────────────────────
+        $thickLine = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.6);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+            $pdf->SetLineWidth(0.2);
+        };
+
+        $thinLine = function () use ($pdf, $W, $margins) {
+            $pdf->SetLineWidth(0.2);
+            $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
+        };
+
+        $drawTableHeader = function () use ($pdf, $wNo, $wName, $wOrders, $wPrice, $wTotal) {
+            $pdf->SetFont('arial', 'B', 9);
+            $pdf->Cell($wNo,     6, '#',           1, 0, 'C');
+            $pdf->Cell($wName,   6, 'اسم التحليل', 1, 0, 'C');
+            $pdf->Cell($wOrders, 6, 'عدد الطلبات', 1, 0, 'C');
+            $pdf->Cell($wPrice,  6, 'السعر',        1, 0, 'C');
+            $pdf->Cell($wTotal,  6, 'الإجمالي',     1, 1, 'C');
+        };
+
+        // ── Report title ──────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 16);
+        $pdf->Cell($W, 9, 'إحصائيات التحاليل', 0, 1, 'C');
+        $pdf->SetFont('arial', '', 9);
+        $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
+        $pdf->Ln(2);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+        $pdf->Ln(5);
+
+        if (empty($byPackage)) {
+            $pdf->SetFont('arial', '', 11);
+            $pdf->Cell($W, 8, 'لا توجد تحاليل في هذه الوردية', 0, 1, 'C');
+            return $this->shiftPdfResponse($pdf, 'LabStats_Shift_' . $shift->id . '.pdf');
+        }
+
+        // ── Per-package sections ──────────────────────────────────
+        $grandOrders = 0;
+        $grandTotal  = 0.0;
+
+        foreach ($byPackage as $packageName => $tests) {
+            $pkgOrders = array_sum(array_column($tests, 'orders'));
+            $pkgTotal  = array_sum(array_column($tests, 'total'));
+
+            // Package banner
+            $thickLine();
+            $pdf->Ln(1);
+            $pdf->SetFont('arial', 'B', 11);
+            $pdf->Cell($W - $wOrders - $wTotal, 6, $packageName,              0, 0, 'R');
+            $pdf->Cell($wOrders,                6, $pkgOrders . ' طلب',        0, 0, 'C');
+            $pdf->Cell($wTotal,                 6, number_format($pkgTotal, 2), 0, 1, 'C');
+            $thinLine();
+            $pdf->Ln(1);
+
+            $drawTableHeader();
+
+            $i = 1;
+            foreach ($tests as $test) {
+                $pdf->SetFont('arial', '', 9);
+                $pdf->Cell($wNo,     6, $i++,                                       1, 0, 'C');
+                $pdf->Cell($wName,   6, $test['name'],                              1, 0, 'R');
+                $pdf->Cell($wOrders, 6, $test['orders'],                            1, 0, 'C');
+                $pdf->Cell($wPrice,  6, number_format($test['price'],  2),          1, 0, 'C');
+                $pdf->Cell($wTotal,  6, number_format($test['total'],  2),          1, 1, 'C');
+            }
+
+            // Package subtotal
+            $pdf->SetFont('arial', 'B', 9);
+            $pdf->Cell($wNo + $wName, 6, 'مجموع الفئة',                            1, 0, 'R');
+            $pdf->Cell($wOrders,      6, $pkgOrders,                                1, 0, 'C');
+            $pdf->Cell($wPrice,       6, '—',                                       1, 0, 'C');
+            $pdf->Cell($wTotal,       6, number_format($pkgTotal, 2),               1, 1, 'C');
+
+            $grandOrders += $pkgOrders;
+            $grandTotal  += $pkgTotal;
+            $pdf->Ln(3);
+        }
+
+        // ── Grand total ───────────────────────────────────────────
+        $pdf->Ln(3);
+        $pdf->SetFont('arial', 'B', 12);
+        $pdf->Cell($wNo + $wName, 7, 'الإجمالي الكلي',             0, 0, 'R');
+        $pdf->Cell($wOrders,      7, $grandOrders . ' طلب',          0, 0, 'C');
+        $pdf->Cell($wPrice,       7, '',                             0, 0, 'C');
+        $pdf->Cell($wTotal,       7, number_format($grandTotal, 2),  0, 1, 'C');
+
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+
+        return $this->shiftPdfResponse($pdf, 'LabStats_Shift_' . $shift->id . '.pdf');
+    }
+
+    public function shiftDiscountsPdf(Request $request)
+    {
+        $shift = $this->resolveShift($request);
+        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+
+        $shift->load([
+            'patients.patient',
+            'patients.labRequests',
+            'patients.requestedServices',
+            'patients.doctor:id,name',
+        ]);
+
+        // ── Aggregate per visit ───────────────────────────────────
+        $rows = [];
+
+        foreach ($shift->patients as $visit) {
+            $labDiscount = 0.0;
+            foreach ($visit->labRequests as $lr) {
+                $labDiscount += (float)$lr->price * max(1, (int)$lr->count) * ((int)$lr->discount_per / 100);
+            }
+
+            $svcDiscount = 0.0;
+            foreach ($visit->requestedServices as $rs) {
+                $fixed   = (float)$rs->discount;
+                $percent = (float)$rs->price * max(1, (int)$rs->count) * ((int)$rs->discount_per / 100);
+                $svcDiscount += $fixed + $percent;
+            }
+
+            $total = $labDiscount + $svcDiscount;
+            if ($total <= 0) continue;
+
+            $rows[] = [
+                'visit_id'    => $visit->id,
+                'patient'     => $visit->patient->name ?? '—',
+                'doctor'      => $visit->doctor->name  ?? '—',
+                'lab_dis'     => $labDiscount,
+                'svc_dis'     => $svcDiscount,
+                'total'       => $total,
+            ];
+        }
+
+        // Sort by total desc
+        usort($rows, fn($a, $b) => $b['total'] <=> $a['total']);
+
+        $sumLab  = array_sum(array_column($rows, 'lab_dis'));
+        $sumSvc  = array_sum(array_column($rows, 'svc_dis'));
+        $sumTot  = array_sum(array_column($rows, 'total'));
+
+        // ── PDF ───────────────────────────────────────────────────
+        $filterLine = 'وردية رقم: ' . $shift->id
+            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+
+        $pdf = new MyCustomTCPDF('تقرير التخفيضات', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->SetAutoPageBreak(true, 25);
+        $pdf->SetFont('arial', '', 10);
+        $pdf->AddPage();
+
+        $margins = $pdf->getMargins();
+        $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+
+        // Column widths: # | المريض | الطبيب | تخفيض المختبر | تخفيض العيادات | الإجمالي
+        $wNo    = $W * 0.05;
+        $wPat   = $W * 0.26;
+        $wDoc   = $W * 0.23;
+        $wLab   = $W * 0.18;
+        $wSvc   = $W * 0.18;
+        $wTot   = $W * 0.10;
+
+        $drawTableHeader = function () use ($pdf, $wNo, $wPat, $wDoc, $wLab, $wSvc, $wTot) {
+            $pdf->SetFont('arial', 'B', 9);
+            $pdf->Cell($wNo,  6, '#',               1, 0, 'C');
+            $pdf->Cell($wPat, 6, 'المريض',          1, 0, 'C');
+            $pdf->Cell($wDoc, 6, 'الطبيب',          1, 0, 'C');
+            $pdf->Cell($wLab, 6, 'تخفيض المختبر',  1, 0, 'C');
+            $pdf->Cell($wSvc, 6, 'تخفيض العيادات', 1, 0, 'C');
+            $pdf->Cell($wTot, 6, 'الإجمالي',        1, 1, 'C');
+        };
+
+        // ── Report title ──────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 16);
+        $pdf->Cell($W, 9, 'تقرير التخفيضات', 0, 1, 'C');
+        $pdf->SetFont('arial', '', 9);
+        $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
+        $pdf->Ln(2);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+        $pdf->Ln(5);
+
+        // ── Summary box ───────────────────────────────────────────
+        $sw = $W / 3;
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->Cell($sw, 7, 'تخفيض المختبر: '   . number_format($sumLab, 2), 'B', 0, 'C');
+        $pdf->Cell($sw, 7, 'تخفيض العيادات: '  . number_format($sumSvc, 2), 'B', 0, 'C');
+        $pdf->Cell($sw, 7, 'إجمالي التخفيضات: '. number_format($sumTot, 2), 'B', 1, 'C');
+        $pdf->Ln(4);
+
+        if (empty($rows)) {
+            $pdf->SetFont('arial', '', 11);
+            $pdf->Cell($W, 8, 'لا توجد تخفيضات في هذه الوردية', 0, 1, 'C');
+            return $this->shiftPdfResponse($pdf, 'Discounts_Shift_' . $shift->id . '.pdf');
+        }
+
+        // ── Table ─────────────────────────────────────────────────
+        $drawTableHeader();
+
+        foreach ($rows as $idx => $row) {
+            // Auto re-draw header on page break
+            if ($pdf->GetY() + 6 > $pdf->getPageHeight() - $margins['bottom'] - 25) {
+                $pdf->AddPage();
+                $drawTableHeader();
+            }
+
+            $pdf->SetFont('arial', '', 9);
+            $pdf->Cell($wNo,  6, $idx + 1,                              1, 0, 'C');
+            $pdf->Cell($wPat, 6, $row['patient'],                       1, 0, 'R');
+            $pdf->Cell($wDoc, 6, $row['doctor'],                        1, 0, 'R');
+            $pdf->Cell($wLab, 6, $row['lab_dis'] > 0 ? number_format($row['lab_dis'], 2) : '—', 1, 0, 'C');
+            $pdf->Cell($wSvc, 6, $row['svc_dis'] > 0 ? number_format($row['svc_dis'], 2) : '—', 1, 0, 'C');
+            $pdf->Cell($wTot, 6, number_format($row['total'], 2),       1, 1, 'C');
+        }
+
+        // ── Totals row ────────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->Cell($wNo + $wPat + $wDoc, 7, 'الإجمالي',                1, 0, 'R');
+        $pdf->Cell($wLab, 7, number_format($sumLab, 2),                 1, 0, 'C');
+        $pdf->Cell($wSvc, 7, number_format($sumSvc, 2),                 1, 0, 'C');
+        $pdf->Cell($wTot, 7, number_format($sumTot, 2),                 1, 1, 'C');
+
+        // Double-line
+        $pdf->Ln(4);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+
+        return $this->shiftPdfResponse($pdf, 'Discounts_Shift_' . $shift->id . '.pdf');
+    }
+
+    public function shiftDoctorLabPdf(Request $request)
+    {
+        $shift = $this->resolveShift($request);
+        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+
+        $shift->load(['patients.doctor:id,name', 'patients.labRequests.mainTest']);
+
+        // ── Aggregate per doctor ──────────────────────────────────
+        $doctors = [];   // [ doctor_id => [ name, tests(count), total ] ]
+
+        foreach ($shift->patients as $visit) {
+            if (!$visit->doctor) continue;
+
+            $did = $visit->doctor->id;
+            if (!isset($doctors[$did])) {
+                $doctors[$did] = [
+                    'name'  => $visit->doctor->name,
+                    'count' => 0,
+                    'total' => 0.0,
+                ];
+            }
+
+            foreach ($visit->labRequests as $lr) {
+                $qty = max(1, (int) $lr->count);
+                $doctors[$did]['count'] += $qty;
+                $doctors[$did]['total'] += (float) $lr->price * $qty;
+            }
+        }
+
+        // Sort by total desc
+        uasort($doctors, fn($a, $b) => $b['total'] <=> $a['total']);
+
+        $grandCount = array_sum(array_column($doctors, 'count'));
+        $grandTotal = array_sum(array_column($doctors, 'total'));
+
+        // ── PDF ───────────────────────────────────────────────────
+        $filterLine = 'وردية رقم: ' . $shift->id
+            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+
+        $pdf = new MyCustomTCPDF('أداء الأطباء - المختبر', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->SetAutoPageBreak(true, 25);
+        $pdf->SetFont('arial', '', 10);
+        $pdf->AddPage();
+
+        $margins = $pdf->getMargins();
+        $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+
+        $wNo    = $W * 0.07;
+        $wName  = $W * 0.43;
+        $wCount = $W * 0.20;
+        $wTotal = $W * 0.30;
+
+        // ── Title ─────────────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 16);
+        $pdf->Cell($W, 9, 'أداء الأطباء — المختبر', 0, 1, 'C');
+        $pdf->SetFont('arial', '', 9);
+        $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
+        $pdf->Ln(2);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+        $pdf->Ln(5);
+
+        if (empty($doctors)) {
+            $pdf->SetFont('arial', '', 11);
+            $pdf->Cell($W, 8, 'لا توجد فحوصات مختبرية في هذه الوردية', 0, 1, 'C');
+            return $this->shiftPdfResponse($pdf, 'DoctorLab_Shift_' . $shift->id . '.pdf');
+        }
+
+        // ── Table header ──────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->Cell($wNo,    7, '#',                    1, 0, 'C');
+        $pdf->Cell($wName,  7, 'اسم الطبيب',           1, 0, 'C');
+        $pdf->Cell($wCount, 7, 'عدد الفحوصات',         1, 0, 'C');
+        $pdf->Cell($wTotal, 7, 'إجمالي قيمة الفحوصات', 1, 1, 'C');
+
+        // ── Rows ──────────────────────────────────────────────────
+        $i = 1;
+        foreach ($doctors as $data) {
+            $pdf->SetFont('arial', '', 10);
+            $pdf->Cell($wNo,    6, $i++,                                1, 0, 'C');
+            $pdf->Cell($wName,  6, $data['name'],                       1, 0, 'R');
+            $pdf->Cell($wCount, 6, $data['count'],                      1, 0, 'C');
+            $pdf->Cell($wTotal, 6, number_format($data['total'], 2),    1, 1, 'C');
+        }
+
+        // ── Totals row ────────────────────────────────────────────
+        $pdf->SetFont('arial', 'B', 10);
+        $pdf->Cell($wNo + $wName, 7, 'الإجمالي',                       1, 0, 'R');
+        $pdf->Cell($wCount,       7, $grandCount,                       1, 0, 'C');
+        $pdf->Cell($wTotal,       7, number_format($grandTotal, 2),     1, 1, 'C');
+
+        // Double-line
+        $pdf->Ln(4);
+        $pdf->SetLineWidth(0.5);
+        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->SetLineWidth(0.2);
+        $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
+
+        return $this->shiftPdfResponse($pdf, 'DoctorLab_Shift_' . $shift->id . '.pdf');
+    }
+
     public function generateThermalServiceReceipt(Request $request, DoctorVisit $visit)
     {
         if ($visit->requestedServices()->count() === 0) {

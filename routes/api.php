@@ -578,6 +578,13 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/doctor-shifts/{doctorShift}/financial-summary/pdf', [ReportController::class, 'clinicReport']);
   // The route api/reports/clinic-shift-summary/pdf could not be found.
   Route::get('/reports/clinic-shift-summary/pdf', [ReportController::class, 'allclinicsReportNew']);
+  Route::get('/reports/clinic-shift/profit-loss/pdf',     [ReportController::class, 'shiftProfitLossPdf']);
+  Route::get('/reports/clinic-shift/revenue/pdf',         [ReportController::class, 'shiftRevenuePdf']);
+  Route::get('/reports/clinic-shift/expenses/pdf',        [ReportController::class, 'shiftExpensesPdf']);
+  Route::get('/reports/clinic-shift/insurance-stats/pdf', [ReportController::class, 'shiftInsuranceStatsPdf']);
+  Route::get('/reports/clinic-shift/lab-stats/pdf',       [ReportController::class, 'shiftLabStatsPdf']);
+  Route::get('/reports/clinic-shift/discounts/pdf',       [ReportController::class, 'shiftDiscountsPdf']);
+  Route::get('/reports/clinic-shift/doctor-lab/pdf',      [ReportController::class, 'shiftDoctorLabPdf']);
   // ...
   Route::get('/visits/{visit}/lab-thermal-receipt/pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
   Route::get('/reports/costs/pdf', [ReportController::class, 'generateCostsReportPdf']);
