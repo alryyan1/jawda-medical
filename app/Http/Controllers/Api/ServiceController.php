@@ -69,12 +69,12 @@ class ServiceController extends Controller
             'variable' => 'sometimes|required|boolean',
         ]);
         if (isset($validatedData['price']) && (float) $validatedData['price'] !== (float) $service->price) {
-            ServicePriceHistory::create([
-                'service_id' => $service->id,
-                'user_id'    => Auth::id(),
-                'old_price'  => $service->price,
-                'new_price'  => $validatedData['price'],
-            ]);
+            // ServicePriceHistory::create([
+            //     'service_id' => $service->id,
+            //     'user_id'    => Auth::id(),
+            //     'old_price'  => $service->price,
+            //     'new_price'  => $validatedData['price'],
+            // ]);
         }
 
         $service->update($validatedData);

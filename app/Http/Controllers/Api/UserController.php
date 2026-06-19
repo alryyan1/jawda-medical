@@ -590,4 +590,23 @@ class UserController extends Controller
             'data' => array_values($doctorVisits)
         ]);
     }
+
+    public function getUsersWithLabDepositsForShift(Request $request)
+    {
+        $request->validate([
+            'shift_id' => 'required|integer|exists:shifts,id',
+        ]);
+
+        $users = DB::table('labrequests')
+            ->join('doctorvisits', 'labrequests.doctor_visit_id', '=', 'doctorvisits.id')
+            ->join('users', 'labrequests.user_deposited', '=', 'users.id')
+            ->where('doctorvisits.shift_id', $request->shift_id)
+            ->whereNotNull('labrequests.user_deposited')
+            ->select('users.id', 'users.name')
+            ->distinct()
+            ->orderBy('users.name')
+            ->get();
+
+        return response()->json(['data' => $users]);
+    }
 }

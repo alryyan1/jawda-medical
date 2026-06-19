@@ -161,6 +161,7 @@ Route::middleware('auth:sanctum')->group(function () {
   // Specific routes must come before apiResource to avoid route model binding conflicts
   Route::get('/users/with-shift-transactions', [UserController::class, 'getUsersWithShiftTransactions']);
   Route::get('/users/shift-patient-transactions', [UserController::class, 'getUserShiftPatientTransactions']);
+  Route::get('/users/lab-deposits-for-shift', [UserController::class, 'getUsersWithLabDepositsForShift']);
   Route::apiResource('users', UserController::class);
   Route::apiResource('roles', RoleController::class);
   Route::post('/users/{user}/update-password', [UserController::class, 'updatePassword']);

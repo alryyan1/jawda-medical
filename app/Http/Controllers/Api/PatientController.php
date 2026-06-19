@@ -196,9 +196,10 @@ class PatientController extends Controller
                 $fileToUseId = $file->id;
             }
 
-            //the visit number is the number of the in the general shift
-            // Use pessimistic locking to prevent duplicate visitLabNumber in concurrent requests
-            $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)
+            // Lock patients rows for this shift to get a strictly serialized visit_number.
+            // Locking patients (the table that owns visit_number) is more direct than
+            // locking doctor_visits and avoids a gap between the count source and the insert target.
+            $visitLabNumber = Patient::where('shift_id', $currentGeneralShift->id)
                 ->lockForUpdate()
                 ->count() + 1;
 
@@ -684,10 +685,7 @@ class PatientController extends Controller
                 $fileToUseId = $file->id;
             }
 
-            // Use pessimistic locking to prevent duplicate visitLabNumber in concurrent requests
-            // Lock rows to prevent race conditions when multiple users save simultaneously
-            // This ensures only one transaction can read the count at a time
-            $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)
+            $visitLabNumber = Patient::where('shift_id', $currentGeneralShift->id)
                 ->lockForUpdate()
                 ->count() + 1;
 
@@ -924,8 +922,6 @@ class PatientController extends Controller
         if (!$currentGeneralShift) {
             return response()->json(['message' => 'No open clinic shift available to create a visit.'], 400);
         }
-        //the visit number is the number of  the in the general shift
-        $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1;
 
 
         // Find the latest active shift for the selected referring doctor.
@@ -950,6 +946,10 @@ class PatientController extends Controller
             // Your logic for finding an existing patient file can be reused here
             // For simplicity, we'll create a new file for each new lab visit encounter
             $file = File::create();
+
+            $visitLabNumber = Patient::where('shift_id', $currentGeneralShift->id)
+                ->lockForUpdate()
+                ->count() + 1;
 
             // Create the new Patient record for this encounter
             // A new patient record is created for each visit to capture their state at that time.
@@ -1096,10 +1096,7 @@ class PatientController extends Controller
                 $fileToUseId = $file->id;
             }
 
-            // Use pessimistic locking to prevent duplicate visitLabNumber in concurrent requests
-            // Lock rows to prevent race conditions when multiple users save simultaneously
-            // This ensures only one transaction can read the count at a time
-            $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)
+            $visitLabNumber = Patient::where('shift_id', $currentGeneralShift->id)
                 ->lockForUpdate()
                 ->count() + 1;
 
@@ -1447,8 +1444,12 @@ class PatientController extends Controller
                 $fileToUseId = $file->id;
             }
 
-            $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1;
-            $queueNumber = DoctorVisit::where('doctor_shift_id', $validated['doctor_shift_id'])->count() + 1;
+            $visitLabNumber = Patient::where('shift_id', $currentGeneralShift->id)
+                ->lockForUpdate()
+                ->count() + 1;
+            $queueNumber = DoctorVisit::where('doctor_shift_id', $validated['doctor_shift_id'])
+                ->lockForUpdate()
+                ->count() + 1;
 
             // Create a new Patient record for this clinic visit
             $newPatient = Patient::create([
@@ -1720,10 +1721,7 @@ class PatientController extends Controller
             // Create a new file
             $file = File::create();
 
-            // Use pessimistic locking to prevent duplicate visitLabNumber in concurrent requests
-            // Lock rows to prevent race conditions when multiple users save simultaneously
-            // This ensures only one transaction can read the count at a time
-            $visitLabNumber = DoctorVisit::where('shift_id', $currentGeneralShift->id)
+            $visitLabNumber = Patient::where('shift_id', $currentGeneralShift->id)
                 ->lockForUpdate()
                 ->count() + 1;
 
