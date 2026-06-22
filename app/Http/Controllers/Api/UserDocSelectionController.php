@@ -22,7 +22,7 @@ class UserDocSelectionController extends Controller
             $userId = Auth::id();
 
             if (!$userId) {
-                return response()->json(['message' => 'غير مصرح بالوصول'], 401);
+                return response()->json(['message' => 'غير مصرح بالوصول'], 403);
             }
 
             $favorites = UserDocSelection::where('user_id', $userId)
@@ -55,7 +55,7 @@ class UserDocSelectionController extends Controller
             $userId = Auth::id();
 
             if (!$userId) {
-                return response()->json(['message' => 'غير مصرح بالوصول'], 401);
+                return response()->json(['message' => 'غير مصرح بالوصول'], 403);
             }
 
             $search = $request->get('search', '');
@@ -108,7 +108,7 @@ class UserDocSelectionController extends Controller
             $userId = Auth::id();
 
             if (!$userId) {
-                return response()->json(['message' => 'غير مصرح بالوصول'], 401);
+                return response()->json(['message' => 'غير مصرح بالوصول'], 403);
             }
 
             $validator = Validator::make($request->all(), [
@@ -178,7 +178,7 @@ class UserDocSelectionController extends Controller
             $userId = Auth::id();
 
             if (!$userId) {
-                return response()->json(['message' => 'غير مصرح بالوصول'], 401);
+                return response()->json(['message' => 'غير مصرح بالوصول'], 403);
             }
 
             // Check if the selection exists
@@ -227,7 +227,7 @@ class UserDocSelectionController extends Controller
             $userId = Auth::id();
 
             if (!$userId) {
-                return response()->json(['message' => 'غير مصرح بالوصول'], 401);
+                return response()->json(['message' => 'غير مصرح بالوصول'], 403);
             }
 
             $validator = Validator::make($request->all(), [

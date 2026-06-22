@@ -5,6 +5,7 @@ namespace App\Services\Pdf;
 use App\Models\DoctorShift;
 use App\Models\DoctorVisit;
 use App\Models\Setting;
+use Illuminate\Support\Facades\URL;
 use TCPDF;
 
 /**
@@ -229,6 +230,13 @@ class ClinicShiftReport extends TCPDF
 
             $netCenter = $visit->total_paid_services() - $doctorCredit;
 
+            // Signed URL for this specific visit's breakdown — valid 7 days, no auth token needed
+            $visitBreakdownUrl = URL::signedRoute(
+                'reports.doctor-credit-breakdown',
+                ['doctorShift' => $this->doctorShift->id, 'visit' => $visit->id],
+                now()->addDays(7)
+            );
+
             $rowData = [
                 $visit->number,
                 $visit->patient->name ?? '-',
@@ -237,7 +245,7 @@ class ClinicShiftReport extends TCPDF
                 number_format($visit->total_paid_services() - $visit->bankak_service(), 1),
                 number_format($visit->bankak_service(), 1),
                 number_format($totalDiscount, 1),
-                number_format($doctorCredit, 1),
+                number_format($doctorCredit, 1),  // index 7 — will be rendered as clickable
                 number_format($netCenter, 1),
             ];
 
@@ -256,7 +264,21 @@ class ClinicShiftReport extends TCPDF
 
             foreach ($rowData as $i => $val) {
                 $align = in_array($i, [3, 4, 5, 6, 7, 8]) ? 'C' : $cols[$i]['a'];
-                $this->MultiCell($cols[$i]['w'], $rowHeight, $val, 'LRB', $align, true, 0, null, null, true, 0, false, true, $rowHeight, 'M');
+
+                if ($i === 7) {
+                    // Cell() has a built-in $link param — simpler and RTL-safe
+                    $this->SetFillColor(41, 98, 255);
+                    $this->SetTextColor(255, 255, 255);
+                    $this->Cell($cols[$i]['w'], $rowHeight, $val, 'LRB', 0, 'C', true, $visitBreakdownUrl);
+                    $this->SetFillColorArray($currentFillColor);
+                    if ($visit->patient->company_id) {
+                        $this->SetTextColor(192, 57, 43);
+                    } else {
+                        $this->SetTextColor(40, 40, 40);
+                    }
+                } else {
+                    $this->MultiCell($cols[$i]['w'], $rowHeight, $val, 'LRB', $align, true, 0, null, null, true, 0, false, true, $rowHeight, 'M');
+                }
             }
 
             // Services with dynamic height and HTML support for strikethrough
@@ -303,7 +325,13 @@ class ClinicShiftReport extends TCPDF
         $this->Cell($cols[7]['w'], 9, number_format($totalDoctor, 1), 1, 0, 'C', true);
         $this->Cell($cols[8]['w'], 9, number_format($totalNetCenter, 1), 1, 0, 'C', true);
         $this->Cell($cols[9]['w'], 9, '', 1, 1, 'C', true);
-        $this->Ln(8);
+
+        // Hint below totals row
+        $this->setFont('arial', 'I', 8);
+        $this->SetTextColor(41, 98, 255);
+        $this->Cell(0, 6, '* اضغط على خلية حصة الطبيب (باللون الأزرق) في أي صف لفتح تفاصيل الاحتساب للمريض', 0, 1, 'R');
+        $this->SetTextColor(44, 62, 80);
+        $this->Ln(4);
     }
 
     protected function renderServiceCosts()

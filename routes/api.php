@@ -991,6 +991,8 @@ Route::post('/lab-requests/{labrequest}/cancel-payment', [LabRequestController::
 Route::patch('/labrequests/{labrequest}/toggle-bankak', [LabRequestController::class, 'toggleBankak'])->middleware('auth:sanctum');
 Route::patch('/doctor-visits/{visit}/update-all-lab-requests-bankak', [LabRequestController::class, 'updateAllLabRequestsBankak'])->middleware('auth:sanctum');
 Route::get('/lab-requests/visit/{visit}/thermal-receipt-pdf', [LabRequestController::class, 'generateLabThermalReceiptPdf']);
+// Signed-URL route — no auth token needed, link is embedded inside the clinic shift PDF
+Route::get('/reports/doctor-shifts/{doctorShift}/doctor-credit-breakdown/pdf', [ReportController::class, 'doctorCreditBreakdownPdf'])->name('reports.doctor-credit-breakdown');
 Route::get('/visits/{visit}/thermal-receipt/pdf', [ReportController::class, 'generateThermalServiceReceipt']);
 Route::get('/visits/{visit}/clinic-invoice/pdf', [ReportController::class, 'generateClinicInvoicePdf']);
 Route::get('/visits/{visit}/requested-services/{requestedService}/thermal-receipt/pdf', [ReportController::class, 'generateSingleServiceThermalReceipt']);

@@ -987,6 +987,33 @@ class ReportController extends Controller
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+    public function doctorCreditBreakdownPdf(DoctorShift $doctorShift, Request $request)
+    {
+        if (!$request->hasValidSignature()) {
+            abort(403, 'رابط غير صالح أو منتهي الصلاحية.');
+        }
+
+        $doctorShift->load([
+            'doctor.specificServices',
+            'doctor.doctorServiceCosts',
+            'user',
+            'visits.patient.company',
+            'visits.requestedServices.service',
+            'visits.requestedServices.returnedRefunds',
+            'visits.requestedServices.requestedServiceCosts',
+        ]);
+
+        $visitId = $request->query('visit');
+
+        $pdf = new \App\Services\Pdf\DoctorCreditBreakdownPdf($doctorShift, $visitId ? (int) $visitId : null);
+        $pdfContent = $pdf->generate();
+
+        $suffix = $visitId ? "_visit_{$visitId}" : '';
+        return response($pdfContent, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', "inline; filename=\"doctor_credit_breakdown_{$doctorShift->id}{$suffix}.pdf\"");
+    }
+
     public function clinicReport_old(Request $request)
     {
         $doctor_shift_id = $request->get('doctor_shift_id');

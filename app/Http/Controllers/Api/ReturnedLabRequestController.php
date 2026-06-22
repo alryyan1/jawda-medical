@@ -17,7 +17,7 @@ class ReturnedLabRequestController extends Controller
     public function store(Request $request, LabRequest $labrequest)
     {
         if (! Auth::id()) {
-            return response()->json(['message' => 'يجب تسجيل الدخول لتسجيل الاسترداد.'], 401);
+            return response()->json(['message' => 'يجب تسجيل الدخول لتسجيل الاسترداد.'], 403);
         }
 
         $validated = $request->validate([
@@ -59,7 +59,7 @@ class ReturnedLabRequestController extends Controller
     public function update(Request $request, ReturnedLabRequest $returnedLabRequest)
     {
         if (! Auth::id()) {
-            return response()->json(['message' => 'يجب تسجيل الدخول لتعديل الاسترداد.'], 401);
+            return response()->json(['message' => 'يجب تسجيل الدخول لتعديل الاسترداد.'], 403);
         }
 
         $validated = $request->validate([

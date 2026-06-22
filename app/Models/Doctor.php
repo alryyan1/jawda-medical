@@ -200,14 +200,8 @@ class Doctor extends Model
                 continue;
             }
 
-            // Skip returned (refunded) services.
-            if ($service->returnedRefunds->isNotEmpty()) {
-                continue;
-            }
-
             $eligible = $disableServiceCheck
-                || in_array($service->service_id, $individualServiceIds)
-                || in_array($service->service_id, $categoryServiceIds);
+                || in_array($service->service_id, $individualServiceIds);
 
             if (! $eligible) {
                 continue;
@@ -269,14 +263,14 @@ class Doctor extends Model
     private function calcCashCredit(RequestedService $service): float
     {
         // --- 1. Category-service settings ---
-        if ($this->category_id) {
-            $categoryService = $this->category->services
-                ->first(fn ($s) => $s->id === $service->service_id);
+        // if ($this->category_id) {
+        //     $categoryService = $this->category->services
+        //         ->first(fn ($s) => $s->id === $service->service_id);
 
-            if ($categoryService?->pivot) {
-                return $this->applyPivotRate($service, $categoryService->pivot);
-            }
-        }
+        //     if ($categoryService?->pivot) {
+        //         return $this->applyPivotRate($service, $categoryService->pivot);
+        //     }
+        // }
 
         // --- 2. Individual doctor-service settings ---
         $doctorService = $this->specificServices
@@ -302,13 +296,14 @@ class Doctor extends Model
      */
     private function applyPivotRate(RequestedService $service, object $pivot): float
     {
-        if (($pivot->percentage ?? 0) > 0) {
-            return $service->amount_paid * $pivot->percentage / 100;
-        }
-
+      
         if (($pivot->fixed ?? 0) > 0 && ($pivot->percentage ?? 0) == 0) {
             return $pivot->fixed * $service->count;
         }
+          if (($pivot->percentage ?? 0) > 0) {
+            return $service->amount_paid * $pivot->percentage / 100;
+        }
+
 
         // Neither percentage nor fixed — fall back to doctor's default.
         $totalCost = $service->getTotalCostsForDoctor($this);
