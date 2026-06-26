@@ -626,7 +626,7 @@ class DoctorShift extends Model
 
         // 2. Individual doctor-service pivot
         $docService = $doctor->specificServices
-            ->first(fn ($s) => $s->pivot->service_id === $service->service_id);
+            ->first(fn ($s) => $s->id == $service->service_id);
         if ($docService?->pivot) {
             return $this->applyPivotRateInline($service, $docService->pivot, $doctor);
         }

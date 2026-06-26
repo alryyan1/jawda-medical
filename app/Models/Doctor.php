@@ -274,7 +274,7 @@ class Doctor extends Model
 
         // --- 2. Individual doctor-service settings ---
         $doctorService = $this->specificServices
-            ->first(fn ($s) => $s->pivot->service_id === $service->service_id);
+            ->first(fn ($s) => $s->id == $service->service_id);
 
         if ($doctorService?->pivot) {
             return $this->applyPivotRate($service, $doctorService->pivot);

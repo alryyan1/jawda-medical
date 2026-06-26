@@ -137,4 +137,47 @@ class DoctorServiceController extends Controller
         $doctor->specificServices()->detach($service->id);
         return response()->json(null, 204);
     }
+
+    /**
+     * Remove all service configurations from a doctor.
+     */
+    public function destroyAll(Doctor $doctor)
+    {
+        $doctor->specificServices()->detach();
+        return response()->json(null, 204);
+    }
+
+    /**
+     * Bulk-add all active services from a service group for a doctor.
+     */
+    public function bulkStoreByGroup(Request $request, Doctor $doctor)
+    {
+        $validated = $request->validate([
+            'service_group_id' => 'required|integer|exists:service_groups,id',
+            'percentage'       => 'nullable|numeric|min:0|max:100',
+            'fixed'            => 'nullable|numeric|min:0',
+        ]);
+
+        $configuredIds = $doctor->specificServices()->pluck('services.id');
+
+        $services = Service::where('service_group_id', $validated['service_group_id'])
+            ->where('activate', true)
+            ->whereNotIn('id', $configuredIds)
+            ->get();
+
+        if ($services->isEmpty()) {
+            return response()->json(['message' => 'لا توجد خدمات متاحة لهذه المجموعة أو جميعها مضافة مسبقاً.'], 422);
+        }
+
+        $pivotData = [];
+        foreach ($services as $service) {
+            $pivotData[$service->id] = [
+                'percentage' => $validated['percentage'] ?? null,
+                'fixed'      => $validated['fixed'] ?? null,
+            ];
+        }
+        $doctor->specificServices()->attach($pivotData);
+
+        return response()->json(['count' => count($pivotData)], 200);
+    }
 }

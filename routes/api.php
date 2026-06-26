@@ -109,6 +109,8 @@ Route::get('/doctors/{doctor}/available-services-for-config', [DoctorServiceCont
 Route::post('/doctors/{doctor}/configure-service', [DoctorServiceController::class, 'store']);
 Route::put('/doctors/{doctor}/configure-service/{service}', [DoctorServiceController::class, 'update']);
 Route::delete('/doctors/{doctor}/configure-service/{service}', [DoctorServiceController::class, 'destroy']);
+Route::delete('/doctors/{doctor}/configure-services', [DoctorServiceController::class, 'destroyAll']);
+Route::post('/doctors/{doctor}/configure-services/by-group', [DoctorServiceController::class, 'bulkStoreByGroup']);
 /*
 |--------------------------------------------------------------------------
 | Authentication Routes

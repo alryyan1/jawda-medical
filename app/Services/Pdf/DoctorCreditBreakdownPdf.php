@@ -194,9 +194,14 @@ class DoctorCreditBreakdownPdf extends TCPDF
                 } else {
                     // Cash – check specific service settings first
                     $doctorService = $doctor->specificServices
-                        ->first(fn($s) => $s->pivot->service_id === $rs->service_id);
-
+                        ->first(fn($s) => $s->pivot->service_id == $rs->service_id);
+                    //log doctorservices
+                    // \Log::info('Doctor Specific Services:', ['services' => $doctor->specificServices]);
                     $pivot = $doctorService?->pivot;
+                    //log requested service
+                    \Log::info('Requested Service:', ['service' => $rs]);
+                    //log pivot
+                    \Log::info('Doctor Service Pivot:', ['pivot' => $pivot]);
 
                     if ($pivot && ($pivot->fixed ?? 0) > 0 && ($pivot->percentage ?? 0) == 0) {
                         // Fixed rate
