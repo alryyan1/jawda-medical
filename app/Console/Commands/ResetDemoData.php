@@ -21,7 +21,6 @@ class ResetDemoData extends Command
         '/lab-reception',
         '/lab-sample-collection',
         '/lab-workstation',
-        '/attendance/sheet',
         '/patients',
         '/admissions',
         '/online-booking',
@@ -182,8 +181,6 @@ class ResetDemoData extends Command
 
         $this->truncate([
             'personal_access_tokens',
-            'attendances',
-            'user_default_shifts',
             'denos_users',
             'user_routes',
             'user_sub_routes',

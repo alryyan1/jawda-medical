@@ -3,8 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens; // <--- Ensure this is present
@@ -87,28 +85,8 @@ class User extends Authenticatable
         'is_active' => 'boolean',
     ];
 
-    public function defaultShifts(): BelongsToMany
-    {
-        return $this->belongsToMany(ShiftDefinition::class, 'user_default_shifts', 'user_id', 'shift_definition_id')
-            ->using(UserDefaultShift::class)
-            ->withTimestamps();
-    }
-
-    public function attendances(): HasMany
-    {
-        return $this->hasMany(Attendance::class);
-    }
     public function doctor()
     {
         return $this->belongsTo(Doctor::class);
-    }
-    public function supervisedAttendances(): HasMany // Attendances this user supervised
-    {
-        return $this->hasMany(Attendance::class, 'supervisor_id');
-    }
-
-    public function recordedAttendances(): HasMany // Attendances this user recorded
-    {
-        return $this->hasMany(Attendance::class, 'recorded_by_user_id');
     }
 }

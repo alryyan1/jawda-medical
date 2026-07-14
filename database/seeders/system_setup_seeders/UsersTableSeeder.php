@@ -32,7 +32,7 @@ class UsersTableSeeder extends Seeder
                 'is_supervisor' => 0,
                 'is_active' => 1,
                 'user_type' => NULL,
-                'nav_items' => '["\\/dashboard","\\/clinic","\\/lab-reception","\\/lab-sample-collection","\\/lab-workstation","\\/attendance\\/sheet","\\/patients","\\/admissions","\\/online-booking","\\/cash-reconciliation"]',
+                'nav_items' => '["\\/dashboard","\\/clinic","\\/lab-reception","\\/lab-sample-collection","\\/lab-workstation","\\/patients","\\/admissions","\\/online-booking","\\/cash-reconciliation"]',
                 'name' => '',
                 'user_money_collector_type' => 'all',
             ),

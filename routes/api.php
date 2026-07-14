@@ -12,10 +12,7 @@ use App\Http\Controllers\Api\AdmissionDoseController;
 use App\Http\Controllers\Api\AdmissionNursingAssignmentController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
-use App\Http\Controllers\Api\AttendanceController;
-use App\Http\Controllers\Api\AttendanceReportController;
 use App\Http\Controllers\Api\AdmissionSettingController;
-use App\Http\Controllers\Api\AttendanceSettingController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankakImageController;
 use App\Http\Controllers\Api\BedController;
@@ -28,6 +25,8 @@ use App\Http\Controllers\Api\CompanyController;
 use App\Http\Controllers\Api\CompanyMainTestController;
 use App\Http\Controllers\Api\CompanyRelationController;
 use App\Http\Controllers\Api\CompanyServiceController;
+use App\Http\Controllers\Api\PartyController;
+use App\Http\Controllers\Api\PartyServiceCostController;
 use App\Http\Controllers\Api\ContainerController;
 use App\Http\Controllers\Api\CostController;
 use App\Http\Controllers\Api\DashboardController;
@@ -41,7 +40,6 @@ use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
 use App\Http\Controllers\Api\ExcelController;
 use App\Http\Controllers\Api\FinanceAccountController;
-use App\Http\Controllers\Api\HolidayController;
 use App\Http\Controllers\Api\InsuranceAuditController;
 use App\Http\Controllers\Api\LabRequestController;
 use App\Http\Controllers\Api\MainTestController;
@@ -62,7 +60,6 @@ use App\Http\Controllers\Api\ServiceCostController;
 use App\Http\Controllers\Api\ServiceGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ShiftController;
-use App\Http\Controllers\Api\ShiftDefinitionController;
 use App\Http\Controllers\Api\SpecialistController;
 use App\Http\Controllers\Api\SubSpecialistController;
 use App\Http\Controllers\Api\SubcompanyController;
@@ -291,6 +288,18 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('companies/{company}/contracted-services/{service}', [CompanyServiceController::class, 'update']);
   Route::delete('companies/{company}/contracted-services/{service}', [CompanyServiceController::class, 'destroy']);
   Route::post('companies/{company}/contracted-services/import-all', [CompanyServiceController::class, 'importAllServices']);
+
+  // Parties
+  Route::get('parties-list', [PartyController::class, 'indexList']);
+  Route::apiResource('parties', PartyController::class);
+
+  // Party Service Costs
+  Route::get('parties/{party}/service-costs', [PartyServiceCostController::class, 'index']);
+  Route::get('parties/{party}/available-services', [PartyServiceCostController::class, 'availableServices']);
+  Route::post('parties/{party}/service-costs', [PartyServiceCostController::class, 'store']);
+  Route::put('parties/{party}/service-costs/{service}', [PartyServiceCostController::class, 'update']);
+  Route::delete('parties/{party}/service-costs/{service}', [PartyServiceCostController::class, 'destroy']);
+  Route::post('parties/{party}/service-costs/import-by-group', [PartyServiceCostController::class, 'importByServiceGroup']);
 
   // Services & Service Groups
   Route::get('service-groups-list', [ServiceGroupController::class, 'indexList']);
@@ -772,65 +781,11 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/yearly-income-comparison', [ReportController::class, 'yearlyIncomeComparisonByMonth']);
   Route::get('/reports/yearly-patient-frequency', [ReportController::class, 'yearlyPatientFrequencyByMonth']);
   // Route::get('/reports/yearly-patient-frequency/pdf', [ReportController::class, 'exportYearlyPatientFrequencyPdf']); // For future PDF
-  /*
-    |--------------------------------------------------------------------------
-    | ATTENDANCE MODULE - CONFIGURATION ROUTES
-    |--------------------------------------------------------------------------
-    */
 
   // Admission stay fee rules (configurable)
   Route::get('/admission-settings', [AdmissionSettingController::class, 'show']);
   Route::put('/admission-settings', [AdmissionSettingController::class, 'update']);
 
-  // 1. Global Attendance Settings
-  // Fetches the single global attendance settings record
-  Route::get('/attendance-settings', [AttendanceSettingController::class, 'show']);
-  // Updates the single global attendance settings record
-  Route::put('/attendance-settings', [AttendanceSettingController::class, 'update']);
-
-  // 2. Shift Definitions (e.g., Morning, Evening Shift timings)
-  // Provides a simplified list, often for dropdowns (e.g., only active shifts)
-  Route::get('/shifts-definitions/list', [ShiftDefinitionController::class, 'indexList']);
-  // Standard CRUD for shift definitions
-
-
-  // 3. Holiday Management
-  // Provides a simplified list, often for calendar highlighting or dropdowns
-  Route::get('/holidays/list', [HolidayController::class, 'indexList']);
-  // Standard CRUD for holidays
-
-
-  // 4. User-Specific Attendance Settings
-  // (Integrated into existing UserController or a dedicated UserAttendanceSettingController)
-
-  // Endpoint to update a user's supervisor status and their default shift assignments
-  Route::put('/users/{user}/attendance-settings', [UserController::class, 'updateAttendanceSettings']);
-  // Endpoint to get a user's currently assigned default shifts
-  Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts']);
-
-
-  /*
-    |--------------------------------------------------------------------------
-    | ATTENDANCE MODULE - RECORDING & VIEWING (from previous steps, for context)
-    |--------------------------------------------------------------------------
-    */
-  Route::get('/attendances/monthly-sheet', [AttendanceController::class, 'getMonthlySheet']);
-  Route::post('/attendances/record', [AttendanceController::class, 'recordOrUpdateAttendance']);
-  Route::delete('/attendances/{attendance}', [AttendanceController::class, 'destroyAttendance']);
-
-
-  /*
-    |--------------------------------------------------------------------------
-    | ATTENDANCE MODULE - REPORTING (from previous steps, for context)
-    |--------------------------------------------------------------------------
-    */
-  Route::get('/attendance/reports/monthly-employee-summary', [AttendanceReportController::class, 'monthlyEmployeeSummary']);
-  Route::get('/attendance/reports/daily-detail', [AttendanceReportController::class, 'dailyAttendanceDetail']);
-  Route::get('/attendance/reports/payroll', [AttendanceReportController::class, 'payrollAttendanceReport']);
-  Route::prefix('attendance/reports')->group(function () {
-    Route::get('/monthly-summary', [ReportController::class, 'getMonthlyAttendanceSummary']);
-    Route::get('/monthly-summary/pdf', [ReportController::class, 'generateMonthlyAttendancePdf']);
-  });
   /*
     |--------------------------------------------------------------------------
     | Employee Expense Routes
@@ -841,40 +796,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::apiResource('employee-expenses', EmployeeExpenseController::class)->only(['index', 'store', 'destroy']);
   Route::apiResource('departments', DepartmentController::class)->only(['index', 'store']);
 
-  /*
-    |--------------------------------------------------------------------------
-    | Attendance Configuration Routes
-    |--------------------------------------------------------------------------
-    */
-  Route::prefix('attendance-config')->group(function () {
-    // Attendance Global Settings
-    Route::get('/settings', [AttendanceSettingController::class, 'show']);
-    Route::post('/settings', [AttendanceSettingController::class, 'storeOrUpdate']); // Use POST for create or update
-
-    // Shift Definitions
-    Route::get('/shift-definitions/list', [ShiftDefinitionController::class, 'indexList']); // For dropdowns
-    Route::apiResource('/shift-definitions', ShiftDefinitionController::class);
-
-    // Holidays
-    Route::apiResource('/holidays', HolidayController::class);
-
-    // User Default Shift Assignments (assuming these are part of UserController)
-    Route::get('/users/{user}/default-shifts', [UserController::class, 'getUserDefaultShifts']);
-    Route::put('/users/{user}/default-shifts', [UserController::class, 'updateUserDefaultShifts']);
-  });
-
-  /*
-  |--------------------------------------------------------------------------
-  | Attendance Recording & Reporting Routes (To be created)
-  |--------------------------------------------------------------------------
-  */
-  Route::prefix('attendance')->group(function () {
-    Route::get('/daily-sheet', [AttendanceController::class, 'getDailySheet']);
-    Route::post('/record', [AttendanceController::class, 'recordAttendance']);
-    Route::put('/record/{attendance}', [AttendanceController::class, 'updateAttendanceStatus']); // For changing status later
-    // Add more routes for reports later
-    // Route::get('/reports/monthly', [AttendanceController::class, 'getMonthlyReport']);
-  });
   Route::post('/visits/{visit}/send-whatsapp-report', [ReportController::class, 'sendVisitReportViaWhatsApp']);
   Route::get('/search/patient-visits', [PatientController::class, 'searchPatientVisitsForAutocomplete']);
   Route::post('/patients/{doctorVisit}/create-lab-visit', [PatientController::class, 'createLabVisitForExistingPatient']);
