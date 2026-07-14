@@ -474,7 +474,7 @@ class DoctorShift extends Model
      *
      * Optimisations vs. the individual methods:
      *  - Two SQL aggregate queries replace loading every visit+service into PHP memory.
-     *  - Setting::first(), specificServices, and categoryServiceIds are resolved once.
+     *  - Setting::first() and specificServices are resolved once.
      *  - All required Eloquent relations are loaded in a single loadMissing() call.
      *
      * @return array{
@@ -547,7 +547,6 @@ class DoctorShift extends Model
         // ── 2. Doctor credits (PHP logic, one eager-load pass) ───────────────
         $this->loadMissing([
             'doctor.specificServices',
-            'doctor.category.services',
             'doctor.doctorServiceCosts',
             'visits.patient:id,company_id',
             'visits.requestedServices.returnedRefunds',
@@ -557,9 +556,6 @@ class DoctorShift extends Model
         $doctor              = $this->doctor;
         $disableCheck        = (bool) optional(Setting::first())->disable_doctor_service_check;
         $individualServiceIds = $doctor->specificServices->pluck('id')->toArray();
-        $categoryServiceIds   = $doctor->category_id
-            ? ($doctor->category?->services->pluck('id')->toArray() ?? [])
-            : [];
 
         $cashCredit      = 0.0;
         $insuranceCredit = 0.0;
@@ -582,8 +578,7 @@ class DoctorShift extends Model
                 }
 
                 $eligible = $disableCheck
-                    || in_array($service->service_id, $individualServiceIds)
-                    || in_array($service->service_id, $categoryServiceIds);
+                    || in_array($service->service_id, $individualServiceIds);
 
                 if (! $eligible) {
                     continue;
@@ -615,23 +610,14 @@ class DoctorShift extends Model
 
     public function calcServiceCreditInline(RequestedService $service, Doctor $doctor): float
     {
-        // 1. Category-service pivot
-        if ($doctor->category_id && $doctor->relationLoaded('category')) {
-            $catService = $doctor->category->services
-                ->first(fn ($s) => $s->id === $service->service_id);
-            if ($catService?->pivot) {
-                return $this->applyPivotRateInline($service, $catService->pivot, $doctor);
-            }
-        }
-
-        // 2. Individual doctor-service pivot
+        // 1. Individual doctor-service pivot
         $docService = $doctor->specificServices
             ->first(fn ($s) => $s->id == $service->service_id);
         if ($docService?->pivot) {
             return $this->applyPivotRateInline($service, $docService->pivot, $doctor);
         }
 
-        // 3. Default percentage
+        // 2. Default percentage
         $cost = $service->getTotalCostsForDoctor($doctor);
         return ((float) $service->amount_paid - $cost) * (float) $doctor->cash_percentage / 100;
     }

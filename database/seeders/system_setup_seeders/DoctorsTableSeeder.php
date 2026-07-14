@@ -32,7 +32,6 @@ class DoctorsTableSeeder extends Seeder
             'calc_insurance' => 0,
             'is_default' => 1,
             'firebase_id' => null,
-            'category_id' => null,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

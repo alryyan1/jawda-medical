@@ -79,7 +79,6 @@ class Doctor extends Model
         'finance_account_id_insurance', // Corrected name from migration
         'calc_insurance',
         'is_default',
-        'category_id',
     ];
 
     protected $casts = [
@@ -168,13 +167,6 @@ class Doctor extends Model
     }
 
     /**
-     * Get the category that the doctor belongs to.
-     */
-    public function category()
-    {
-        return $this->belongsTo(Category::class);
-    }
-    /**
      * Calculate the total doctor credit for all services in a visit.
      *
      * @param  Doctorvisit  $doctorvisit
@@ -185,9 +177,8 @@ class Doctor extends Model
         // Resolve once — avoids N+1 inside the loop.
         $disableServiceCheck = (bool) optional(Setting::first())->disable_doctor_service_check;
 
-        // Eligible service IDs from individual assignments and category.
+        // Eligible service IDs from individual assignments.
         $individualServiceIds = $this->specificServices()->pluck('service_id')->toArray();
-        $categoryServiceIds   = $this->resolveCategoryServiceIds();
 
         $total = 0.0;
 
@@ -216,24 +207,6 @@ class Doctor extends Model
     }
 
     /**
-     * Return the service IDs covered by the doctor's category (empty if no category).
-     *
-     * @return array<int>
-     */
-    private function resolveCategoryServiceIds(): array
-    {
-        if (! $this->category_id) {
-            return [];
-        }
-
-        if (! $this->relationLoaded('category')) {
-            $this->load('category.services');
-        }
-
-        return $this->category?->services->pluck('id')->toArray() ?? [];
-    }
-
-    /**
      * Credit calculation for company / insurance patients.
      *
      * Formula: (price × count − total_costs) × company_percentage / 100
@@ -253,26 +226,15 @@ class Doctor extends Model
      * Credit calculation for cash (self-pay) patients.
      *
      * Priority order for rate lookup:
-     *   1. Category-service pivot  (percentage > fixed > default)
-     *   2. Individual doctor-service pivot (percentage > fixed > default)
-     *   3. Doctor's default cash_percentage
+     *   1. Individual doctor-service pivot (percentage > fixed > default)
+     *   2. Doctor's default cash_percentage
      *
      * @param  RequestedService  $service
      * @return float
      */
     private function calcCashCredit(RequestedService $service): float
     {
-        // --- 1. Category-service settings ---
-        // if ($this->category_id) {
-        //     $categoryService = $this->category->services
-        //         ->first(fn ($s) => $s->id === $service->service_id);
-
-        //     if ($categoryService?->pivot) {
-        //         return $this->applyPivotRate($service, $categoryService->pivot);
-        //     }
-        // }
-
-        // --- 2. Individual doctor-service settings ---
+        // --- 1. Individual doctor-service settings ---
         $doctorService = $this->specificServices
             ->first(fn ($s) => $s->id == $service->service_id);
 
@@ -280,7 +242,7 @@ class Doctor extends Model
             return $this->applyPivotRate($service, $doctorService->pivot);
         }
 
-        // --- 3. Default: cash_percentage on amount paid minus costs ---
+        // --- 2. Default: cash_percentage on amount paid minus costs ---
         $totalCost = $service->getTotalCostsForDoctor($this);
 
         return ($service->amount_paid - $totalCost) * $this->cash_percentage / 100;
