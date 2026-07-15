@@ -65,6 +65,9 @@ class PatientResource extends JsonResource
             'discount' => (float) $this->discount,
             'discount_comment' => $this->discount_comment,
 
+            // Lab-to-lab (external lab) linkage
+            'lab_to_lab_object_id' => $this->lab_to_lab_object_id,
+
             // Visit-specific flags (Consider if these truly belong at the top-level Patient resource
             // or if they are more related to the LATEST visit. If latest visit, they should be on a Visit resource).
             // For now, including them as per your Patient model's fillable/casts.

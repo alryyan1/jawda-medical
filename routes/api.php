@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PatientController;
+use App\Http\Controllers\Api\Lab2LabController;
 use App\Http\Controllers\Api\PatientMedicalHistoryController;
 use App\Http\Controllers\Api\PdfSettingController;
 use App\Http\Controllers\Api\ReportController;
@@ -232,6 +233,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
   Route::get('/patients/search-admission-patients', [PatientController::class, 'searchAdmissionPatients']);
+  Route::get('/patients/lab2lab-today-saved-ids', [Lab2LabController::class, 'todaySavedObjectIds']);
   Route::post('/patients/{doctorVisit}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
   // Patients
   Route::apiResource('patients', PatientController::class);
@@ -735,7 +737,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/labrequests/{labrequest}/organisms', [LabRequestController::class, 'getOrganisms']);
   Route::patch('/requested-organisms/{organism}', [LabRequestController::class, 'updateOrganism']);
   Route::delete('/requested-organisms/{organism}', [LabRequestController::class, 'deleteOrganism']);
-  Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
+  Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResauthenticateResultsultLock']);
   Route::patch('/patients/{patient}/authenticate-results', [PatientController::class, 'authenticateResults']);
   Route::get('/patients/{patient}/result-url', [PatientController::class, 'getResultUrl']);
   Route::post('/patients/{patient}/upload-to-firebase', [PatientController::class, 'uploadToFirebase']);
@@ -793,7 +795,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
   Route::post('/patients/store-from-lab', [PatientController::class, 'storeFromLab']);
-  Route::post('/patients/save-from-online-lab', [PatientController::class, 'saveFromOnlineLab']);
+  Route::post('/patients/save-from-online-lab', [Lab2LabController::class, 'saveFromOnlineLab']);
 
   Route::get('/visits/{doctorvisit}/lab-barcode/pdf', [ReportController::class, 'printBarcodeWithViewer']);
   // Devices

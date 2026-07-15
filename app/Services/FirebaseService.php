@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Factory;
@@ -288,11 +289,14 @@ class FirebaseService
 
     /**
      * Update Firestore document field.
-     * Pass $project = 'hospital' to target the hospital Firebase project.
+     * Pass $project ('sales' or 'hospital') to target a specific Firebase project;
+     * leave null to use the configured lab-to-lab Firebase source (settings.lab_to_lab_firebase_source).
      */
-    public static function updateFirestoreDocument(string $collection, string $documentId, array $fields, ?string $project = 'hospital'): bool
+    public static function updateFirestoreDocument(string $collection, string $documentId, array $fields, ?string $project = null): bool
     {
         try {
+            $project ??= Setting::instance()?->lab_to_lab_firebase_source ?? 'sales';
+
             if ($project === 'hospital') {
                 $projectId = config('firebase.hospital.project_id');
                 $serviceAccountPath = config('firebase.hospital.service_account_path');
