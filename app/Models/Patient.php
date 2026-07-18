@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
-use App\Models\Admission;
 
 /**
  * 
@@ -167,8 +166,6 @@ class Patient extends Model
         'lab_to_lab_id',
         'social_status',
         'income_source',
-        'from_addmission_page',
-        'specialist_doctor_id',
     ];
 
     /**
@@ -199,7 +196,6 @@ class Patient extends Model
         'lymphadenopathy' => 'boolean',
         'peripheral_pulses' => 'boolean',
         'feet_ulcer' => 'boolean',
-        'from_addmission_page' => 'boolean',
         'doctor_finish' => 'boolean',
         'doctor_lab_request_confirm' => 'boolean',
         'doctor_lab_urgent_confirm' => 'boolean',
@@ -225,15 +221,6 @@ class Patient extends Model
             // You can set other defaults for the many NOT NULL string fields here if needed
             // e.g., $patient->history_of_present_illness = $patient->history_of_present_illness ?? '';
         });
-    }
-
-    /**
-     * The current active admission for this patient (if any).
-     */
-    public function admission()
-    {
-        return $this->hasOne(Admission::class);
-            
     }
 
     // Relationships
@@ -311,11 +298,6 @@ class Patient extends Model
     public function doctor()
     {
         return $this->belongsTo(Doctor::class);
-    }
-    
-    public function specialistDoctor()
-    {
-        return $this->belongsTo(Doctor::class, 'specialist_doctor_id');
     }
     
     public function doctorVisit()

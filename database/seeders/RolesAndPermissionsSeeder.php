@@ -77,7 +77,6 @@ class RolesAndPermissionsSeeder extends Seeder
                 '/clinic',
                 '/cash-reconciliation',
                 '/patients',
-                '/admissions',
                 '/online-booking'
             ],
             'خزنه موحده' => [

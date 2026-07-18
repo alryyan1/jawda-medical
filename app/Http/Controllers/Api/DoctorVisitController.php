@@ -63,7 +63,7 @@ class DoctorVisitController extends Controller
      * GET /visits-summary
      * Lean endpoint for the patients list page.
      * Drops all joins not needed for the list (service names, test names,
-     * doctor-shift chain, admission, user) and loads only the financial
+     * doctor-shift chain, user) and loads only the financial
      * columns needed to compute per-visit totals.
      */
     public function summaryIndex(Request $request)
@@ -163,7 +163,6 @@ class DoctorVisitController extends Controller
             'patient:id,name,phone,gender,age_year,age_month,age_day,company_id,user_id',
             'patient.company:id,name', // Eager load company for patient
             'patient.doctor:id,name',          // EAGER LOAD DOCTOR
-            'patient.admission', // For bed icon in TodaysPatientsPage
             'doctor:id,name', // Eager load direct doctor relationship
             'createdByUser:id,name',
             'requestedServices.service', // For calculating totals

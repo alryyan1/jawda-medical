@@ -47,8 +47,6 @@ class UserController extends Controller
             'user_type' => 'nullable|string|max:255',
             'nav_items' => 'nullable|array',
             'nav_items.*' => 'string|max:255',
-            'admission_tabs' => 'nullable|array',
-            'admission_tabs.*' => 'string|max:255',
         ]);
 
         $createData = collect($validatedData)->except(['password_confirmation', 'roles'])->toArray();
@@ -64,11 +62,6 @@ class UserController extends Controller
         if (isset($createData['nav_items'])) {
             $createData['nav_items'] = json_encode($createData['nav_items']);
         }
-
-        if (isset($createData['admission_tabs'])) {
-            $createData['admission_tabs'] = json_encode($createData['admission_tabs']);
-        }
-
 
         $user = User::create($createData);
 
@@ -98,8 +91,6 @@ class UserController extends Controller
             'user_type' => 'nullable|string|max:255',
             'nav_items' => 'nullable|array',
             'nav_items.*' => 'string|max:255',
-            'admission_tabs' => 'nullable|array',
-            'admission_tabs.*' => 'string|max:255',
         ]);
 
         // Prepare data for update, excluding password and roles (handled separately)
@@ -108,10 +99,6 @@ class UserController extends Controller
         // Handle nav_items - encode as JSON if provided
         if (isset($updateData['nav_items'])) {
             $updateData['nav_items'] = json_encode($updateData['nav_items']);
-        }
-
-        if (isset($updateData['admission_tabs'])) {
-            $updateData['admission_tabs'] = json_encode($updateData['admission_tabs']);
         }
 
         // Handle password change if provided

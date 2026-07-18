@@ -72,7 +72,6 @@ class SystemSetupSeeder extends Seeder
                     "/lab-sample-collection",
                     "/lab-workstation",
                     "/patients",
-                    "/admissions",
                     "/online-booking",
                     "/cash-reconciliation"
                 ]),
@@ -91,7 +90,6 @@ class SystemSetupSeeder extends Seeder
                 "/lab-sample-collection",
                 "/lab-workstation",
                 "/patients",
-                "/admissions",
                 "/online-booking",
                 "/cash-reconciliation"
             ]);

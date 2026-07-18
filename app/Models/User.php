@@ -66,7 +66,6 @@ class User extends Authenticatable
         'is_active',
         'user_type',
         'nav_items',
-        'admission_tabs',
     ];
 
     // No guarded attributes on User for this change

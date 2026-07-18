@@ -462,25 +462,15 @@ class WhatsAppCloudApiController extends Controller
 
                             try {
                                 if ($isOneCare) {
-                                           // Only handle finance (PDF, approve, reject) when button payload contains admission
-                                      
                                     // Notify on non-text messages (images, etc.)
                                     if (($message['type'] ?? '') !== 'text' || !isset($message['text']['body'])) {
                                         $from = $message['from'] ?? 'unknown';
                                         $msg = 'استعلام جديد لصيدليه ون كير من الرقم ' . $from;
                                         $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
                                     }
-                                    if ($this->messageHasAdmissionPayload($message)) {
-                                        $this->handleFinanceMessage($message, $value, $recipientPhoneNumberId);
-                                    }else{
-
-                                        $this->handleIncomingMessage($message, $value, $collection, $recipientPhoneNumberId);
-                                    }
-
-                             
-                                } else {
-                                    $this->handleIncomingMessage($message, $value, $collection, $recipientPhoneNumberId);
                                 }
+
+                                $this->handleIncomingMessage($message, $value, $collection, $recipientPhoneNumberId);
                             } catch (\Throwable $e) {
                                 Log::error('WhatsApp Cloud API: Message handling failed.', [
                                     'message_id' => $message['id'] ?? null,
@@ -1054,201 +1044,6 @@ class WhatsAppCloudApiController extends Controller
                 'error' => $e->getMessage(),
             ]);
         }
-    }
-
-    /**
-     * Check if message is a button/interactive with payload containing "admission".
-     */
-    protected function messageHasAdmissionPayload(array $message): bool
-    {
-        $type = $message['type'] ?? null;
-        $buttonData = null;
-
-        if ($type === 'interactive' && isset($message['interactive']['button_reply'])) {
-            $buttonData = $message['interactive']['button_reply'];
-        } elseif ($type === 'button' && isset($message['button'])) {
-            $buttonData = $message['button'];
-        }
-
-        if (!$buttonData || !is_array($buttonData)) {
-            return false;
-        }
-
-        $payload = $buttonData['payload'] ?? $buttonData['id'] ?? $buttonData['text'] ?? $buttonData['title'] ?? null;
-
-        return $payload !== null && str_contains((string) $payload, 'admission');
-    }
-
-    /**
-     * Handle finance PDF button clicks from request_finance_approve template.
-     * When user clicks "PDF تنزيل", fetch download_url from Firestore and send the document.
-     */
-    protected function handleFinanceMessage(array $message, array $value, $phoneNumberId = null): void
-    {
-        $from = $message['from'] ?? null;
-        $type = $message['type'] ?? null;
-
-        if (!$from) {
-            return;
-        }
-
-        $buttonData = null;
-        if ($type === 'interactive' && isset($message['interactive']['button_reply'])) {
-            $buttonData = $message['interactive']['button_reply'];
-        } elseif ($type === 'button' && isset($message['button'])) {
-            $buttonData = $message['button'];
-        }
-
-        if (!$buttonData) {
-            Log::info('WhatsApp Cloud API: Finance handler - non-button message ignored.', ['from' => $from, 'type' => $type]);
-            return;
-        }
-
-        $payloadString = $buttonData['payload'] ?? $buttonData['id'] ?? $buttonData['text'] ?? $buttonData['title'] ?? null;
-                Log::info('WhatsApp Cloud API: Finance handler - payload string.', ['payload_string' => $payloadString]);
-
-        if (!$payloadString) {
-            Log::info('WhatsApp Cloud API: Finance handler - no payload in button.', ['button_data' => $buttonData]);
-            return;
-        }
-
-        // Handle اعتماد (approve) button: admission_{admissionId}_surgery_{surgeryId}_approve
-        if (preg_match('/^admission_(\d+)_surgery_(\d+)_approve$/', $payloadString, $m)) {
-            $this->handleFinanceApprove((int) $m[1], (int) $m[2], $from, $phoneNumberId);
-            return;
-        }
-
-        // Handle رفض (reject) button: admission_{admissionId}_surgery_{surgeryId}_reject
-        if (preg_match('/^admission_(\d+)_surgery_(\d+)_reject$/', $payloadString, $m)) {
-            $this->handleFinanceReject((int) $m[1], (int) $m[2], $from, $phoneNumberId);
-            return;
-        }
-
-        $pdfUrl = null;
-
-        if (str_starts_with($payloadString, 'admission_')) {
-            $admissionId = substr($payloadString, strlen('admission_'));
-            if (is_numeric($admissionId)) {
-                $pdfUrl = $this->getFinancePdfUrlByAdmission((int) $admissionId);
-            }
-        } elseif ($payloadString === 'finance_pdf') {
-            $pdfUrl = $this->getFinancePdfUrlByPhone($from);
-        }
-
-        if ($pdfUrl) {
-            $this->sendTextToUser($from, 'سيتم إرسال التقرير إليكم خلال لحظات', $phoneNumberId);
-            $this->sendDocumentToUser($from, $pdfUrl, 'finance_report', $phoneNumberId);
-        } else {
-            $this->sendTextToUser($from, 'عذراً، لم يتم العثور على التقرير.', $phoneNumberId);
-        }
-    }
-
-    /**
-     * Handle اعتماد (approve) button: update approved_at in Firestore only.
-     */
-    protected function handleFinanceApprove(int $admissionId, int $surgeryId, string $from, $phoneNumberId): void
-    {
-        $this->updateFirestoreApprovedAt($admissionId, $surgeryId, now());
-    }
-
-    /**
-     * Handle رفض (reject) button: set approved_at to null in Firestore only.
-     */
-    protected function handleFinanceReject(int $admissionId, int $surgeryId, string $from, $phoneNumberId): void
-    {
-        $this->updateFirestoreApprovedAt($admissionId, $surgeryId, null);
-    }
-
-    /**
-     * Update requested_surgery.approved_at in Firestore only.
-     */
-    protected function updateFirestoreApprovedAt(int $admissionId, int $requestedSurgeryId, $approvedAt): void
-    {
-        $firestorePath = "pharmacies/one_care/admissions/{$admissionId}";
-        $fields = FirebaseService::getFirestoreDocumentFields($firestorePath);
-        if (!$fields || !isset($fields['requested_surgeries']) || !is_array($fields['requested_surgeries'])) {
-            return;
-        }
-
-        $requestedSurgeriesData = $fields['requested_surgeries'];
-        $updated = false;
-        foreach ($requestedSurgeriesData as &$rs) {
-            if (!is_array($rs)) {
-                continue;
-            }
-            $id = $rs['id'] ?? null;
-            if ((int) $id === $requestedSurgeryId) {
-                $rs['approved_at'] = $approvedAt instanceof \DateTimeInterface ? $approvedAt->format('Y-m-d H:i:s') : $approvedAt;
-                $updated = true;
-                break;
-            }
-        }
-        unset($rs);
-
-        if ($updated) {
-            FirebaseService::createOrUpdateFirestoreDocumentByPath($firestorePath, [
-                'requested_surgeries' => $requestedSurgeriesData,
-                'updated_at'          => now(),
-            ]);
-        }
-    }
-
-
-    /**
-     * Get finance PDF download URL from Firestore by admission ID.
-     */
-    protected function getFinancePdfUrlByAdmission(int $admissionId): ?string
-    {
-        $documentPath = "pharmacies/one_care/admissions/{$admissionId}";
-        return $this->getDocumentFieldFromFirestore($documentPath, 'download_url');
-    }
-
-    /**
-     * Get finance PDF download URL from Firestore by phone (pdf_requests collection).
-     */
-    protected function getFinancePdfUrlByPhone(string $phone): ?string
-    {
-        $normalizedPhone = preg_replace('/[^0-9]/', '', $phone);
-        if (strlen($normalizedPhone) >= 9 && strpos($normalizedPhone, '249') !== 0) {
-            $normalizedPhone = '249' . ltrim($normalizedPhone, '0');
-        }
-        $documentPath = "pharmacies/one_care/pdf_requests/{$normalizedPhone}";
-        $url = $this->getDocumentFieldFromFirestore($documentPath, 'download_url');
-        if ($url) {
-            return $url;
-        }
-        $documentPath = "pharmacies/one_care/pdf_requests/{$phone}";
-        return $this->getDocumentFieldFromFirestore($documentPath, 'download_url');
-    }
-    
-    /**
-     * Get a string field from a Firestore document by path.
-     */
-    protected function getDocumentFieldFromFirestore(string $documentPath, string $fieldName): ?string
-    {
-        try {
-            $projectId = config('firebase.project_id');
-            if (!$projectId) {
-                return null;
-            }
-            $accessToken = FirebaseService::getAccessToken();
-            if (!$accessToken) {
-                return null;
-            }
-            $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$documentPath}";
-            $response = Http::withToken($accessToken)->get($url);
-            if ($response->successful()) {
-                $document = $response->json();
-                $fields = $document['fields'] ?? [];
-                return $fields[$fieldName]['stringValue'] ?? null;
-            }
-        } catch (\Throwable $e) {
-            Log::warning('WhatsApp Cloud API: Failed to get Firestore document.', [
-                'path' => $documentPath,
-                'error' => $e->getMessage(),
-            ]);
-        }
-        return null;
     }
 
 }

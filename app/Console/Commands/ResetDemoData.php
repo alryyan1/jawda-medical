@@ -22,7 +22,6 @@ class ResetDemoData extends Command
         '/lab-sample-collection',
         '/lab-workstation',
         '/patients',
-        '/admissions',
         '/online-booking',
         '/cash-reconciliation',
         '/reports',
@@ -113,23 +112,7 @@ class ResetDemoData extends Command
             'patient_medical_histories',
             'audited_patient_records',
             'appointments',
-            // Surgery children
-            'requested_surgery_transactions',
-            'requested_surgery_finances',
-            'requested_surgeries',
-            // Admission children
-            'admission_vital_signs',
-            'admission_requested_lab_tests',
-            'admission_requested_service_costs',
-            'admission_requested_service_deposits',
-            'admission_requested_services',
-            'admission_doses',
-            'admission_nursing_assignments',
-            'admission_treatments',
-            'admission_transactions',
-            'admission_deposits',
             // Main tables
-            'admissions',
             'doctorvisits',
             // Misc patient data
             'images',

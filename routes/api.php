@@ -1,21 +1,9 @@
 <?php
 
-use App\Http\Controllers\Api\AdmissionController;
-use App\Http\Controllers\Api\AdmissionRequestedServiceController;
-use App\Http\Controllers\Api\AdmissionRequestedLabTestController;
-use App\Http\Controllers\Api\AdmissionVitalSignController;
-use App\Http\Controllers\Api\AdmissionRequestedServiceDepositController;
-use App\Http\Controllers\Api\AdmissionDepositController;
-use App\Http\Controllers\Api\AdmissionTransactionController;
-use App\Http\Controllers\Api\AdmissionTreatmentController;
-use App\Http\Controllers\Api\AdmissionDoseController;
-use App\Http\Controllers\Api\AdmissionNursingAssignmentController;
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
-use App\Http\Controllers\Api\AdmissionSettingController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BankakImageController;
-use App\Http\Controllers\Api\BedController;
 use App\Http\Controllers\Api\CashDenominationController;
 use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
@@ -64,12 +52,9 @@ use App\Http\Controllers\Api\SpecialistController;
 use App\Http\Controllers\Api\SubSpecialistController;
 use App\Http\Controllers\Api\SubcompanyController;
 use App\Http\Controllers\Api\SubServiceCostController;
-use App\Http\Controllers\Api\RoomController;
-use App\Http\Controllers\Api\ShortStayBedController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
-use App\Http\Controllers\Api\WardController;
 use App\Http\Controllers\Api\VisitServiceController;
 use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\SettingUploadController;
@@ -232,14 +217,11 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/patients/recent-lab-activity', [PatientController::class, 'getRecentLabActivityPatients']);
 
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
-  Route::get('/patients/search-admission-patients', [PatientController::class, 'searchAdmissionPatients']);
   Route::get('/patients/lab2lab-today-saved-ids', [Lab2LabController::class, 'todaySavedObjectIds']);
   Route::post('/patients/{doctorVisit}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
   // Patients
   Route::apiResource('patients', PatientController::class);
   Route::get('/clinic-active-patients', [ClinicWorkspaceController::class, 'getActivePatients']);
-  Route::get('/admission-patients-by-date', [ClinicWorkspaceController::class, 'getAdmissionPatientsByDate']);
-  Route::get('/patients/{patient}/admission', [AdmissionController::class, 'getPatientActiveAdmission']);
   Route::get('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'show']);
   Route::put('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'update']);
 
@@ -300,137 +282,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('services-list', [ServiceController::class, 'indexList']);
   Route::apiResource('services', ServiceController::class);
   Route::get('services/{service}/price-history', [ServiceController::class, 'priceHistory']);
-
-  /*
-    |--------------------------------------------------------------------------
-    | Admissions Management Routes
-    |--------------------------------------------------------------------------
-    */
-  // Wards
-  Route::get('wards-list', [WardController::class, 'indexList']);
-  Route::apiResource('wards', WardController::class);
-  Route::get('wards/{ward}/rooms', [WardController::class, 'getRooms']);
-
-  // Rooms
-  Route::apiResource('rooms', RoomController::class);
-  Route::get('rooms/{room}/beds', [RoomController::class, 'getBeds']);
-
-  // Beds
-  // Specific routes must come BEFORE apiResource to avoid route conflicts
-  Route::get('beds/available', [BedController::class, 'getAvailable']);
-  Route::apiResource('beds', BedController::class);
-
-  // Short Stay Beds
-  Route::apiResource('short-stay-beds', ShortStayBedController::class);
-
-  // Admissions
-  // Specific routes must come BEFORE apiResource to avoid route conflicts
-  Route::get('admissions/active', [AdmissionController::class, 'getActive']);
-  Route::get('admissions/list/pdf', [AdmissionController::class, 'exportListPdf']);
-  Route::apiResource('admissions', AdmissionController::class);
-  Route::put('admissions/{admission}/discharge', [AdmissionController::class, 'discharge']);
-  Route::put('admissions/{admission}/vacate-bed', [AdmissionController::class, 'vacateBed']);
-  Route::put('admissions/{admission}/transfer', [AdmissionController::class, 'transfer']);
-  Route::get('admissions/{admission}/balance', [AdmissionTransactionController::class, 'balance']);
-
-  // Admission Transactions
-  Route::get('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'index']);
-  Route::post('admissions/{admission}/transactions', [AdmissionTransactionController::class, 'store']);
-  Route::delete('admissions/{admission}/transactions/{transaction}', [AdmissionTransactionController::class, 'destroy']);
-  Route::get('admissions/{admission}/ledger', [AdmissionTransactionController::class, 'ledger']);
-  Route::get('admissions/{admission}/ledger/pdf', [AdmissionTransactionController::class, 'exportLedgerPdf']);
-
-  // Admission Deposits (deprecated - kept for backward compatibility, will redirect to transactions)
-  Route::get('admissions/{admission}/deposits', [AdmissionDepositController::class, 'index']);
-  Route::post('admissions/{admission}/deposits', [AdmissionDepositController::class, 'store']);
-
-  // Admission Services
-  Route::get('admissions/{admission}/requested-services', [AdmissionRequestedServiceController::class, 'index']);
-  Route::post('admissions/{admission}/request-services', [AdmissionRequestedServiceController::class, 'store']);
-  Route::put('admission-requested-services/{requestedService}', [AdmissionRequestedServiceController::class, 'update']);
-  Route::delete('admissions/{admission}/requested-services/{requestedService}', [AdmissionRequestedServiceController::class, 'destroy']);
-
-  // Admission Service Cost Breakdown
-  Route::get('admission-requested-services/{requestedService}/cost-breakdown', [AdmissionRequestedServiceController::class, 'getServiceCosts']);
-  Route::post('admission-requested-services/{requestedService}/costs', [AdmissionRequestedServiceController::class, 'addServiceCosts']);
-
-  // Admission Service Deposits
-  Route::get('admission-requested-services/{requestedService}/deposits', [AdmissionRequestedServiceDepositController::class, 'indexForRequestedService']);
-  Route::post('admission-requested-services/{requestedService}/deposits', [AdmissionRequestedServiceDepositController::class, 'store']);
-
-  // Admission Lab Tests
-  Route::get('admissions/{admission}/requested-lab-tests', [AdmissionRequestedLabTestController::class, 'index']);
-  Route::post('admissions/{admission}/request-lab-tests', [AdmissionRequestedLabTestController::class, 'store']);
-  Route::put('admission-requested-lab-tests/{requestedLabTest}', [AdmissionRequestedLabTestController::class, 'update']);
-  Route::delete('admissions/{admission}/requested-lab-tests/{requestedLabTest}', [AdmissionRequestedLabTestController::class, 'destroy']);
-  Route::put('admission-requested-service-deposits/{deposit}', [AdmissionRequestedServiceDepositController::class, 'update']);
-  Route::delete('admission-requested-service-deposits/{deposit}', [AdmissionRequestedServiceDepositController::class, 'destroy']);
-
-  // Admission Vital Signs
-  Route::get('admissions/{admission}/vital-signs', [AdmissionVitalSignController::class, 'index']);
-  Route::post('admissions/{admission}/vital-signs', [AdmissionVitalSignController::class, 'store']);
-  Route::put('admission-vital-signs/{vitalSign}', [AdmissionVitalSignController::class, 'update']);
-  Route::delete('admission-vital-signs/{vitalSign}', [AdmissionVitalSignController::class, 'destroy']);
-
-  // Admission Treatments
-  Route::get('admissions/{admission}/treatments', [AdmissionTreatmentController::class, 'index']);
-  Route::post('admissions/{admission}/treatments', [AdmissionTreatmentController::class, 'store']);
-  Route::get('admissions/{admission}/treatments/{treatment}', [AdmissionTreatmentController::class, 'show']);
-  Route::put('admissions/{admission}/treatments/{treatment}', [AdmissionTreatmentController::class, 'update']);
-  Route::delete('admissions/{admission}/treatments/{treatment}', [AdmissionTreatmentController::class, 'destroy']);
-
-  // Admission Doses
-  Route::get('admissions/{admission}/doses', [AdmissionDoseController::class, 'index']);
-  Route::post('admissions/{admission}/doses', [AdmissionDoseController::class, 'store']);
-  Route::get('admissions/{admission}/doses/{dose}', [AdmissionDoseController::class, 'show']);
-  Route::put('admissions/{admission}/doses/{dose}', [AdmissionDoseController::class, 'update']);
-  Route::delete('admissions/{admission}/doses/{dose}', [AdmissionDoseController::class, 'destroy']);
-
-  // Admission Nursing Assignments
-  Route::get('admissions/{admission}/nursing-assignments', [AdmissionNursingAssignmentController::class, 'index']);
-  Route::post('admissions/{admission}/nursing-assignments', [AdmissionNursingAssignmentController::class, 'store']);
-  Route::get('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'show']);
-  Route::put('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'update']);
-  Route::delete('admissions/{admission}/nursing-assignments/{assignment}', [AdmissionNursingAssignmentController::class, 'destroy']);
-
-  // Requested Surgeries (nested under admissions + by date)
-  Route::get('requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'indexByDate']);
-  Route::get('requested-surgeries/summary', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'summaryByDate']);
-  Route::get('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'index']);
-  Route::get('admissions/{admission}/requested-surgeries/summary', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'admissionSummary']);
-  Route::post('admissions/{admission}/requested-surgeries', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'store']);
-  Route::patch('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'update']);
-  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/approve', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'approve']);
-  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/reject', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'reject']);
-  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/unapprove', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'unapprove']);
-  Route::delete('admissions/{admission}/requested-surgeries/{requestedSurgery}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroy']);
-  Route::patch('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'updateFinance']);
-  Route::delete('requested-surgery-finances/{requestedSurgeryFinance}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroyFinance']);
-  Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/print', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'print']);
-  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/prepare-whatsapp', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'prepareWhatsApp']);
-  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/mark-request-sent', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'markRequestSent']);
-  Route::post('admissions/{admission}/requested-surgeries/{requestedSurgery}/sync-approval-from-firestore', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'syncApprovalFromFirestore']);
-  Route::post('admissions/{admission}/sync-all-from-firestore', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'syncAllFromFirestore']);
-  Route::get('admissions/{admission}/requested-surgeries/{requestedSurgery}/invoice', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'invoice']);
-  Route::get('requested-surgeries/{requestedSurgery}/ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'getLedger']);
-  Route::post('requested-surgeries/{requestedSurgery}/transactions', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'addTransaction']);
-  Route::delete('requested-surgeries/{requestedSurgery}/transactions/{transaction}', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'destroyTransaction']);
-  Route::get('requested-surgeries/{requestedSurgery}/print-ledger', [\App\Http\Controllers\Api\RequestedSurgeryController::class, 'printLedger']);
-
-  // Surgery Statistics
-  Route::get('/surgeries/statistics', [\App\Http\Controllers\Api\SurgeryStatisticsController::class, 'getStatistics']);
-  Route::get('/surgeries/daily-report', [\App\Http\Controllers\Api\SurgeryStatisticsController::class, 'getDailyReport']);
-
-  /*
-    |--------------------------------------------------------------------------
-    | Operations Management Routes (Surgical Operations)
-    |--------------------------------------------------------------------------
-    */
-  // Surgical Operations
-  Route::apiResource('surgical-operations', \App\Http\Controllers\Api\SurgicalOperationController::class);
-  Route::apiResource('surgical-operations.charges', \App\Http\Controllers\Api\SurgicalOperationChargeController::class);
-  Route::get('standard-surgical-charges', [\App\Http\Controllers\Api\StandardSurgicalChargeController::class, 'index']);
-  Route::post('surgical-operations/{surgical_operation}/import-standard-charges', [\App\Http\Controllers\Api\StandardSurgicalChargeController::class, 'import']);
 
   // PDF Settings
   Route::get('pdf-settings', [PdfSettingController::class, 'index']);
@@ -703,7 +554,6 @@ Route::middleware('auth:sanctum')->group(function () {
     */
   // Existing search and store-from-history routes for patients
   Route::get('/patients/search-existing', [PatientController::class, 'searchExisting']);
-  Route::get('/patients/search-admission-patients', [PatientController::class, 'searchAdmissionPatients']);
   Route::post('/patients/{patient}/store-visit-from-history', [PatientController::class, 'storeVisitFromHistory']);
 
   // NEW: Route for patient visit history
@@ -737,7 +587,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/labrequests/{labrequest}/organisms', [LabRequestController::class, 'getOrganisms']);
   Route::patch('/requested-organisms/{organism}', [LabRequestController::class, 'updateOrganism']);
   Route::delete('/requested-organisms/{organism}', [LabRequestController::class, 'deleteOrganism']);
-  Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResauthenticateResultsultLock']);
+  Route::patch('/patients/{patient}/toggle-result-lock', [PatientController::class, 'toggleResultLock']);
   Route::patch('/patients/{patient}/authenticate-results', [PatientController::class, 'authenticateResults']);
   Route::get('/patients/{patient}/result-url', [PatientController::class, 'getResultUrl']);
   Route::post('/patients/{patient}/upload-to-firebase', [PatientController::class, 'uploadToFirebase']);
@@ -774,10 +624,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/yearly-income-comparison', [ReportController::class, 'yearlyIncomeComparisonByMonth']);
   Route::get('/reports/yearly-patient-frequency', [ReportController::class, 'yearlyPatientFrequencyByMonth']);
   // Route::get('/reports/yearly-patient-frequency/pdf', [ReportController::class, 'exportYearlyPatientFrequencyPdf']); // For future PDF
-
-  // Admission stay fee rules (configurable)
-  Route::get('/admission-settings', [AdmissionSettingController::class, 'show']);
-  Route::put('/admission-settings', [AdmissionSettingController::class, 'update']);
 
   /*
     |--------------------------------------------------------------------------

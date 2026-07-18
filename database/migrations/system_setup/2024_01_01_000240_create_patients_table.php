@@ -19,7 +19,6 @@ return new class extends Migration
             $table->unsignedBigInteger('shift_id');
             $table->unsignedBigInteger('user_id');
             $table->unsignedBigInteger('doctor_id')->nullable();
-            $table->unsignedBigInteger('specialist_doctor_id')->nullable();
             $table->string('phone', 10);
             $table->string('lab_to_lab_id', 255)->nullable();
             $table->string('gender', 255);
@@ -79,10 +78,6 @@ return new class extends Migration
             $table->foreign('shift_id', 'patients_shift_id_foreign')
                   ->references('id')
                   ->on('shifts')
-                  ->onDelete('cascade');
-            $table->foreign('specialist_doctor_id', 'patients_specialist_doctor_id_foreign')
-                  ->references('id')
-                  ->on('doctors')
                   ->onDelete('cascade');
             $table->foreign('subcompany_id', 'patients_subcompany_id_foreign')
                   ->references('id')
