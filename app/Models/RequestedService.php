@@ -161,14 +161,6 @@ class RequestedService extends Model
         return $this->hasMany(RequestedServiceDeposit::class, 'requested_service_id');
     }
 
-    /**
-     * Get all refund records for this requested service.
-     */
-    public function returnedRefunds()
-    {
-        return $this->hasMany(ReturnedRequestedService::class, 'requested_service_id');
-    }
-
     public function diagnosis()
     {
         return $this->hasOne(RequestedServiceDiagnosis::class, 'requested_service_id');

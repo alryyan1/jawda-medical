@@ -182,9 +182,6 @@ class Doctor extends Model
 
         $total = 0.0;
 
-        // Eager load returnedRefunds to avoid N+1 in the loop
-        $doctorvisit->loadMissing('requestedServices.returnedRefunds');
-
         foreach ($doctorvisit->requestedServices as $service) {
             // Only process services assigned to this doctor.
             if ($service->doctor_id !== $this->id) {

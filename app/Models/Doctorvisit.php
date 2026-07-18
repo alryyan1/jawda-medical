@@ -384,24 +384,18 @@ TEXT;
      */
     /**
      * Hospital's net credit from this visit.
-     * Total collected - (Returns + Doctor's share + Service costs).
+     * Total collected - (Doctor's share + Service costs).
      */
     public function hospital_credit(): float
     {
-        $totalReturns = 0;
-        
         // Ensure relations are loaded for performance and accuracy
-        $this->loadMissing(['requestedServices.returnedRefunds', 'requestedServices.requestedServiceCosts.serviceCost']);
-        
-        foreach ($this->requestedServices as $rs) {
-            $totalReturns += (float) $rs->returnedRefunds->sum('amount');
-        }
+        $this->loadMissing(['requestedServices.requestedServiceCosts.serviceCost']);
 
         $grossPaid = (float) $this->total_paid_services();
         $serviceCosts = (float) $this->totalServiceCosts($this->doctor);
         $doctorCredit = (float) ($this->doctorShift->doctor->doctor_credit($this) ?? 0);
 
-        return $grossPaid - $totalReturns - $serviceCosts - $doctorCredit;
+        return $grossPaid - $serviceCosts - $doctorCredit;
     }
   /**
      * Calculate total value of services (and lab tests if they are services) for this visit,

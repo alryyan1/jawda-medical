@@ -90,7 +90,6 @@ class ResetDemoData extends Command
             'requested_results',
             'requested_organisms',
             'discount_lab_requests',
-            'returned_lab_requests',
             'countings',
             'lab_finished_notifications',
             'new_patient_notifications',
@@ -102,7 +101,6 @@ class ResetDemoData extends Command
             'requested_service_deposits',
             'requested_service_cost',
             'audited_requested_services',
-            'returned_requested_services',
             'costs',
             'requested_services',
             // Visit children

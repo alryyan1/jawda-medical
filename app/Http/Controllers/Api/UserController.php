@@ -8,8 +8,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use App\Http\Resources\UserResource;
 use App\Models\LabRequest;
-use App\Models\ReturnedLabRequest;
-use App\Models\ReturnedRequestedService;
 use App\Models\RequestedServiceDeposit;
 use App\Models\Shift;
 use Illuminate\Support\Facades\Auth;
@@ -270,23 +268,10 @@ class UserController extends Controller
         $totalCashService = $totalPaidService - $totalBankService;
         $totalCostCash = $totalCost - $totalCostBank;
 
-        $serviceRefundQuery = ReturnedRequestedService::where('user_id', $user->id)
-            ->where('shift_id', $shiftId);
-        $serviceCashRefund = (float) (clone $serviceRefundQuery)->where('returned_payment_method', 'cash')->sum('amount');
-        $serviceBankRefund = (float) (clone $serviceRefundQuery)->where('returned_payment_method', 'bank')->sum('amount');
+        $netTotal = $totalPaidService + $totalLab;
 
-        $labRefundQuery = ReturnedLabRequest::where('user_id', $user->id)
-            ->where('shift_id', $shiftId);
-        $labCashRefund = (float) (clone $labRefundQuery)->where('returned_payment_method', 'cash')->sum('amount');
-        $labBankRefund = (float) (clone $labRefundQuery)->where('returned_payment_method', 'bank')->sum('amount');
-
-        $totalCashRefund = $serviceCashRefund + $labCashRefund;
-        $totalBankRefund = $serviceBankRefund + $labBankRefund;
-        $totalRefund = $totalCashRefund + $totalBankRefund;
-        $netTotal = ($totalPaidService + $totalLab) - $totalRefund;
-
-        $netCash = ($totalCashService + $totallabCash) - $totalCostCash - $totalCashRefund;
-        $netBank = ($totalBankService + $totalLabBank) - $totalCostBank - $totalBankRefund;
+        $netCash = ($totalCashService + $totallabCash) - $totalCostCash;
+        $netBank = ($totalBankService + $totalLabBank) - $totalCostBank;
 
         $expenses = [
             'total_cash_expenses' => (float) $totalCostCash,
@@ -302,22 +287,15 @@ class UserController extends Controller
                     'total' => (float) $totalPaidService,
                     'bank' => (float) $totalBankService,
                     'cash' => (float) $totalCashService,
-                    'cash_refund' => $serviceCashRefund,
-                    'bank_refund' => $serviceBankRefund,
                 ],
                 'lab_income' => [
                     'total' => (float) $totalLab,
                     'bank' => (float) $totalLabBank,
                     'cash' => (float) $totallabCash,
-                    'cash_refund' => $labCashRefund,
-                    'bank_refund' => $labBankRefund,
                 ],
                 'total' => (float) $totalPaidService + $totalLab,
                 'total_cash' => (float) $totalCashService + $totallabCash,
                 'total_bank' => (float) $totalBankService + $totalLabBank,
-                'total_cash_refund' => $totalCashRefund,
-                'total_bank_refund' => $totalBankRefund,
-                'total_refund' => $totalRefund,
                 'net_total' => $netTotal,
                 'total_cash_expenses' => (float) $totalCostCash,
                 'total_bank_expenses' => (float) $totalCostBank,
@@ -350,11 +328,6 @@ class UserController extends Controller
         $totalBank = (float) (clone $query)->where('is_bankak', true)->sum('amount_paid');
         $totalCash = $totalIncome - $totalBank;
 
-        $refundQuery = ReturnedLabRequest::where('user_id', $user->id)
-            ->where('shift_id', $shiftId);
-        $totalCashRefund = (float) (clone $refundQuery)->where('returned_payment_method', 'cash')->sum('amount');
-        $totalBankRefund = (float) (clone $refundQuery)->where('returned_payment_method', 'bank')->sum('amount');
-
         return response()->json([
             'data' => [
                 'user_id' => $user->id,
@@ -363,8 +336,6 @@ class UserController extends Controller
                 'total_lab_income' => $totalIncome,
                 'total_cash' => $totalCash,
                 'total_bank' => $totalBank,
-                'total_cash_refund' => $totalCashRefund,
-                'total_bank_refund' => $totalBankRefund,
             ]
         ]);
     }

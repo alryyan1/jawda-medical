@@ -28,7 +28,6 @@ class RequestedServiceResource extends JsonResource {
             'done_at' => $this->done_at?->toIso8601String(),
             'approval' => (bool) $this->approval,
             'created_at' => $this->created_at?->toIso8601String(),
-            'returned_refunds' => ReturnedRequestedServiceResource::collection($this->whenLoaded('returnedRefunds')),
             // Calculated fields for convenience (can also be done on frontend)
             'sub_total' => $this->total_price, // From accessor: price * count
             'net_payable' => $this->net_amount_due, // From accessor: sub_total - discount - endurance

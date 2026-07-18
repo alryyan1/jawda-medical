@@ -215,9 +215,8 @@ class ClinicShiftReport extends TCPDF
 
             foreach($visit->requestedServices as $idx => $rs) {
                 $serviceName = $rs->service?->name ?? 'خدمة غير معروفة';
-                $isReturned = $rs->returnedRefunds->isNotEmpty();
 
-                $servicesHtml .= $isReturned ? '<del>' . $serviceName . '</del>' : $serviceName;
+                $servicesHtml .= $serviceName;
 
                 if ($idx < count($visit->requestedServices) - 1) {
                     $servicesHtml .= ' - ';

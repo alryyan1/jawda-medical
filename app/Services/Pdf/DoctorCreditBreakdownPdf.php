@@ -177,7 +177,6 @@ class DoctorCreditBreakdownPdf extends TCPDF
             foreach ($visit->requestedServices as $rs) {
                 if ($rs->doctor_id !== $doctor->id) continue;
                 if (!$disableServiceCheck && !in_array($rs->service_id, $individualServiceIds)) continue;
-                if ($rs->returnedRefunds->isNotEmpty()) continue; // skip returned
 
                 $hasServices = true;
 

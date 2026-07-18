@@ -158,14 +158,6 @@ class LabRequest extends Model
     }
 
     /**
-     * Get all refund records for this lab request.
-     */
-    public function returnedRefunds(): HasMany
-    {
-        return $this->hasMany(ReturnedLabRequest::class, 'lab_request_id');
-    }
-
-    /**
      * Check if this lab request and all its expected child test results
      * have been marked as authorized.
      *

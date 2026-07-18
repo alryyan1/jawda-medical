@@ -446,19 +446,6 @@ class DoctorShift extends Model
         return $total_paid;
     }
 
-    /**
-     * Get total amount of returns (refunds) for services in this shift.
-     */
-    public function total_returns(): float
-    {
-        $total = 0;
-        foreach ($this->visits as $visit) {
-            foreach ($visit->requestedServices as $rs) {
-                $total += (float) $rs->returnedRefunds->sum('amount');
-            }
-        }
-        return $total;
-    }
     public function hospital_credit()
     {
         $total =0;
@@ -549,7 +536,6 @@ class DoctorShift extends Model
             'doctor.specificServices',
             'doctor.doctorServiceCosts',
             'visits.patient:id,company_id',
-            'visits.requestedServices.returnedRefunds',
             'visits.requestedServices.requestedServiceCosts',
         ]);
 
@@ -571,9 +557,6 @@ class DoctorShift extends Model
 
             foreach ($visit->requestedServices as $service) {
                 if ($service->doctor_id !== $doctor->id) {
-                    continue;
-                }
-                if ($service->returnedRefunds->isNotEmpty()) {
                     continue;
                 }
 

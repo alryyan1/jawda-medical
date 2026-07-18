@@ -308,7 +308,7 @@ class DoctorVisitController extends Controller
     {
         // Load all relevant data for displaying a single visit's details
         // $doctorVisit->load(['patient', 'doctor', 'createdByUser', 'generalShift', 'doctorShift', 'requestedServices.service.serviceGroup', 'doctorShift.doctor', 'patientLabRequests']);
-        $doctorVisit->load(['patient.subcompany', 'patient.doctor','patientLabRequests','patientLabRequests.returnedRefunds.user','doctor','patientLabRequests.mainTest','createdByUser']);
+        $doctorVisit->load(['patient.subcompany', 'patient.doctor','patientLabRequests','doctor','patientLabRequests.mainTest','createdByUser']);
         return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor']));
     }
 

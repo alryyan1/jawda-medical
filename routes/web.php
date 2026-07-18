@@ -35,7 +35,6 @@ Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDo
 Route::get('/reports/lab-general/pdf', [ReportController::class, 'generateLabGeneralReportPdf']);
 Route::get('/reports/lab-shift/pdf', [ReportController::class, 'labShiftReportPdf']);
 Route::get('/reports/shift-patients-discount/pdf', [ReportController::class, 'generateShiftPatientsDiscountPdfWeb']);
-Route::get('/reports/shift-refunds/pdf', [ReportController::class, 'generateShiftRefundsPdfWeb']);
 Route::get('/reports/cash-reconciliation/pdf', [ReportController::class, 'generateCashReconciliationPdfWeb']);
 Route::get('/reports/companies/pdf', [CompanyReportController::class, 'exportAllCompaniesPdf']);
 Route::get('/visits/{visit}/lab-report/pdf', [ReportController::class, 'result']);

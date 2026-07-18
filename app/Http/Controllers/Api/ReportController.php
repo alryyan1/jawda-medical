@@ -35,8 +35,6 @@ use App\Models\Patient;
 use App\Models\RequestedServiceCost;
 use App\Models\RequestedServiceDeposit;
 use App\Models\RequestedService;
-use App\Models\ReturnedRequestedService;
-use App\Models\ReturnedLabRequest;
 use App\Models\SubServiceCost;
 use App\Models\Deno;
 use App\Models\DenoUser;
@@ -823,7 +821,6 @@ class ReportController extends Controller
             'user',
             'visits.patient.company',
             'visits.requestedServices.service',
-            'visits.requestedServices.returnedRefunds',
             'visits.requestedServices.requestedServiceCosts',
         ]);
 
@@ -4826,7 +4823,7 @@ class ReportController extends Controller
         }
     }
     /**
-     * Get monthly shifts financial summary: one row per shift with revenue, cost, refund, net.
+     * Get monthly shifts financial summary: one row per shift with revenue, cost, net.
      */
     public function monthlyShiftsSummary(Request $request)
     {
@@ -4853,8 +4850,6 @@ class ReportController extends Controller
             'revenue_bank' => 0,
             'cost_cash' => 0,
             'cost_bank' => 0,
-            'refund_cash' => 0,
-            'refund_bank' => 0,
             'net_cash' => 0,
             'net_bank' => 0,
             'net_total' => 0,
@@ -4873,16 +4868,8 @@ class ReportController extends Controller
             $costBank = (float) $shift->totalCostBank(null);
             $costCash = $costTotal - $costBank;
 
-            $serviceCashRefund = (float) ReturnedRequestedService::where('shift_id', $shift->id)->where('returned_payment_method', 'cash')->sum('amount');
-            $serviceBankRefund = (float) ReturnedRequestedService::where('shift_id', $shift->id)->where('returned_payment_method', 'bank')->sum('amount');
-            $labCashRefund = (float) ReturnedLabRequest::where('shift_id', $shift->id)->where('returned_payment_method', 'cash')->sum('amount');
-            $labBankRefund = (float) ReturnedLabRequest::where('shift_id', $shift->id)->where('returned_payment_method', 'bank')->sum('amount');
-
-            $refundCash = $serviceCashRefund + $labCashRefund;
-            $refundBank = $serviceBankRefund + $labBankRefund;
-
-            $netCash = $revenueCash - $refundCash - $costCash;
-            $netBank = $revenueBank - $refundBank - $costBank;
+            $netCash = $revenueCash - $costCash;
+            $netBank = $revenueBank - $costBank;
             $netTotal = $netCash + $netBank;
 
             $rows[] = [
@@ -4895,8 +4882,6 @@ class ReportController extends Controller
                 'revenue_bank' => round($revenueBank, 2),
                 'cost_cash' => round($costCash, 2),
                 'cost_bank' => round($costBank, 2),
-                'refund_cash' => round($refundCash, 2),
-                'refund_bank' => round($refundBank, 2),
                 'net_cash' => round($netCash, 2),
                 'net_bank' => round($netBank, 2),
                 'net_total' => round($netTotal, 2),
@@ -4906,8 +4891,6 @@ class ReportController extends Controller
             $summary['revenue_bank'] += $revenueBank;
             $summary['cost_cash'] += $costCash;
             $summary['cost_bank'] += $costBank;
-            $summary['refund_cash'] += $refundCash;
-            $summary['refund_bank'] += $refundBank;
             $summary['net_cash'] += $netCash;
             $summary['net_bank'] += $netBank;
             $summary['net_total'] += $netTotal;
@@ -5707,22 +5690,6 @@ class ReportController extends Controller
     public function generateShiftPatientsDiscountPdfWeb(Request $request)
     {
         $result = \App\Services\Pdf\ShiftPatientsDiscountReport::generateFromRequest($request);
-
-        if (isset($result['error'])) {
-            return response()->json(['message' => $result['error']], $result['status']);
-        }
-
-        return response($result['content'], 200)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', "inline; filename=\"{$result['filename']}\"");
-    }
-
-    /**
-     * Generate Shift Refunds PDF Report for Web (opens in new tab)
-     */
-    public function generateShiftRefundsPdfWeb(Request $request)
-    {
-        $result = \App\Services\Pdf\ShiftRefundReport::generateFromRequest($request);
 
         if (isset($result['error'])) {
             return response()->json(['message' => $result['error']], $result['status']);

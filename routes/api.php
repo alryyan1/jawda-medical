@@ -39,8 +39,6 @@ use App\Http\Controllers\Api\PdfSettingController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RequestedServiceCostController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
-use App\Http\Controllers\Api\ReturnedRequestedServiceController;
-use App\Http\Controllers\Api\ReturnedLabRequestController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SampleCollectionController;
 use App\Http\Controllers\Api\ServiceController;
@@ -150,9 +148,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::apiResource('roles', RoleController::class);
   Route::post('/users/{user}/update-password', [UserController::class, 'updatePassword']);
 
-  Route::put('/returned-lab-requests/{returnedLabRequest}', [ReturnedLabRequestController::class, 'update']);
-  Route::put('/returned-requested-services/{returnedRequestedService}', [ReturnedRequestedServiceController::class, 'update']);
-
   /*
     |--------------------------------------------------------------------------
     | Medical Staff Routes (Doctors & Specialists)
@@ -243,7 +238,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('/requested-service-diagnoses/{diagnosis}', [RequestedServiceDiagnosisController::class, 'update']);
   Route::get('/requested-service-diagnoses/{diagnosis}/pdf', [RequestedServiceDiagnosisController::class, 'generatePdf']);
   Route::post('/requested-services/{requestedService}/deposits', [RequestedServiceDepositController::class, 'store']);
-  Route::post('/requested-services/{requestedService}/refunds', [ReturnedRequestedServiceController::class, 'store']);
 
   /*
     |--------------------------------------------------------------------------
@@ -369,7 +363,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::put('/labrequests/{labrequest}', [LabRequestController::class, 'update']);
   Route::delete('/labrequests/{labrequest}', [LabRequestController::class, 'destroy']);
   Route::post('/labrequests/{labrequest}/pay', [LabRequestController::class, 'recordPayment']);
-  Route::post('/labrequests/{labrequest}/refunds', [ReturnedLabRequestController::class, 'store']);
   Route::post('/labrequests/{labrequest}/authorize', [LabRequestController::class, 'authorizeResults']);
   Route::post('/labrequests/{labRequest}/upload-image', [LabRequestController::class, 'uploadImage']);
   Route::delete('/labrequests/{labRequest}/remove-image', [LabRequestController::class, 'removeImage']);
