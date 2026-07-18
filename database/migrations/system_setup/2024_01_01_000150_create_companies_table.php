@@ -23,12 +23,7 @@ return new class extends Migration
             $table->string('email', 255);
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
-            $table->unsignedBigInteger('finance_account_id')->nullable();
             $table->string('lab2lab_firestore_id', 255)->nullable();
-            $table->foreign('finance_account_id', 'companies_finance_account_id_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
         });
     }
 

@@ -35,10 +35,6 @@ class DoctorResource extends JsonResource
             }),
             'start' => $this->start,
             'image' => $this->image, // You might want to return a full URL if storing paths
-            'finance_account_id' => $this->finance_account_id,
-            'finance_account_name' => $this->whenLoaded('financeAccount', optional($this->financeAccount)->name),
-            'finance_account_id_insurance' => $this->finance_account_id_insurance,
-            'insurance_finance_account_name' => $this->whenLoaded('insuranceFinanceAccount', optional($this->insuranceFinanceAccount)->name),
             'calc_insurance' => $this->calc_insurance,
             'created_at' => optional($this->created_at)->toIso8601String(),
             'updated_at' => optional($this->updated_at)->toIso8601String(),

@@ -47,17 +47,8 @@ class SettingResource extends JsonResource
             'edit_result_after_auth' => (bool) $this->edit_result_after_auth,
             'auditor_stamp' => $this->auditor_stamp,
             'manager_stamp' => $this->manager_stamp,
-            'finance_account_id' => $this->finance_account_id,
-            'bank_id' => $this->bank_id,
-            'company_account_id' => $this->company_account_id,
-            'endurance_account_id' => $this->endurance_account_id,
-            'main_cash' => $this->main_cash,
-            'main_bank' => $this->main_bank,
             'financial_year_start' => $this->financial_year_start?->toDateString(),
             'financial_year_end' => $this->financial_year_end?->toDateString(),
-            'pharmacy_bank' => $this->pharmacy_bank,
-            'pharmacy_cash' => $this->pharmacy_cash,
-            'pharmacy_income' => $this->pharmacy_income,
             'welcome_message' => $this->welcome_message,
             'send_welcome_message' => (bool) $this->send_welcome_message,
             'updated_at' => $this->updated_at?->toIso8601String(),
@@ -101,10 +92,6 @@ class SettingResource extends JsonResource
             'pdf_header_subtitle_font_size' => (int) $this->pdf_header_subtitle_font_size,
             'pdf_header_title_y_offset' => (int) $this->pdf_header_title_y_offset,
             'pdf_header_subtitle_y_offset' => (int) $this->pdf_header_subtitle_y_offset,
-
-
-            // Eager load related finance accounts if needed for display
-            // 'default_finance_account_details' => new FinanceAccountResource($this->whenLoaded('defaultFinanceAccount')),
         ];
     }
 }

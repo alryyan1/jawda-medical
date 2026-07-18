@@ -5,7 +5,6 @@ namespace Database\Seeders;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 
 use App\Models\Deno;
-use App\Models\Deposit;
 use App\Models\Doctor;
 use App\Models\DrugCategory;
 use App\Models\Patient;

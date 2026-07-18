@@ -29,7 +29,6 @@ class ResetDemoData extends Command
         '/users',
         '/doctors',
         '/finance',
-        '/employees',
     ];
 
     public function handle(): int
@@ -81,7 +80,6 @@ class ResetDemoData extends Command
 
         $this->truncate([
             // Analyzer results
-            'acon_cbc_results',
             'mindray_cbc',
             'mindray2',
             'sysmex',
@@ -100,7 +98,6 @@ class ResetDemoData extends Command
             'requested_service_deposit_deletions',
             'requested_service_deposits',
             'requested_service_cost',
-            'audited_requested_services',
             'costs',
             'requested_services',
             // Visit children
@@ -108,16 +105,12 @@ class ResetDemoData extends Command
             'sickleaves',
             'nurse_notes',
             'patient_medical_histories',
-            'audited_patient_records',
             'appointments',
             // Main tables
             'doctorvisits',
             // Misc patient data
-            'images',
             'files',
-            'bankak_images',
             'whats_app_messages',
-            // client_payments preserved (insurance/company payment records)
             'patients',
         ]);
     }
@@ -139,19 +132,8 @@ class ResetDemoData extends Command
         $this->info('🧹 Cleaning financial/shift data...');
 
         $this->truncate([
-            'deducted_items',
-            'deducts',
-            'debits',
-            'deposit_items',
-            'deposits',
             'petty_cash_permissions',
-            'debit_entries',
-            'credit_entries',
-            'finance_entries',
             'cash_tally',
-            'balance_sheet_statements',
-            'income_statement_reports',
-            'income_statements',
             'shifts',
         ]);
     }

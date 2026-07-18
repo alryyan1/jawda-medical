@@ -27,17 +27,7 @@ return new class extends Migration
             $table->timestamp('updated_at')->nullable();
             $table->integer('start');
             $table->string('image', 255)->nullable();
-            $table->unsignedBigInteger('finance_account_id')->nullable();
-            $table->unsignedBigInteger('finanace_account_id_insurance')->nullable();
             $table->boolean('calc_insurance')->default(0);
-            $table->foreign('finanace_account_id_insurance', 'doctors_finanace_account_id_insurance_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
-            $table->foreign('finance_account_id', 'doctors_finance_account_id_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
             $table->foreign('specialist_id', 'doctors_specialist_id_foreign')
                   ->references('id')
                   ->on('specialists')

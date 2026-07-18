@@ -27,7 +27,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $queue_number
  * @property string|null $reason_for_visit
  * @property string|null $visit_notes
- * @property-read \App\Models\AuditedPatientRecord|null $auditRecord
  * @property-read \App\Models\User|null $createdByUser
  * @property-read \App\Models\Doctor|null $doctor
  * @property-read \App\Models\DoctorShift|null $doctorShift
@@ -478,13 +477,6 @@ TEXT;
         return $this->hasHormone();
     }
 
-      /**
-     * Get the audit record associated with this doctor visit.
-     */
-    public function auditRecord() // <-- THE NEW RELATIONSHIP
-    {
-        return $this->hasOne(AuditedPatientRecord::class, 'doctor_visit_id');
-    }
     public function total_services_according_to_service_group($service_group_id)
     {
         $total = 0;

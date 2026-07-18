@@ -17,7 +17,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $email
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property int|null $finance_account_id
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CompanyMainTest> $companyMainTestEntries
  * @property-read int|null $company_main_test_entries_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CompanyRelation> $companyRelations
@@ -29,7 +28,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read int|null $contracted_main_tests_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Service> $contractedServices
  * @property-read int|null $contracted_services_count
- * @property-read \App\Models\FinanceAccount|null $financeAccount
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Patient> $patients
  * @property-read int|null $patients_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Subcompany> $subcompanies
@@ -39,7 +37,6 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Company query()
  * @method static \Illuminate\Database\Eloquent\Builder|Company whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Company whereEmail($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Company whereFinanceAccountId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Company whereId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Company whereLabEndurance($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Company whereLabRoof($value)
@@ -56,7 +53,7 @@ class Company extends Model
     use HasFactory;
     protected $fillable = [
         'name', 'lab_endurance', 'service_endurance', 'status',
-        'lab_roof', 'service_roof', 'phone', 'email', 'finance_account_id',
+        'lab_roof', 'service_roof', 'phone', 'email',
         'lab2lab_firestore_id',
     ];
     protected $casts = [
@@ -65,7 +62,6 @@ class Company extends Model
         'status' => 'boolean',
     ];
 
-    public function financeAccount() { return $this->belongsTo(FinanceAccount::class); }
     public function subcompanies() { return $this->hasMany(Subcompany::class); }
     public function companyRelations() { return $this->hasMany(CompanyRelation::class); }
     public function patients() { return $this->hasMany(Patient::class); }

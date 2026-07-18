@@ -3,7 +3,6 @@
 use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\WebHookController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\BankakImageController;
 use App\Http\Controllers\Api\CashDenominationController;
 use App\Http\Controllers\Api\ChildGroupController;
 use App\Http\Controllers\Api\ChildTestController;
@@ -26,8 +25,6 @@ use App\Http\Controllers\Api\DoctorServiceController;
 use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
 use App\Http\Controllers\Api\ExcelController;
-use App\Http\Controllers\Api\FinanceAccountController;
-use App\Http\Controllers\Api\InsuranceAuditController;
 use App\Http\Controllers\Api\LabRequestController;
 use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\OfferController;
@@ -62,9 +59,6 @@ use App\Http\Controllers\Api\ImageProxyController;
 use App\Http\Controllers\Api\BindingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\EmployeeController;
-use App\Http\Controllers\Api\EmployeeExpenseController;
-use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\SmsController;
 use App\Http\Controllers\Api\RequestedServiceDiagnosisController;
 
@@ -290,8 +284,6 @@ Route::middleware('auth:sanctum')->group(function () {
     | Finance & Settings Routes
     |--------------------------------------------------------------------------
     */
-  // Finance Accounts
-  Route::get('finance-accounts-list', [FinanceAccountController::class, 'indexList']);
   Route::get('/user/current-shift-income-summary', [UserController::class, 'getCurrentUserShiftIncomeSummary']);
 
   Route::post('/settings/upload', [SettingUploadController::class, 'upload']);
@@ -520,24 +512,6 @@ Route::middleware('auth:sanctum')->group(function () {
   });
 
   Route::post('companies/{targetCompany}/copy-contracts-from/{sourceCompany}', [CompanyServiceController::class, 'copyContractsFrom']); // NEW ROUTE
-  /*
-    |--------------------------------------------------------------------------
-    | Insurance Auditing Routes
-    |--------------------------------------------------------------------------
-    */
-  Route::get('/insurance-audit/patients', [InsuranceAuditController::class, 'listAuditableVisits']);
-  Route::get('/insurance-audit/visits/{doctorVisit}/audit-record', [InsuranceAuditController::class, 'getOrCreateAuditRecordForVisit']);
-  Route::put('/insurance-audit/records/{auditedPatientRecord}', [InsuranceAuditController::class, 'updateAuditedPatientInfo']);
-  Route::post('/insurance-audit/records/{auditedPatientRecord}/copy-services', [InsuranceAuditController::class, 'copyServicesToAudit']);
-  Route::post('/insurance-audit/audited-services', [InsuranceAuditController::class, 'storeAuditedService']);
-  Route::put('/insurance-audit/audited-services/{auditedRequestedService}', [InsuranceAuditController::class, 'updateAuditedService']);
-  Route::delete('/insurance-audit/audited-services/{auditedRequestedService}', [InsuranceAuditController::class, 'deleteAuditedService']);
-  Route::post('/insurance-audit/records/{auditedPatientRecord}/verify', [InsuranceAuditController::class, 'verifyAuditRecord']);
-
-  // PDF/Excel Export Routes
-  Route::get('/insurance-audit/export/pdf', [InsuranceAuditController::class, 'exportPdf']);
-  // http://127.0.0.1/jawda-medical/public/api/insurance-audit/export/excel?company_id=1&date_from=2025-05-01&date_to=2025-05-31&service_group_ids[]=9&service_group_ids[]=1&service_group_ids[]=2&service_group_ids[]=3&service_group_ids[]=4&service_group_ids[]=7&service_group_ids[]=5
-  Route::get('/insurance-audit/export/excel', [ExcelController::class, 'exportInsuranceClaim']);
   Route::get('/excel/reclaim', [ExcelController::class, 'reclaim']);
   Route::get('/reports/monthly-service-deposits-income', [ReportController::class, 'monthlyServiceDepositsIncome']);
   /*
@@ -617,16 +591,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/reports/yearly-income-comparison', [ReportController::class, 'yearlyIncomeComparisonByMonth']);
   Route::get('/reports/yearly-patient-frequency', [ReportController::class, 'yearlyPatientFrequencyByMonth']);
   // Route::get('/reports/yearly-patient-frequency/pdf', [ReportController::class, 'exportYearlyPatientFrequencyPdf']); // For future PDF
-
-  /*
-    |--------------------------------------------------------------------------
-    | Employee Expense Routes
-    |--------------------------------------------------------------------------
-    */
-  Route::apiResource('employees', EmployeeController::class);
-  Route::get('employee-expenses/print', [EmployeeExpenseController::class, 'printPdf']);
-  Route::apiResource('employee-expenses', EmployeeExpenseController::class)->only(['index', 'store', 'destroy']);
-  Route::apiResource('departments', DepartmentController::class)->only(['index', 'store']);
 
   Route::post('/visits/{visit}/send-whatsapp-report', [ReportController::class, 'sendVisitReportViaWhatsApp']);
   Route::get('/search/patient-visits', [PatientController::class, 'searchPatientVisitsForAutocomplete']);
@@ -756,13 +720,6 @@ Route::post('/reports/cash-reconciliation/pdf', [ReportController::class, 'gener
 // Firestore update endpoints
 Route::post('/firestore/update-document', [App\Http\Controllers\Api\FirestoreController::class, 'updateFirestoreDocument'])->middleware('auth:sanctum');
 Route::post('/firestore/update-patient-pdf', [App\Http\Controllers\Api\FirestoreController::class, 'updatePatientPdf']);
-
-// Bankak Images endpoints
-Route::middleware('auth:sanctum')->group(function () {
-  Route::get('/bankak-images', [BankakImageController::class, 'index']);
-  Route::get('/bankak-images/dates', [BankakImageController::class, 'getAvailableDates']);
-  Route::get('/bankak-images/stats', [BankakImageController::class, 'getStats']);
-});
 
 //send from firebase storage using visit_id and settings.storage_name
 Route::post('/ultramsg/send-document-from-firebase', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFirebase']);

@@ -42,7 +42,6 @@ class CostController extends Controller
             'amount_bank_input' => 'required_without:amount_cash|nullable|numeric|min:0', // Amount from bank
             'doctor_shift_id_for_sub_cost' => 'nullable|integer|exists:doctor_shifts,id',
             'sub_service_cost_id' => 'nullable|integer|exists:sub_service_costs,id',
-            'employee_id' => 'nullable|integer|exists:employees,id',
         ]);
     
         // Ensure at least one amount is provided and not both zero if one is required
@@ -61,7 +60,6 @@ class CostController extends Controller
             'comment' => $validated['comment'] ?? null,
             'amount' => $validated['amount_cash_input'] ?? 0,       // Store cash portion
             'amount_bankak' => $validated['amount_bank_input'] ?? 0, // Store bank portion
-            'employee_id' => $validated['employee_id'] ?? null,
         ]);
         return new CostResource($cost->load(['costCategory', 'userCost:id,name']));
     }
@@ -85,11 +83,10 @@ class CostController extends Controller
         ]);
 
         $query = Cost::with([
-            'costCategory:id,name', 
-            'userCost:id,name', 
-            'shift:id', 
-            'doctorShift.doctor:id,name',
-            'employee:id,name'
+            'costCategory:id,name',
+            'userCost:id,name',
+            'shift:id',
+            'doctorShift.doctor:id,name'
         ]); // Eager load
 
         // Apply all filters to the main query

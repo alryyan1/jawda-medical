@@ -27,8 +27,6 @@ class DoctorsTableSeeder extends Seeder
             'sub_specialist_id' => null,
             'start' => 1,
             'image' => null,
-            'finance_account_id' => null,
-            'finanace_account_id_insurance' => null,
             'calc_insurance' => 0,
             'is_default' => 1,
             'firebase_id' => null,

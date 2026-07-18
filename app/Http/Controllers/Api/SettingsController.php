@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
-use App\Models\FinanceAccount; // For validating exists
 use Illuminate\Http\Request;
 use App\Http\Resources\SettingResource;
 use Illuminate\Support\Facades\Storage; // For handling file uploads (stamps, logo)
@@ -24,10 +23,7 @@ class SettingsController extends Controller
      */
     public function show()
     {
-        // Eager load any finance accounts needed for display by name in the form
-        $settings = Setting::with([
-            // 'defaultFinanceAccount', 'defaultBank', /* ... other finance account relations */
-        ])->first();
+        $settings = Setting::first();
 
         if (!$settings) {
             // Optionally, create a default settings record if none exists
@@ -112,17 +108,8 @@ class SettingsController extends Controller
             'send_result_after_result' => 'sometimes|boolean',
             'edit_result_after_auth' => 'sometimes|boolean',
 
-            'finance_account_id' => 'nullable|exists:finance_accounts,id',
-            'bank_id' => 'nullable|exists:finance_accounts,id',
-            'company_account_id' => 'nullable|exists:finance_accounts,id',
-            'endurance_account_id' => 'nullable|exists:finance_accounts,id',
-            'main_cash' => 'nullable|exists:finance_accounts,id',
-            'main_bank' => 'nullable|exists:finance_accounts,id',
             'financial_year_start' => 'nullable|date_format:Y-m-d',
             'financial_year_end' => 'nullable|date_format:Y-m-d|after_or_equal:financial_year_start',
-            'pharmacy_bank' => 'nullable|exists:finance_accounts,id',
-            'pharmacy_cash' => 'nullable|exists:finance_accounts,id',
-            'pharmacy_income' => 'nullable|exists:finance_accounts,id',
             'welcome_message' => 'nullable|string|max:2000',
             'send_welcome_message' => 'sometimes|boolean',
             'report_header_company_name' => 'nullable|string|max:255',

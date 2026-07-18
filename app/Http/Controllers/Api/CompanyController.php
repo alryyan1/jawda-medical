@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
-use App\Models\FinanceAccount; // Assuming you might want to create/link these
 use Illuminate\Http\Request;
 use App\Http\Resources\CompanyResource;
 // use App\Http\Resources\CompanyCollection; // If you have a custom collection resource for pagination
@@ -27,8 +26,7 @@ class CompanyController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Company::withCount('contractedServices')->where('name', '!=', '') // Get count of service contracts
-                          ->with('financeAccount');      // Eager load finance account
+        $query = Company::withCount('contractedServices')->where('name', '!=', ''); // Get count of service contracts
 
         // Example Search Filter (optional)
         if ($request->has('search') && !empty($request->search)) {
@@ -67,7 +65,6 @@ class CompanyController extends Controller
             'service_endurance' => 'required|numeric|min:0|max:100', // Assuming percentage
             'lab_roof' => 'required|numeric|min:0',
             'service_roof' => 'required|numeric|min:0',
-            'finance_account_id' => 'nullable|exists:finance_accounts,id',
         ]);
 
         // Ensure numeric values are correctly typed before creation if needed
@@ -78,26 +75,9 @@ class CompanyController extends Controller
         $validatedData['service_roof'] = (float) $validatedData['service_roof'];
 
 
-        // Example: Create a finance account for the company if one isn't provided
-        // This is optional and depends on your business logic
-        // if (empty($validatedData['finance_account_id'])) {
-        //     DB::transaction(function () use (&$company, $validatedData) {
-        //         $financeAccount = FinanceAccount::create([
-        //             'name' => $validatedData['name'] . ' - حساب الشركة',
-        //             'code' => 'COMP-' . strtoupper(substr(md5($validatedData['name']), 0, 6)), // Example code
-        //             'type' => 'revenue', // Or 'liability' depending on context
-        //             'debit' => 'credit', // Or 'debit'
-        //         ]);
-        //         $validatedData['finance_account_id'] = $financeAccount->id;
-        //         $company = Company::create($validatedData);
-        //     });
-        // } else {
-        //    $company = Company::create($validatedData);
-        // }
-
         $company = Company::create($validatedData);
 
-        return new CompanyResource($company->load('financeAccount'));
+        return new CompanyResource($company);
     }
 
     /**
@@ -107,7 +87,7 @@ class CompanyController extends Controller
     {
         // Already loaded with contracts in the CompanyResource by default if index also does it.
         // For a show route, you might want to load more details or specific relationships.
-        return new CompanyResource($company->loadMissing('financeAccount', 'contractedServices.serviceGroup'));
+        return new CompanyResource($company->loadMissing('contractedServices.serviceGroup'));
     }
 
     /**
@@ -124,7 +104,6 @@ class CompanyController extends Controller
             'service_endurance' => 'sometimes|required|numeric|min:0|max:100',
             'lab_roof' => 'sometimes|required|numeric|min:0',
             'service_roof' => 'sometimes|required|numeric|min:0',
-            'finance_account_id' => 'nullable|exists:finance_accounts,id',
         ]);
 
         // Explicit casting for numeric fields if they might come as strings from the request
@@ -135,7 +114,7 @@ class CompanyController extends Controller
 
         $company->update($validatedData);
 
-        return new CompanyResource($company->load('financeAccount'));
+        return new CompanyResource($company);
     }
 
     /**
@@ -194,6 +173,6 @@ class CompanyController extends Controller
 
         $company->update($validatedData);
 
-        return new CompanyResource($company->load('financeAccount'));
+        return new CompanyResource($company);
     }
 }

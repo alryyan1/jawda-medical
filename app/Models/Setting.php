@@ -39,29 +39,16 @@ use Illuminate\Database\Eloquent\Model;
  * @property bool $edit_result_after_auth
  * @property string|null $auditor_stamp
  * @property string|null $manager_stamp
- * @property int|null $finance_account_id
- * @property int|null $bank_id
- * @property int|null $company_account_id
- * @property int|null $endurance_account_id
- * @property int|null $main_cash
- * @property int|null $main_bank
  * @property \Illuminate\Support\Carbon|null $financial_year_start
  * @property \Illuminate\Support\Carbon|null $financial_year_end
- * @property int|null $pharmacy_bank
- * @property int|null $pharmacy_cash
- * @property int|null $pharmacy_income
  * @property string|null $welcome_message
  * @property bool $send_welcome_message
- * @property-read \App\Models\FinanceAccount|null $defaultBank
- * @property-read \App\Models\FinanceAccount|null $defaultFinanceAccount
  * @method static \Illuminate\Database\Eloquent\Builder|Setting newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Setting newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Setting query()
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereAddress($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereAuditorStamp($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting whereBankId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereBarcode($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCompanyAccountId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCountry($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCr($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereCreatedAt($value)
@@ -69,8 +56,6 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereDisableDoctorServiceCheck($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereEditResultAfterAuth($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereEmail($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting whereEnduranceAccountId($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFinanceAccountId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFinancialYearEnd($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFinancialYearStart($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFooterBase64($value)
@@ -87,12 +72,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereIsLogo($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereLabName($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereLogoBase64($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting whereMainBank($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting whereMainCash($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereManagerStamp($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePharmacyBank($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePharmacyCash($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePharmacyIncome($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting wherePhone($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereFirestoreResultCollection($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereSendResultAfterAuth($value)
@@ -146,17 +126,8 @@ class Setting extends Model
         'edit_result_after_auth',
         'auditor_stamp',
         'manager_stamp', // Paths or base64 for stamps
-        'finance_account_id',
-        'bank_id',
-        'company_account_id',
-        'endurance_account_id',
-        'main_cash',
-        'main_bank',
         'financial_year_start',
         'financial_year_end',
-        'pharmacy_bank',
-        'pharmacy_cash',
-        'pharmacy_income',
         'welcome_message',
         'send_welcome_message',
         'report_header_company_name',
@@ -252,15 +223,4 @@ class Setting extends Model
     {
         return static::first();
     }
-
-    // You might have relationships to FinanceAccount for the various account IDs
-    public function defaultFinanceAccount()
-    {
-        return $this->belongsTo(FinanceAccount::class, 'finance_account_id');
-    }
-    public function defaultBank()
-    {
-        return $this->belongsTo(FinanceAccount::class, 'bank_id');
-    }
-    // ... and so on for other finance_account_id fields
 }

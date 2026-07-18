@@ -150,7 +150,6 @@ class Patient extends Model
         'result_auth',
         'result_auth_user',
         'auth_date',
-        'country_id',
         'gov_id',
         'address',
         'discount',
@@ -311,16 +310,6 @@ class Patient extends Model
     {
         return $this->belongsTo(CompanyRelation::class);
     }
-
-    /**
-     * Get the country of the patient.
-     */
-    public function country()
-    {
-        return $this->belongsTo(Country::class); // Assuming Country model exists
-    }
-
-
 
 
 

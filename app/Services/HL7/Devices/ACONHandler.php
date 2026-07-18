@@ -8,7 +8,6 @@ use Aranyasen\HL7\Segments\OBX;
 use App\Services\HL7\Contracts\DeviceHandlerInterface;
 use App\Services\HL7\Devices\SysmexCbcInserter;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 
 class ACONHandler implements DeviceHandlerInterface
 {
@@ -55,9 +54,6 @@ class ACONHandler implements DeviceHandlerInterface
             } else {
                 Log::warning('ACON: No valid doctor visit ID found', ['doctorVisitId' => $doctorVisitId]);
             }
-            
-            // Log the results to ACON tables
-            $this->logCBCResults($patientInfo, $cbcResults);
             
             // Send acknowledgment back to device
             $this->sendAcknowledgment($connection, $msh);
@@ -221,50 +217,6 @@ class ACONHandler implements DeviceHandlerInterface
             
         } catch (\Exception $e) {
             return null;
-        }
-    }
-
-    /**
-     * Log CBC results to database
-     */
-    protected function logCBCResults(array $patientInfo, array $cbcResults): void
-    {
-        try {
-            // Insert into CBC results table
-            $resultData = [
-                'patient_id' => $patientInfo['patient_id'] ?? null,
-                'patient_name' => $patientInfo['name'] ?? null,
-                'patient_dob' => $patientInfo['dob'] ?? null,
-                'patient_gender' => $patientInfo['gender'] ?? null,
-                'device_type' => 'ACON',
-                'test_date' => now(),
-                'results' => json_encode($cbcResults),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-            
-            DB::table('acon_cbc_results')->insert($resultData);
-            
-            // Also insert individual results for easier querying
-            foreach ($cbcResults as $parameter => $result) {
-                DB::table('acon_cbc_parameters')->insert([
-                    'patient_id' => $patientInfo['patient_id'] ?? null,
-                    'parameter_name' => $parameter,
-                    'test_code' => $result['test_code'],
-                    'test_name' => $result['test_name'],
-                    'value' => $result['value'],
-                    'unit' => $result['unit'],
-                    'reference_range' => $result['reference_range'],
-                    'abnormal_flag' => $result['abnormal_flag'],
-                    'status' => $result['status'],
-                    'test_date' => now(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-            
-        } catch (\Exception $e) {
-            // Error handling without logging
         }
     }
 

@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\Doctor;
 use App\Models\Specialist;
-use App\Models\FinanceAccount;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class DoctorFactory extends Factory
@@ -41,7 +40,7 @@ class DoctorFactory extends Factory
             'static_wage' => $this->faker->randomElement([5000, 4000, 3000, 2000]),
             'lab_percentage' => $this->faker->randomFloat(2, 5, 15),
             
-            // Assumes Specialist and FinanceAccount factories/records exist
+            // Assumes Specialist factories/records exist
             // Use ::factory() if you want to create them on the fly,
             // or ::inRandomOrder()->first()->id if you want to pick existing ones.
             'specialist_id' => Specialist::factory(), // Creates a new Specialist
@@ -50,10 +49,6 @@ class DoctorFactory extends Factory
 
             'start' => $this->faker->numberBetween(1000, 9999), // Example for 'start' column
             'image' => null, // Or $this->faker->imageUrl(640, 480, 'people') if you want placeholder images
-
-            // Ensure FinanceAccount records exist or use factories
-            'finance_account_id' => null, // Or pick existing
-            'finance_account_id_insurance' => null, // Or pick existing
 
             'calc_insurance' => $this->faker->boolean(70), // 70% chance of being true
             'created_at' => now(),

@@ -47,17 +47,8 @@ return new class extends Migration
             $table->boolean('edit_result_after_auth')->nullable();
             $table->string('auditor_stamp', 255)->nullable();
             $table->string('manager_stamp', 255)->nullable();
-            $table->unsignedBigInteger('finance_account_id')->nullable();
-            $table->unsignedBigInteger('bank_id')->nullable();
-            $table->unsignedBigInteger('company_account_id')->nullable();
-            $table->unsignedBigInteger('endurance_account_id')->nullable();
-            $table->unsignedBigInteger('main_cash')->nullable();
-            $table->unsignedBigInteger('main_bank')->nullable();
             $table->date('financial_year_start')->nullable();
             $table->date('financial_year_end')->nullable();
-            $table->unsignedBigInteger('pharmacy_bank')->nullable();
-            $table->unsignedBigInteger('pharmacy_cash')->nullable();
-            $table->unsignedBigInteger('pharmacy_income')->nullable();
             $table->text('welcome_message')->nullable()->default('');
             $table->boolean('send_welcome_message')->nullable();
             $table->string('default_lab_report_template', 255)->nullable();
@@ -84,42 +75,6 @@ return new class extends Migration
             $table->integer('pdf_header_subtitle_font_size')->nullable()->default(17);
             $table->integer('pdf_header_title_y_offset')->nullable()->default(5);
             $table->integer('pdf_header_subtitle_y_offset')->nullable()->default(5);
-            $table->foreign('bank_id', 'settings_bank_id_foreign')
-                  ->references('id')
-                  ->on('banks')
-                  ->onDelete('cascade');
-            $table->foreign('company_account_id', 'settings_company_account_id_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
-            $table->foreign('endurance_account_id', 'settings_endurance_account_id_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
-            $table->foreign('finance_account_id', 'settings_finance_account_id_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
-            $table->foreign('main_bank', 'settings_main_bank_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
-            $table->foreign('main_cash', 'settings_main_cash_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
-            $table->foreign('pharmacy_bank', 'settings_pharmacy_bank_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
-            $table->foreign('pharmacy_cash', 'settings_pharmacy_cash_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
-            $table->foreign('pharmacy_income', 'settings_pharmacy_income_foreign')
-                  ->references('id')
-                  ->on('finance_accounts')
-                  ->onDelete('cascade');
         });
     }
 

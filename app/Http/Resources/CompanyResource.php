@@ -12,8 +12,6 @@ class CompanyResource extends JsonResource {
             'service_endurance' => (float) $this->service_endurance,
             'lab_roof' => (int) $this->lab_roof,
             'service_roof' => (int) $this->service_roof,
-            'finance_account_id' => $this->finance_account_id,
-            'finance_account' => new FinanceAccountResource($this->whenLoaded('financeAccount')),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
             // Optionally, a count or brief summary of contracted services

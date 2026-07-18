@@ -29,8 +29,6 @@ use Illuminate\Support\Facades\DB;
  * @property-read int|null $doctor_shifts_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorVisit> $doctorVisits
  * @property-read int|null $doctor_visits_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\FinanceEntry> $financeEntries
- * @property-read int|null $finance_entries_count
  * @property-read float $net_cash
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Patient> $patients
  * @property-read int|null $patients_count
@@ -127,14 +125,6 @@ class Shift extends Model
         }
         return $total;
     }
-    /**
-     * Get all financial entries associated with this shift.
-     */
-    public function financeEntries()
-    {
-        return $this->hasMany(FinanceEntry::class);
-    }
-
     /**
      * Get all costs recorded during this shift.
      */

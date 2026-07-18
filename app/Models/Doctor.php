@@ -20,15 +20,11 @@ use Illuminate\Support\Facades\Log;
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property int $start
  * @property string|null $image
- * @property int|null $finance_account_id
- * @property int $finanace_account_id_insurance
  * @property bool $calc_insurance
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorServiceCost> $doctorServiceCosts
  * @property-read int|null $doctor_service_costs_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorServiceCost> $doctorSubServiceCosts
  * @property-read int|null $doctor_sub_service_costs_count
- * @property-read \App\Models\FinanceAccount|null $financeAccount
- * @property-read \App\Models\FinanceAccount|null $insuranceFinanceAccount
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorSchedule> $schedules
  * @property-read int|null $schedules_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorService> $services
@@ -46,8 +42,6 @@ use Illuminate\Support\Facades\Log;
  * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereCashPercentage($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereCompanyPercentage($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereFinanaceAccountIdInsurance($value)
- * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereFinanceAccountId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereImage($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Doctor whereLabPercentage($value)
@@ -75,8 +69,6 @@ class Doctor extends Model
         'sub_specialist_id',
         'start', // This was an INT(11) in the schema, meaning? Patient capacity? Starting number?
         'image',
-        'finance_account_id',
-        'finance_account_id_insurance', // Corrected name from migration
         'calc_insurance',
         'is_default',
     ];
@@ -105,24 +97,6 @@ class Doctor extends Model
     public function subSpecialist()
     {
         return $this->belongsTo(SubSpecialist::class, 'sub_specialist_id');
-    }
-
-    /**
-     * Get the finance account for the doctor.
-     */
-    public function financeAccount()
-    {
-        // Assuming 'finance_account_id' is the FK column name
-        return $this->belongsTo(FinanceAccount::class, 'finance_account_id');
-    }
-
-    /**
-     * Get the insurance finance account for the doctor.
-     */
-    public function insuranceFinanceAccount()
-    {
-        // Assuming 'finance_account_id_insurance' is the FK column name
-        return $this->belongsTo(FinanceAccount::class, 'finance_account_id_insurance');
     }
 
     /**

@@ -22,9 +22,6 @@ class SystemSetupSeeder extends Seeder
         \DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
         // 1. Run basic setup seeders (excluding Auth tables)
-        // $this->call(\Database\Seeders\system_setup_seeders\WardsTableSeeder::class);
-        // $this->call(\Database\Seeders\system_setup_seeders\RoomsTableSeeder::class);
-        // $this->call(\Database\Seeders\system_setup_seeders\BedsTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\SpecialistsTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\DoctorsTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\ContainersTableSeeder::class);
@@ -36,7 +33,6 @@ class SystemSetupSeeder extends Seeder
         $this->call(\Database\Seeders\system_setup_seeders\UnitsTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\ChildTestsTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\ChildTestOptionsTableSeeder::class);
-        $this->call(\Database\Seeders\system_setup_seeders\ClientsTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\DenosTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\DiagnosisTableSeeder::class);
         $this->call(\Database\Seeders\system_setup_seeders\DrugsTableSeeder::class);
