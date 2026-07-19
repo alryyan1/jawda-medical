@@ -19,10 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read int|null $companies_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Doctor> $doctorsProviding
  * @property-read int|null $doctors_providing_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ServiceCost> $serviceCosts
- * @property-read int|null $service_costs_count
  * @property-read \App\Models\ServiceGroup $serviceGroup
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ServiceCost> $service_costs
  * @method static \Database\Factories\ServiceFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Service newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Service newQuery()
@@ -67,15 +64,7 @@ class Service extends Model
                     ]);
                     // ->withTimestamps(); // if pivot has timestamps
     }
-    
-    // NEWLY ADDED for the cost breakdown structure:
-    /**
-     * Get all defined costs associated with this service.
-     */
-    public function serviceCosts()
-    {
-        return $this->hasMany(ServiceCost::class);
-    }
+
        /**
      * The doctors who offer this service with specific financial terms.
      */
@@ -85,9 +74,5 @@ class Service extends Model
                     ->using(DoctorService::class)
                     ->withPivot(['id', 'percentage', 'fixed'])
                     ->withTimestamps();
-    }
-    public function service_costs()
-    {
-        return $this->hasMany(ServiceCost::class);
     }
 }

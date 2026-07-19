@@ -7,13 +7,11 @@ use App\Models\Company;
 use App\Models\Patient;
 use App\Models\DoctorVisit;
 use App\Models\RequestedService;
-use App\Models\RequestedServiceCost;
 
 class RequestedServiceHelper
 {
     /**
-     * Create a requested service from a favorite service with company contract handling
-     * and automatic cost breakdown creation.
+     * Create a requested service from a favorite service with company contract handling.
      *
      * @param Service $service The service to create a request for
      * @param DoctorVisit $doctorVisit The doctor visit to attach the service to
@@ -29,9 +27,6 @@ class RequestedServiceHelper
         int $userId,
         int $count = 1
     ): ?RequestedService {
-        // Load service with costs relationship
-        $service->load('serviceCosts.subServiceCost');
-
         // Get company if patient has one
         $company = $patient->company_id ? Company::find($patient->company_id) : null;
 
@@ -84,68 +79,7 @@ class RequestedServiceHelper
             'done' => false,
         ]);
 
-        // Auto-create RequestedServiceCost breakdowns
-        self::createServiceCostBreakdowns($requestedService, $service, $price, $count);
-
         return $requestedService;
-    }
-
-    /**
-     * Create cost breakdown entries for a requested service.
-     *
-     * @param RequestedService $requestedService The requested service to attach costs to
-     * @param Service $service The service with cost definitions
-     * @param float $price The base price for calculations
-     * @param int $count The count/quantity multiplier
-     * @return void
-     */
-    public static function createServiceCostBreakdowns(
-        RequestedService $requestedService,
-        Service $service,
-        float $price,
-        int $count = 1
-    ): void {
-        if ($service->serviceCosts->isEmpty()) {
-            return;
-        }
-
-        $costEntriesData = [];
-        $baseAmountForCostCalc = $price * $count;
-
-        foreach ($service->serviceCosts as $serviceCostDefinition) {
-            $calculatedCostAmount = 0;
-            $currentBase = $baseAmountForCostCalc;
-
-            // Handle "after cost" type - subtract already calculated costs
-            if ($serviceCostDefinition->cost_type === 'after cost') {
-                $alreadyCalculatedCostsSum = collect($costEntriesData)->sum('amount');
-                $currentBase = $baseAmountForCostCalc - $alreadyCalculatedCostsSum;
-            }
-
-            // Calculate cost amount based on fixed or percentage
-            if ($serviceCostDefinition->fixed !== null && $serviceCostDefinition->fixed > 0) {
-                $calculatedCostAmount = (float) $serviceCostDefinition->fixed;
-            } elseif ($serviceCostDefinition->percentage !== null && $serviceCostDefinition->percentage > 0) {
-                $calculatedCostAmount = ($currentBase * (float) $serviceCostDefinition->percentage) / 100;
-            }
-
-            // Add to cost entries if amount is greater than 0
-            if ($calculatedCostAmount > 0) {
-                $costEntriesData[] = [
-                    'requested_service_id' => $requestedService->id,
-                    'sub_service_cost_id' => $serviceCostDefinition->sub_service_cost_id,
-                    'service_cost_id' => $serviceCostDefinition->id,
-                    'amount' => round($calculatedCostAmount, 2),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            }
-        }
-
-        // Bulk insert cost entries if any were created
-        if (!empty($costEntriesData)) {
-            RequestedServiceCost::insert($costEntriesData);
-        }
     }
 }
 

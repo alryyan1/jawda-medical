@@ -93,27 +93,6 @@ class DoctorShift extends Model
   
 
 
-    public function additionalCosts()
-    {
-        $arr = [];
-        foreach ($this->shift_service_costs() as $cost) {
-            $min = [];
-            $min['id'] = $cost['id'];
-            $min['name'] = $cost['name'];
-            $min['amount'] = $cost['amount'];
-            $arr[] = $min;
-        }
-
-        return $arr;
-    }
-    public function getTotalCostsByServiceCostId($cost_id)
-    {
-        $total = 0;
-        foreach ($this->visits as $visit) {
-            $total += $visit->total_services_cost($cost_id);
-        }
-        return $total;
-    }
     public function getVisitsCountAttribute(){
         $pdo = DB::getPdo();
         $stmt = $pdo->prepare('SELECT count(id)  FROM doctorvisits WHERE doctor_shift_id = ?');
@@ -121,40 +100,6 @@ class DoctorShift extends Model
         $stmt->execute([$this->id]);
         // return $this->id;;
         return $stmt->fetchColumn();
-    }
-    public function shift_service_costs()
-    {
-        $costs = collect();
-
-        /**@var Doctorvisit $visit */
-        foreach ($this->visits as $visit) {
-
-            foreach ($visit->service_costs() as $cost) {
-                // if(!$costs->contains(function($el)use($cost){
-                //     return $el->id == $cost->id;
-                // })){
-                //     //add to collection
-                // }
-
-                $arr = [];
-                $arr['id'] = $cost->subServiceCost->id;
-                $arr['name'] = $cost->subServiceCost->name;
-                $arr['amount'] = $visit->total_services_cost($cost->id);
-                $costs->push($arr);
-            }
-        }
-        // return $costs;
-        return $costs
-            ->groupBy('id') // Group by the 'id' key
-            ->map(function ($group) {
-                return [
-                    'id' => $group->first()['id'],
-                    'name' => $group->first()['name'],
-                    'amount' => $group->sum('amount'), // Sum the 'amount' field
-                ];
-            })
-            ->values() // Reset the keys
-            ->toArray();
     }
     /**
      * Get the doctor associated with this shift session.
@@ -534,9 +479,7 @@ class DoctorShift extends Model
         // ── 2. Doctor credits (PHP logic, one eager-load pass) ───────────────
         $this->loadMissing([
             'doctor.specificServices',
-            'doctor.doctorServiceCosts',
             'visits.patient:id,company_id',
-            'visits.requestedServices.requestedServiceCosts',
         ]);
 
         $doctor              = $this->doctor;
@@ -569,8 +512,7 @@ class DoctorShift extends Model
 
                 if ($isInsurance) {
                     $gross = (float) $service->price * $service->count;
-                    $cost  = $service->getTotalCostsForDoctor($doctor);
-                    $insuranceCredit += ($gross - $cost) * (float) $doctor->company_percentage / 100;
+                    $insuranceCredit += $gross * (float) $doctor->company_percentage / 100;
                 } else {
                     $cashCredit += $this->calcServiceCreditInline($service, $doctor);
                 }
@@ -601,8 +543,7 @@ class DoctorShift extends Model
         }
 
         // 2. Default percentage
-        $cost = $service->getTotalCostsForDoctor($doctor);
-        return ((float) $service->amount_paid - $cost) * (float) $doctor->cash_percentage / 100;
+        return (float) $service->amount_paid * (float) $doctor->cash_percentage / 100;
     }
 
     public function applyPivotRateInline(RequestedService $service, object $pivot, Doctor $doctor): float
@@ -613,8 +554,7 @@ class DoctorShift extends Model
         if (($pivot->fixed ?? 0) > 0) {
             return (float) $pivot->fixed * $service->count;
         }
-        $cost = $service->getTotalCostsForDoctor($doctor);
-        return ((float) $service->amount_paid - $cost) * (float) $doctor->cash_percentage / 100;
+        return (float) $service->amount_paid * (float) $doctor->cash_percentage / 100;
     }
 
     /**

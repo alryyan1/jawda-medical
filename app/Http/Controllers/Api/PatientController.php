@@ -29,7 +29,6 @@ use App\Models\DoctorShift;
 use App\Models\File;
 use App\Models\UserDocSelection;
 use App\Models\RequestedService;
-use App\Models\RequestedServiceCost;
 use App\Zebra;
 use App\Models\RequestedResult;
 use App\Models\Service;
@@ -245,7 +244,7 @@ class PatientController extends Controller
                 ->first();
 
             if ($fav && $fav->fav_service) {
-                $service = Service::with('serviceCosts.subServiceCost')->find($fav->fav_service);
+                $service = Service::find($fav->fav_service);
                 // $company_service = CompanyService::where('company_id', $patient->company_id)->where('service_id', $fav->fav_service)->first();
                 // Log::info('company_service', ['company_service' => $company_service]);
                 // if ($company_service && $company_service?->price != 0) {
@@ -1459,7 +1458,7 @@ class PatientController extends Controller
                 ->first();
 
             if ($fav && $fav->fav_service) {
-                $service = Service::with('serviceCosts.subServiceCost')->find($fav->fav_service);
+                $service = Service::find($fav->fav_service);
                 if ($service) {
                     $company = $newPatient->company_id ? Company::find($newPatient->company_id) : null;
 
@@ -1506,42 +1505,6 @@ class PatientController extends Controller
                         'approval' => $contractApproval,
                         'done' => false,
                     ]);
-
-                    // Auto-create RequestedServiceCost breakdowns
-                    if ($service->serviceCosts->isNotEmpty()) {
-                        $costEntriesData = [];
-                        $baseAmountForCostCalc = $price * 1; // count is 1
-
-                        foreach ($service->serviceCosts as $serviceCostDefinition) {
-                            $calculatedCostAmount = 0;
-                            $currentBase = $baseAmountForCostCalc;
-
-                            if ($serviceCostDefinition->cost_type === 'after cost') {
-                                $alreadyCalculatedCostsSum = collect($costEntriesData)->sum('amount');
-                                $currentBase = $baseAmountForCostCalc - $alreadyCalculatedCostsSum;
-                            }
-
-                            if ($serviceCostDefinition->fixed !== null && $serviceCostDefinition->fixed > 0) {
-                                $calculatedCostAmount = (float) $serviceCostDefinition->fixed;
-                            } elseif ($serviceCostDefinition->percentage !== null && $serviceCostDefinition->percentage > 0) {
-                                $calculatedCostAmount = ($currentBase * (float) $serviceCostDefinition->percentage) / 100;
-                            }
-
-                            if ($calculatedCostAmount > 0) {
-                                $costEntriesData[] = [
-                                    'requested_service_id' => $requestedService->id,
-                                    'sub_service_cost_id' => $serviceCostDefinition->sub_service_cost_id,
-                                    'service_cost_id' => $serviceCostDefinition->id,
-                                    'amount' => round($calculatedCostAmount, 2),
-                                    'created_at' => now(),
-                                    'updated_at' => now(),
-                                ];
-                            }
-                        }
-                        if (!empty($costEntriesData)) {
-                            RequestedServiceCost::insert($costEntriesData);
-                        }
-                    }
                 }
             }
 

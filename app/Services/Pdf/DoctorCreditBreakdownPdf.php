@@ -134,8 +134,7 @@ class DoctorCreditBreakdownPdf extends TCPDF
         // Column widths (landscape A4 usable ≈ 257 mm)
         $wService = 55;
         $wType    = 22;
-        $wBase    = 22;
-        $wCost    = 22;
+        $wBase    = 44;
         $wRate    = 28;
         $wCredit  = 21;
 
@@ -165,7 +164,6 @@ class DoctorCreditBreakdownPdf extends TCPDF
             $this->Cell($wService, 7, 'اسم الخدمة',     1, 0, 'C', true);
             $this->Cell($wType,    7, 'نوع المريض',     1, 0, 'C', true);
             $this->Cell($wBase,    7, 'الأساس',         1, 0, 'C', true);
-            $this->Cell($wCost,    7, 'مصروفات',        1, 0, 'C', true);
             $this->Cell($wRate,    7, 'النسبة / المبلغ الثابت', 1, 0, 'C', true);
             $this->Cell($wCredit,  7, 'الحصة',          1, 1, 'C', true);
 
@@ -181,12 +179,11 @@ class DoctorCreditBreakdownPdf extends TCPDF
                 $hasServices = true;
 
                 $serviceName = $rs->service?->name ?? 'خدمة غير معروفة';
-                $totalCost   = $rs->getTotalCostsForDoctor($doctor);
 
                 if ($isInsurance) {
-                    // Company formula: (price × count - costs) × company_percentage / 100
+                    // Company formula: (price × count) × company_percentage / 100
                     $gross    = (float)$rs->price * (int)$rs->count;
-                    $base     = $gross - $totalCost;
+                    $base     = $gross;
                     $rateLabel = $doctor->company_percentage . '% (تأمين)';
                     $credit   = $base * $doctor->company_percentage / 100;
                     $typeLabel = 'تأمين';
@@ -208,18 +205,16 @@ class DoctorCreditBreakdownPdf extends TCPDF
                         $base      = $gross;
                         $rateLabel = ' (ثابت × ' . $rs->count . ')'.number_format($pivot->fixed, 2) ;
                         $credit    = $pivot->fixed * $rs->count;
-                        $totalCost = 0; // cost not deducted for fixed
                     } elseif ($pivot && ($pivot->percentage ?? 0) > 0) {
                         // Specific percentage
                         $gross     = (float)$rs->amount_paid;
                         $base      = $gross;
                         $rateLabel =  '% (خاص)'. $pivot->percentage ;
                         $credit    = $gross * $pivot->percentage / 100;
-                        $totalCost = 0; // cost not deducted in this branch
                     } else {
                         // Default cash percentage
                         $gross     = (float)$rs->amount_paid;
-                        $base      = $gross - $totalCost;
+                        $base      = $gross;
                         $rateLabel =  '% (افتراضي)'. $doctor->cash_percentage ;
                         $credit    = $base * $doctor->cash_percentage / 100;
                     }
@@ -233,7 +228,6 @@ class DoctorCreditBreakdownPdf extends TCPDF
                 $this->Cell($wService, 6, $serviceName,                    'LRB', 0, 'R', true);
                 $this->Cell($wType,    6, $typeLabel,                       'LRB', 0, 'C', true);
                 $this->Cell($wBase,    6, number_format($gross, 2),         'LRB', 0, 'C', true);
-                $this->Cell($wCost,    6, number_format($totalCost, 2),     'LRB', 0, 'C', true);
                 $this->Cell($wRate,    6, $rateLabel,                       'LRB', 0, 'C', true);
                 $this->Cell($wCredit,  6, number_format($credit, 2),        'LRB', 1, 'C', true);
             }
@@ -247,7 +241,7 @@ class DoctorCreditBreakdownPdf extends TCPDF
             $this->setFont('arial', 'B', 9);
             $this->SetFillColor(230, 235, 240);
             $this->SetTextColor(44, 62, 80);
-            $usedWidth = $wService + $wType + $wBase + $wCost + $wRate;
+            $usedWidth = $wService + $wType + $wBase + $wRate;
             $this->Cell($usedWidth, 7, 'مجموع حصة الطبيب لهذه الزيارة', 1, 0, 'R', true);
             $this->Cell($wCredit,   7, number_format($visitCredit, 2),    1, 1, 'C', true);
 
@@ -266,7 +260,7 @@ class DoctorCreditBreakdownPdf extends TCPDF
         $this->setFont('arial', 'B', 12);
         $this->SetFillColor(39, 174, 96);
         $this->SetTextColor(255, 255, 255);
-        $usedWidth = $wService + $wType + $wBase + $wCost + $wRate;
+        $usedWidth = $wService + $wType + $wBase + $wRate;
         // $this->Cell($usedWidth, 10, 'إجمالي حصة الطبيب للمناوبة كاملة', 1, 0, 'R', true);
         // $this->Cell($wCredit,   10, number_format($grandTotal, 2),       1, 1, 'C', true);
     }

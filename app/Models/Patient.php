@@ -54,16 +54,12 @@ use Carbon\Carbon;
  * @property-read \App\Models\Country|null $country
  * @property-read \App\Models\Doctor|null $doctor
  * @property-read \App\Models\DoctorVisit|null $doctorVisit
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DrugPrescribed> $drugsPrescribed
- * @property-read int|null $drugs_prescribed_count
  * @property-read \App\Models\File|null $file
  * @property-read string $full_age
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LabRequest> $labRequests
  * @property-read int|null $lab_requests_count
  * @property-read \App\Models\Doctor|null $primaryDoctor
  * @property-read \App\Models\Shift $shift
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Sickleave> $sickleaves
- * @property-read int|null $sickleaves_count
  * @property-read \App\Models\Subcompany|null $subcompany
  * @property-read \App\Models\User $user
  * @method static \Database\Factories\PatientFactory factory($count = null, $state = [])
@@ -319,27 +315,6 @@ class Patient extends Model
         return $this->hasMany(LabRequest::class, 'pid'); // 'pid' is the FK in labrequests table
     }
 
-    /**
-     * Get all prescribed drugs for this patient.
-     */
-    public function drugsPrescribed()
-    {
-        return $this->hasMany(DrugPrescribed::class);
-    }
-
-    /**
-     * Get all sick leaves for this patient.
-     */
-    public function sickleaves()
-    {
-        return $this->hasMany(Sickleave::class);
-    }
-
-    /**
-     * Get all appointments for this patient (indirectly, if appointments link to doctor_visits or directly if patient_id is added to appointments).
-     * If appointments directly link to patients:
-     * public function appointments() { return $this->hasMany(Appointment::class); }
-     */
 
 
     // Accessors & Mutators (Examples)

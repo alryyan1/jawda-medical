@@ -291,44 +291,6 @@ class Shift extends Model
         return $total;
     }
 
-    /**
-     * Clinic's service costs (not patient-specific, but general operational costs for services).
-     * This is a complex one. It depends on how you define and link "service costs" that are not
-     * directly tied to a patient visit but are part of the clinic's operational expenses for services during this shift.
-     * The original PDF code ` $doctorShift->shift_service_costs()` was on DoctorShift.
-     * If these are general shift costs related to services:
-     */
-    public function shiftClinicServiceCosts()
-    {
-        $costs = collect();
-
-        /**@var Doctorvisit $visit */
-        foreach ($this->doctorShifts as $shifts) {
-
-            foreach ($shifts->visits as $visit) {
-                foreach ($visit->service_costs() as $cost) {
-                    // echo $visit->total_services_cost($cost->id);
-                    $arr = [];
-                    $arr['id'] = $cost->subServiceCost->id;
-                    $arr['name'] = $cost->subServiceCost->name;
-                    $arr['amount'] = $visit->total_services_cost($cost->id);
-                    $costs->push($arr);
-                }
-            }
-        }
-        // return $costs;
-        return $costs
-            ->groupBy('id') // Group by the 'id' key
-            ->map(function ($group) {
-                return [
-                    'id' => $group->first()['id'],
-                    'name' => $group->first()['name'],
-                    'amount' => $group->sum('amount'), // Sum the 'amount' field
-                ];
-            })
-            ->values() // Reset the keys
-            ->toArray();
-    }
     public  function cost()
     {
         return $this->hasMany(Cost::class);

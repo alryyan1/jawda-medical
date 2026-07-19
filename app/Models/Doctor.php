@@ -21,12 +21,6 @@ use Illuminate\Support\Facades\Log;
  * @property int $start
  * @property string|null $image
  * @property bool $calc_insurance
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorServiceCost> $doctorServiceCosts
- * @property-read int|null $doctor_service_costs_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorServiceCost> $doctorSubServiceCosts
- * @property-read int|null $doctor_sub_service_costs_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorSchedule> $schedules
- * @property-read int|null $schedules_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorService> $services
  * @property-read int|null $services_count
  * @property-read \App\Models\Specialist $specialist
@@ -66,7 +60,6 @@ class Doctor extends Model
         'static_wage',
         'lab_percentage',
         'specialist_id',
-        'sub_specialist_id',
         'start', // This was an INT(11) in the schema, meaning? Patient capacity? Starting number?
         'image',
         'calc_insurance',
@@ -92,14 +85,6 @@ class Doctor extends Model
     }
 
     /**
-     * Get the sub specialist that belongs to the doctor.
-     */
-    public function subSpecialist()
-    {
-        return $this->belongsTo(SubSpecialist::class, 'sub_specialist_id');
-    }
-
-    /**
      * Get the users associated with this doctor (if a doctor can be a user).
      * Or, if a user *has one* doctor profile.
      */
@@ -109,14 +94,6 @@ class Doctor extends Model
         return $this->hasOne(User::class);
         // Or if a Doctor can have multiple user accounts (less common for this field name)
         // return $this->hasMany(User::class);
-    }
-    public function doctorServiceCosts()
-    {
-        return $this->hasMany(DoctorServiceCost::class);
-    }
-    public function doctorSubServiceCosts()
-    {
-        return $this->hasMany(DoctorServiceCost::class);
     }
     public function services()
     {
@@ -132,14 +109,6 @@ class Doctor extends Model
             ->withPivot(['id', 'percentage', 'fixed']) // id is the DoctorService record id
             ->withTimestamps(); // If your doctor_services table has timestamps
     }
-    /**
-     * Get the doctor's schedules.
-     */
-    public function schedules()
-    {
-        return $this->hasMany(DoctorSchedule::class);
-    }
-
     /**
      * Calculate the total doctor credit for all services in a visit.
      *
@@ -180,7 +149,7 @@ class Doctor extends Model
     /**
      * Credit calculation for company / insurance patients.
      *
-     * Formula: (price × count − total_costs) × company_percentage / 100
+     * Formula: (price × count) × company_percentage / 100
      *
      * @param  RequestedService  $service
      * @return float
@@ -188,9 +157,8 @@ class Doctor extends Model
     private function calcCompanyCredit(RequestedService $service): float
     {
         $grossPrice = $service->price * $service->count;
-        $totalCost  = $service->getTotalCostsForDoctor($this);
 
-        return ($grossPrice - $totalCost) * $this->company_percentage / 100;
+        return $grossPrice * $this->company_percentage / 100;
     }
 
     /**
@@ -213,10 +181,8 @@ class Doctor extends Model
             return $this->applyPivotRate($service, $doctorService->pivot);
         }
 
-        // --- 2. Default: cash_percentage on amount paid minus costs ---
-        $totalCost = $service->getTotalCostsForDoctor($this);
-
-        return ($service->amount_paid - $totalCost) * $this->cash_percentage / 100;
+        // --- 2. Default: cash_percentage on amount paid ---
+        return $service->amount_paid * $this->cash_percentage / 100;
     }
 
     /**
@@ -239,8 +205,6 @@ class Doctor extends Model
 
 
         // Neither percentage nor fixed — fall back to doctor's default.
-        $totalCost = $service->getTotalCostsForDoctor($this);
-
-        return ($service->amount_paid - $totalCost) * $this->cash_percentage / 100;
+        return $service->amount_paid * $this->cash_percentage / 100;
     }
 }

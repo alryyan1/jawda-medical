@@ -117,9 +117,6 @@ class ClinicShiftReport extends TCPDF
         // --- 2. Patients Table ---
         $this->renderPatientsTable();
 
-        // --- 3. Service Costs Section ---
-        $this->renderServiceCosts();
-
         return $this->Output('clinic_report_' . $this->doctorShift->id . '.pdf', 'S');
     }
 
@@ -333,46 +330,4 @@ class ClinicShiftReport extends TCPDF
         $this->Ln(4);
     }
 
-    protected function renderServiceCosts()
-    {
-        $costs = $this->doctorShift->shift_service_costs();
-        if (empty($costs)) return;
-
-        // Check if we need a new page for costs or if there's enough space
-        if ($this->GetY() + 40 > $this->getPageHeight() - 15) {
-            $this->AddPage();
-        }
-
-        $this->setFont('arial', 'B', 14);
-        $this->SetTextColor(41, 98, 255); // Match header color
-        $this->Cell(0, 10, 'تفاصيل مصروفات الخدمات المستقطعة', 0, 1, 'R');
-        $this->Ln(2);
-
-        $col1 = $this->pageUsableWidth * 0.75;
-        $col2 = $this->pageUsableWidth * 0.25;
-
-        $this->setFont('arial', 'B', 10);
-        $this->SetFillColor(240, 244, 248);
-        $this->SetTextColor(44, 62, 80);
-        $this->SetDrawColor(200, 205, 210);
-
-        $this->Cell(40, 8, 'بيان مصروف الخدمة', 1, 0, 'C', true);
-        $this->Cell(40, 8, 'المبلغ الإجمالي', 1, 1, 'C', true);
-
-        $this->SetTextColor(40, 40, 40);
-        $this->setFont('arial', '', 9);
-        
-        $totalCosts = 0;
-        foreach ($costs as $cost) {
-            $this->Cell(40, 8, $cost['name'], 1, 0, 'C', false);
-            $this->Cell(40, 8, number_format($cost['amount'], 1), 1, 1, 'C', false);
-            $totalCosts += $cost['amount'];
-        }
-
-        // Add a total row for service costs
-        $this->setFont('arial', 'B', 10);
-        $this->SetFillColor(245, 245, 245);
-        $this->Cell(40, 8, 'الإجمالي', 1, 0, 'C', true);
-        $this->Cell(40, 8, number_format($totalCosts, 1), 1, 1, 'C', true);
-    }
 }

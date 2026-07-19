@@ -7,8 +7,6 @@ use App\Models\DoctorVisit;
 use App\Models\Service;
 use App\Models\RequestedService;
 use App\Models\Company;
-use App\Models\ServiceCost; // For accessing predefined costs
-use App\Models\RequestedServiceCost; // For creating cost breakdown entries
 use App\Http\Resources\ServiceResource;
 use App\Http\Resources\RequestedServiceResource;
 use App\Models\Shift;
@@ -97,11 +95,9 @@ class VisitServiceController extends Controller
         $requested = $visit->requestedServices()
             ->with([
                 'service.serviceGroup',
-                'service.serviceCosts.subServiceCost', // Eager load service costs for potential display
                 'requestingUser:id,name',
                 'depositUser:id,name',
                 'performingDoctor:id,name',
-                'costBreakdown.subServiceCost', // Eager load actual cost breakdown
                 'doneByUser:id,name',
             ])
             ->orderBy('created_at', 'desc')
@@ -132,7 +128,7 @@ class VisitServiceController extends Controller
         DB::beginTransaction();
         try {
             foreach ($validated['service_ids'] as $index => $serviceId) {
-                $service = Service::with('serviceCosts.subServiceCost')->find($serviceId); // Eager load predefined costs
+                $service = Service::find($serviceId);
                 if (!$service) {
                     Log::warning("Service ID {$serviceId} not found during visit service request.");
                     continue;
@@ -231,44 +227,6 @@ class VisitServiceController extends Controller
                     'done' => false,
                 ]);
 
-                // --- START: Auto-create RequestedServiceCost entries ---
-                if ($service->serviceCosts->isNotEmpty()) {
-                    $costEntriesData = [];
-                    $baseAmountForCostCalc = $price * $count; // Initial base is total price before patient discount/endurance
-
-                    foreach ($service->serviceCosts as $serviceCostDefinition) {
-                        $calculatedCostAmount = 0;
-                        $currentBase = $baseAmountForCostCalc;
-
-                        // If cost_type is 'after cost', we need to subtract previously calculated costs from the base
-                        if ($serviceCostDefinition->cost_type === 'after cost') {
-                            $alreadyCalculatedCostsSum = collect($costEntriesData)->sum('amount');
-                            $currentBase = $baseAmountForCostCalc - $alreadyCalculatedCostsSum;
-                        }
-
-                        if ($serviceCostDefinition->fixed !== null && $serviceCostDefinition->fixed > 0) {
-                            $calculatedCostAmount = (float) $serviceCostDefinition->fixed;
-                        } elseif ($serviceCostDefinition->percentage !== null && $serviceCostDefinition->percentage > 0) {
-                            $calculatedCostAmount = ($currentBase * (float) $serviceCostDefinition->percentage) / 100;
-                        }
-
-                        if ($calculatedCostAmount > 0) {
-                            $costEntriesData[] = [
-                                'requested_service_id' => $requestedService->id,
-                                'sub_service_cost_id' => $serviceCostDefinition->sub_service_cost_id,
-                                'service_cost_id' => $serviceCostDefinition->id,
-                                'amount' => round($calculatedCostAmount, 2), // Round to 2 decimal places
-                                'created_at' => now(),
-                                'updated_at' => now(),
-                            ];
-                        }
-                    }
-                    if (!empty($costEntriesData)) {
-                        RequestedServiceCost::insert($costEntriesData);
-                    }
-                }
-                // --- END: Auto-create RequestedServiceCost entries ---
-
                 $createdItems[] = $requestedService;
             }
             DB::commit();
@@ -278,7 +236,7 @@ class VisitServiceController extends Controller
         }
 
         $loadedItems = collect($createdItems)->map(function ($item) {
-            return $item->load(['service.serviceGroup', 'service.serviceCosts', 'requestingUser:id,name', 'performingDoctor:id,name', 'costBreakdown']);
+            return $item->load(['service.serviceGroup', 'requestingUser:id,name', 'performingDoctor:id,name']);
         });
 
         return RequestedServiceResource::collection($loadedItems);
@@ -298,7 +256,6 @@ class VisitServiceController extends Controller
             if ($requestedService->deposits()->count() > 0) {
                 return response()->json(['message' => 'لا يمكنك حذف الخدمة لأنها مدفوعة.'], 403);
             }
-            $requestedService->costBreakdown()->delete(); // Delete associated cost breakdown entries
             $requestedService->deposits()->delete(); // Delete associated deposits entries
             $requestedService->delete();
             DB::commit();

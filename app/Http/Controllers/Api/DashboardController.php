@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Appointment;
 use App\Models\Cost;
 use App\Models\DoctorShift;
 use App\Models\DoctorVisit;
@@ -148,30 +147,11 @@ class DashboardController extends Controller
             
         $totalRevenue = (float) $serviceRevenue + (float) $labRevenue;
 
-
-        // --- Appointments Today ---
-        // Counts appointments scheduled for the target date
-        $appointmentsQuery = Appointment::query(); // Assuming Appointment model
-        if ($targetShift) {
-            // If appointments are linked to general shifts or fall within shift times
-            // This logic is complex and depends on your Appointment <-> Shift relation
-            // For simplicity, let's use visit_date of the shift
-            if ($targetShift->created_at) {
-                $appointmentsQuery->whereDate('appointment_date', Carbon::parse($targetShift->created_at));
-            }
-        } else {
-            $appointmentsQuery->whereDate('appointment_date', $date);
-        }
-        // $appointmentsQuery->whereNotIn('status', ['cancelled', 'no_show']); // Count only relevant appointments
-        $appointmentsTodayCount = $appointmentsQuery->count();
-
-
         return response()->json([
             'data' => [
                 'patientsToday' => $patientsTodayCount,
                 'doctorsOnShift' => $doctorsOnShiftCount,
                 'revenueToday' => round($totalRevenue, 2),
-                'appointmentsToday' => $appointmentsTodayCount,
             ]
         ]);
     }

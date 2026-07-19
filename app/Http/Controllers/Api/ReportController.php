@@ -32,10 +32,8 @@ use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Log;
 use App\Models\CostCategory;
 use App\Models\Patient;
-use App\Models\RequestedServiceCost;
 use App\Models\RequestedServiceDeposit;
 use App\Models\RequestedService;
-use App\Models\SubServiceCost;
 use App\Models\Deno;
 use App\Models\DenoUser;
 use Illuminate\Support\Facades\Auth;
@@ -744,29 +742,6 @@ class ReportController extends Controller
         $pdf->Ln(5);
 
 
-        // --- Service Costs Section --- (If data is available)
-        $shiftServiceCosts = $doctorShift->shift_service_costs(); // Assumes this returns an array
-        if (!empty($shiftServiceCosts)) {
-            $pdf->AddPage(); // Start service costs on a new page for clarity
-            $pdf->SetFont('arial', 'B', 14);
-            $pdf->Cell($page_width, 10, 'مصروفات الخدمات للوردية', 0, 1, 'C');
-            $pdf->Ln(2);
-
-            $pdf->SetFont('arial', 'B', 10);
-            $cost_col_widths = [$page_width * 0.6, $page_width * 0.4];
-            $cost_aligns = ['R', 'C'];
-            $pdf->DrawTableHeader(['بيان مصروف الخدمة', 'الإجمالي'], $cost_col_widths, $cost_aligns);
-
-            $pdf->SetFont('arial', '', 9);
-            $fillCost = false;
-            foreach ($shiftServiceCosts as $cost) {
-                $pdf->DrawTableRow([$cost['name'], number_format($cost['amount'], 1)], $cost_col_widths, $cost_aligns, $fillCost);
-                $fillCost = !$fillCost;
-            }
-            $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
-            $pdf->Ln(5);
-        }
-
         // --- Costs Table Section (from your second table example) ---
         // This seems to list visits again, but with service_cost_name. This needs clarification.
         // For now, I'll comment this out as its data source (total_services_cost, services_cost_name)
@@ -817,11 +792,9 @@ class ReportController extends Controller
 
         $doctorShift->load([
             'doctor.specificServices',
-            'doctor.doctorServiceCosts',
             'user',
             'visits.patient.company',
             'visits.requestedServices.service',
-            'visits.requestedServices.requestedServiceCosts',
         ]);
 
         $visitId = $request->query('visit');
@@ -1126,34 +1099,6 @@ class ReportController extends Controller
         $pdf->Ln(5);
 
 
-        // --- Section 3: Clinic Service Costs (مصروف الخدمات) ---
-        $pdf->SetFont('arial', 'B', 14);
-        $pdf->Cell(0, 8, 'تفاصيل مصروفات الخدمات للعيادة', 0, 1, 'C');
-
-        $pdf->SetFont('arial', 'B', 10);
-        $serviceCostColWidth = $pageWidth / 2;
-        $pdf->Cell($serviceCostColWidth, 6, 'بند مصروف الخدمة', 1, 0, 'C', 1);
-        $pdf->Cell($serviceCostColWidth, 6, 'المبلغ', 1, 1, 'C', 1);
-
-        $pdf->SetFont('arial', '', 10);
-        $totalServiceCosts = 0;
-        $clinicServiceCosts = $shift->shiftClinicServiceCosts(); // Assuming this returns an array like ['name' => ..., 'amount' => ...]
-
-        if (count($clinicServiceCosts) > 0) {
-            foreach ($clinicServiceCosts as $cost) {
-                $pdf->Cell($serviceCostColWidth, 6, $cost['name'], 1, 0, 'R');
-                $pdf->Cell($serviceCostColWidth, 6, number_format($cost['amount'], 2), 1, 1, 'C');
-                $totalServiceCosts += $cost['amount'];
-            }
-            // Total Service Costs Row
-            $pdf->SetFont('arial', 'B', 10);
-            $pdf->Cell($serviceCostColWidth, 6, 'إجمالي مصروفات الخدمات', 1, 0, 'C', 1);
-            $pdf->Cell($serviceCostColWidth, 6, number_format($totalServiceCosts, 2), 1, 1, 'C', 1);
-        } else {
-            $pdf->Cell(0, 7, 'لا توجد مصروفات خدمات مسجلة لهذه الوردية.', 1, 1, 'C');
-        }
-        $pdf->Ln(10);
-
         // --- Final Summary Section (Optional, but good for a professional report) ---
         $pdf->SetFont('arial', 'B', 14);
         $pdf->Cell(0, 8, 'الملخص المالي النهائي للوردية', 0, 1, 'C');
@@ -1165,15 +1110,10 @@ class ReportController extends Controller
             $totalRevenueAllUsers += ($shift->paidLab($u->id) + $shift->totalPaidService($u->id));
         }
 
-        $netCash = ($totalRevenueAllUsers - $totalBank) - ($totalExpenses - $totalBankExpenses) - ($totalServiceCosts); // This net needs careful calculation based on your business logic
-        // Example: (Total Cash Revenue) - (Total Cash Expenses including service costs)
-        // Or (Total Revenue) - (Total Expenses) - (Total Service Costs)
-
         $data = [
             'إجمالي الإيرادات (جميع المستخدمين)' => number_format($totalRevenueAllUsers, 2),
             'إجمالي المصروفات العامة' => number_format($totalExpenses, 2),
-            'إجمالي مصروفات الخدمات' => number_format($totalServiceCosts, 2),
-            'صافي الدخل للوردية (قبل توزيع مستحقات الأطباء من خدماتهم)' => number_format($totalRevenueAllUsers - $totalExpenses - $totalServiceCosts, 2),
+            'صافي الدخل للوردية (قبل توزيع مستحقات الأطباء من خدماتهم)' => number_format($totalRevenueAllUsers - $totalExpenses, 2),
             'إجمالي مستحقات الأطباء النقدية (من خدماتهم)' => number_format($grandTotalDoctorCash, 2),
             'إجمالي مستحقات الأطباء التأمين (من خدماتهم)' => number_format($grandTotalDoctorInsurance, 2),
             'صافي دخل المنشأة من خدمات الأطباء' => number_format($grandTotalHospitalShare, 2),
@@ -2875,143 +2815,6 @@ class ReportController extends Controller
 
 
         $pdfFileName = 'doctor_reclaims_report_' . $validated['date_from'] . '_to_' . $validated['date_to'] . '.pdf';
-        $pdfContent = $pdf->Output($pdfFileName, 'S');
-        return response($pdfContent, 200)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
-    }
-    public function serviceCostBreakdownReport(Request $request)
-    {
-        // $this->authorize('view service_cost_breakdown_report'); // Permission check
-
-        $validated = $request->validate([
-            'date_from' => 'required|date_format:Y-m-d',
-            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
-            'sub_service_cost_id' => 'nullable|integer|exists:sub_service_costs,id', // Optional filter by specific cost type
-            'service_id' => 'nullable|integer|exists:services,id', // Optional filter by main service
-            'doctor_id' => 'nullable|integer|exists:doctors,id', // Optional filter by doctor if relevant
-        ]);
-
-        $startDate = Carbon::parse($validated['date_from'])->startOfDay();
-        $endDate = Carbon::parse($validated['date_to'])->endOfDay();
-
-        $query = RequestedServiceCost::with([
-            'subServiceCost:id,name', // Name of the cost type
-            'requestedService.service:id,name', // Name of the parent service
-            'requestedService.doctorVisit.doctor:id,name' // Doctor if filtering or grouping by doctor
-        ])
-            ->select(
-                'sub_service_cost_id',
-                DB::raw('SUM(amount) as total_amount')
-            )
-            ->whereBetween('requested_service_cost.created_at', [$startDate, $endDate]) // Filter by RequestedServiceCost creation date
-            ->groupBy('sub_service_cost_id');
-
-        if ($request->filled('sub_service_cost_id')) {
-            $query->where('sub_service_cost_id', $validated['sub_service_cost_id']);
-        }
-        if ($request->filled('service_id')) {
-            $query->whereHas('requestedService.service', function ($q) use ($validated) {
-                $q->where('id', $validated['service_id']);
-            });
-        }
-        if ($request->filled('doctor_id')) {
-            $query->whereHas('requestedService.doctorVisit.doctor', function ($q) use ($validated) {
-                $q->where('id', $validated['doctor_id']);
-            });
-        }
-
-        // Order by sub_service_cost_id to group them if sub_service_cost_id filter is not applied
-        // Or order by total_amount
-        $results = $query->orderBy('sub_service_cost_id')->get();
-
-        // We need to fetch SubServiceCost names if not directly joinable or already loaded
-        // The with('subServiceCost') above should handle this for results that have it.
-        // For a cleaner structure, fetch all SubServiceCost names once.
-        $allSubServiceCostTypes = SubServiceCost::pluck('name', 'id');
-
-        $reportData = $results->map(function ($item) use ($allSubServiceCostTypes) {
-            return [
-                'sub_service_cost_id' => $item->sub_service_cost_id,
-                'sub_service_cost_name' => $item->subServiceCost?->name ?? $allSubServiceCostTypes->get($item->sub_service_cost_id) ?? 'Unknown Cost Type',
-                'total_amount' => (float) $item->total_amount,
-            ];
-        });
-
-        return response()->json([
-            'data' => $reportData,
-            'grand_total_cost' => $reportData->sum('total_amount'),
-            'report_period' => [
-                'from' => $startDate->toDateString(),
-                'to' => $endDate->toDateString(),
-            ]
-        ]);
-    }
-
-    public function exportServiceCostBreakdownPdf(Request $request)
-    {
-        // $this->authorize('print service_cost_breakdown_report');
-
-        // Re-use the data fetching logic (consider extracting to a private method or service)
-        $jsonResponse = $this->serviceCostBreakdownReport($request);
-        $responseData = json_decode($jsonResponse->getContent(), true);
-
-        if ($jsonResponse->getStatusCode() !== 200 || empty($responseData['data'])) {
-            // Attempt to generate PDF even for empty data to show "No data"
-            // Or return a 404 if that's preferred. Here, we'll generate a PDF indicating no data.
-        }
-
-        $reportData = $responseData['data'] ?? [];
-        $grandTotalCost = $responseData['grand_total_cost'] ?? 0;
-        $reportPeriod = $responseData['report_period'] ?? [
-            'from' => $request->date_from,
-            'to' => $request->date_to
-        ];
-
-
-        $reportTitle = 'تقرير تفصيل تكاليف الخدمات';
-        $filterCriteria = "الفترة من: " . $reportPeriod['from'] . " إلى: " . $reportPeriod['to'];
-        // Add other active filters to $filterCriteria string if they were applied
-
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'P', 'mm', 'A4'); // Portrait
-        $pdf->AddPage();
-        $pdf->SetLineWidth(0.1);
-        $fontname = 'helvetica';
-
-        // Table Header
-        $headers = ['نوع التكلفة الفرعية', 'إجمالي المبلغ'];
-        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-        $colWidths = [$pageWidth * 0.7, $pageWidth * 0.3];
-        $alignments = ['R', 'C'];
-
-        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
-
-        // Table Body
-        $pdf->SetFont($fontname, '', 9);
-        $fill = false;
-        if (empty($reportData)) {
-            $pdf->Cell(array_sum($colWidths), 10, 'لا توجد بيانات لهذه الفترة أو الفلاتر المحددة.', 1, 1, 'C', $fill);
-        } else {
-            foreach ($reportData as $item) {
-                $rowData = [
-                    $item['sub_service_cost_name'],
-                    number_format($item['total_amount'], 2),
-                ];
-                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 7); // Height 7
-                $fill = !$fill;
-            }
-        }
-        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
-
-        // Summary Footer for Table
-        $pdf->SetFont($fontname, 'B', 10);
-        $summaryRowPdf = [
-            'الإجمالي العام للتكاليف:',
-            number_format($grandTotalCost, 2),
-        ];
-        $pdf->DrawTableRow($summaryRowPdf, $colWidths, $alignments, true, 8); // Filled, height 8
-
-        $pdfFileName = 'service_cost_breakdown_' . $reportPeriod['from'] . '_to_' . $reportPeriod['to'] . '.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')

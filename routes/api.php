@@ -20,7 +20,6 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeviceChildTestNormalRangeController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DoctorController;
-use App\Http\Controllers\Api\DoctorScheduleController;
 use App\Http\Controllers\Api\DoctorServiceController;
 use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
@@ -32,21 +31,16 @@ use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\Lab2LabController;
 use App\Http\Controllers\Api\PatientMedicalHistoryController;
-use App\Http\Controllers\Api\PdfSettingController;
 use App\Http\Controllers\Api\ReportController;
-use App\Http\Controllers\Api\RequestedServiceCostController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\SampleCollectionController;
 use App\Http\Controllers\Api\ServiceController;
-use App\Http\Controllers\Api\ServiceCostController;
 use App\Http\Controllers\Api\ServiceGroupController;
 use App\Http\Controllers\Api\SettingsController;
 use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\SpecialistController;
-use App\Http\Controllers\Api\SubSpecialistController;
 use App\Http\Controllers\Api\SubcompanyController;
-use App\Http\Controllers\Api\SubServiceCostController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
@@ -162,11 +156,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/favorite-doctors/toggle', [UserDocSelectionController::class, 'toggle']);
   Route::delete('/favorite-doctors/{docId}', [UserDocSelectionController::class, 'destroy']);
 
-  // Doctor Schedules
-  Route::get('/doctor-schedules', [DoctorScheduleController::class, 'index']);
-  Route::get('/doctors/{doctor}/schedule', [DoctorScheduleController::class, 'getDoctorSchedule']);
-  Route::post('/doctors/{doctor}/schedule', [DoctorScheduleController::class, 'storeOrUpdateForDoctor']);
-
   /*
     |--------------------------------------------------------------------------
     | Shift Management Routes
@@ -188,7 +177,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/doctor-shifts/compute-snapshot-batch', [DoctorShiftController::class, 'computeSnapshotBatch']);
   Route::put('/doctor-shifts/{doctorShift}/end', [DoctorShiftController::class, 'endShift']);
   Route::get('/doctor-shifts/{doctorShift}/financial-summary', [DoctorShiftController::class, 'showFinancialSummary']);
-  Route::get('/doctor-shifts/{doctorShift}/shift-service-costs', [DoctorShiftController::class, 'shiftServiceCosts']);
   Route::get('/doctor-shifts/{doctorShift}/adjacent', [DoctorShiftController::class, 'adjacent']);
   Route::get('/doctor-shifts/{doctorShift}/users-payment-summary', [DoctorShiftController::class, 'usersPaymentSummary']);
   Route::get('/doctor-shifts/{doctorShift}/users-insurance-payment-summary', [DoctorShiftController::class, 'usersInsurancePaymentSummary']);
@@ -269,15 +257,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/service-groups-with-services', [ServiceGroupController::class, 'getGroupsWithServices']);
   Route::get('services-list', [ServiceController::class, 'indexList']);
   Route::apiResource('services', ServiceController::class);
-  Route::get('services/{service}/price-history', [ServiceController::class, 'priceHistory']);
-
-  // PDF Settings
-  Route::get('pdf-settings', [PdfSettingController::class, 'index']);
-  Route::put('pdf-settings', [PdfSettingController::class, 'update']);
-  Route::post('pdf-settings/upload-logo', [PdfSettingController::class, 'uploadLogo']);
-  Route::post('pdf-settings/upload-header', [PdfSettingController::class, 'uploadHeader']);
-  Route::delete('pdf-settings/logo', [PdfSettingController::class, 'deleteLogo']);
-  Route::delete('pdf-settings/header', [PdfSettingController::class, 'deleteHeader']);
 
   /*
     |--------------------------------------------------------------------------
@@ -447,39 +426,6 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-  // SubServiceCost (Cost Components/Types)
-  Route::get('/sub-service-costs-list', [SubServiceCostController::class, 'indexList']);
-  Route::apiResource('sub-service-costs', SubServiceCostController::class);
-  // Route::post('/doctors/{doctor}/sub-service-costs', [DoctorSubServiceCostController::class, 'store']); // If managing pivot
-  // Route::delete('/doctors/{doctor}/sub-service-costs/{subServiceCost}', [DoctorSubServiceCostController::class, 'destroy']); // If managing pivot
-
-
-  // ServiceCost (Defines costs for a specific Service)
-  Route::apiResource('services.service-costs', ServiceCostController::class)->shallow();
-  // This will create routes like:
-  // GET    /api/services/{service}/service-costs        (index)
-  // POST   /api/services/{service}/service-costs        (store)
-  // GET    /api/service-costs/{service_cost}          (show) - shallow
-  // PUT    /api/service-costs/{service_cost}          (update) - shallow
-  // DELETE /api/service-costs/{service_cost}          (destroy) - shallow
-
-
-  // RequestedServiceCost (Actual cost breakdown for a requested service)
-  // These are often created programmatically, direct CRUD might be less common.
-  // Example: Route to view cost breakdown for a specific requested service
-  // Route::apiResource('requested-service-costs', RequestedServiceCostController::class); // If full CRUD needed
-
-  // For RequestedServiceCost entries linked to a specific RequestedService
-  Route::get('/requested-services/{requested_service}/cost-breakdown', [RequestedServiceCostController::class, 'indexForRequestedService']);
-  Route::post('/requested-services/{requested_service}/costs', [RequestedServiceCostController::class, 'storeOrUpdateBatch']); // For creating/updating multiple costs for a RequestedService
-
-  // If you need individual CRUD for RequestedServiceCost items directly by their own ID
-  // Route::apiResource('requested-service-costs', RequestedServiceCostController::class)->only(['show', 'update', 'destroy']);
-  // OR if you want to allow creating one by one via its own resource controller, less common if always tied to requested service
-  Route::post('/requested-service-costs', [RequestedServiceCostController::class, 'storeSingle']);
-  Route::put('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'updateSingle']);
-  Route::delete('/requested-service-costs/{requested_service_cost}', [RequestedServiceCostController::class, 'destroySingle']);
-
   // Deposits for a specific Requested Service
   Route::get('/requested-services/{requested_service}/deposits', [RequestedServiceDepositController::class, 'indexForRequestedService']); // list deposits for one service
   // POST to '/requested-services/{requested_service}/deposits' is already handled by RequestedServiceDepositController@store
@@ -487,9 +433,6 @@ Route::middleware('auth:sanctum')->group(function () {
   // Direct CRUD on the deposit records themselves by their own ID
   Route::put('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'update']);
   Route::delete('/requested-service-deposits/{requestedServiceDeposit}', [RequestedServiceDepositController::class, 'destroy']);
-
-  // Listing deleted/voided deposits
-  Route::get('/requested-service-deposit-deletions', [\App\Http\Controllers\Api\RequestedServiceDepositDeletionController::class, 'index']);
 
   // Jobs Management Routes
   Route::prefix('jobs-management')->group(function () {
@@ -560,14 +503,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::post('/patients/{patient}/upload-to-firebase', [PatientController::class, 'uploadToFirebase']);
   Route::patch('/patients/{patient}/toggle-authentication', [PatientController::class, 'toggleAuthentication']);
 
-  /*
-    |--------------------------------------------------------------------------
-    | WhatsApp Communication Routes
-    |--------------------------------------------------------------------------
-    */
   Route::get('/reports/monthly-service-deposits-income/pdf', [ReportController::class, 'exportMonthlyServiceDepositsIncomePdf']);
-  Route::get('/whatsapp/messages/{phone}', [\App\Http\Controllers\Api\WhatsAppMessageController::class, 'index']);
-  Route::post('/whatsapp/messages', [\App\Http\Controllers\Api\WhatsAppMessageController::class, 'store']);
   Route::get('/reports/monthly-service-deposits-income/excel', [ExcelController::class, 'exportMonthlyServiceDepositsIncomeExcel']);
   Route::put('/doctor-shifts/{doctorShift}/update-proofing-flags', [DoctorShiftController::class, 'updateProofingFlags']);
   Route::put('/doctor-shifts/{doctorShift}/reopen', [DoctorShiftController::class, 'reopen']);
@@ -576,10 +512,6 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('/analysis/summary', [AnalysisController::class, 'getAnalysisData']);
 
   Route::get('/reports/doctor-reclaims/pdf', [ReportController::class, 'generateDoctorReclaimsPdf']);
-  // "The route api/reports/service-cost-breakdown could not be found."
-  Route::get('/reports/service-cost-breakdown', [ReportController::class, 'serviceCostBreakdownReport']);
-  // {message: "The route api/reports/service-cost-breakdown/pdf could not be found.",…}
-  Route::get('/reports/service-cost-breakdown/pdf', [ReportController::class, 'exportServiceCostBreakdownPdf']);
   Route::get('/reports/doctor-statistics', [ReportController::class, 'doctorStatisticsReport']);
   Route::get('/reports/doctor-statistics/pdf', [ReportController::class, 'exportDoctorStatisticsPdf']);
   Route::get('/reports/company-performance', [ReportController::class, 'companyPerformanceReport']);
@@ -630,14 +562,7 @@ Route::middleware('auth:sanctum')->group(function () {
   Route::get('specialists-list', [SpecialistController::class, 'indexList']);
   Route::apiResource('specialists', SpecialistController::class);
 
-  // Sub Specialists routes
-  Route::get('specialists/{specialist}/sub-specialists', [SubSpecialistController::class, 'index']);
-  Route::post('specialists/{specialist}/sub-specialists', [SubSpecialistController::class, 'store']);
-  Route::put('specialists/{specialist}/sub-specialists/{subSpecialist}', [SubSpecialistController::class, 'update']);
-  Route::delete('specialists/{specialist}/sub-specialists/{subSpecialist}', [SubSpecialistController::class, 'destroy']);
   Route::get('/reports/services-list/excel', [ExcelController::class, 'exportServicesListToExcel']);
-  // NEW route for the services with cost details export
-  Route::get('/reports/services-with-costs/excel', [ExcelController::class, 'exportServicesWithCostsToExcel']);
   Route::post('/services/batch-update-prices', [ServiceController::class, 'batchUpdatePrices']);
   // NEW route for the PDF services list export
   Route::get('/reports/services-list/pdf', [ReportController::class, 'exportServicesListToPdf']);

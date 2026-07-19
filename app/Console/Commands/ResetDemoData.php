@@ -80,7 +80,6 @@ class ResetDemoData extends Command
 
         $this->truncate([
             // Analyzer results
-            'mindray_cbc',
             'mindray2',
             'sysmex',
             'sysmex550',
@@ -89,8 +88,6 @@ class ResetDemoData extends Command
             'requested_organisms',
             'discount_lab_requests',
             'countings',
-            'lab_finished_notifications',
-            'new_patient_notifications',
             'hl7_messages',
             // Lab requests
             'labrequests',
@@ -110,7 +107,6 @@ class ResetDemoData extends Command
             'doctorvisits',
             // Misc patient data
             'files',
-            'whats_app_messages',
             'patients',
         ]);
     }
@@ -145,8 +141,6 @@ class ResetDemoData extends Command
         $this->truncate([
             'personal_access_tokens',
             'denos_users',
-            'user_routes',
-            'user_sub_routes',
             'user_doc_selections',
             'user_settings',
             'model_has_permissions',

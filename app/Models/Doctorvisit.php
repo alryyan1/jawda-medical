@@ -35,8 +35,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\LabRequest> $labRequests
  * @property-read int|null $lab_requests_count
  * @property-read \App\Models\Patient $patient
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DrugPrescribed> $prescriptions
- * @property-read int|null $prescriptions_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RequestedService> $requestedServices
  * @property-read int|null $requested_services_count
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit completed()
@@ -148,13 +146,6 @@ class DoctorVisit extends Model
     }
 
     /**
-     * The appointment linked to this visit, if any.
-     * public function appointment() {
-     *     return $this->belongsTo(Appointment::class); // Or hasOne if FK is on appointments table
-     * }
-     */
-    
-    /**
      * The "file" associated with this visit, if any.
      */
     public function file()
@@ -185,14 +176,6 @@ class DoctorVisit extends Model
     }
     
     
-    /**
-     * Get all prescriptions issued during this visit.
-     */
-    public function prescriptions()
-    {
-        return $this->hasMany(DrugPrescribed::class, 'doctor_visit_id');
-    }
-
     public function labRequests()
     {
         return $this->hasMany(LabRequest::class, 'doctor_visit_id');
@@ -308,109 +291,18 @@ class DoctorVisit extends Model
         return $total;
     }
 
-    public function total_services_cost($cost_id = null)
-    {
-        $total = 0;
-        /**@var RequestedService $requested_service */
-        foreach ($this->requestedServices as $requested_service) {
-            
-
-
-            /**@var RequestedServiceCost $requestedServiceCost */
-            foreach ($requested_service->requestedServiceCosts as $requestedServiceCost) {
-                // $total += 500
-                // echo $requestedServiceCost->amount;
-                $service_cost = $requestedServiceCost->serviceCost;
-                if ($cost_id) {
-                    // echo $cost_id . ' -  service_cost_id: ' . $service_cost?->id.'<br>';
-                    if ($cost_id != $service_cost?->id) continue;
-                }
-                $total += $requestedServiceCost->amount;
-            }
-        }
-        return $total;
-    }
-
-
-    /**
-     * Concatenated string of service cost names (or descriptions of costs incurred for this visit).
-     */
-    public function services_cost_name()
-    {
-        $total = '';
-        /**@var RequestedService $requested_service */
-        foreach ($this->requestedServices as $requested_service) {
-
-            /**@var requestedServiceCost $requestedServiceCost */
-            foreach ($requested_service->requestedServiceCosts as $requestedServiceCost) {
-                $service_cost = $requestedServiceCost->serviceCost;
-                $name = $service_cost->subServiceCost->name;
-                if ($service_cost->fixed > 0) {
-                    $val = $requestedServiceCost->amount;
-                    $total .= <<<TEXT
-
-  -  $name    -  $service_cost->fixed = $val
-TEXT;
-                } else {
-                    $val = $requestedServiceCost->amount;
-
-                    $total .= <<<TEXT
-
-  -  $name  -  $service_cost->percentage % = $val
-TEXT;
-                }
-            }
-        }
-        return $total;
-    }
-    public function service_costs()
-    {
-        $total = [];
-        /**@var RequestedService $requested_service */
-        foreach ($this->requestedServices as $requested_service) {
-
-            /**@var ServiceCost $service_cost */
-            foreach ($requested_service->service->service_costs as $service_cost) {
-                $total[] = $service_cost;
-            }
-        }
-        return $total;
-    }
     /**
      * Hospital's net credit from this visit.
-     * Total collected for this visit - doctor's share for this visit.
-     * The service costs are general clinic expenses, not subtracted per visit for hospital credit *from this visit*.
-     */
-    /**
-     * Hospital's net credit from this visit.
-     * Total collected - (Doctor's share + Service costs).
+     * Total collected - doctor's share for this visit.
      */
     public function hospital_credit(): float
     {
-        // Ensure relations are loaded for performance and accuracy
-        $this->loadMissing(['requestedServices.requestedServiceCosts.serviceCost']);
-
         $grossPaid = (float) $this->total_paid_services();
-        $serviceCosts = (float) $this->totalServiceCosts($this->doctor);
         $doctorCredit = (float) ($this->doctorShift->doctor->doctor_credit($this) ?? 0);
 
-        return $grossPaid - $serviceCosts - $doctorCredit;
+        return $grossPaid - $doctorCredit;
     }
-  /**
-     * Calculate total value of services (and lab tests if they are services) for this visit,
-     * potentially considering the specific doctor's pricing or contract if applicable.
-     * For this example, sums price * count from requested_services.
-     */
-   
-    public function totalServiceCosts($doctor)
-    {
-        $total = 0;
-        foreach ($this->requestedServices as $requested_service) {
-            $total += $requested_service->getTotalCosts($doctor);
-        }
-        return $total;
-    }
- 
+
     public function total_paid()
     {
         return $this->total_paid_services() + $this->patient->paid_lab();

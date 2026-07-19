@@ -57,8 +57,6 @@ class Cost extends Model
         'amount',
         'amount_bankak',
         'cost_category_id',
-        'doctor_shift_id_for_sub_cost',
-        'sub_service_cost_id',
     ];
 
     /**
@@ -69,7 +67,6 @@ class Cost extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'amount_bankak' => 'decimal:2',
-        'doctor_shift_id_for_sub_cost' => 'integer',
     ];
 
     /**
