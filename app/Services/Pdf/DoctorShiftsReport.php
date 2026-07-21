@@ -2,11 +2,10 @@
 
 namespace App\Services\Pdf;
 
-use App\Models\DoctorShift;
 use App\Models\Doctor;
-use App\Models\User;
+use App\Models\DoctorShift;
 use App\Models\Shift;
-use App\Services\Pdf\MyCustomTCPDF;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -15,7 +14,6 @@ class DoctorShiftsReport
     /**
      * Generate doctor shifts PDF report.
      *
-     * @param Request $request
      * @return string PDF content
      */
     public function generate(Request $request): string
@@ -40,42 +38,43 @@ class DoctorShiftsReport
 
         $filterCriteria = [];
 
-
-
         // Apply filters
         if ($request->filled('doctor_id')) {
             $query->where('doctor_id', $request->doctor_id);
-            if ($doc = Doctor::find($request->doctor_id))
-                $filterCriteria[] = "Doctor: " . $doc->name;
+            if ($doc = Doctor::find($request->doctor_id)) {
+                $filterCriteria[] = 'Doctor: '.$doc->name;
+            }
         }
 
-        if ($request->filled('user_opened')) {
-            $query->where('user_id', $request->user_opened);
-            if ($u = User::find($request->user_opened))
-                $filterCriteria[] = "Opened By: " . $u->name;
+        if ($request->filled('user_id_opened')) {
+            $query->where('user_id', $request->user_id_opened);
+            if ($u = User::find($request->user_id_opened)) {
+                $filterCriteria[] = 'Opened By: '.$u->name;
+            }
         }
 
         if ($request->filled('doctor_name_search')) {
             $searchTerm = $request->doctor_name_search;
-            $query->whereHas('doctor', fn($q) => $q->where('name', 'LIKE', "%{$searchTerm}%"));
-            $filterCriteria[] = "Search: " . $searchTerm;
+            $query->whereHas('doctor', fn ($q) => $q->where('name', 'LIKE', "%{$searchTerm}%"));
+            $filterCriteria[] = 'Search: '.$searchTerm;
         }
 
         if ($request->has('status') && $request->status !== 'all') {
             $query->where('status', (bool) $request->status);
-            $filterCriteria[] = "Status: " . ((bool) $request->status ? 'Open' : 'Closed');
+            $filterCriteria[] = 'Status: '.((bool) $request->status ? 'Open' : 'Closed');
         }
 
         if ($request->filled('shift_id')) {
             $query->where('shift_id', $request->shift_id);
-            if ($gs = Shift::find($request->shift_id))
-                $filterCriteria[] = "Gen. Shift: #" . ($gs->name ?? $gs->id);
+            if ($gs = Shift::find($request->shift_id)) {
+                $filterCriteria[] = 'Gen. Shift: #'.($gs->name ?? $gs->id);
+            }
         }
         if ($request->filled('date_from')) {
-            $query->where('doctor_shifts.created_at', $request->date_from);
+            $query->whereDate('doctor_shifts.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            $query->where('doctor_shifts.created_at', $request->date_to);
+            $query->whereDate('doctor_shifts.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
 
         // Execute query with sorting
@@ -88,8 +87,8 @@ class DoctorShiftsReport
             throw new \Exception('No data found for the selected filters.');
         }
 
-        // For the user summary, re-query WITHOUT the user_opened filter so all users appear.
-        $userOpenedId = $request->filled('user_opened') ? (int) $request->user_opened : null;
+        // For the user summary, re-query WITHOUT the user_id_opened filter so all users appear.
+        $userOpenedId = $request->filled('user_id_opened') ? (int) $request->user_id_opened : null;
         if ($userOpenedId !== null) {
             $summaryQuery = DoctorShift::with([
                 'user:id,name',
@@ -98,20 +97,25 @@ class DoctorShiftsReport
                 'visits.patientLabRequests.mainTest',
                 'doctor',
             ]);
-            if ($request->filled('shift_id'))
+            if ($request->filled('shift_id')) {
                 $summaryQuery->where('shift_id', $request->shift_id);
-            if ($request->filled('doctor_id'))
+            }
+            if ($request->filled('doctor_id')) {
                 $summaryQuery->where('doctor_id', $request->doctor_id);
+            }
             if ($request->filled('doctor_name_search')) {
                 $st = $request->doctor_name_search;
-                $summaryQuery->whereHas('doctor', fn($q) => $q->where('name', 'LIKE', "%{$st}%"));
+                $summaryQuery->whereHas('doctor', fn ($q) => $q->where('name', 'LIKE', "%{$st}%"));
             }
-            if ($request->has('status') && $request->status !== 'all')
+            if ($request->has('status') && $request->status !== 'all') {
                 $summaryQuery->where('status', (bool) $request->status);
-            if ($request->filled('date_from'))
-                $summaryQuery->where('doctor_shifts.created_at', $request->date_from);
-            if ($request->filled('date_to'))
-                $summaryQuery->where('doctor_shifts.created_at', $request->date_to);
+            }
+            if ($request->filled('date_from')) {
+                $summaryQuery->whereDate('doctor_shifts.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+            }
+            if ($request->filled('date_to')) {
+                $summaryQuery->whereDate('doctor_shifts.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+            }
             $allUsersShifts = $summaryQuery->get();
         } else {
             $allUsersShifts = $doctorShifts; // already all users, no user_opened filter was applied
@@ -123,14 +127,12 @@ class DoctorShiftsReport
     /**
      * Generate the PDF content
      *
-     * @param \Illuminate\Database\Eloquent\Collection $doctorShifts
-     * @param array $filterCriteria
-     * @return string
+     * @param  \Illuminate\Database\Eloquent\Collection  $doctorShifts
      */
     private function generatePdf($doctorShifts, array $filterCriteria, ?int $userOpenedId = null, $allUsersShifts = null): string
     {
         $reportTitle = 'Doctor Shifts Report';
-        $filterCriteriaString = !empty($filterCriteria) ? "Filters: " . implode(' | ', $filterCriteria) : "All Shifts";
+        $filterCriteriaString = ! empty($filterCriteria) ? 'Filters: '.implode(' | ', $filterCriteria) : 'All Shifts';
 
         $pdf = new MyCustomTCPDF('', null, 'L', 'mm', 'A4', true, 'utf-8', false, false, $filterCriteriaString);
         $pdf->AddPage();
@@ -158,16 +160,13 @@ class DoctorShiftsReport
         $this->addReportFooter($pdf, $doctorShifts->count(), $isRTL);
 
         // Generate PDF content
-        $pdfFileName = 'DoctorShifts_Report_' . date('Ymd_His') . '.pdf';
+        $pdfFileName = 'DoctorShifts_Report_'.date('Ymd_His').'.pdf';
+
         return $pdf->Output($pdfFileName, 'S');
     }
 
     /**
      * Setup table headers and structure
-     *
-     * @param MyCustomTCPDF $pdf
-     * @param string $defaultFont
-     * @param bool $isRTL
      */
     private function setupTable(MyCustomTCPDF $pdf, string $defaultFont, bool $isRTL): void
     {
@@ -189,10 +188,7 @@ class DoctorShiftsReport
     /**
      * Render data rows
      *
-     * @param MyCustomTCPDF $pdf
-     * @param \Illuminate\Database\Eloquent\Collection $doctorShifts
-     * @param bool $isRTL
-     * @return array
+     * @param  \Illuminate\Database\Eloquent\Collection  $doctorShifts
      */
     private function renderDataRows(MyCustomTCPDF $pdf, $doctorShifts, bool $isRTL): array
     {
@@ -210,7 +206,7 @@ class DoctorShiftsReport
         foreach ($doctorShifts as $ds) {
             $cashEntl = $ds->doctor_credit_cash();
             $insEntl = $ds->doctor_credit_company();
-            $staticWage = (!$ds->status && $ds->doctor) ? (float) $ds->doctor->static_wage : 0;
+            $staticWage = (! $ds->status && $ds->doctor) ? (float) $ds->doctor->static_wage : 0;
             $totalEntl = $cashEntl + $insEntl + $staticWage;
 
             $totalPaid = $ds->total_paid_services();
@@ -220,9 +216,9 @@ class DoctorShiftsReport
             $totalDiscount = 0;
             foreach ($ds->visits as $visit) {
                 foreach ($visit->requestedServices as $rs) {
-                    $price = (float)$rs->price * (int)$rs->count;
-                    $totalDiscount += (float)$rs->discount;
-                    $totalDiscount += $price * ((int)($rs->discount_per ?? 0) / 100);
+                    $price = (float) $rs->price * (int) $rs->count;
+                    $totalDiscount += (float) $rs->discount;
+                    $totalDiscount += $price * ((int) ($rs->discount_per ?? 0) / 100);
                 }
             }
 
@@ -248,11 +244,11 @@ class DoctorShiftsReport
 
             // Add navigation link for the doctor's name
             $links = [
-                1 => url('/reports/clinic-report-old/pdf?doctor_shift_id=' . $ds->id)
+                1 => url('/reports/clinic-report-old/pdf?doctor_shift_id='.$ds->id),
             ];
 
             $pdf->DrawTableRow($rowData, $colWidths, null, $fill, 7, 10, $links);
-            $fill = !$fill;
+            $fill = ! $fill;
         }
 
         return $grandTotals;
@@ -260,10 +256,6 @@ class DoctorShiftsReport
 
     /**
      * Render grand totals row
-     *
-     * @param MyCustomTCPDF $pdf
-     * @param array $grandTotals
-     * @param bool $isRTL
      */
     private function renderGrandTotals(MyCustomTCPDF $pdf, array $grandTotals, bool $isRTL): void
     {
@@ -303,7 +295,7 @@ class DoctorShiftsReport
             $userId = $ds->user_id ?? 0;
             $userName = $ds->user->name ?? $ds->user->username ?? "#{$userId}";
 
-            if (!isset($byUser[$userId])) {
+            if (! isset($byUser[$userId])) {
                 $byUser[$userId] = [
                     'name' => $userName,
                     'income' => 0,
@@ -320,7 +312,7 @@ class DoctorShiftsReport
             $income_cash = $income - $income_bank;
             $entl_cash = $ds->doctor_credit_cash();
             $entl_ins = $ds->doctor_credit_company();
-            $staticWage = (!$ds->status && $ds->doctor) ? (float) $ds->doctor->static_wage : 0;
+            $staticWage = (! $ds->status && $ds->doctor) ? (float) $ds->doctor->static_wage : 0;
             $costs = $entl_cash + $entl_ins + $staticWage;
             $costs_cash = $entl_cash;
             $costs_bank = $entl_ins + $staticWage;
@@ -471,9 +463,6 @@ class DoctorShiftsReport
 
     /**
      * Add report header with better styling
-     *
-     * @param MyCustomTCPDF $pdf
-     * @param bool $isRTL
      */
     private function addReportHeader(MyCustomTCPDF $pdf, bool $isRTL): void
     {
@@ -487,7 +476,7 @@ class DoctorShiftsReport
 
         // Date and time
         $pdf->SetFont($pdf->getDefaultFontFamily(), '', 11);
-        $dateTime = $isRTL ? 'تاريخ التقرير: ' . date('Y-m-d H:i') : 'Report Date: ' . date('Y-m-d H:i');
+        $dateTime = $isRTL ? 'تاريخ التقرير: '.date('Y-m-d H:i') : 'Report Date: '.date('Y-m-d H:i');
         $pdf->Cell(0, 6, $dateTime, 0, 1, 'C');
 
         $pdf->Ln(5);
@@ -495,10 +484,6 @@ class DoctorShiftsReport
 
     /**
      * Add report footer with summary information
-     *
-     * @param MyCustomTCPDF $pdf
-     * @param int $totalRecords
-     * @param bool $isRTL
      */
     private function addReportFooter(MyCustomTCPDF $pdf, int $totalRecords, bool $isRTL): void
     {
@@ -511,7 +496,7 @@ class DoctorShiftsReport
 
         // Generated timestamp
         $pdf->SetFont($pdf->getDefaultFontFamily(), '', 8);
-        $generated = $isRTL ? 'تم إنشاء التقرير في: ' . date('Y-m-d H:i:s') : 'Generated on: ' . date('Y-m-d H:i:s');
+        $generated = $isRTL ? 'تم إنشاء التقرير في: '.date('Y-m-d H:i:s') : 'Generated on: '.date('Y-m-d H:i:s');
         $pdf->Cell(0, 4, $generated, 0, 1, 'C');
     }
 }
