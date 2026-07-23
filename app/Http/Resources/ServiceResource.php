@@ -1,7 +1,10 @@
 <?php
+
 namespace App\Http\Resources;
+
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+
 class ServiceResource extends JsonResource
 {
     public function toArray(Request $request): array
@@ -15,8 +18,10 @@ class ServiceResource extends JsonResource
             'price' => (float) $this->price, // Ensure it's a number
             'activate' => (bool) $this->activate,
             'variable' => (bool) $this->variable,
-            'created_at' => $this->created_at->toIso8601String(),
-            'updated_at' => $this->updated_at->toIso8601String(),
+            'has_cost' => (bool) $this->has_cost,
+            'deleted_at' => $this->when($this->deleted_at !== null, fn () => $this->deleted_at->toIso8601String()),
+            'created_at' => $this->created_at?->toIso8601String(),
+            'updated_at' => $this->updated_at?->toIso8601String(),
         ];
     }
 }

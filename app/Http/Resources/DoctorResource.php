@@ -19,20 +19,13 @@ class DoctorResource extends JsonResource
             'name' => $this->name,
             'phone' => $this->phone,
             'cash_percentage' => $this->cash_percentage,
-            'company_percentage' => $this->company_percentage,  
+            'company_percentage' => $this->company_percentage,
             'static_wage' => $this->static_wage,
             'lab_percentage' => $this->lab_percentage,
             'specialist_id' => $this->specialist_id,
-            'sub_specialist_id' => $this->sub_specialist_id,
             'firebase_id' => $this->firebase_id,
             'specialist_firestore_id' => $this->whenLoaded('specialist', $this?->specialist?->firestore_id),
             'specialist_name' => $this->whenLoaded('specialist', $this?->specialist?->name), // Eager load 'specialist'
-            'sub_specialist' => $this->whenLoaded('subSpecialist', function () {
-                return $this->subSpecialist ? [
-                    'id' => $this->subSpecialist->id,
-                    'name' => $this->subSpecialist->name,
-                ] : null;
-            }),
             'start' => $this->start,
             'image' => $this->image, // You might want to return a full URL if storing paths
             'calc_insurance' => $this->calc_insurance,

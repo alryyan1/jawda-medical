@@ -2,14 +2,12 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * 
- *
  * @property int $id
  * @property int $user_id
  * @property int $shift_id
@@ -26,6 +24,7 @@ use Illuminate\Support\Facades\DB;
  * @property-read int|null $visits_count
  * @property-read \App\Models\User $user
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\DoctorVisit> $visits
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift active()
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift activeToday()
  * @method static \Database\Factories\DoctorShiftFactory factory($count = null, $state = [])
@@ -41,6 +40,7 @@ use Illuminate\Support\Facades\DB;
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereStatus($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorShift whereUserId($value)
+ *
  * @mixin \Eloquent
  */
 class DoctorShift extends Model
@@ -73,34 +73,35 @@ class DoctorShift extends Model
     ];
 
     protected $casts = [
-        'status'                           => 'boolean',
-        'has_journal'                      => 'boolean',
-        'start_time'                       => 'datetime',
-        'end_time'                         => 'datetime',
-        'snap_patients_count'              => 'integer',
-        'snap_total_paid'                  => 'decimal:2',
-        'snap_total_cash_revenue'          => 'decimal:2',
-        'snap_total_insurance_revenue'     => 'decimal:2',
-        'snap_total_insurance_services'    => 'decimal:2',
-        'snap_total_bank'                  => 'decimal:2',
-        'snap_doctor_cash_percentage'      => 'decimal:2',
+        'status' => 'boolean',
+        'has_journal' => 'boolean',
+        'start_time' => 'datetime',
+        'end_time' => 'datetime',
+        'snap_patients_count' => 'integer',
+        'snap_total_paid' => 'decimal:2',
+        'snap_total_cash_revenue' => 'decimal:2',
+        'snap_total_insurance_revenue' => 'decimal:2',
+        'snap_total_insurance_services' => 'decimal:2',
+        'snap_total_bank' => 'decimal:2',
+        'snap_doctor_cash_percentage' => 'decimal:2',
         'snap_doctor_insurance_percentage' => 'decimal:2',
-        'snap_doctor_cash_entitlement'     => 'decimal:2',
-        'snap_doctor_insurance_entitlement'=> 'decimal:2',
-        'snap_doctor_fixed_entitlement'    => 'decimal:2',
-        'snap_total_doctor_entitlement'    => 'decimal:2',
+        'snap_doctor_cash_entitlement' => 'decimal:2',
+        'snap_doctor_insurance_entitlement' => 'decimal:2',
+        'snap_doctor_fixed_entitlement' => 'decimal:2',
+        'snap_total_doctor_entitlement' => 'decimal:2',
     ];
-  
 
-
-    public function getVisitsCountAttribute(){
+    public function getVisitsCountAttribute()
+    {
         $pdo = DB::getPdo();
         $stmt = $pdo->prepare('SELECT count(id)  FROM doctorvisits WHERE doctor_shift_id = ?');
         // $stmt->bindParam(':shift_id', $this->id);
         $stmt->execute([$this->id]);
+
         // return $this->id;;
         return $stmt->fetchColumn();
     }
+
     /**
      * Get the doctor associated with this shift session.
      */
@@ -184,6 +185,7 @@ class DoctorShift extends Model
         // Simpler version if 'status' column is reliably managed:
         // ->where('status', true)->whereDate('created_at', Carbon::today());
     }
+
     public function scopeLatestGeneralShift($query)
     {
         // Get the latest open (not closed) general shift
@@ -191,14 +193,15 @@ class DoctorShift extends Model
             ->whereNull('closed_at')
             ->latest()
             ->first();
-        
-        if (!$latestOpenShift) {
+
+        if (! $latestOpenShift) {
             // If no open shift exists, return empty query
             return $query->whereRaw('1 = 0');
         }
-        
+
         return $query->where('shift_id', $latestOpenShift->id)->where('status', true);
     }
+
     /**
      * Get all visits associated with this specific doctor's shift session.
      * This assumes DoctorVisit has a 'doctor_shift_id' FK.
@@ -221,44 +224,48 @@ class DoctorShift extends Model
             $start++;
             if ($start >= $this->doctor->start) {
                 if ($doctorvisit->patient->company_id == null) {
-                    $total_credit += $this->doctor->doctor_credit($doctorvisit);
+                    $total_credit += $this->doctor->doctor_credit($doctorvisit, $this);
                 }
             }
         }
+
         return $total_credit;
     }
-    
+
     public function clinic_cash()
     {
         $total_cash = 0;
         $start = 0;
         /** @var Doctorvisit $doctorvisit */
         foreach ($this->visits as $doctorvisit) {
-                if ($doctorvisit->patient->company_id == null) {
+            if ($doctorvisit->patient->company_id == null) {
                 // echo "s";
 
-                   $cash =  $doctorvisit->total_paid_services($this->doctor) - $doctorvisit->bankak_service();
-                   $total_cash += $cash;
+                $cash = $doctorvisit->total_paid_services($this->doctor) - $doctorvisit->bankak_service();
+                $total_cash += $cash;
             }
         }
+
         return $total_cash;
     }
-        
+
     public function clinic_enurance()
     {
         $total_insurance = 0;
         $start = 0;
         /** @var Doctorvisit $doctorvisit */
         foreach ($this->visits as $doctorvisit) {
-                if ($doctorvisit->patient->company_id != null) {
+            if ($doctorvisit->patient->company_id != null) {
                 // echo "s";
 
-                   $cash =  $doctorvisit->total_paid_services($this->doctor) ;
-                   $total_insurance += $cash;
+                $cash = $doctorvisit->total_paid_services($this->doctor);
+                $total_insurance += $cash;
             }
         }
+
         return $total_insurance;
     }
+
     public function clinic_bank()
     {
         $total_bank = 0;
@@ -266,13 +273,15 @@ class DoctorShift extends Model
         /** @var Doctorvisit $doctorvisit */
         foreach ($this->visits as $doctorvisit) {
             $start++;
-                if ($doctorvisit->patient->company_id == null) {
-                   $bank =  $doctorvisit->bankak_service();
-                   $total_bank += $bank;
+            if ($doctorvisit->patient->company_id == null) {
+                $bank = $doctorvisit->bankak_service();
+                $total_bank += $bank;
             }
         }
+
         return $total_bank;
     }
+
     public function clinic_bank_company()
     {
         $total_bank = 0;
@@ -280,17 +289,18 @@ class DoctorShift extends Model
         /** @var Doctorvisit $doctorvisit */
         foreach ($this->visits as $doctorvisit) {
             $start++;
-                if ($doctorvisit->patient->company_id != null) {
-                   $bank =  $doctorvisit->bankak_service();
-                   $total_bank += $bank;
+            if ($doctorvisit->patient->company_id != null) {
+                $bank = $doctorvisit->bankak_service();
+                $total_bank += $bank;
             }
         }
+
         return $total_bank;
     }
+
     /**
      * Calculate doctor's credit from company/insurance patients' services during this shift.
      */
-  
     public function doctor_credit_company()
     {
         $total_credit = 0;
@@ -302,12 +312,14 @@ class DoctorShift extends Model
             if ($start >= $this->doctor->start) {
 
                 if ($doctorvisit->patient->company_id != null) {
-                    $total_credit += $this->doctor->doctor_credit($doctorvisit);
+                    $total_credit += $this->doctor->doctor_credit($doctorvisit, $this);
                 }
             }
         }
+
         return $total_credit;
     }
+
     public function count_cash()
     {
         $count = 0;
@@ -317,6 +329,7 @@ class DoctorShift extends Model
                 $count++;
             }
         }
+
         return $count;
     }
 
@@ -330,19 +343,23 @@ class DoctorShift extends Model
         foreach ($this->visits as $doctorvisit) {
             $total_paid += $doctorvisit->total_services($this->doctor);
         }
+
         return $total_paid;
     }
-        public function total_services_insurance()
+
+    public function total_services_insurance()
     {
         $total_paid = 0;
         /** @var Doctorvisit $doctorvisit */
         foreach ($this->visits as $doctorvisit) {
             if ($doctorvisit->patient->company_id != null) {
-            $total_paid += $doctorvisit->total_services();
+                $total_paid += $doctorvisit->total_services();
             }
         }
+
         return $total_paid;
     }
+
     public function total_services_cash()
     {
         $total_cash = 0;
@@ -350,11 +367,13 @@ class DoctorShift extends Model
         foreach ($this->visits as $doctorvisit) {
             if ($doctorvisit->patient->company_id == null) {
                 $total_cash += $doctorvisit->total_services($this->doctor);
-                }
+            }
         }
+
         return $total_cash;
     }
-      public function count_insurance()
+
+    public function count_insurance()
     {
         $count = 0;
         /** @var Doctorvisit $doctorvisit */
@@ -363,8 +382,10 @@ class DoctorShift extends Model
                 $count++;
             }
         }
+
         return $count;
     }
+
     /**
      * Get total amount paid for all services during this doctor's shift.
      */
@@ -375,6 +396,7 @@ class DoctorShift extends Model
         foreach ($this->visits as $doctorvisit) {
             $total_paid += $doctorvisit->total_paid_services($this->doctor);
         }
+
         return $total_paid;
     }
 
@@ -388,15 +410,17 @@ class DoctorShift extends Model
         foreach ($this->visits as $doctorvisit) {
             $total_paid += $doctorvisit->bankak_service();
         }
+
         return $total_paid;
     }
 
     public function hospital_credit()
     {
-        $total =0;
-        foreach($this->visits as $visit){
+        $total = 0;
+        foreach ($this->visits as $visit) {
             $total += $visit->hospital_credit();
         }
+
         return $total;
     }
 
@@ -429,19 +453,44 @@ class DoctorShift extends Model
         $fin = $this->financialSummaryFast();
 
         $this->update([
-            'snap_patients_count'              => $this->visits()->count(),
-            'snap_total_paid'                  => $fin['total_paid_services'],
-            'snap_total_cash_revenue'          => $fin['clinic_cash'],
-            'snap_total_insurance_revenue'     => $fin['clinic_endurance'],
-            'snap_total_insurance_services'    => $this->total_services_insurance(),
-            'snap_total_bank'                  => $fin['total_bank'],
-            'snap_doctor_cash_percentage'      => $this->doctor?->cash_percentage ?? 0,
+            'snap_patients_count' => $this->visits()->count(),
+            'snap_total_paid' => $fin['total_paid_services'],
+            'snap_total_cash_revenue' => $fin['clinic_cash'],
+            'snap_total_insurance_revenue' => $fin['clinic_endurance'],
+            'snap_total_insurance_services' => $this->total_services_insurance(),
+            'snap_total_bank' => $fin['total_bank'],
+            'snap_doctor_cash_percentage' => $this->doctor?->cash_percentage ?? 0,
             'snap_doctor_insurance_percentage' => $this->doctor?->company_percentage ?? 0,
-            'snap_doctor_cash_entitlement'     => $fin['doctor_credit_cash'],
-            'snap_doctor_insurance_entitlement'=> $fin['doctor_credit_insurance'],
-            'snap_doctor_fixed_entitlement'    => $fin['doctor_fixed_share'],
-            'snap_total_doctor_entitlement'    => $fin['total_doctor_share'],
+            'snap_doctor_cash_entitlement' => $fin['doctor_credit_cash'],
+            'snap_doctor_insurance_entitlement' => $fin['doctor_credit_insurance'],
+            'snap_doctor_fixed_entitlement' => $fin['doctor_fixed_share'],
+            'snap_total_doctor_entitlement' => $fin['total_doctor_share'],
         ]);
+    }
+
+    /**
+     * Report totals for the doctors' dues table: total paid, doctor cash/insurance
+     * dues, and hospital's net share. Always reads the persisted snapshot columns,
+     * computing (and persisting) the snapshot first if it hasn't been taken yet.
+     *
+     * @return array{total_paid: float, doctor_cash: float, doctor_insurance: float, hospital_share: float}
+     */
+    public function reportTotals(): array
+    {
+        if ($this->snap_total_paid === null) {
+            $this->saveFinancialSnapshot();
+        }
+
+        $totalPaid = (float) $this->snap_total_paid;
+        $doctorCash = (float) $this->snap_doctor_cash_entitlement;
+        $doctorInsurance = (float) $this->snap_doctor_insurance_entitlement;
+
+        return [
+            'total_paid' => $totalPaid,
+            'doctor_cash' => $doctorCash,
+            'doctor_insurance' => $doctorInsurance,
+            'hospital_share' => $totalPaid - $doctorCash - $doctorInsurance,
+        ];
     }
 
     public function financialSummaryFast(): array
@@ -449,7 +498,7 @@ class DoctorShift extends Model
         // ── 1. Pure-SQL aggregates ────────────────────────────────────────────
         $paid = DB::table('requested_services as rs')
             ->join('doctorvisits as dv', 'dv.id', '=', 'rs.doctorvisits_id')
-            ->join('patients as p',      'p.id',  '=', 'dv.patient_id')
+            ->join('patients as p', 'p.id', '=', 'dv.patient_id')
             ->where('dv.doctor_shift_id', $this->id)
             ->selectRaw('
                 COALESCE(SUM(rs.amount_paid), 0)                                              AS total_paid,
@@ -459,8 +508,8 @@ class DoctorShift extends Model
 
         $bank = DB::table('requested_service_deposits as rsd')
             ->join('requested_services as rs', 'rs.id', '=', 'rsd.requested_service_id')
-            ->join('doctorvisits as dv',        'dv.id', '=', 'rs.doctorvisits_id')
-            ->join('patients as p',             'p.id',  '=', 'dv.patient_id')
+            ->join('doctorvisits as dv', 'dv.id', '=', 'rs.doctorvisits_id')
+            ->join('patients as p', 'p.id', '=', 'dv.patient_id')
             ->where('dv.doctor_shift_id', $this->id)
             ->where('rsd.is_bank', 1)
             ->selectRaw('
@@ -469,26 +518,29 @@ class DoctorShift extends Model
             ')
             ->first();
 
-        $totalPaid     = (float) $paid->total_paid;
+        $totalPaid = (float) $paid->total_paid;
         $insurancePaid = (float) $paid->insurance_paid;
-        $cashPaid      = $totalPaid - $insurancePaid;
-        $totalBank     = (float) $bank->total_bank;
-        $cashBank      = (float) $bank->cash_bank;
-        $clinicCash    = $cashPaid - $cashBank;
+        $cashPaid = $totalPaid - $insurancePaid;
+        $totalBank = (float) $bank->total_bank;
+        $cashBank = (float) $bank->cash_bank;
+        $clinicCash = $cashPaid - $cashBank;
 
         // ── 2. Doctor credits (PHP logic, one eager-load pass) ───────────────
         $this->loadMissing([
             'doctor.specificServices',
             'visits.patient:id,company_id',
+            'visits.requestedServices' => function ($query): void {
+                $query->withSum('costs', 'amount');
+            },
         ]);
 
-        $doctor              = $this->doctor;
-        $disableCheck        = (bool) optional(Setting::first())->disable_doctor_service_check;
+        $doctor = $this->doctor;
+        $disableCheck = (bool) optional(Setting::first())->disable_doctor_service_check;
         $individualServiceIds = $doctor->specificServices->pluck('id')->toArray();
 
-        $cashCredit      = 0.0;
+        $cashCredit = 0.0;
         $insuranceCredit = 0.0;
-        $visitIndex      = 0;
+        $visitIndex = 0;
 
         foreach ($this->visits as $visit) {
             $visitIndex++;
@@ -511,7 +563,7 @@ class DoctorShift extends Model
                 }
 
                 if ($isInsurance) {
-                    $gross = (float) $service->price * $service->count;
+                    $gross = max(0.0, (float) $service->price * $service->count - (float) $service->total_cost);
                     $insuranceCredit += $gross * (float) $doctor->company_percentage / 100;
                 } else {
                     $cashCredit += $this->calcServiceCreditInline($service, $doctor);
@@ -522,14 +574,14 @@ class DoctorShift extends Model
         $fixedShare = (float) ($doctor->static_wage ?? 0);
 
         return [
-            'total_paid_services'        => $totalPaid,
-            'clinic_cash'                => $clinicCash,
-            'clinic_endurance'           => $insurancePaid,
-            'total_bank'                 => $totalBank,
-            'doctor_credit_cash'         => $cashCredit,
-            'doctor_credit_insurance'    => $insuranceCredit,
-            'doctor_fixed_share'         => $fixedShare,
-            'total_doctor_share'         => $cashCredit + $insuranceCredit + $fixedShare,
+            'total_paid_services' => $totalPaid,
+            'clinic_cash' => $clinicCash,
+            'clinic_endurance' => $insurancePaid,
+            'total_bank' => $totalBank,
+            'doctor_credit_cash' => $cashCredit,
+            'doctor_credit_insurance' => $insuranceCredit,
+            'doctor_fixed_share' => $fixedShare,
+            'total_doctor_share' => $cashCredit + $insuranceCredit + $fixedShare,
         ];
     }
 
@@ -542,19 +594,29 @@ class DoctorShift extends Model
             return $this->applyPivotRateInline($service, $docService->pivot, $doctor);
         }
 
-        // 2. Default percentage
-        return (float) $service->amount_paid * (float) $doctor->cash_percentage / 100;
+        // 2. Default percentage, net of recorded requested_service_costs
+        return $this->netAmountPaidInline($service) * (float) $doctor->cash_percentage / 100;
     }
 
     public function applyPivotRateInline(RequestedService $service, object $pivot, Doctor $doctor): float
     {
         if (($pivot->percentage ?? 0) > 0) {
-            return (float) $service->amount_paid * $pivot->percentage / 100;
+            return $this->netAmountPaidInline($service) * $pivot->percentage / 100;
         }
         if (($pivot->fixed ?? 0) > 0) {
             return (float) $pivot->fixed * $service->count;
         }
-        return (float) $service->amount_paid * (float) $doctor->cash_percentage / 100;
+
+        return $this->netAmountPaidInline($service) * (float) $doctor->cash_percentage / 100;
+    }
+
+    /**
+     * Amount paid for a service, net of any recorded requested_service_costs
+     * (money owed to a third party), never negative.
+     */
+    private function netAmountPaidInline(RequestedService $service): float
+    {
+        return max(0.0, (float) $service->amount_paid - (float) $service->total_cost);
     }
 
     /**
@@ -620,5 +682,4 @@ class DoctorShift extends Model
             ->groupBy('users.id', 'users.name')
             ->get();
     }
-
 }

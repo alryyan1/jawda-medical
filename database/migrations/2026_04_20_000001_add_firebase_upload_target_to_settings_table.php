@@ -9,8 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('settings', function (Blueprint $table) {
-            if (!Schema::hasColumn('settings', 'firebase_upload_target')) {
-                $table->string('firebase_upload_target')->default('sales')->after('firestore_result_collection');
+            if (! Schema::hasColumn('settings', 'firestore_result_collection')) {
+                $table->string('firestore_result_collection')->nullable();
+            }
+            if (! Schema::hasColumn('settings', 'firebase_upload_target')) {
+                $table->string('firebase_upload_target')->default('sales');
             }
         });
     }

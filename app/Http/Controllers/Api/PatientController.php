@@ -3,48 +3,43 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\UltramsgController;
-use App\Models\Patient;
-use App\Models\DoctorVisit;
-use App\Models\Shift; // To get current shift for visit
 use App\Http\Requests\StorePatientRequest;
 use App\Http\Requests\UpdatePatientRequest;
-use App\Http\Resources\DoctorVisitResource;
+use App\Http\Resources\DoctorVisitResource; // To get current shift for visit
 use App\Http\Resources\PatientLabQueueItemResource;
 use App\Http\Resources\PatientResource;
 use App\Http\Resources\PatientSearchResultResource;
 use App\Http\Resources\PatientStrippedResource;
 use App\Http\Resources\RecentDoctorVisitSearchResource;
+use App\Jobs\EmitPatientRegisteredJob;
+use App\Jobs\SendAuthWhatsappMessage;
+use App\Models\Company;
+use App\Models\CompanyService;
 use App\Models\Doctor;
-use App\Models\MainTest;
-use App\Models\LabRequest;
+use App\Models\DoctorShift;
 // use App\Http\Resources\PatientCollection; // If you have custom pagination
-use Http;
+use App\Models\DoctorVisit;
+use App\Models\File;
+use App\Models\HormoneBinding;
+use App\Models\HormoneResult;
+use App\Models\LabRequest;
+use App\Models\MainTest;
+use App\Models\Mindray;
+use App\Models\Patient;
+use App\Models\RequestedResult;
+use App\Models\RequestedService;
+use App\Models\Service;
+use App\Models\Setting;
+use App\Models\Shift;
+use App\Models\UserDocSelection;
+use App\Services\RequestedServiceHelper;
+use App\Zebra;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
-use App\Models\DoctorShift;
-use App\Models\File;
-use App\Models\UserDocSelection;
-use App\Models\RequestedService;
-use App\Zebra;
-use App\Models\RequestedResult;
-use App\Models\Service;
-use App\Models\Company;
-use App\Services\RequestedServiceHelper;
 use Illuminate\Support\Facades\Http as HttpClient;
-use App\Jobs\EmitPatientRegisteredJob;
-use App\Models\Setting;
-use App\Services\UltramsgService;
-use App\Jobs\SendAuthWhatsappMessage;
-use App\Jobs\SmsResultAuth;
-use App\Models\CompanyService;
-use App\Models\Mindray;
-use App\Models\HormoneResult;
-use App\Models\HormoneBinding;
-use App\Services\Pdf\LabResultReport;
+use Illuminate\Support\Facades\Log;
 
 class PatientController extends Controller
 {
@@ -98,7 +93,6 @@ class PatientController extends Controller
     {
         $currentGeneralShift = Shift::orderBy('id', 'desc')->first();
 
-
         // Check if shift is closed by either is_closed flag or closed_at timestamp
         if ($currentGeneralShift->is_closed || $currentGeneralShift->closed_at !== null) {
             return response()->json(['message' => 'لا يمكن تسجيل مريض جديد. الوردية مغلقة حالياً.'], 400);
@@ -114,7 +108,7 @@ class PatientController extends Controller
     private function checkLatestShiftDateIsToday()
     {
         $latestShift = Shift::orderBy('id', 'desc')->first();
-        if (!$latestShift) {
+        if (! $latestShift) {
             return response()->json(['message' => 'لا توجد وردية عيادة متاحة اليوم.'], 400);
         }
 
@@ -131,15 +125,65 @@ class PatientController extends Controller
         return $latestShift;
     }
 
+    /**
+     * Determine whether two names likely belong to the same person: the words
+     * of the shorter name positionally match the longer name's leading words
+     * (e.g. "الريان محجوب" against "الريان محجوب عثمان"), tolerating common
+     * Arabic spelling variants (normalizeArabicText) and a transposed-letter
+     * typo within a word (e.g. "مجحوب" for "محجوب"). Used to link visits into
+     * the same File across visits where the name was entered with a
+     * different number of words or a fat-fingered letter swap.
+     *
+     * Deliberately NOT a generic edit-distance/"close enough" match: many
+     * distinct, common Arabic names differ by a single character (e.g.
+     * "أحمد" vs "محمد" are edit-distance 1 apart) and must never be silently
+     * treated as the same person. Requiring the same letters, just reordered,
+     * targets the actual typo pattern without that false-positive risk.
+     */
+    private function namesArePrefixCompatible(string $nameA, string $nameB): bool
+    {
+        $wordsA = preg_split('/\s+/u', trim($this->normalizeArabicText($nameA)), -1, PREG_SPLIT_NO_EMPTY);
+        $wordsB = preg_split('/\s+/u', trim($this->normalizeArabicText($nameB)), -1, PREG_SPLIT_NO_EMPTY);
+
+        if (empty($wordsA) || empty($wordsB)) {
+            return false;
+        }
+
+        $length = min(count($wordsA), count($wordsB));
+
+        for ($i = 0; $i < $length; $i++) {
+            $wordA = mb_strtolower($wordsA[$i]);
+            $wordB = mb_strtolower($wordsB[$i]);
+
+            if ($wordA === $wordB) {
+                continue;
+            }
+
+            $charsA = mb_str_split($wordA, 1, 'UTF-8');
+            $charsB = mb_str_split($wordB, 1, 'UTF-8');
+            sort($charsA);
+            sort($charsB);
+
+            if ($charsA !== $charsB) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public function store(StorePatientRequest $request)
     {
-
 
         $validatedPatientData = $request->validated(); // Use validated() directly
 
         $visitDoctorId = $validatedPatientData['doctor_id'];
         // Remove fields that are not part of the Patient model directly or handled separately
         $patientSpecificData = collect($validatedPatientData)->except(['doctor_id', 'notes', 'active_doctor_shift_id'])->toArray();
+        // 'phone' can be omitted entirely when the "require phone" setting is
+        // off; the patients.phone column is NOT NULL, so default it here
+        // rather than relaxing the schema.
+        $patientSpecificData['phone'] = $patientSpecificData['phone'] ?? '';
 
         // Check if shift is open before proceeding
         $shiftCheck = $this->checkShiftIsOpen();
@@ -154,7 +198,7 @@ class PatientController extends Controller
         $activeDoctorShiftId = $request->input('doctor_shift_id');
         $user = Auth::user();
         if ($request->filled('company_id')) {
-            if (!$user->user_type == 'تامين') {
+            if (! $user->user_type == 'تامين') {
                 // return response()->json(['message' => '   المستخدم ليس من نوع تامين .'], 400);
             } else {
                 // if(!$user->hasRole('admin')) return response()->json(['message' => '  المستخدم من نوع نقدي لا يمكنه تسجيل مريض من نوع تامين .'], 400);
@@ -162,35 +206,46 @@ class PatientController extends Controller
             // $this->authorize('register insurance_patient');
         } else {
             // return response()->json(['all permissions' => $user->getAllPermissions()], 200);
-            if (!$user->can('تسجيل مريض كاش')) return response()->json(['message' => '  المستخدم ليس لديه صلاحية تسجيل مريض كاش .'], 400);
+            if (! $user->can('تسجيل مريض كاش')) {
+                return response()->json(['message' => '  المستخدم ليس لديه صلاحية تسجيل مريض كاش .'], 400);
+            }
         }
         DB::beginTransaction();
         // return $request->validated();
         try {
-            // Check for existing patient with same phone number or identical name
+            // Only reuse an existing File when phone matches AND the names are
+            // prefix-compatible (one is a leading word-for-word subset of the
+            // other). Matching on phone alone is unsafe: a phone number is shared
+            // within a household (e.g. a father registering himself under his own
+            // number, then his son under the same number), so phone-only matching
+            // can silently merge two different people into one File. Requiring an
+            // exact name match is too strict: Arabic names are commonly entered
+            // with a varying number of words across visits (given name, then
+            // father's/grandfather's name appended later), so the same person can
+            // fail to match themselves. Prefix compatibility satisfies both: it
+            // still links "الريان محجوب" -> "الريان محجوب عثمان" as the same
+            // person, while rejecting "أحمد محجوب" vs "الريان أحمد" (different
+            // leading/given name) as different people.
             $existingPatient = null;
             $fileToUseId = null;
 
-            if (!empty($patientSpecificData['phone']) || !empty($patientSpecificData['name'])) {
-                $existingPatient = Patient::where(function ($query) use ($patientSpecificData) {
-                    if (!empty($patientSpecificData['phone'])) {
-                        $query->where('phone', $patientSpecificData['phone']);
-                    }
-                    if (!empty($patientSpecificData['name'])) {
-                        $query->orWhere('name', $patientSpecificData['name']);
-                    }
-                })->latest()->first();
+            if (! empty($patientSpecificData['phone']) && ! empty($patientSpecificData['name'])) {
+                $existingPatient = Patient::where('phone', $patientSpecificData['phone'])
+                    ->latest()
+                    ->limit(50)
+                    ->get(['id', 'name'])
+                    ->first(fn (Patient $candidate) => $this->namesArePrefixCompatible($candidate->name, $patientSpecificData['name']));
+            }
 
-                if ($existingPatient) {
-                    $latestVisit = $existingPatient->doctorVisit()->latest()->first();
-                    if ($latestVisit && $latestVisit->file_id) {
-                        $fileToUseId = $latestVisit->file_id;
-                    }
+            if ($existingPatient) {
+                $latestVisit = $existingPatient->doctorVisit()->latest()->first();
+                if ($latestVisit && $latestVisit->file_id) {
+                    $fileToUseId = $latestVisit->file_id;
                 }
             }
 
             // Create a new File record only if we didn't find an existing one to reuse
-            if (!$fileToUseId) {
+            if (! $fileToUseId) {
                 $file = File::create();
                 $fileToUseId = $file->id;
             }
@@ -217,7 +272,6 @@ class PatientController extends Controller
                 'discount_comment' => '',
                 'auth_date' => null,
             ]));
-
 
             // 3. Create the DoctorVisit record linked to this new Patient record and new File
             $doctorVisit = $patient->doctorVisit()->create([
@@ -268,16 +322,15 @@ class PatientController extends Controller
             return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'doctorVisit.doctor', 'doctorVisit.file', 'sampleCollectedBy']));
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("New patient registration failed: " . $e->getMessage(), ['exception' => $e]);
-            return response()->json(['message' => 'فشل تسجيل المريض.', 'error' => 'خطأ داخلي.' . $e->getMessage()], 500);
+            Log::error('New patient registration failed: '.$e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['message' => 'فشل تسجيل المريض.', 'error' => 'خطأ داخلي.'.$e->getMessage()], 500);
         }
     }
 
     /**
      * Toggle the result lock status for a patient.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Patient  $patient
      * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
      */
     public function toggleResultLock(Request $request, Patient $patient)
@@ -293,9 +346,10 @@ class PatientController extends Controller
 
         if ($patient->result_is_locked === $request->boolean('lock')) {
             $status = $request->boolean('lock') ? 'locked' : 'unlocked';
+
             return response()->json([
                 'message' => "Results are already {$status}.",
-                'data' => new PatientResource($patient->fresh()->loadMissing(['sampleCollectedBy'])) // Return current state
+                'data' => new PatientResource($patient->fresh()->loadMissing(['sampleCollectedBy'])), // Return current state
             ], 200); // Or 409 Conflict if preferred
         }
 
@@ -314,17 +368,16 @@ class PatientController extends Controller
         $patient->save();
 
         $action = $request->boolean('lock') ? 'locked' : 'unlocked';
+
         return response()->json([
             'message' => "Patient results have been successfully {$action}.",
-            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor', 'sampleCollectedBy'])) // Reload relations for consistency
+            'data' => new PatientResource($patient->fresh()->load(['company', 'primaryDoctor', 'sampleCollectedBy'])), // Reload relations for consistency
         ]);
     }
 
     /**
      * Authenticate patient results
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Patient  $patient
      * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
      */
     public function authenticateResults(Request $request, Patient $patient)
@@ -342,7 +395,7 @@ class PatientController extends Controller
                     'patient',
                     'patientLabRequests',
                     'patientLabRequests.mainTest',
-                    'patientLabRequests.results'
+                    'patientLabRequests.results',
                 ]);
 
                 // Set test_count attribute (expected by PatientLabQueueItemResource)
@@ -358,8 +411,8 @@ class PatientController extends Controller
             }
 
             return response()->json([
-                'message' => "Results are already authenticated.",
-                'data' => $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null
+                'message' => 'Results are already authenticated.',
+                'data' => $doctorVisit ? new PatientLabQueueItemResource($doctorVisit) : null,
             ], 200);
         }
 
@@ -375,7 +428,7 @@ class PatientController extends Controller
                 'patient',
                 'patientLabRequests',
                 'patientLabRequests.mainTest',
-                'patientLabRequests.results'
+                'patientLabRequests.results',
             ]);
 
             // Set test_count attribute (expected by PatientLabQueueItemResource)
@@ -399,17 +452,17 @@ class PatientController extends Controller
                 $payload = [
                     'queueItem' => $queueItemResource->resolve(),
                 ];
-                $url = config('services.realtime.url') . '/emit/lab-queue-item-updated';
+                $url = config('services.realtime.url').'/emit/lab-queue-item-updated';
                 HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
                     ->post($url, $payload);
             } catch (\Throwable $e) {
-                Log::warning('Failed to emit lab-queue-item-updated realtime event: ' . $e->getMessage());
+                Log::warning('Failed to emit lab-queue-item-updated realtime event: '.$e->getMessage());
             }
         }
 
         $responseData = [
-            'message' => "Patient results have been successfully authenticated.",
-            'data' => $queueItemResource
+            'message' => 'Patient results have been successfully authenticated.',
+            'data' => $queueItemResource,
         ];
 
         return response()->json($responseData);
@@ -418,21 +471,19 @@ class PatientController extends Controller
     /**
      * Get the result URL for a patient
      *
-     * @param  \App\Models\Patient  $patient
      * @return \Illuminate\Http\JsonResponse
      */
     public function getResultUrl(Patient $patient)
     {
         return response()->json([
             'result_url' => $patient->result_url,
-            'has_result_url' => !empty($patient->result_url)
+            'has_result_url' => ! empty($patient->result_url),
         ]);
     }
 
     /**
      * Upload lab result to Firebase for a patient
      *
-     * @param  \App\Models\Patient  $patient
      * @return \Illuminate\Http\JsonResponse
      */
     public function uploadToFirebase(Patient $patient, bool $sendWhatsappMessage = false)
@@ -440,21 +491,22 @@ class PatientController extends Controller
         try {
             // Get doctor visit
             $doctorVisit = $patient->doctorVisit;
-            if (!$doctorVisit) {
+            if (! $doctorVisit) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No doctor visit found for this patient'
+                    'message' => 'No doctor visit found for this patient',
                 ], 400);
             }
 
             // Check if patient already has result_url (for logging purposes)
-            $hadExistingUrl = !empty($patient->result_url);
+            $hadExistingUrl = ! empty($patient->result_url);
             $oldResultUrl = $patient->result_url;
             $settings = Setting::first();
 
             // Check if storage_name is set
             if (empty($settings->storage_name)) {
-                Log::warning("Firebase upload failed: storage_name is not set in settings");
+                Log::warning('Firebase upload failed: storage_name is not set in settings');
+
                 return response()->json([
                     'success' => false,
                     'message' => 'اسم التخزين (Storage Name) غير محدد في الإعدادات. يرجى تحديده من صفحة الإعدادات العامة.',
@@ -484,7 +536,7 @@ class PatientController extends Controller
             Log::info("Firebase upload completed for patient {$patient->id}, visit {$doctorVisit->id}", [
                 'had_existing_url' => $hadExistingUrl,
                 'old_url' => $oldResultUrl,
-                'new_url' => $patient->result_url
+                'new_url' => $patient->result_url,
             ]);
 
             $message = $hadExistingUrl
@@ -498,12 +550,12 @@ class PatientController extends Controller
                 'result_url' => $patient->result_url,
                 'patient_id' => $patient->id,
                 'visit_id' => $doctorVisit->id,
-                'was_updated' => $hadExistingUrl
+                'was_updated' => $hadExistingUrl,
             ]);
         } catch (\Exception $e) {
-            Log::error('Error uploading to Firebase: ' . $e->getMessage(), [
+            Log::error('Error uploading to Firebase: '.$e->getMessage(), [
                 'patient_id' => $patient->id,
-                'exception' => $e
+                'exception' => $e,
             ]);
 
             // Return detailed error message to help with debugging
@@ -515,13 +567,13 @@ class PatientController extends Controller
             } elseif (strpos($e->getMessage(), 'Permission denied') !== false) {
                 $errorMessage = 'Firebase storage permission denied. Please contact system administrator.';
             } else {
-                $errorMessage = 'Firebase upload failed: ' . $e->getMessage();
+                $errorMessage = 'Firebase upload failed: '.$e->getMessage();
             }
 
             return response()->json([
                 'success' => false,
                 'message' => $errorMessage,
-                'error_details' => $e->getMessage()
+                'error_details' => $e->getMessage(),
             ], 500);
         }
     }
@@ -529,8 +581,6 @@ class PatientController extends Controller
     /**
      * Toggle authentication status for a patient (Admin only)
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\Patient  $patient
      * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
      */
     public function toggleAuthentication(Request $request, Patient $patient)
@@ -543,7 +593,7 @@ class PatientController extends Controller
         // }
 
         // Toggle the authentication status
-        $patient->result_auth = !$patient->result_auth;
+        $patient->result_auth = ! $patient->result_auth;
 
         if ($patient->result_auth) {
             // If authenticating, set the auth user and date
@@ -557,7 +607,7 @@ class PatientController extends Controller
                 if ($doctorVisit) {
                     // Check if storage_name is set
                     if (empty($settings->storage_name)) {
-                        Log::warning("Firebase upload skipped: storage_name is not set in settings");
+                        Log::warning('Firebase upload skipped: storage_name is not set in settings');
                     } else {
                         \App\Jobs\UploadLabResultToFirebase::dispatch(
                             $patient->id,
@@ -568,7 +618,7 @@ class PatientController extends Controller
                     }
                 }
             } catch (\Exception $e) {
-                Log::error('Error dispatching Firebase upload job: ' . $e->getMessage());
+                Log::error('Error dispatching Firebase upload job: '.$e->getMessage());
             }
         } else {
             // If de-authenticating, clear the auth user and date
@@ -587,7 +637,7 @@ class PatientController extends Controller
                 'patient',
                 'patientLabRequests',
                 'patientLabRequests.mainTest',
-                'patientLabRequests.results'
+                'patientLabRequests.results',
             ]);
 
             // Set test_count attribute (expected by PatientLabQueueItemResource)
@@ -610,19 +660,20 @@ class PatientController extends Controller
                 $payload = [
                     'queueItem' => $queueItemResource->resolve(),
                 ];
-                $url = config('services.realtime.url') . '/emit/lab-queue-item-updated';
+                $url = config('services.realtime.url').'/emit/lab-queue-item-updated';
                 HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
                     ->post($url, $payload);
             } catch (\Throwable $e) {
-                Log::warning('Failed to emit lab-queue-item-updated realtime event: ' . $e->getMessage());
+                Log::warning('Failed to emit lab-queue-item-updated realtime event: '.$e->getMessage());
             }
         }
 
         return response()->json([
-            'message' => $patient->result_auth ? "Patient results have been authenticated." : "Patient results authentication has been revoked.",
-            'data' => $queueItemResource
+            'message' => $patient->result_auth ? 'Patient results have been authenticated.' : 'Patient results authentication has been revoked.',
+            'data' => $queueItemResource,
         ]);
     }
+
     /**
      * Create a new Patient record by cloning data, and then create a new DoctorVisit.
      * A new File record is created and linked if no previous_visit_id is provided,
@@ -634,11 +685,11 @@ class PatientController extends Controller
             'doctor_id' => 'required|integer|exists:doctors,id',
             'active_doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
             'reason_for_visit' => 'nullable|string|max:1000',
-            'previous_visit_id' => 'nullable|integer|exists:doctorvisits,id,patient_id,' . $doctorVisit->patient_id,
+            'previous_visit_id' => 'nullable|integer|exists:doctorvisits,id,patient_id,'.$doctorVisit->patient_id,
         ]);
 
         $currentGeneralShift = Shift::open()->latest('id')->first();
-        if (!$currentGeneralShift) {
+        if (! $currentGeneralShift) {
             return response()->json(['message' => 'لا توجد وردية عيادة مفتوحة حالياً.'], 400);
         }
         $dateCheck = $this->checkLatestShiftDateIsToday();
@@ -658,11 +709,10 @@ class PatientController extends Controller
         // $user = Auth::user();
         // if($doctorVisit->patient->company_id == null && $user->user_type == 'تامين') return response()->json(['message' => '  المستخدم من نوع تامين لا يمكنه تسجيل مريض من نوع نقدي .'], 400);
 
-
         $fileToUseId = null;
         $previousVisit = null;
 
-        if (!empty($validatedVisitData['previous_visit_id'])) {
+        if (! empty($validatedVisitData['previous_visit_id'])) {
             $previousVisit = DoctorVisit::find($validatedVisitData['previous_visit_id']);
             $fileToUseId = $previousVisit?->file_id; // Copy existing file_id
         }
@@ -670,16 +720,15 @@ class PatientController extends Controller
         // If no previous visit was specified to copy file_id from, OR if that visit had no file_id,
         // AND if the existingPatient's latest visit also doesn't provide a file_id, create a new file.
         // This logic assumes you want to reuse file_id if available from history.
-        if (!$fileToUseId) {
+        if (! $fileToUseId) {
             $latestVisitOfExistingPatient = $doctorVisit->patient->doctorVisit()->latest('created_at')->first();
             $fileToUseId = $latestVisitOfExistingPatient?->file_id;
         }
 
-
         DB::beginTransaction();
         try {
             // 1. Create a new File record ONLY if we couldn't find one to copy
-            if (!$fileToUseId) {
+            if (! $fileToUseId) {
                 $file = File::create();
                 $fileToUseId = $file->id;
             }
@@ -737,23 +786,34 @@ class PatientController extends Controller
             return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor', 'file']));
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to store visit from history for original patient {$doctorVisit->patient->id}: " . $e->getMessage(), ['exception' => $e]);
-            return response()->json(['message' => 'فشل إنشاء الزيارة الجديدة من السجل.', 'error' => 'خطأ داخلي.' . $e->getMessage()], 500);
+            Log::error("Failed to store visit from history for original patient {$doctorVisit->patient->id}: ".$e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['message' => 'فشل إنشاء الزيارة الجديدة من السجل.', 'error' => 'خطأ داخلي.'.$e->getMessage()], 500);
         }
     }
+
     public function searchExisting(Request $request)
     {
         $searchTerm = $request->validate([
             'term' => 'required|string|min:2',
         ])['term'];
 
-        $visits = DoctorVisit::query()
-            ->whereHas('patient', function ($query) use ($searchTerm) {
-                $query->where(function ($q) use ($searchTerm) {
-                    $q->where('name', 'LIKE', "%{$searchTerm}%")
-                        ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
-                });
+        // Resolve matching patients first: a correlated whereHas() on 330k+ visits
+        // forces MySQL into a full table scan + filesort (no index can serve an
+        // unanchored LIKE), even though only a handful of patients ever match.
+        // Filtering patients directly lets it walk the primary key in reverse and
+        // stop as soon as enough matches are found.
+        $patientIds = Patient::query()
+            ->where(function ($query) use ($searchTerm) {
+                $query->where('name', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
             })
+            ->orderByDesc('id')
+            ->limit(50)
+            ->pluck('id');
+
+        $visits = DoctorVisit::query()
+            ->whereIn('patient_id', $patientIds)
             ->with(['patient', 'doctor'])
             ->orderBy('created_at', 'desc')
             ->limit(20)
@@ -761,7 +821,6 @@ class PatientController extends Controller
 
         return PatientSearchResultResource::collection($visits);
     }
-
 
     /**
      * Display the specified patient.
@@ -778,6 +837,7 @@ class PatientController extends Controller
             'sampleCollectedBy:id,name', // User who collected the sample
 
         ]);
+
         return new PatientResource($patient);
     }
 
@@ -801,7 +861,7 @@ class PatientController extends Controller
             // }
         }
 
-        Log::info('Updating patient:  ' . $patient->id . ' with data: ' . json_encode($request->all()));
+        Log::info('Updating patient:  '.$patient->id.' with data: '.json_encode($request->all()));
         // Exclude fields that are managed by other processes or shouldn't be mass updated here
         // For example, financial or specific clinical flags related to visits.
 
@@ -811,11 +871,11 @@ class PatientController extends Controller
             $payload = [
                 'patient' => (new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'sampleCollectedBy'])))->resolve(),
             ];
-            $url = config('services.realtime.url') . '/emit/patient-updated';
+            $url = config('services.realtime.url').'/emit/patient-updated';
             HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
                 ->post($url, $payload);
         } catch (\Throwable $e) {
-            Log::warning('Failed to emit patient-updated realtime event: ' . $e->getMessage());
+            Log::warning('Failed to emit patient-updated realtime event: '.$e->getMessage());
         }
 
         return new PatientResource($patient->loadMissing(['company', 'primaryDoctor', 'sampleCollectedBy']));
@@ -834,27 +894,38 @@ class PatientController extends Controller
         // DB::transaction(function() use ($patient) {
         // Handle related data if necessary
         $patient->delete();
+
         // });
         return response()->json(null, 204);
     }
+
     // In PatientController.php
     public function visitHistory(Patient $patient)
     {
-        // Get all doctor visits where the patient's phone number matches
-        $patients = DoctorVisit::whereHas('patient', function ($query) use ($patient) {
-            $query->where('phone', $patient->phone);
-        })
+        // Match other registrations belonging to the same real person via phone number,
+        // but only when the phone is a real, distinguishing value — placeholder values
+        // like '0' or an empty string are shared by tens of thousands of patients here,
+        // and matching on them would try to eager-load the entire doctorvisits table.
+        $phone = trim((string) $patient->phone);
+        $hasReliablePhone = $phone !== '' && $phone !== '0';
+
+        $visits = DoctorVisit::query()
+            ->when(
+                $hasReliablePhone,
+                fn ($query) => $query->whereHas('patient', fn ($q) => $q->where('phone', $phone)),
+                fn ($query) => $query->where('patient_id', $patient->id)
+            )
             ->with(['doctor:id,name', 'requestedServices.service:id,name', 'patient', 'doctor'])
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->paginate(15);
 
-        return DoctorVisitResource::collection($patients);
+        return DoctorVisitResource::collection($visits);
     }
+
     /**
      * Store a new patient and create a lab-centric visit from the Lab Reception page.
      * This method does not require an active doctor shift but links to a general clinic shift.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return \App\Http\Resources\PatientResource|\Illuminate\Http\JsonResponse
      */
     public function storeFromLab(Request $request)
@@ -878,10 +949,9 @@ class PatientController extends Controller
         ]);
 
         $currentGeneralShift = Shift::open()->latest('created_at')->first();
-        if (!$currentGeneralShift) {
+        if (! $currentGeneralShift) {
             return response()->json(['message' => 'No open clinic shift available to create a visit.'], 400);
         }
-
 
         // Find the latest active shift for the selected referring doctor.
         // This is important for correctly assigning any doctor-related credit later.
@@ -891,7 +961,7 @@ class PatientController extends Controller
 
         if ($activeDoctorShift) {
         } else {
-            //create a new shift
+            // create a new shift
             $activeDoctorShift = DoctorShift::create([
                 'doctor_id' => $validatedData['doctor_id'],
                 'start_time' => Carbon::now(),
@@ -933,7 +1003,6 @@ class PatientController extends Controller
                 'discount_comment' => '',
                 'visit_number' => $visitLabNumber,
 
-
             ]);
 
             // Create the DoctorVisit record linked to this new Patient record
@@ -966,7 +1035,8 @@ class PatientController extends Controller
             return new PatientResource($patient);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Lab patient registration failed: " . $e->getMessage(), ['exception' => $e]);
+            Log::error('Lab patient registration failed: '.$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'Failed to register patient for lab.', 'error_details' => $e->getMessage()], 500);
         }
     }
@@ -1006,6 +1076,7 @@ class PatientController extends Controller
 
         return response()->json(['data' => $formattedResults]);
     }
+
     /**
      * Create a new lab-only visit for an existing patient.
      */
@@ -1018,7 +1089,6 @@ class PatientController extends Controller
             'company_id' => 'nullable|integer|exists:companies,id', // Company for insurance patients
             'reason_for_visit' => 'nullable|string|max:1000',
         ]);
-
 
         // return ['validated' => $validated['doctor_id']];
         // Check if shift is open before proceeding
@@ -1050,7 +1120,7 @@ class PatientController extends Controller
             $fileToUseId = $patient->doctorVisit?->file_id;
 
             // If for some reason no previous visit had a file, create a new one
-            if (!$fileToUseId) {
+            if (! $fileToUseId) {
                 $file = File::create();
                 $fileToUseId = $file->id;
             }
@@ -1107,10 +1177,12 @@ class PatientController extends Controller
             return new \App\Http\Resources\PatientResource($newPatient);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to create lab visit for existing patient {$patient->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Failed to create lab visit for existing patient {$patient->id}: ".$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'Failed to create lab visit.', 'error' => $e->getMessage()], 500);
         }
     }
+
     public function getRecentLabActivityPatients(Request $request)
     {
         // if (!Auth::user()->can('view lab_workstation_patient_dropdown')) { /* ... */ }
@@ -1131,9 +1203,10 @@ class PatientController extends Controller
 
         // The resource needs to handle 'latest_visit_id' if it's not a direct attribute
         return PatientStrippedResource::collection($patients)->additional([
-            'meta' => ['note' => 'latest_visit_id refers to the DoctorVisit ID']
+            'meta' => ['note' => 'latest_visit_id refers to the DoctorVisit ID'],
         ]);
     }
+
     /**
      * Search for DoctorVisits by patient name for Autocomplete.
      * Returns recent visits matching the patient name.
@@ -1154,7 +1227,7 @@ class PatientController extends Controller
         if (is_numeric($searchTerm)) {
             $visits = DoctorVisit::with([
                 'patient:id,name,phone', // Eager load basic patient info
-                'doctor:id,name'         // Eager load basic doctor info
+                'doctor:id,name',         // Eager load basic doctor info
             ])
                 ->where('id', $searchTerm)
                 ->take($limit)
@@ -1168,7 +1241,7 @@ class PatientController extends Controller
 
             $visits = DoctorVisit::with([
                 'patient:id,name,phone', // Eager load basic patient info
-                'doctor:id,name'         // Eager load basic doctor info
+                'doctor:id,name',         // Eager load basic doctor info
             ])
                 ->whereHas('patient', function ($query) use ($searchTerm) {
                     $query->where('name', 'LIKE', "%{$searchTerm}%")
@@ -1197,7 +1270,6 @@ class PatientController extends Controller
             return true;
         });
 
-
         return RecentDoctorVisitSearchResource::collection($visitsWithLabs);
     }
 
@@ -1210,8 +1282,8 @@ class PatientController extends Controller
         $hostPrinter = "\\$ip_address\zebra";
         $speedPrinter = 3;
         $darknessPrint = 20;
-        $labelSize = array(300, 10);
-        $referencePoint = array(223, 30);
+        $labelSize = [300, 10];
+        $referencePoint = [223, 30];
         $z = new Zebra($hostPrinter, $speedPrinter, $darknessPrint, $labelSize, $referencePoint);
         $containers = $patient->labrequests->map(function (LabRequest $req) {
             return $req->mainTest->container;
@@ -1223,7 +1295,7 @@ class PatientController extends Controller
             })->map(function (LabRequest $labRequest) {
                 return $labRequest->mainTest;
             });
-            $tests = "";
+            $tests = '';
             /** @var MainTest $maintest */
             foreach ($tests_accoriding_to_container as $maintest) {
                 $main_test_name = $maintest->main_test_name;
@@ -1235,27 +1307,26 @@ class PatientController extends Controller
             //                $z->writeLabel("$tests",330,10,1);
             //                //$z->writeLabel("-",200,20,1);
             //                $z->setLabelCopies(1);
-            $z->setBarcode(1, 270, 110, $doctorvisit->id); #1 -> cod128//barcode
+            $z->setBarcode(1, 270, 110, $doctorvisit->id); // 1 -> cod128//barcode
             // $z->writeLabel($patient->visit_number, 340, 155, 4); //patient id
-            $z->writeLabelBig($patient->visit_number, 335, 155, 4); //patient id
+            $z->writeLabelBig($patient->visit_number, 335, 155, 4); // patient id
 
             $z->writeLabel("$tests", 330, 10, 1);
             //            $z->writeLabel("$package_name",210,150,1);
 
-            //$z->writeLabel("-",200,20,1);
+            // $z->writeLabel("-",200,20,1);
             $z->setLabelCopies(1);
-        } //end of foreach
+        } // end of foreach
 
         $z->print2zebra();
+
         return ['status' => true];
     }
 
-
     /**
      * Print barcode labels for lab containers based on doctor visit
-     * 
-     * @param Request $request
-     * @param Doctorvisit $doctorvisit
+     *
+     * @param  Request  $request
      * @return array
      */
     // public function printBarcode(Request $request, Doctorvisit $doctorvisit)
@@ -1313,12 +1384,8 @@ class PatientController extends Controller
 
     /**
      * Generate label for a specific container
-     * 
-     * @param Zebra $zebra
-     * @param Patient $patient
-     * @param Doctorvisit $doctorvisit
-     * @param object $container
-     * @return void
+     *
+     * @param  object  $container
      */
     private function generateLabelForContainer(Zebra $zebra, Patient $patient, Doctorvisit $doctorvisit, $container): void
     {
@@ -1382,13 +1449,13 @@ class PatientController extends Controller
             ->where('status', true)
             ->first();
 
-        if (!$doctorShift) {
+        if (! $doctorShift) {
             return response()->json(['message' => 'وردية الطبيب غير صحيحة أو غير نشطة.'], 400);
         }
 
         $patient = $doctorVisit->patient;
-        $company_id =   $validated['company_id'] ?? $patient->company_id;
-        if ($company_id != null && !$user->can('تسجيل مريض تامين')) {
+        $company_id = $validated['company_id'] ?? $patient->company_id;
+        if ($company_id != null && ! $user->can('تسجيل مريض تامين')) {
             return response()->json(['message' => 'المستخدم ليس لديه صلاحية تسجيل مريض تامين.'], 400);
         }
 
@@ -1398,7 +1465,7 @@ class PatientController extends Controller
             $fileToUseId = $doctorVisit->file_id;
 
             // If for some reason no previous visit had a file, create a new one
-            if (!$fileToUseId) {
+            if (! $fileToUseId) {
                 $file = File::create();
                 $fileToUseId = $file->id;
             }
@@ -1521,7 +1588,8 @@ class PatientController extends Controller
             return new PatientResource($newPatient);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to create clinic visit from history for doctor visit {$doctorVisit->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Failed to create clinic visit from history for doctor visit {$doctorVisit->id}: ".$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'فشل إنشاء زيارة العيادة من السجل.', 'error' => $e->getMessage()], 500);
         }
     }
@@ -1562,7 +1630,7 @@ class PatientController extends Controller
                         ->withCount([
                             'labRequests as lab_request_count' => function ($labQuery) {
                                 $labQuery->where('valid', true);
-                            }
+                            },
                         ])
                         ->orderBy('created_at', 'desc');
                 },
@@ -1590,9 +1658,9 @@ class PatientController extends Controller
                 'visit_date' => $latestVisit ? $latestVisit->visit_date : null,
                 'lab_request_count' => $labRequestCount,
                 'company_name' => $patient->company ? $patient->company->name : null,
-                'autocomplete_label' => $patient->name .
-                    ($latestVisit && $latestVisit->visit_date ? " - " . $latestVisit->visit_date->format('d/M/Y') : '') .
-                    " (" . $labRequestCount . " tests)",
+                'autocomplete_label' => $patient->name.
+                    ($latestVisit && $latestVisit->visit_date ? ' - '.$latestVisit->visit_date->format('d/M/Y') : '').
+                    ' ('.$labRequestCount.' tests)',
             ];
         });
 
@@ -1600,27 +1668,27 @@ class PatientController extends Controller
             'data' => $formattedResults,
             'meta' => [
                 'total_patients' => $patientsWithLabHistory->count(),
-                'phone_searched' => $phone
-            ]
+                'phone_searched' => $phone,
+            ],
         ]);
     }
 
     public function populatePatientChemistryData(Request $request, Doctorvisit $doctorvisit)
     {
         $main_test_id = $request->get('main_test_id');
-        $chemistry =   Mindray::where('doctorvisit_id', '=', $doctorvisit->id)->first();
+        $chemistry = Mindray::where('doctorvisit_id', '=', $doctorvisit->id)->first();
         if ($chemistry == null) {
-            return  ['status' => false, 'message' => 'no data found'];
+            return ['status' => false, 'message' => 'no data found'];
         }
-        $bindings =   \App\Models\ChemistryBinder::all();
+        $bindings = \App\Models\ChemistryBinder::all();
         /** @var \App\Models\ChemistryBinder $binding */
         $object = null;
         foreach ($bindings as $binding) {
             $object[$binding->name_in_mindray_table] = [
                 'child_id' => [$binding->child_id_array],
-                'result' => $chemistry[$binding->name_in_mindray_table]
+                'result' => $chemistry[$binding->name_in_mindray_table],
             ];
-            $child_array =  explode(',', $binding->child_id_array);
+            $child_array = explode(',', $binding->child_id_array);
             foreach ($child_array as $child_id) {
                 $requested_result = RequestedResult::whereChildTestId($child_id)->where('main_test_id', '=', $main_test_id)->where('patient_id', '=', $doctorvisit->patient->id)->first();
                 if ($requested_result != null) {
@@ -1638,7 +1706,7 @@ class PatientController extends Controller
         $main_test_id = $request->get('main_test_id');
         $hormone = HormoneResult::where('doctorvisit_id', '=', $doctorvisit->id)->first();
         if ($hormone == null) {
-            return  ['status' => false, 'message' => 'no data found'];
+            return ['status' => false, 'message' => 'no data found'];
         }
         $bindings = HormoneBinding::all();
         /** @var \App\Models\HormoneBinding $binding */
@@ -1646,9 +1714,9 @@ class PatientController extends Controller
         foreach ($bindings as $binding) {
             $object[$binding->name_in_hormone_table] = [
                 'child_id' => [$binding->child_id_array],
-                'result' => $hormone[$binding->name_in_hormone_table]
+                'result' => $hormone[$binding->name_in_hormone_table],
             ];
-            $child_array =  explode(',', $binding->child_id_array);
+            $child_array = explode(',', $binding->child_id_array);
             foreach ($child_array as $child_id) {
                 $requested_result = RequestedResult::whereChildTestId($child_id)->where('main_test_id', '=', $main_test_id)->where('patient_id', '=', $doctorvisit->patient->id)->first();
                 if ($requested_result != null) {
@@ -1669,7 +1737,6 @@ class PatientController extends Controller
             return ['status' => false, 'message' => 'no data found'];
         }
 
-
         $this->uploadToFirebase($doctorvisit->patient);
 
         $settings = Setting::first();
@@ -1687,7 +1754,7 @@ class PatientController extends Controller
                 'url' => $doctorvisit->patient->result_url,
                 'token' => $token,
                 'instance_id' => $instanceId,
-                'collection' => $collection
+                'collection' => $collection,
 
             ]
         );
@@ -1708,6 +1775,7 @@ class PatientController extends Controller
             'message' => $message,
         ], $response->status());
     }
+
     public function sendWhatsappDirectWithoutUpload(Request $request)
     {
         $doctorVisitId = $request->get('visit_id');
@@ -1715,8 +1783,6 @@ class PatientController extends Controller
         if ($doctorvisit == null) {
             return ['status' => false, 'message' => 'no data found'];
         }
-
-
 
         $settings = Setting::first();
         $token = $settings?->ultramsg_token ?? '';
@@ -1730,7 +1796,7 @@ class PatientController extends Controller
                 'url' => $doctorvisit->patient->result_url,
                 'token' => $token,
                 'instance_id' => $instanceId,
-                'collection' => $collection
+                'collection' => $collection,
             ]
         );
 
@@ -1776,7 +1842,9 @@ class PatientController extends Controller
         }
 
         $maxWords = max(\count($oldWords), \count(explode(' ', $newName)));
-        if ($maxWords === 0) return 0;
+        if ($maxWords === 0) {
+            return 0;
+        }
 
         return ($matchedWords / $maxWords) * 100;
     }
@@ -1788,6 +1856,7 @@ class PatientController extends Controller
         $text = preg_replace('/[أإآ]/u', 'ا', $text);
         $text = preg_replace('/ة/u', 'ه', $text);
         $text = preg_replace('/[ىي]/u', 'ي', $text);
+
         return $text;
     }
 
@@ -1796,15 +1865,23 @@ class PatientController extends Controller
         $length1 = mb_strlen($str1, 'UTF-8');
         $length2 = mb_strlen($str2, 'UTF-8');
 
-        if ($length1 == 0) return $length2;
-        if ($length2 == 0) return $length1;
+        if ($length1 == 0) {
+            return $length2;
+        }
+        if ($length2 == 0) {
+            return $length1;
+        }
 
         $s1 = mb_str_split($str1, 1, 'UTF-8');
         $s2 = mb_str_split($str2, 1, 'UTF-8');
 
         $d = [];
-        for ($i = 0; $i <= $length1; $i++) $d[$i][0] = $i;
-        for ($j = 0; $j <= $length2; $j++) $d[0][$j] = $j;
+        for ($i = 0; $i <= $length1; $i++) {
+            $d[$i][0] = $i;
+        }
+        for ($j = 0; $j <= $length2; $j++) {
+            $d[0][$j] = $j;
+        }
 
         for ($i = 1; $i <= $length1; $i++) {
             for ($j = 1; $j <= $length2; $j++) {

@@ -1,16 +1,18 @@
 <?php
+
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * 
- *
  * @property int $id
  * @property string $name
  * @property int $service_group_id
  * @property string $price
  * @property bool $activate
+ * @property bool $has_cost
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property bool $variable
@@ -20,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Doctor> $doctorsProviding
  * @property-read int|null $doctors_providing_count
  * @property-read \App\Models\ServiceGroup $serviceGroup
+ *
  * @method static \Database\Factories\ServiceFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Service newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Service newQuery()
@@ -32,22 +35,26 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Service whereServiceGroupId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Service whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Service whereVariable($value)
+ *
  * @mixin \Eloquent
  */
 class Service extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
+
     protected $fillable = [
         'name',
         'service_group_id',
         'price',
         'activate',
+        'has_cost',
         'variable',
     ];
 
     protected $casts = [
         'price' => 'decimal:2',
         'activate' => 'boolean',
+        'has_cost' => 'boolean',
         'variable' => 'boolean',
     ];
 
@@ -55,24 +62,26 @@ class Service extends Model
     {
         return $this->belongsTo(ServiceGroup::class);
     }
-    public function companies() {
+
+    public function companies()
+    {
         return $this->belongsToMany(Company::class, 'company_service')
-                    ->using(CompanyService::class)
-                    ->withPivot([
-                        'price', 'static_endurance', 'percentage_endurance',
-                        'static_wage', 'percentage_wage', 'use_static', 'approval'
-                    ]);
-                    // ->withTimestamps(); // if pivot has timestamps
+            ->using(CompanyService::class)
+            ->withPivot([
+                'price', 'static_endurance', 'percentage_endurance',
+                'static_wage', 'percentage_wage', 'use_static', 'approval',
+            ]);
+        // ->withTimestamps(); // if pivot has timestamps
     }
 
-       /**
+    /**
      * The doctors who offer this service with specific financial terms.
      */
     public function doctorsProviding()
     {
         return $this->belongsToMany(Doctor::class, 'doctor_services')
-                    ->using(DoctorService::class)
-                    ->withPivot(['id', 'percentage', 'fixed'])
-                    ->withTimestamps();
+            ->using(DoctorService::class)
+            ->withPivot(['id', 'percentage', 'fixed'])
+            ->withTimestamps();
     }
 }

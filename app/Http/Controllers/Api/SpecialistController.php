@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\SpecialistResource;
 use App\Models\Specialist;
 use Illuminate\Http\Request;
-use App\Http\Resources\SpecialistResource;
 use Illuminate\Validation\Rule;
 
 class SpecialistController extends Controller
@@ -18,7 +18,7 @@ class SpecialistController extends Controller
         // $this->middleware('can:edit specialists')->only('update');
         // $this->middleware('can:delete specialists')->only('destroy');
     }
-    
+
     /**
      * Display a paginated listing of the resource.
      * THIS IS THE MISSING METHOD.
@@ -33,11 +33,11 @@ class SpecialistController extends Controller
         $query = Specialist::withCount('doctors')->latest('id'); // Get count of doctors for each specialty
 
         if ($request->filled('search')) {
-            $query->where('name', 'LIKE', '%' . $request->search . '%');
+            $query->where('name', 'LIKE', '%'.$request->search.'%');
         }
 
         $specialists = $query->paginate($request->get('per_page', 15));
-        
+
         return SpecialistResource::collection($specialists);
     }
 
@@ -58,6 +58,7 @@ class SpecialistController extends Controller
             'name' => 'required|string|max:255|unique:specialists,name',
         ]);
         $specialist = Specialist::create($validated);
+
         return new SpecialistResource($specialist);
     }
 
@@ -75,10 +76,11 @@ class SpecialistController extends Controller
     public function update(Request $request, Specialist $specialist)
     {
         $validated = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('specialists')->ignore($specialist->id),],
+            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('specialists')->ignore($specialist->id)],
             'firestore_id' => ['sometimes', 'required', 'string', 'max:255'],
         ]);
         $specialist->update($validated);
+
         return new SpecialistResource($specialist);
     }
 
@@ -88,9 +90,10 @@ class SpecialistController extends Controller
     public function destroy(Specialist $specialist)
     {
         if ($specialist->doctors()->exists()) {
-            return response()->json(['message' => 'Cannot delete this specialization as it is assigned to one or more doctors.'], 403);
+            return response()->json(['message' => 'لا يمكن حذف هذا الاختصاص لارتباطه بطبيب أو أكثر.'], 403);
         }
         $specialist->delete();
+
         return response()->json(null, 204);
     }
 }

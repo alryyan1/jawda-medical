@@ -12,17 +12,20 @@ class LabResultReport
 {
     // Sizing and spacing constants for consistent UI/UX
     private float $baseLineHeight = 5.0;         // Default line height used for table rows
+
     private float $sectionSpacing = 8.0;         // Spacing between major sections
+
     private float $headerSpacing = 6.0;          // Spacing after headers
+
     private float $smallSpacing = 3.0;           // Minor spacing between related elements
+
     private array $themeHeaderFill = [245, 247, 250]; // light header fill
+
     private array $themeBorderColor = [200, 205, 210];
 
     /**
      * Generate lab result PDF content for a doctor visit.
      *
-     * @param DoctorVisit $doctorvisit
-     * @param bool $base64
      * @return string PDF content
      */
     public function generate(DoctorVisit $doctorvisit, bool $base64 = false, bool $isWhatsappContext = false): string
@@ -53,7 +56,7 @@ class LabResultReport
 
         $pdf->setHeaderMargin(PDF_MARGIN_HEADER);
         $pdf->setFooterMargin(0);
-        $pdf->setAutoPageBreak(TRUE, 40);
+        $pdf->setAutoPageBreak(true, 40);
         $page_width = $pdf->getPageWidth() - PDF_MARGIN_LEFT - PDF_MARGIN_RIGHT;
 
         /** @var Setting $img_base64_encoded */
@@ -87,8 +90,8 @@ class LabResultReport
                 $watermarkPath = $candidate;
             }
         }
-        if ($watermarkPath === null && !empty($settings?->watermark_image)) {
-            $candidate = $logo_path . '/' . $settings->watermark_image;
+        if ($watermarkPath === null && ! empty($settings?->watermark_image)) {
+            $candidate = $logo_path.'/'.$settings->watermark_image;
             if (file_exists($candidate)) {
                 $watermarkPath = $candidate;
             }
@@ -122,7 +125,7 @@ class LabResultReport
         // Add logo
         $this->addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64, $isWhatsappContext);
 
-        if (!$isWhatsappContext) {
+        if (! $isWhatsappContext) {
             $patient->update(['result_print_date' => now()]);
         }
 
@@ -183,21 +186,21 @@ class LabResultReport
         $y = $pdf->GetY();
         $pdf->SetFont('arial', '', 13, '', true);
         $table_col_widht = ($page_width) / 4;
-        $pdf->cell($table_col_widht / 2, 5, "Date", 0, 0, 'C');
+        $pdf->cell($table_col_widht / 2, 5, 'Date', 0, 0, 'C');
         $pdf->cell($table_col_widht, 5, $patient->created_at->format('Y-m-d'), 0, 0, 'C');
         $pdf->SetFont('arial', '', 18, '', true);
-        $pdf->cell($table_col_widht * 2 + 10, 5, $patient->name, 0, 0, 'R', stretch: 1); //patient name
-        $pdf->cell($table_col_widht / 2 - 10, 5, "الاسم/ ", 0, 1, 'R'); //
+        $pdf->cell($table_col_widht * 2 + 10, 5, $patient->name, 0, 0, 'R', stretch: 1); // patient name
+        $pdf->cell($table_col_widht / 2 - 10, 5, 'الاسم/ ', 0, 1, 'R'); //
 
-        $pdf->cell($table_col_widht / 2, 5, "SN", 0, 0, 'C');
-        $pdf->cell($table_col_widht, 5, $doctorvisit->id, 0, 0, 'C'); //age
+        $pdf->cell($table_col_widht / 2, 5, 'SN', 0, 0, 'C');
+        $pdf->cell($table_col_widht, 5, $doctorvisit->id, 0, 0, 'C'); // age
         $pdf->SetFont('arial', '', 15, '', true);
 
         $pdf->cell($table_col_widht * 2 + 10, 5, $patient?->doctor?->name, 0, 0, 'R'); // doctor name
-        $pdf->cell($table_col_widht / 2 - 10, 5, "د/ ", 0, 1, 'C');
+        $pdf->cell($table_col_widht / 2 - 10, 5, 'د/ ', 0, 1, 'C');
 
         $requestedTests = $doctorvisit->patientLabRequests
-            ->map(fn($lr) => $lr->mainTest?->main_test_name)
+            ->map(fn ($lr) => $lr->mainTest?->main_test_name)
             ->filter()->unique()->implode(' | ');
 
         $this->drawHeaderLines($pdf, $requestedTests);
@@ -208,16 +211,16 @@ class LabResultReport
      */
     private function drawHeaderLines($pdf, $requestedTests): void
     {
-        $pdf->Line(6, 5, 205, 5); //TOP LINE [H]
-        $pdf->Line(6, 70, 205, 70); //SECOND [H]
-        $pdf->Line(6, 80, 205, 80); //SECOND [H]
+        $pdf->Line(6, 5, 205, 5); // TOP LINE [H]
+        $pdf->Line(6, 70, 205, 70); // SECOND [H]
+        $pdf->Line(6, 80, 205, 80); // SECOND [H]
         $pdf->RoundedRect(6, 50, 199, 18, 6.50, '0101');
 
-        $pdf->Line(6, 70, 6, 280); //line between 2 points
-        $pdf->Line(205, 70, 205, 280); //line between 2 points
+        $pdf->Line(6, 70, 6, 280); // line between 2 points
+        $pdf->Line(205, 70, 205, 280); // line between 2 points
         $pdf->SetFont('arial', '', 9, '', true);
         $pdf->Ln();
-        $pdf->cell(25, 5, "Requested: ", 0, 0, 'L');
+        $pdf->cell(25, 5, 'Requested: ', 0, 0, 'L');
         $pdf->MultiCell(170, 5, "$requestedTests", 0, 'L', 0, 1, '', '', true);
         $pdf->SetFont('arial', '', 15, '', true);
     }
@@ -231,22 +234,22 @@ class LabResultReport
         // $pdf->fontsubsetting(true);
         $col = $page_width / 6;
         $user = auth()->user();
-        $pdf->cell(20, 5, "Sign: ", 0, 1, 'L');
+        $pdf->cell(20, 5, 'Sign: ', 0, 1, 'L');
         $pdf->cell($col, 5, $patient->resultAuthUser->name ?? 'System', 0, 0, 'L');
-        $pdf->cell($col, 5, " ", 0, 0, 'L');
-        $pdf->cell($col, 5, " ", 0, 0, 'L');
-        $pdf->cell($col, 5, " ", 0, 0, 'L');
-        $pdf->cell($col, 5, "No ", 0, 0, 'R');
+        $pdf->cell($col, 5, ' ', 0, 0, 'L');
+        $pdf->cell($col, 5, ' ', 0, 0, 'L');
+        $pdf->cell($col, 5, ' ', 0, 0, 'L');
+        $pdf->cell($col, 5, 'No ', 0, 0, 'R');
         $pdf->cell($col, 5, $patient->visit_number, 0, 1, 'C');
 
-        if ($settings?->footer_content != null) {
+        if ($settings?->address != null) {
             $pdf->SetFont('arial', '', 10, '', true);
-            $pdf->MultiCell($page_width - 25, 5, $settings->footer_content, 0, 'C', 0, 1, '', '', true);
+            $pdf->MultiCell($page_width - 25, 5, $settings->address, 0, 'C', 0, 1, '', '', true);
         }
 
         $y = $pdf->getY();
         if ($settings?->is_footer) {
-            $pdf->Image($logo_path . '/' . $footer_name, 10, $y + 10, $page_width + 10, 10);
+            $pdf->Image($logo_path.'/'.$footer_name, 10, $y + 10, $page_width + 10, 10);
         }
     }
 
@@ -255,19 +258,23 @@ class LabResultReport
      */
     private function addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64, bool $isWhatsappContext = false): void
     {
-        if (!$settings) return;
+        if (! $settings) {
+            return;
+        }
 
         // Determine visibility
         $shouldShow = true;
         if ($settings->show_logo_only_whatsapp) {
-            $shouldShow = (bool)$isWhatsappContext;
+            $shouldShow = (bool) $isWhatsappContext;
         } elseif ($settings->show_logo !== null) {
-            $shouldShow = (bool)$settings->show_logo;
+            $shouldShow = (bool) $settings->show_logo;
         } else {
-            $shouldShow = (bool)$settings->is_logo || (bool)$settings->is_header;
+            $shouldShow = (bool) $settings->is_logo || (bool) $settings->is_header;
         }
 
-        if (!$shouldShow) return;
+        if (! $shouldShow) {
+            return;
+        }
 
         $type = $settings->pdf_header_type ?? ($settings->is_logo ? 'logo' : 'full_width');
 
@@ -281,13 +288,13 @@ class LabResultReport
             $x = ($position === 'right') ? ($pdf->getPageWidth() - PDF_MARGIN_RIGHT - $width - $xOffset) : (PDF_MARGIN_LEFT + $xOffset - 10); // Adjusting for internal TCPDF relative position
 
             // If we are using old defaults where it was 5 on both sides
-            if ($settings->is_logo && !isset($settings->pdf_header_logo_position)) {
+            if ($settings->is_logo && ! isset($settings->pdf_header_logo_position)) {
                 // Classic behavior
-                $pdf->Image($logo_path . '/' . $logo_name, 5, 5, 40, 40);
-                $pdf->Image($logo_path . '/' . $logo_name, 165, 5, 40, 40);
+                $pdf->Image($logo_path.'/'.$logo_name, 5, 5, 40, 40);
+                $pdf->Image($logo_path.'/'.$logo_name, 165, 5, 40, 40);
             } else {
                 $pdf->Image(
-                    $logo_path . '/' . $logo_name,
+                    $logo_path.'/'.$logo_name,
                     $x,
                     $yOffset,
                     $width,
@@ -313,10 +320,10 @@ class LabResultReport
             $yOffset = $settings->pdf_header_image_y_offset ?? 10;
 
             $pdf->Image(
-                $logo_path . '/' . $logo_name,
+                $logo_path.'/'.$logo_name,
                 0,
                 7,
-                $width +10,
+                $width + 10,
                 30,
                 '',
                 '',
@@ -368,16 +375,20 @@ class LabResultReport
         foreach ($main_test_array as $m_test) {
             $count++;
             // dd($m_test);
-            if ($m_test->hidden == 1) continue;
+            if ($m_test->hidden == 1) {
+                continue;
+            }
 
             $children_count = count($m_test->results);
             $children_count_empty = $m_test->results->filter(function ($curr) {
                 return $curr->result == '' || $curr->result == 'no sample';
             }, 0)->count();
 
-            //empty test
+            // empty test
             if ($m_test->requestedOrganisms()->count() == 0) {
-                if ($children_count_empty == $children_count) continue;
+                if ($children_count_empty == $children_count) {
+                    continue;
+                }
             }
 
             $children_count -= $children_count_empty;
@@ -412,7 +423,7 @@ class LabResultReport
             if ($m_test->requestedOrganisms()->count() > 0) {
                 $is_columns = false;
                 $pdf->SetFont('arial', '', 18, '', true);
-                $pdf->cell(180, 5, "Isolated organisms :", 0, 1, 'L', 0);
+                $pdf->cell(180, 5, 'Isolated organisms :', 0, 1, 'L', 0);
                 $pdf->Ln(5);
                 $pdf->setEqualColumns($m_test->requestedOrganisms()->count(), $page_width / $m_test->requestedOrganisms()->count() - 5);
                 $pdf->selectColumn(0);
@@ -492,6 +503,7 @@ class LabResultReport
         // Check if this is a special test (like semen analysis)
         if ($m_test->mainTest->is_special_test) {
             $this->renderSpecialTestResults($pdf, $m_test, $table_col_widht, $page_width);
+
             return;
         }
 
@@ -509,7 +521,7 @@ class LabResultReport
 
             $byChildTestId = $results->keyBy('child_test_id');
             $results = collect($childTestIds)
-                ->map(fn($id) => $byChildTestId->get($id))
+                ->map(fn ($id) => $byChildTestId->get($id))
                 ->filter()
                 ->values();
         }
@@ -517,12 +529,15 @@ class LabResultReport
         foreach ($results as $result) {
             if ($result->result == '') {
                 $children_count_with_result_empty++;
+
                 continue;
             }
             $index_to_start_new_column++;
 
             $child_test = $result->childTest;
-            if ($child_test == null) continue;
+            if ($child_test == null) {
+                continue;
+            }
 
             $half_children_count = (count($m_test->results) - $children_count_with_result_empty) / 2;
             if (ceil($half_children_count) == $index_to_start_new_column) {
@@ -571,8 +586,8 @@ class LabResultReport
             // Pre-measure row height using actual column widths to decide on page break
             $hideUnit = $m_test->mainTest->hide_unit ?? false;
             [$testW, $resultColWidth, $unitColWidth, $normalColWidth] = $this->computeColumnWidths($pdf, $table_col_widht, $m_test->mainTest->divided == 1, $hideUnit);
-            $estimatedResultHeight = $this->measureTextHeight($pdf, $resultColWidth, (string)$report_result, $this->baseLineHeight);
-            $estimatedNormalHeight = $this->measureTextHeight($pdf, $normalColWidth, (string)$normal_range, $this->baseLineHeight);
+            $estimatedResultHeight = $this->measureTextHeight($pdf, $resultColWidth, (string) $report_result, $this->baseLineHeight);
+            $estimatedNormalHeight = $this->measureTextHeight($pdf, $normalColWidth, (string) $normal_range, $this->baseLineHeight);
             $estimatedRowHeight = max($this->baseLineHeight, $estimatedResultHeight, $estimatedNormalHeight);
             $this->ensureSpaceFor($pdf, $estimatedRowHeight + $this->smallSpacing);
 
@@ -593,7 +608,7 @@ class LabResultReport
                 $pdf->SetFont('arial', '', 7, '', true);
             }
 
-            if (!$hideUnit) {
+            if (! $hideUnit) {
                 $pdf->MultiCell($unitColWidth, 5, "$unit", 0, 'C', 0, 0, '', '', true);
             }
             $pdf->SetFont('arial', '', 7, '', true);
@@ -607,17 +622,17 @@ class LabResultReport
             $pdf->SetFont('arial', '', 11, '', true);
 
             if ($resultCellHeight > $normalRangeCellHeight) {
-                //caclulate additional height
+                // caclulate additional height
                 $additional_height = $resultCellHeight * 5 - ($normalRangeCellHeight * 5);
             } else {
                 if ($m_test->mainTest->divided == 1) {
                     $column = $pdf->getColumn();
                     if ($column == 0) {
-                        $pdf->Line(PDF_MARGIN_LEFT, $y, 98, $y); //line between 2 points
+                        $pdf->Line(PDF_MARGIN_LEFT, $y, 98, $y); // line between 2 points
                     }
                     $column = $pdf->getColumn();
                     if ($column == 1) {
-                        $pdf->Line(105, $y, $page_width + PDF_MARGIN_RIGHT, $y); //line between 2 points
+                        $pdf->Line(105, $y, $page_width + PDF_MARGIN_RIGHT, $y); // line between 2 points
                     }
                 } else {
                     $pdf->Line(PDF_MARGIN_LEFT, $y, $page_width + PDF_MARGIN_RIGHT, $y);
@@ -655,10 +670,12 @@ class LabResultReport
             }
 
             $child_test = $result->childTest;
-            if ($child_test == null) continue;
+            if ($child_test == null) {
+                continue;
+            }
 
             $groupName = $child_test->childGroup?->name ?? 'Other';
-            if (!isset($groupedResults[$groupName])) {
+            if (! isset($groupedResults[$groupName])) {
                 $groupedResults[$groupName] = [];
             }
             $groupedResults[$groupName][] = $result;
@@ -691,10 +708,12 @@ class LabResultReport
             }
 
             $child_test = $result->childTest;
-            if ($child_test == null) continue;
+            if ($child_test == null) {
+                continue;
+            }
 
             $groupName = $child_test->childGroup?->name ?? 'Other';
-            if (!isset($groupedResults[$groupName])) {
+            if (! isset($groupedResults[$groupName])) {
                 $groupedResults[$groupName] = [];
             }
             $groupedResults[$groupName][] = $result;
@@ -724,7 +743,7 @@ class LabResultReport
 
         $headerHeight = 14;
         $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 4, '1111', 'DF');
-        $pdf->Cell($page_width, $headerHeight, "GENERAL SEMEN ANALYSIS", 0, 1, 'C', 1);
+        $pdf->Cell($page_width, $headerHeight, 'GENERAL SEMEN ANALYSIS', 0, 1, 'C', 1);
 
         // Reset colors
         $pdf->SetFillColor(255, 255, 255);
@@ -761,12 +780,12 @@ class LabResultReport
             $pdf->AddPage();
             $this->renderMorphologySection($pdf, $groupedResults['MORPHOLOGY'], $page_width);
             // Immediately after morphology, render the comment if provided
-            if ($comment !== null && trim((string)$comment) !== '') {
+            if ($comment !== null && trim((string) $comment) !== '') {
                 $this->addVerticalSpacing($pdf, 4);
                 $pdf->SetFont('arial', 'u', 12, '', true);
-                $pdf->Cell($page_width, 6, "Comment", 0, 1, 'L');
+                $pdf->Cell($page_width, 6, 'Comment', 0, 1, 'L');
                 $pdf->SetFont('arial', '', 11, '', true);
-                $pdf->MultiCell($page_width, 5, (string)$comment, 0, 'L', 0, 1, '', '', true);
+                $pdf->MultiCell($page_width, 5, (string) $comment, 0, 'L', 0, 1, '', '', true);
             }
         }
     }
@@ -786,7 +805,7 @@ class LabResultReport
 
         $headerHeight = 9;
         $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 2, '1111', 'DF');
-        $pdf->Cell($page_width, $headerHeight, "REFERENCE DIAGRAM", 0, 1, 'L', 1);
+        $pdf->Cell($page_width, $headerHeight, 'REFERENCE DIAGRAM', 0, 1, 'L', 1);
 
         // Reset colors
         $pdf->SetDrawColor(220, 220, 220);
@@ -827,8 +846,6 @@ class LabResultReport
         }
     }
 
-
-
     /**
      * Render Personal Information section (like the image layout)
      */
@@ -842,7 +859,7 @@ class LabResultReport
 
         $headerHeight = 9;
         $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 2, '1111', 'DF');
-        $pdf->Cell($page_width, $headerHeight, "PERSONAL INFORMATION", 0, 1, 'L', 1);
+        $pdf->Cell($page_width, $headerHeight, 'PERSONAL INFORMATION', 0, 1, 'L', 1);
 
         // Reset colors
         $pdf->SetDrawColor(220, 220, 220);
@@ -894,7 +911,7 @@ class LabResultReport
                 $pdf->Cell($colWidth, $rowHeight, '', 'LRTB', 1, 'L', 1);
             }
 
-            $isEvenRow = !$isEvenRow;
+            $isEvenRow = ! $isEvenRow;
         }
 
         $this->addVerticalSpacing($pdf, $this->sectionSpacing);
@@ -913,7 +930,7 @@ class LabResultReport
 
         $headerHeight = 9;
         $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 2, '1111', 'DF');
-        $pdf->Cell($page_width, $headerHeight, "PHYSICO – CHEMICAL PROPERTIES", 0, 1, 'L', 1);
+        $pdf->Cell($page_width, $headerHeight, 'PHYSICO – CHEMICAL PROPERTIES', 0, 1, 'L', 1);
 
         // Reset colors
         $pdf->SetDrawColor(220, 220, 220);
@@ -931,9 +948,9 @@ class LabResultReport
         $resultWidth = $page_width * 0.3;
         $refWidth = $page_width * 0.3;
 
-        $pdf->Cell($paramWidth, 8, "PARAMETER", 1, 0, 'C', 1);
-        $pdf->Cell($resultWidth, 8, "PATIENT RESULTS", 1, 0, 'C', 1);
-        $pdf->Cell($refWidth, 8, "REFERENCE VALUE", 1, 1, 'C', 1);
+        $pdf->Cell($paramWidth, 8, 'PARAMETER', 1, 0, 'C', 1);
+        $pdf->Cell($resultWidth, 8, 'PATIENT RESULTS', 1, 0, 'C', 1);
+        $pdf->Cell($refWidth, 8, 'REFERENCE VALUE', 1, 1, 'C', 1);
 
         // Reset for table rows
         $pdf->SetTextColor(0, 0, 0);
@@ -959,7 +976,7 @@ class LabResultReport
             $pdf->SetFont('arial', '', 9, '', true);
             $pdf->Cell($refWidth, 7, $normal_range, 1, 1, 'C', 1);
 
-            $isEvenRow = !$isEvenRow;
+            $isEvenRow = ! $isEvenRow;
         }
 
         $this->addVerticalSpacing($pdf, $this->sectionSpacing);
@@ -978,7 +995,7 @@ class LabResultReport
 
         $headerHeight = 9;
         $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 2, '1111', 'DF');
-        $pdf->Cell($page_width, $headerHeight, "MORPHOLOGY", 0, 1, 'L', 1);
+        $pdf->Cell($page_width, $headerHeight, 'MORPHOLOGY', 0, 1, 'L', 1);
 
         // Reset colors
         $pdf->SetDrawColor(220, 220, 220);
@@ -996,9 +1013,9 @@ class LabResultReport
         $resultWidth = $page_width * 0.3;
         $refWidth = $page_width * 0.3;
 
-        $pdf->Cell($paramWidth, 8, "PARAMETER", 1, 0, 'C', 1);
-        $pdf->Cell($resultWidth, 8, "PATIENT RESULTS", 1, 0, 'C', 1);
-        $pdf->Cell($refWidth, 8, "REFERENCE VALUE", 1, 1, 'C', 1);
+        $pdf->Cell($paramWidth, 8, 'PARAMETER', 1, 0, 'C', 1);
+        $pdf->Cell($resultWidth, 8, 'PATIENT RESULTS', 1, 0, 'C', 1);
+        $pdf->Cell($refWidth, 8, 'REFERENCE VALUE', 1, 1, 'C', 1);
 
         // Reset for table rows
         $pdf->SetTextColor(0, 0, 0);
@@ -1021,7 +1038,7 @@ class LabResultReport
             // Special formatting for percentage results
             $displayResult = $result->result;
             if ($this->isPercentageResult($child_test->child_test_name)) {
-                $displayResult = $result->result . '%';
+                $displayResult = $result->result.'%';
             }
 
             $pdf->Cell($paramWidth, 7, $child_test->child_test_name, 1, 0, 'L', 1);
@@ -1030,7 +1047,7 @@ class LabResultReport
             $pdf->SetFont('arial', '', 9, '', true);
             $pdf->Cell($refWidth, 7, $normal_range, 1, 1, 'C', 1);
 
-            $isEvenRow = !$isEvenRow;
+            $isEvenRow = ! $isEvenRow;
         }
 
         $this->addVerticalSpacing($pdf, $this->sectionSpacing);
@@ -1049,7 +1066,7 @@ class LabResultReport
 
         $headerHeight = 5;
         $pdf->RoundedRect(PDF_MARGIN_LEFT, $pdf->GetY(), $page_width, $headerHeight, 2, '1111', 'DF');
-        $pdf->Cell($page_width, $headerHeight, "STATISTICS ", 0, 1, 'L', 1);
+        $pdf->Cell($page_width, $headerHeight, 'STATISTICS ', 0, 1, 'L', 1);
 
         // Reset colors
         $pdf->SetDrawColor(220, 220, 220);
@@ -1071,25 +1088,25 @@ class LabResultReport
             $subRef = $refHeaderWidth / 3;
 
             // First header row
-            $pdf->Cell($paramWidth, 8, "PARAMETER", 1, 0, 'C', 1);
-            $pdf->Cell($resultWidth, 8, "PATIENT RESULTS", 1, 0, 'C', 1);
-            $pdf->Cell($refHeaderWidth, 8, "REFERENCE VALUE", 1, 1, 'C', 1);
+            $pdf->Cell($paramWidth, 8, 'PARAMETER', 1, 0, 'C', 1);
+            $pdf->Cell($resultWidth, 8, 'PATIENT RESULTS', 1, 0, 'C', 1);
+            $pdf->Cell($refHeaderWidth, 8, 'REFERENCE VALUE', 1, 1, 'C', 1);
 
             // Second header row for refs
             $pdf->SetFont('arial', 'B', 8, '', true);
-            $pdf->Cell($paramWidth, 7, "", 1, 0, 'C', 1);
-            $pdf->Cell($resultWidth, 7, "", 1, 0, 'C', 1);
-            $pdf->Cell($subRef, 7, "LOWER", 1, 0, 'C', 1);
-            $pdf->Cell($subRef, 7, "MEAN", 1, 0, 'C', 1);
-            $pdf->Cell($subRef, 7, "UPPER", 1, 1, 'C', 1);
+            $pdf->Cell($paramWidth, 7, '', 1, 0, 'C', 1);
+            $pdf->Cell($resultWidth, 7, '', 1, 0, 'C', 1);
+            $pdf->Cell($subRef, 7, 'LOWER', 1, 0, 'C', 1);
+            $pdf->Cell($subRef, 7, 'MEAN', 1, 0, 'C', 1);
+            $pdf->Cell($subRef, 7, 'UPPER', 1, 1, 'C', 1);
         } else {
             $paramWidth = $page_width * 0.4;
             $resultWidth = $page_width * 0.3;
             $refWidth = $page_width * 0.3;
 
-            $pdf->Cell($paramWidth, 8, "PARAMETER", 1, 0, 'C', 1);
-            $pdf->Cell($resultWidth, 8, "PATIENT RESULTS", 1, 0, 'C', 1);
-            $pdf->Cell($refWidth, 8, "REFERENCE VALUE", 1, 1, 'C', 1);
+            $pdf->Cell($paramWidth, 8, 'PARAMETER', 1, 0, 'C', 1);
+            $pdf->Cell($resultWidth, 8, 'PATIENT RESULTS', 1, 0, 'C', 1);
+            $pdf->Cell($refWidth, 8, 'REFERENCE VALUE', 1, 1, 'C', 1);
         }
 
         // Reset for table rows
@@ -1113,7 +1130,7 @@ class LabResultReport
             // Special formatting for percentage results
             $displayResult = $result->result;
             if ($this->isPercentageResult($child_test->child_test_name)) {
-                $displayResult = $result->result . '%';
+                $displayResult = $result->result.'%';
             }
 
             if ($isSemen) {
@@ -1121,8 +1138,8 @@ class LabResultReport
                 $pdf->SetFont('arial', 'B', 9, '', true);
                 // Append exponent unit for Total sperm number within semen statistics
                 $displayForCell = $displayResult;
-                if (trim((string)$child_test->child_test_name) === 'Total sperm number (x10⁶  / ejaculate )') {
-                    $displayForCell = rtrim((string)$displayResult) . ' x10⁶';
+                if (trim((string) $child_test->child_test_name) === 'Total sperm number (x10⁶  / ejaculate )') {
+                    $displayForCell = rtrim((string) $displayResult).' x10⁶';
                 }
                 $pdf->Cell($resultWidth, 7, $displayForCell, 1, 0, 'C', 1);
                 $pdf->SetFont('arial', '', 9, '', true);
@@ -1145,7 +1162,7 @@ class LabResultReport
                 $pdf->Cell($refWidth, 7, $normal_range, 1, 1, 'C', 1);
             }
 
-            $isEvenRow = !$isEvenRow;
+            $isEvenRow = ! $isEvenRow;
         }
 
         $this->addVerticalSpacing($pdf, $this->sectionSpacing);
@@ -1240,12 +1257,12 @@ class LabResultReport
         $unitColWidth = $hideUnit ? 0 : $page_width * 0.15; // 15% for unit (0 if hidden)
         $rangeColWidth = $hideUnit ? $page_width * 0.35 : $page_width * 0.2; // 35% if unit hidden, 20% if shown
 
-        $pdf->Cell($testColWidth, 6, "Test", 1, 0, 'C', 1);
-        $pdf->Cell($resultColWidth, 6, "Result", 1, 0, 'C', 1);
-        if (!$hideUnit) {
-            $pdf->Cell($unitColWidth, 6, "Unit", 1, 0, 'C', 1);
+        $pdf->Cell($testColWidth, 6, 'Test', 1, 0, 'C', 1);
+        $pdf->Cell($resultColWidth, 6, 'Result', 1, 0, 'C', 1);
+        if (! $hideUnit) {
+            $pdf->Cell($unitColWidth, 6, 'Unit', 1, 0, 'C', 1);
         }
-        $pdf->Cell($rangeColWidth, 6, "Normal Range", 1, 1, 'C', 1);
+        $pdf->Cell($rangeColWidth, 6, 'Normal Range', 1, 1, 'C', 1);
 
         $this->addVerticalSpacing($pdf, $this->smallSpacing);
     }
@@ -1267,8 +1284,8 @@ class LabResultReport
         $rangeColWidth = $hideUnit ? $page_width * 0.35 : $page_width * 0.2;
 
         // Estimate row height for page break
-        $estimatedResultHeight = $this->measureTextHeight($pdf, $resultColWidth, (string)$report_result, $this->baseLineHeight);
-        $estimatedNormalHeight = $this->measureTextHeight($pdf, $rangeColWidth, (string)$normal_range, $this->baseLineHeight);
+        $estimatedResultHeight = $this->measureTextHeight($pdf, $resultColWidth, (string) $report_result, $this->baseLineHeight);
+        $estimatedNormalHeight = $this->measureTextHeight($pdf, $rangeColWidth, (string) $normal_range, $this->baseLineHeight);
         $estimatedRowHeight = max($this->baseLineHeight, $estimatedResultHeight, $estimatedNormalHeight);
         $this->ensureSpaceFor($pdf, $estimatedRowHeight + $this->smallSpacing);
 
@@ -1282,13 +1299,13 @@ class LabResultReport
         // Special formatting for certain semen analysis results
         if ($isSemenAnalysis && $this->isPercentageResult($child_test->child_test_name)) {
             $pdf->SetFont('arial', 'B', 10, '', true);
-            $resultCellHeight = $pdf->MultiCell($resultColWidth, 5, $report_result . '%', 1, 'C', 0, 0, '', '', true);
+            $resultCellHeight = $pdf->MultiCell($resultColWidth, 5, $report_result.'%', 1, 'C', 0, 0, '', '', true);
         } else {
             $resultCellHeight = $pdf->MultiCell($resultColWidth, 5, $report_result, 1, 'C', 0, 0, '', '', true);
         }
 
         // Unit
-        if (!$hideUnit) {
+        if (! $hideUnit) {
             $pdf->SetFont('arial', '', 9, '', true);
             $pdf->MultiCell($unitColWidth, 5, $unit, 1, 'C', 0, 0, '', '', true);
         }
@@ -1314,7 +1331,7 @@ class LabResultReport
             'Slow progressive PR (grade B)',
             'NP-Sluggish (grade C)',
             'Immotile (grade D)',
-            'Vitality'
+            'Vitality',
         ];
 
         return in_array($testName, $percentageTests);
@@ -1349,9 +1366,9 @@ class LabResultReport
         } else {
             $pdf->Ln(5);
         }
-        $pdf->cell(20, 5, "Comment", 0, 1, 'C');
+        $pdf->cell(20, 5, 'Comment', 0, 1, 'C');
         $pdf->SetFont('arial', 'b', 12, '', true);
-        $pdf->MultiCell($page_width, 5, "♠ " . $combined, 0, "", 0);
+        $pdf->MultiCell($page_width, 5, '♠ '.$combined, 0, '', 0);
         $pdf->SetFont('arial', '', 12, '', true);
     }
 
@@ -1364,17 +1381,17 @@ class LabResultReport
             return;
         }
 
-        $imgPath = storage_path('app/public/' . $m_test->image_path);
-        if (!file_exists($imgPath)) {
+        $imgPath = storage_path('app/public/'.$m_test->image_path);
+        if (! file_exists($imgPath)) {
             return;
         }
 
         [$iw, $ih] = getimagesize($imgPath);
-        $maxW  = $page_width * 0.7;
-        $maxH  = 80;
+        $maxW = $page_width * 0.7;
+        $maxH = 80;
         $scale = min($maxW / $iw, $maxH / $ih, 1);
-        $w     = $iw * $scale;
-        $h     = $ih * $scale;
+        $w = $iw * $scale;
+        $h = $ih * $scale;
 
         $this->ensureSpaceFor($pdf, $h + $this->sectionSpacing);
         $x = PDF_MARGIN_LEFT + ($page_width - $w) / 2;
@@ -1397,8 +1414,8 @@ class LabResultReport
 
             foreach ($m_test->requestedOrganisms as $index => $organism) {
                 // Estimate organism block height: title + headers + max(text heights)
-                $sensHeight = $this->measureTextHeight($pdf, $column_width, (string)$organism->sensitive, $this->baseLineHeight);
-                $resHeight = $this->measureTextHeight($pdf, $column_width, (string)$organism->resistant, $this->baseLineHeight);
+                $sensHeight = $this->measureTextHeight($pdf, $column_width, (string) $organism->sensitive, $this->baseLineHeight);
+                $resHeight = $this->measureTextHeight($pdf, $column_width, (string) $organism->resistant, $this->baseLineHeight);
                 $blockHeight = 10 + 5 + max($sensHeight, $resHeight) + $this->smallSpacing;
                 $this->ensureSpaceFor($pdf, $blockHeight);
 
@@ -1436,12 +1453,12 @@ class LabResultReport
         [$colW, $resultW, $unitW, $rangeW] = $this->computeColumnWidths($pdf, $table_col_widht, $isDivided, $hideUnit);
         $pdf->SetFillColor(...$this->themeHeaderFill);
         $pdf->SetDrawColor(...$this->themeBorderColor);
-        $pdf->cell($colW, 6, "Test", 1, 0, 'C', 1);
-        $pdf->cell($resultW, 6, "Result", 1, 0, 'C', 1);
-        if (!$hideUnit) {
-            $pdf->cell($unitW, 6, "Unit", 1, 0, 'C', 1);
+        $pdf->cell($colW, 6, 'Test', 1, 0, 'C', 1);
+        $pdf->cell($resultW, 6, 'Result', 1, 0, 'C', 1);
+        if (! $hideUnit) {
+            $pdf->cell($unitW, 6, 'Unit', 1, 0, 'C', 1);
         }
-        $pdf->cell($rangeW, 6, "R.Values", 1, 1, 'C', 1);
+        $pdf->cell($rangeW, 6, 'R.Values', 1, 1, 'C', 1);
         $this->addVerticalSpacing($pdf, $this->smallSpacing);
     }
 
@@ -1455,6 +1472,7 @@ class LabResultReport
         $resultW = $base * 1.5;
         $unitW = $hideUnit ? 0 : $base / 2;
         $rangeW = $hideUnit ? $base + ($base / 2) : $base; // Add unit width to range when hiding unit
+
         return [$testW, $resultW, $unitW, $rangeW];
     }
 
@@ -1489,7 +1507,8 @@ class LabResultReport
 
     private function measureTextHeight($pdf, float $width, string $text, float $lineHeight): float
     {
-        $lines = max(1, (int)$pdf->getNumLines($text, $width));
+        $lines = max(1, (int) $pdf->getNumLines($text, $width));
+
         return $lines * $lineHeight;
     }
 }

@@ -6,7 +6,6 @@ use Illuminate\Database\Seeder;
 
 class UsersTableSeeder extends Seeder
 {
-
     /**
      * Auto generated seed file
      *
@@ -14,30 +13,26 @@ class UsersTableSeeder extends Seeder
      */
     public function run()
     {
-        
 
         \DB::table('users')->delete();
-        
-        \DB::table('users')->insert(array (
-            
-            array (
+
+        \DB::table('users')->insert([
+
+            [
                 'id' => 1,
                 'username' => 'admin',
                 'password' => '$2y$12$91YL3vakYAUDJwCbF.V2Be7SGU8bkvbTGEMheOxAh19AB8ownQpr2',
-                'remember_token' => NULL,
+                'remember_token' => null,
                 'created_at' => '2026-01-29 18:48:02',
                 'updated_at' => '2026-01-29 18:31:38',
-                'doctor_id' => NULL,
-                'is_nurse' => 0,
+                'doctor_id' => null,
                 'is_supervisor' => 0,
                 'is_active' => 1,
-                'user_type' => NULL,
+                'user_type' => null,
                 'nav_items' => '["\\/dashboard","\\/clinic","\\/lab-reception","\\/lab-sample-collection","\\/lab-workstation","\\/patients","\\/online-booking","\\/cash-reconciliation"]',
                 'name' => '',
-                'user_money_collector_type' => 'all',
-            ),
-        ));
-        
-        
+            ],
+        ]);
+
     }
 }

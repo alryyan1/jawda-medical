@@ -6,11 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property int $doctorvisits_id
  * @property int $service_id
+ * @property int|null $tooth_id
  * @property int $user_id
  * @property int|null $user_deposited
  * @property int $doctor_id
@@ -35,9 +34,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read float $balance
  * @property-read float $net_payable_by_patient
  * @property-read float $total_price
+ * @property-read float $total_cost
  * @property-read \App\Models\Doctor $performingDoctor
  * @property-read \App\Models\User $requestingUser
  * @property-read \App\Models\Service $service
+ *
  * @method static \Database\Factories\RequestedServiceFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedService newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedService newQuery()
@@ -62,6 +63,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedService whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedService whereUserDeposited($value)
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedService whereUserId($value)
+ *
  * @mixin \Eloquent
  */
 class RequestedService extends Model
@@ -73,6 +75,7 @@ class RequestedService extends Model
     protected $fillable = [
         'doctorvisits_id', // Or 'doctor_visit_id'
         'service_id',
+        'tooth_id',
         'user_id',
         'user_deposited',
         'doctor_id',
@@ -93,6 +96,7 @@ class RequestedService extends Model
     ];
 
     protected $casts = [
+        'tooth_id' => 'integer',
         'price' => 'decimal:2',
         'amount_paid' => 'decimal:2',
         'endurance' => 'decimal:2',
@@ -153,13 +157,49 @@ class RequestedService extends Model
     {
         return $this->hasOne(RequestedServiceDiagnosis::class, 'requested_service_id');
     }
-    public function totalDepositsBank()
+
+    public function costs()
     {
-        return $this->deposits()->where('is_bank', 1)->sum('amount');
+        return $this->hasMany(RequestedServiceCost::class, 'requested_service_id');
     }
-    public function totalDepositsCash()
+
+    /**
+     * Total bank deposits for this requested service. Uses the eager-loaded
+     * `bank_deposits_sum` aggregate when available to avoid a query per
+     * service (this is invoked for every service in a doctor shift report).
+     */
+    public function totalDepositsBank(): float
     {
-        return $this->deposits()->where('is_bank', 0)->sum('amount');
+        if (array_key_exists('bank_deposits_sum', $this->attributes)) {
+            return (float) ($this->attributes['bank_deposits_sum'] ?? 0);
+        }
+
+        return (float) $this->deposits()->where('is_bank', 1)->sum('amount');
+    }
+
+    /**
+     * Total cash deposits for this requested service. Uses the eager-loaded
+     * `cash_deposits_sum` aggregate when available — see totalDepositsBank().
+     */
+    public function totalDepositsCash(): float
+    {
+        if (array_key_exists('cash_deposits_sum', $this->attributes)) {
+            return (float) ($this->attributes['cash_deposits_sum'] ?? 0);
+        }
+
+        return (float) $this->deposits()->where('is_bank', 0)->sum('amount');
+    }
+
+    /**
+     * Total cost recorded against this requested service (sum of requested_service_costs.amount).
+     */
+    public function getTotalCostAttribute(): float
+    {
+        if (array_key_exists('costs_sum_amount', $this->attributes)) {
+            return (float) ($this->attributes['costs_sum_amount'] ?? 0);
+        }
+
+        return (float) $this->costs()->sum('amount');
     }
     // Accessors
 
@@ -176,7 +216,7 @@ class RequestedService extends Model
         $totalPrice = $this->total_price; // Uses accessor
 
         $discountAmountFixed = (float) $this->discount;
-        $discountAmountPercentage = ($totalPrice * (int)($this->discount_per ?? 0)) / 100;
+        $discountAmountPercentage = ($totalPrice * (int) ($this->discount_per ?? 0)) / 100;
         $totalDiscount = $discountAmountFixed + $discountAmountPercentage;
 
         $amountAfterDiscount = $totalPrice - $totalDiscount;
@@ -192,21 +232,32 @@ class RequestedService extends Model
         // The controller or service layer should ensure `endurance` is correctly set based on patient type.
         $enduranceAmount = (float) $this->endurance;
 
-
         return $amountAfterDiscount - $enduranceAmount;
     }
-
 
     public function getBalanceAttribute(): float
     {
         // Net payable by patient (after their discounts and company endurance)
         $netPatientOwes = $this->net_payable_by_patient; // Uses accessor
+
         return $netPatientOwes - (float) $this->amount_paid;
     }
-    public function totalDeposits()
+
+    /**
+     * Total deposits for this requested service — this backs the `amount_paid`
+     * accessor override below, so it runs on every access to that attribute.
+     * Uses the eager-loaded `deposits_sum_amount` aggregate when available to
+     * avoid a query per service.
+     */
+    public function totalDeposits(): float
     {
-        return $this->deposits()->sum('amount');
+        if (array_key_exists('deposits_sum_amount', $this->attributes)) {
+            return (float) ($this->attributes['deposits_sum_amount'] ?? 0);
+        }
+
+        return (float) $this->deposits()->sum('amount');
     }
+
     public function getAttributeValue($key)
     {
         if ($key === 'amount_paid') {

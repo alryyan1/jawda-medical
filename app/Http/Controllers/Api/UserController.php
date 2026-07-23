@@ -4,12 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RoleResource;
-use App\Models\User;
-use Illuminate\Http\Request;
 use App\Http\Resources\UserResource;
 use App\Models\LabRequest;
-use App\Models\RequestedServiceDeposit;
 use App\Models\Shift;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -38,10 +37,8 @@ class UserController extends Controller
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,name,guard_name,web', // Ensure guard_name is web
             'doctor_id' => 'nullable|integer|exists:doctors,id',
-            'is_nurse' => 'sometimes|boolean',
             'is_supervisor' => 'sometimes|boolean', // ADDED
             'is_active' => 'sometimes|boolean',     // ADDED
-            'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
             'user_type' => 'nullable|string|max:255',
             'nav_items' => 'nullable|array',
             'nav_items.*' => 'string|max:255',
@@ -51,10 +48,8 @@ class UserController extends Controller
         $createData['password'] = Hash::make($validatedData['password']);
 
         // Set defaults if not provided
-        $createData['is_nurse'] = $validatedData['is_nurse'] ?? false;
         $createData['is_supervisor'] = $validatedData['is_supervisor'] ?? false;
         $createData['is_active'] = $validatedData['is_active'] ?? true; // Default to active
-        $createData['user_money_collector_type'] = $validatedData['user_money_collector_type'] ?? 'all';
 
         // Handle nav_items - encode as JSON if provided
         if (isset($createData['nav_items'])) {
@@ -63,7 +58,7 @@ class UserController extends Controller
 
         $user = User::create($createData);
 
-        if (!empty($validatedData['roles']) && Auth::user()->can('assign roles')) { // Assuming 'assign roles' permission
+        if (! empty($validatedData['roles']) && Auth::user()->can('assign roles')) { // Assuming 'assign roles' permission
             $user->syncRoles($validatedData['roles']);
         } else {
             // Assign a default role if no roles are provided and you have a default role strategy
@@ -80,10 +75,8 @@ class UserController extends Controller
             'username' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => ['nullable', 'confirmed', Password::defaults()],
             'doctor_id' => 'nullable|integer|exists:doctors,id',
-            'is_nurse' => 'sometimes|boolean',
             'is_supervisor' => 'sometimes|boolean', // ADDED
             'is_active' => 'sometimes|boolean',     // ADDED
-            'user_money_collector_type' => ['sometimes', 'required', Rule::in(['lab', 'company', 'clinic', 'all'])],
             'roles' => 'nullable|array',
             'roles.*' => 'exists:roles,name,guard_name,web', // Ensure guard_name is web
             'user_type' => 'nullable|string|max:255',
@@ -100,16 +93,21 @@ class UserController extends Controller
         }
 
         // Handle password change if provided
-        if (!empty($validatedData['password'])) {
+        if (! empty($validatedData['password'])) {
             $updateData['password'] = Hash::make($validatedData['password']);
         }
 
         // Handle boolean flags explicitly if they are not present in the request but field exists
-        if ($request->has('is_nurse')) $updateData['is_nurse'] = $request->boolean('is_nurse');
-        if ($request->has('is_supervisor')) $updateData['is_supervisor'] = $request->boolean('is_supervisor');
-        if ($request->has('is_active')) $updateData['is_active'] = $request->boolean('is_active');
-        if ($request->has('user_type')) $updateData['user_type'] = (string) $request->input('user_type');
-        if (!$request->has('user_type') || $request->input('user_type') ==  null) {
+        if ($request->has('is_supervisor')) {
+            $updateData['is_supervisor'] = $request->boolean('is_supervisor');
+        }
+        if ($request->has('is_active')) {
+            $updateData['is_active'] = $request->boolean('is_active');
+        }
+        if ($request->has('user_type')) {
+            $updateData['user_type'] = (string) $request->input('user_type');
+        }
+        if (! $request->has('user_type') || $request->input('user_type') == null) {
             $updateData['user_type'] = null;
         }
         $user->update($updateData);
@@ -121,11 +119,11 @@ class UserController extends Controller
         return new UserResource($user->load('roles', 'doctor'));
     }
 
-
     public function show(User $user)
     {
         return new UserResource($user->load('roles', 'permissions'));
     }
+
     public function indexList()
     {
         $users = User::select('id', 'name', 'username')
@@ -184,7 +182,6 @@ class UserController extends Controller
         return UserResource::collection($users);
     }
 
-
     public function destroy(User $user)
     {
         // Add checks: e.g., cannot delete self, cannot delete last super admin
@@ -193,6 +190,7 @@ class UserController extends Controller
         }
         // Add more sophisticated checks if needed
         $user->delete();
+
         return response()->json(null, 204);
     }
 
@@ -206,7 +204,6 @@ class UserController extends Controller
     /**
      * Update the user's password.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function updatePassword(Request $request)
@@ -219,22 +216,22 @@ class UserController extends Controller
         $user = Auth::user();
 
         // Check if current password matches
-        if (!Hash::check($validatedData['current_password'], $user->password)) {
+        if (! Hash::check($validatedData['current_password'], $user->password)) {
             return response()->json([
                 'message' => 'كلمة المرور الحالية غير صحيحة',
                 'errors' => [
-                    'current_password' => ['كلمة المرور الحالية غير صحيحة']
-                ]
+                    'current_password' => ['كلمة المرور الحالية غير صحيحة'],
+                ],
             ], 422);
         }
 
         // Update password
         $user->update([
-            'password' => Hash::make($validatedData['password'])
+            'password' => Hash::make($validatedData['password']),
         ]);
 
         return response()->json([
-            'message' => 'تم تحديث كلمة المرور بنجاح'
+            'message' => 'تم تحديث كلمة المرور بنجاح',
         ]);
     }
 
@@ -255,16 +252,14 @@ class UserController extends Controller
         // }
 
         $shift = Shift::find($shiftId);
-        $totalPaidService =  $shift->totalPaidService($user->id);
-        $totalBankService =  $shift->totalPaidServiceBank($user->id);
-        $totalLab =  $shift->paidLab($user->id);
-        $totalLabBank =  $shift->bankakLab($user->id);
+        $totals = $shift->userIncomeTotals($user->id);
+        $totalPaidService = $totals['total_paid_service'];
+        $totalBankService = $totals['total_bank_service'];
+        $totalLab = $totals['total_lab'];
+        $totalLabBank = $totals['total_lab_bank'];
         $totallabCash = $totalLab - $totalLabBank;
-        // Costs specific to this user within this shift (if applicable)
-        $totalCostForUser = $shift->totalCost($user->id); // Ensure this method exists and is relevant
-        $totalCostBankForUser = $shift->totalCostBank($user->id);
-        $totalCost = $shift->totalCost($user->id);
-        $totalCostBank = $shift->totalCostBank($user->id);
+        $totalCost = $totals['total_cost'];
+        $totalCostBank = $totals['total_cost_bank'];
         $totalCashService = $totalPaidService - $totalBankService;
         $totalCostCash = $totalCost - $totalCostBank;
 
@@ -277,6 +272,7 @@ class UserController extends Controller
             'total_cash_expenses' => (float) $totalCostCash,
             'total_bank_expenses' => (float) $totalCostBank,
         ];
+
         return response()->json([
 
             'data' => [
@@ -303,9 +299,10 @@ class UserController extends Controller
                 'net_cash' => (float) $netCash,
                 'net_bank' => (float) $netBank,
                 'expenses' => $expenses,
-            ]
+            ],
         ]);
     }
+
     /**
      * Get a summary of lab payments processed by the current user in a specific shift.
      */
@@ -336,7 +333,7 @@ class UserController extends Controller
                 'total_lab_income' => $totalIncome,
                 'total_cash' => $totalCash,
                 'total_bank' => $totalBank,
-            ]
+            ],
         ]);
     }
 
@@ -350,43 +347,10 @@ class UserController extends Controller
             'shift_id' => 'required|integer|exists:shifts,id',
         ]);
 
-        $shift = Shift::find($request->input('shift_id'));
-        if (!$shift) {
-            return response()->json(['error' => 'Shift not found'], 404);
-        }
-
-        $users = User::all();
-        $usersWithTransactions = [];
-
-        foreach ($users as $user) {
-            $totalPaid = $shift->paidLab($user->id) + $shift->totalPaidService($user->id);
-            $totalBank = $shift->bankakLab($user->id) + $shift->totalPaidServiceBank($user->id);
-            // Costs specific to this user within this shift (if applicable)
-            $totalCost = $shift->totalCost($user->id);
-            $totalCostBank = $shift->totalCostBank($user->id);
-            $totalCash = $totalPaid - $totalBank;
-            $totalCostCash = $totalCost - $totalCostBank;
-            $netCash = $totalCash - $totalCostCash;
-
-            // Only include users who have transactions (same logic as ReportController)
-            if ($totalPaid > 0 || $totalBank > 0) {
-                $usersWithTransactions[] = [
-                    'id' => $user->id,
-                    'name' => $user->name ?: $user->username,
-                    'username' => $user->username,
-                    'total_paid' => $totalPaid,
-                    'total_bank' => $totalBank,
-                    'total_cash' => $totalCash,
-                    'total_cost' => $totalCost,
-                    'total_cost_bank' => $totalCostBank,
-                    'net_bank' => $totalBank - $totalCostBank,
-                    'net_cash' => $netCash,
-                ];
-            }
-        }
+        $shift = Shift::findOrFail($request->input('shift_id'));
 
         return response()->json([
-            'data' => $usersWithTransactions
+            'data' => $shift->collectionsByUser(),
         ]);
     }
 
@@ -403,7 +367,7 @@ class UserController extends Controller
         $shift = Shift::find($request->input('shift_id'));
         $userId = $request->input('user_id');
 
-        if (!$shift) {
+        if (! $shift) {
             return response()->json(['error' => 'Shift not found'], 404);
         }
 
@@ -420,10 +384,12 @@ class UserController extends Controller
 
         foreach ($labRequests as $labRequest) {
             $doctorVisit = $labRequest->doctorVisit;
-            if (!$doctorVisit) continue;
+            if (! $doctorVisit) {
+                continue;
+            }
 
             $visitId = $doctorVisit->id;
-            if (!isset($doctorVisits[$visitId])) {
+            if (! isset($doctorVisits[$visitId])) {
                 $doctorVisits[$visitId] = [
                     'doctor_visit_id' => $visitId,
                     'patient_id' => $doctorVisit->patient->id ?? null,
@@ -467,13 +433,17 @@ class UserController extends Controller
 
         foreach ($serviceDeposits as $deposit) {
             $requestedService = $deposit->requestedService;
-            if (!$requestedService) continue;
+            if (! $requestedService) {
+                continue;
+            }
 
             $doctorVisit = $requestedService->doctorVisit;
-            if (!$doctorVisit) continue;
+            if (! $doctorVisit) {
+                continue;
+            }
 
             $visitId = $doctorVisit->id;
-            if (!isset($doctorVisits[$visitId])) {
+            if (! isset($doctorVisits[$visitId])) {
                 $doctorVisits[$visitId] = [
                     'doctor_visit_id' => $visitId,
                     'patient_id' => $doctorVisit->patient->id ?? null,
@@ -511,7 +481,7 @@ class UserController extends Controller
         }
 
         return response()->json([
-            'data' => array_values($doctorVisits)
+            'data' => array_values($doctorVisits),
         ]);
     }
 

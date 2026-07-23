@@ -29,35 +29,9 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'doctor_id' => null, // This will be null by default, can be set manually when needed
-            'is_nurse' => fake()->boolean(20), // 20% chance of being a nurse
-            'user_money_collector_type' => fake()->randomElement(['lab', 'company', 'clinic', 'all']),
             'created_at' => now(),
             'updated_at' => now(),
         ];
-    }
-
-    /**
-     * Configure the model factory to create a nurse user.
-     */
-    public function nurse(): static
-    {
-        return $this->state(function (array $attributes) {
-            return [
-                'is_nurse' => true,
-            ];
-        });
-    }
-
-    /**
-     * Configure the model factory to set a specific money collector type.
-     */
-    public function moneyCollectorType(string $type): static
-    {
-        return $this->state(function (array $attributes) use ($type) {
-            return [
-                'user_money_collector_type' => $type,
-            ];
-        });
     }
 
     /**

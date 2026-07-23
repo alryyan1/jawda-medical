@@ -1,11 +1,19 @@
-<?php namespace App\Http\Resources;
-use Illuminate\Http\Request; use Illuminate\Http\Resources\Json\JsonResource;
-class RequestedServiceResource extends JsonResource {
-    public function toArray(Request $request): array {
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class RequestedServiceResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
         return [
             'id' => $this->id,
             'doctorvisits_id' => $this->doctorvisits_id, // Or your FK name
             'service_id' => $this->service_id,
+            'tooth_id' => $this->tooth_id,
             'service' => new ServiceResource($this->whenLoaded('service')), // Eager load service.serviceGroup in controller
             'user_id' => $this->user_id,
             'requesting_user' => new UserStrippedResource($this->whenLoaded('requestingUser')),
@@ -32,6 +40,7 @@ class RequestedServiceResource extends JsonResource {
             'sub_total' => $this->total_price, // From accessor: price * count
             'net_payable' => $this->net_amount_due, // From accessor: sub_total - discount - endurance
             'balance_due' => $this->balance, // From accessor: net_payable - amount_paid
+            'total_cost' => $this->total_cost, // From accessor: sum of requested_service_costs.amount
         ];
     }
 }

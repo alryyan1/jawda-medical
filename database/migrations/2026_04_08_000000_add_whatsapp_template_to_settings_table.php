@@ -9,8 +9,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('settings', function (Blueprint $table) {
-            $table->string('whatsapp_result_template_name')->nullable()->after('whatsapp_number');
-            $table->string('whatsapp_result_language_code')->nullable()->after('whatsapp_result_template_name');
+            if (! Schema::hasColumn('settings', 'whatsapp_number')) {
+                $table->string('whatsapp_number')->nullable();
+            }
+            if (! Schema::hasColumn('settings', 'whatsapp_result_template_name')) {
+                $table->string('whatsapp_result_template_name')->nullable();
+            }
+            if (! Schema::hasColumn('settings', 'whatsapp_result_language_code')) {
+                $table->string('whatsapp_result_language_code')->nullable();
+            }
         });
     }
 

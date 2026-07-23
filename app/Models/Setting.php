@@ -6,8 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property bool $is_header
  * @property bool $is_footer
@@ -43,6 +41,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property \Illuminate\Support\Carbon|null $financial_year_end
  * @property string|null $welcome_message
  * @property bool $send_welcome_message
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|Setting newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Setting newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Setting query()
@@ -83,6 +82,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereVatin($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Setting whereWelcomeMessage($value)
+ *
  * @mixin \Eloquent
  */
 class Setting extends Model
@@ -90,7 +90,7 @@ class Setting extends Model
     use HasFactory;
 
     // No need for $table if it's 'settings' (plural of Setting)
-    // protected $table = 'settings'; 
+    // protected $table = 'settings';
 
     protected $fillable = [
         'is_header',
@@ -153,6 +153,8 @@ class Setting extends Model
         'lab_welcome_sms_message',
         'discount_request_phone',
         'enforce_shift_hours',
+        'require_patient_phone',
+        'show_patient_address_field',
         'whatsapp_result_template_name',
         'whatsapp_result_language_code',
         'pdf_header_type',
@@ -202,6 +204,8 @@ class Setting extends Model
         'show_title_in_lab_result' => 'boolean',
         'prevent_backdated_entry' => 'boolean',
         'enforce_shift_hours' => 'boolean',
+        'require_patient_phone' => 'boolean',
+        'show_patient_address_field' => 'boolean',
         'whatsapp_result_template_name' => 'string',
         'whatsapp_result_language_code' => 'string',
         'pdf_header_logo_width' => 'integer',

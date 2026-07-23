@@ -9,9 +9,10 @@ class SettingResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
-        if (!$this->resource) {
+        if (! $this->resource) {
             return []; // Return empty array if no settings record found
         }
+
         return [
             'id' => $this->id, // Though likely always 1
             'is_header' => (bool) $this->is_header,
@@ -69,6 +70,8 @@ class SettingResource extends JsonResource
             'settings_enable_Sms_front' => (bool) $this->settings_enable_Sms_front,
             'prevent_backdated_entry' => (bool) $this->prevent_backdated_entry,
             'enforce_shift_hours' => (bool) $this->enforce_shift_hours,
+            'require_patient_phone' => (bool) $this->require_patient_phone,
+            'show_patient_address_field' => (bool) $this->show_patient_address_field,
             'whatsapp_number' => $this->whatsapp_number,
             'payment_cancellation_phone' => $this->payment_cancellation_phone,
             'shift_summary_phone' => $this->shift_summary_phone,

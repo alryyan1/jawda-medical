@@ -6,42 +6,39 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\LabTestStatisticResource;
-use App\Models\Service;
-use App\Models\Package;
-use App\Models\ServiceGroup; // For filter
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB; // For aggregate functions
-use Carbon\Carbon;
-// You might create a specific Resource for this report item if needed
-use App\Http\Resources\ServiceResource; // Can be adapted or a new one created
+use App\Http\Resources\PatientLabQueueItemResource;
+use App\Http\Resources\ServiceResource;
+// For filter
 use App\Models\Company;
-use App\Models\Cost;
-use App\Models\Doctor;
+use App\Models\Cost; // For aggregate functions
+use App\Models\CostCategory;
+// You might create a specific Resource for this report item if needed
+use App\Models\Doctor; // Can be adapted or a new one created
 use App\Models\DoctorShift;
 use App\Models\DoctorVisit;
 use App\Models\LabRequest;
 use App\Models\MainTest;
+use App\Models\Package;
+use App\Models\Patient;
 use App\Models\RequestedResult;
+use App\Models\RequestedService;
+use App\Models\RequestedServiceDeposit;
+use App\Models\Service;
 use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\User;
 use App\Mypdf\Pdf;
-
-use App\Services\Pdf\MyCustomTCPDF;
-use Carbon\CarbonPeriod;
-use Illuminate\Support\Facades\Log;
-use App\Models\CostCategory;
-use App\Models\Patient;
-use App\Models\RequestedServiceDeposit;
-use App\Models\RequestedService;
-use App\Models\Deno;
-use App\Models\DenoUser;
-use Illuminate\Support\Facades\Auth;
-use App\Services\UltramsgService;
-use App\Services\Pdf\LabResultReport;
 use App\Services\Pdf\CashReconciliationReport;
-use App\Http\Resources\PatientLabQueueItemResource;
+use App\Services\Pdf\LabResultReport;
+use App\Services\Pdf\MyCustomTCPDF;
+use App\Services\UltramsgService;
+use Carbon\Carbon;
+use Carbon\CarbonPeriod;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http as HttpClient;
+use Illuminate\Support\Facades\Log;
 
 class ReportController extends Controller
 {
@@ -57,7 +54,7 @@ class ReportController extends Controller
         $tests = [];
         foreach ($labRequests as $req) {
             $tests[] = [
-                'name' => $req->mainTest->main_test_name ?? ('Test #' . $req->id),
+                'name' => $req->mainTest->main_test_name ?? ('Test #'.$req->id),
                 'price' => (float) $req->price,
             ];
         }
@@ -71,15 +68,18 @@ class ReportController extends Controller
 
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="lab-invoice.pdf"'
+            'Content-Disposition' => 'inline; filename="lab-invoice.pdf"',
         ]);
     }
+
     // ... (other report methods) ...
     protected UltramsgService $ultramsgService;
+
     public function __construct(UltramsgService $ultramsgService)
     {
         $this->ultramsgService = $ultramsgService;
     }
+
     public function serviceStatistics(Request $request)
     {
         // Permission check: e.g., can('view service_statistics_report')
@@ -138,7 +138,7 @@ class ReportController extends Controller
 
         // Filter by service name (search)
         if ($request->filled('search_service_name')) {
-            $query->where('services.name', 'LIKE', '%' . $request->search_service_name . '%');
+            $query->where('services.name', 'LIKE', '%'.$request->search_service_name.'%');
         }
 
         $query->groupBy('services.id', 'services.name', 'services.price', 'services.service_group_id', 'services.activate'); // Must group by all selected non-aggregated columns
@@ -152,7 +152,6 @@ class ReportController extends Controller
             $query->orderBy('request_count', $sortDirection);
         }
         $query->orderBy('services.name', 'asc'); // Secondary sort by name
-
 
         $perPage = $request->input('per_page', 15);
         $statistics = $query->paginate($perPage);
@@ -168,10 +167,11 @@ class ReportController extends Controller
         // if (!Auth::user()->can('print doctor_shift_reports')) { /* ... */ }
 
         try {
-            $doctorShiftsReport = new \App\Services\Pdf\DoctorShiftsReport();
+            $doctorShiftsReport = new \App\Services\Pdf\DoctorShiftsReport;
             $pdfContent = $doctorShiftsReport->generate($request);
 
-            $pdfFileName = '' . date('Ymd_His') . '.pdf';
+            $pdfFileName = ''.date('Ymd_His').'.pdf';
+
             return response($pdfContent, 200)
                 ->header('Content-Type', 'application/pdf')
                 ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
@@ -203,8 +203,8 @@ class ReportController extends Controller
 
         if ($request->filled('search_service_name')) {
             $searchTerm = $request->search_service_name;
-            $query->where('main_test_name', 'LIKE', '%' . $searchTerm . '%');
-            $filterCriteria[] = "بحث: " . $searchTerm;
+            $query->where('main_test_name', 'LIKE', '%'.$searchTerm.'%');
+            $filterCriteria[] = 'بحث: '.$searchTerm;
         }
         // Add other filters here if applicable
         // if ($request->filled('service_group_id')) { ... }
@@ -215,7 +215,7 @@ class ReportController extends Controller
             return response()->json(['message' => 'لا توجد فحوصات لعرضها في قائمة الأسعار بناءً على الفلاتر.'], 404);
         }
 
-        $filterCriteriaString = !empty($filterCriteria) ? implode(' | ', $filterCriteria) : "جميع الفحوصات المتاحة";
+        $filterCriteriaString = ! empty($filterCriteria) ? implode(' | ', $filterCriteria) : 'جميع الفحوصات المتاحة';
 
         // --- PDF Generation ---
         $pdf = new MyCustomTCPDF(
@@ -273,7 +273,6 @@ class ReportController extends Controller
             // $pdf->Cell($priceWidth, $cellHeight, 'السعر', 1, 1, 'C', true); // ln=1 to ensure Y is updated
             // $yForItemBlock = $pdf->GetY();
 
-
             $pdf->SetFont($dataFont, '', 8);
 
             // Test Name Cell
@@ -305,13 +304,14 @@ class ReportController extends Controller
         }
 
         // --- Output PDF ---
-        $pdfFileName = 'lab_price_list_' . date('Ymd_His') . '.pdf';
+        $pdfFileName = 'lab_price_list_'.date('Ymd_His').'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     public function generateCompanyServiceContractPdf(Request $request, Company $company)
     {
         // Permission Check: e.g., can('print company_contracts') or can('view company_contracts')
@@ -331,8 +331,8 @@ class ReportController extends Controller
             return response()->json(['message' => 'لا توجد خدمات متعاقد عليها لهذه الشركة لإنشاء التقرير.'], 404);
         }
 
-        $reportTitle = 'تقرير عقد الخدمات لشركة: ' . $company->name;
-        $filterCriteriaString = $searchTerm ? "بحث: " . $searchTerm : "جميع الخدمات المتعاقد عليها";
+        $reportTitle = 'تقرير عقد الخدمات لشركة: '.$company->name;
+        $filterCriteriaString = $searchTerm ? 'بحث: '.$searchTerm : 'جميع الخدمات المتعاقد عليها';
 
         $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteriaString);
         $pdf->AddPage();
@@ -348,8 +348,8 @@ class ReportController extends Controller
         $fill = false;
         foreach ($contractedServices as $service) {
             $enduranceText = $service->pivot->use_static
-                ? number_format((float) $service->pivot->static_endurance, 2) . ' (ثابت)'
-                : number_format((float) $service->pivot->percentage_endurance, 1) . '%';
+                ? number_format((float) $service->pivot->static_endurance, 2).' (ثابت)'
+                : number_format((float) $service->pivot->percentage_endurance, 1).'%';
 
             $rowData = [
                 $service->name,
@@ -359,13 +359,13 @@ class ReportController extends Controller
                 $service->pivot->approval ? 'نعم' : 'لا',
             ];
             $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
-            $fill = !$fill;
+            $fill = ! $fill;
         }
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
-
-        $pdfFileName = 'company_service_contracts_' . $company->id . '_' . date('Ymd_His') . '.pdf';
+        $pdfFileName = 'company_service_contracts_'.$company->id.'_'.date('Ymd_His').'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
@@ -389,8 +389,8 @@ class ReportController extends Controller
             return response()->json(['message' => 'لا توجد فحوصات متعاقد عليها لهذه الشركة لإنشاء التقرير.'], 404);
         }
 
-        $reportTitle = 'تقرير عقد الفحوصات لشركة: ' . $company->name;
-        $filterCriteriaString = $searchTerm ? "بحث: " . $searchTerm : "جميع الفحوصات المتعاقد عليها";
+        $reportTitle = 'تقرير عقد الفحوصات لشركة: '.$company->name;
+        $filterCriteriaString = $searchTerm ? 'بحث: '.$searchTerm : 'جميع الفحوصات المتعاقد عليها';
 
         $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteriaString);
         $pdf->AddPage();
@@ -405,8 +405,8 @@ class ReportController extends Controller
         $fill = false;
         foreach ($contractedTests as $test) {
             $enduranceText = $test->pivot->use_static
-                ? number_format((float) $test->pivot->endurance_static, 0) . ' (ثابت)' // Assuming static endurance for tests might be integer
-                : number_format((float) $test->pivot->endurance_percentage, 1) . '%';
+                ? number_format((float) $test->pivot->endurance_static, 0).' (ثابت)' // Assuming static endurance for tests might be integer
+                : number_format((float) $test->pivot->endurance_percentage, 1).'%';
 
             $rowData = [
                 $test->main_test_name,
@@ -416,18 +416,17 @@ class ReportController extends Controller
                 $test->pivot->approve ? 'نعم' : 'لا',
             ];
             $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
-            $fill = !$fill;
+            $fill = ! $fill;
         }
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
-
-        $pdfFileName = 'company_test_contracts_' . $company->id . '_' . date('Ymd_His') . '.pdf';
+        $pdfFileName = 'company_test_contracts_'.$company->id.'_'.date('Ymd_His').'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
-
 
     // public function generateMonthlyLabIncomePdf(Request $request)
     // {
@@ -472,7 +471,6 @@ class ReportController extends Controller
     //     $requestsByDate = $labRequestsForMonth->groupBy(function ($request) {
     //         return Carbon::parse($request->created_at)->format('Y-m-d');
     //     });
-
 
     //     foreach ($period as $date) {
     //         $currentDateStr = $date->format('Y-m-d');
@@ -534,7 +532,6 @@ class ReportController extends Controller
     //         $grandTotals['bank'] += $dailyBank;
     //     }
 
-
     //     // --- PDF Generation ---
     //     $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
     //     $pdf->AddPage();
@@ -554,7 +551,7 @@ class ReportController extends Controller
     //     foreach ($dailyData as $dayData) {
     //         if ($dayData['income'] == 0 && $dayData['cash'] == 0 && $dayData['bank'] == 0 && $dayData['discount'] == 0) {
     //             // Optionally skip days with no activity to make report shorter
-    //             // continue; 
+    //             // continue;
     //         }
     //         $rowData = [
     //             Carbon::parse($dayData['date'])->format('Y-m-d (D)'), // Format date with day name
@@ -590,7 +587,6 @@ class ReportController extends Controller
     //     $pdf->Cell($totalLabelWidth, 7, 'إجمالي صافي الدخل المحصل:', 'LTRB', 0, 'R');
     //     $pdf->Cell($totalValueWidth, 7, number_format($grandTotals['cash'] + $grandTotals['bank'], 2), 'LTRB', 1, 'C');
 
-
     //     // --- Output PDF ---
     //     $pdfFileName = 'monthly_lab_income_' . $year . '_' . str_pad($month, 2, '0', STR_PAD_LEFT) . '.pdf';
     //     $pdfContent = $pdf->Output($pdfFileName, 'S');
@@ -614,17 +610,17 @@ class ReportController extends Controller
             'visits.patientLabRequests.mainTest:id,main_test_name', // Load lab tests for each visit
         ]);
 
-        if (!$doctorShift) {
+        if (! $doctorShift) {
             return response()->json(['message' => 'لم يتم العثور على مناوبة الطبيب المحددة.'], 404);
         }
-        if (!$doctorShift->doctor) {
+        if (! $doctorShift->doctor) {
             return response()->json(['message' => 'لم يتم العثور على بيانات الطبيب لهذه المناوبة.'], 404);
         }
 
         // Prepare filter criteria string for PDF header
-        $filterCriteria = "مناوبة الطبيب: " . ($doctorShift->doctor->name ?? 'غير محدد') .
-            " (#" . $doctorShift->id . ")" .
-            " | بتاريخ: " . $doctorShift->start_time?->format('Y-m-d');
+        $filterCriteria = 'مناوبة الطبيب: '.($doctorShift->doctor->name ?? 'غير محدد').
+            ' (#'.$doctorShift->id.')'.
+            ' | بتاريخ: '.$doctorShift->start_time?->format('Y-m-d');
 
         // --- PDF Generation ---
         // Using your MyCustomTCPDF class
@@ -653,7 +649,6 @@ class ReportController extends Controller
         $pdf->AddPage();
         $pdf->setRTL(true);
         $page_width = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-
 
         // Header section in your PDF logic
         $pdf->SetFont('arial', 'B', 16); // Slightly smaller than your 22
@@ -684,9 +679,9 @@ class ReportController extends Controller
         $pdf->SetFont('arial', 'B', 9);
         $sectionWidth = ($page_width / 3) - 5; // Approx width for each financial section
 
-        $pdf->Cell($sectionWidth, 7, 'إجمالي المرضى: ' . $doctorShift->visits->where('only_lab', 0)->count(), 1, 0, 'C');
-        $pdf->Cell($sectionWidth, 7, 'استحقاق نقدي: ' . number_format($doctorShift->doctor_credit_cash(), 1), 1, 0, 'C');
-        $pdf->Cell($sectionWidth, 7, 'استحقاق تأمين: ' . number_format($doctorShift->doctor_credit_company(), 1), 1, 1, 'C');
+        $pdf->Cell($sectionWidth, 7, 'إجمالي المرضى: '.$doctorShift->visits->where('only_lab', 0)->count(), 1, 0, 'C');
+        $pdf->Cell($sectionWidth, 7, 'استحقاق نقدي: '.number_format($doctorShift->doctor_credit_cash(), 1), 1, 0, 'C');
+        $pdf->Cell($sectionWidth, 7, 'استحقاق تأمين: '.number_format($doctorShift->doctor_credit_company(), 1), 1, 1, 'C');
         $pdf->Ln(5);
 
         // Table for patient visits
@@ -701,12 +696,12 @@ class ReportController extends Controller
 
         $pdf->SetFont('arial', '', 8);
         $index = 1;
-        $visits = $doctorShift->visits->reverse()->filter(fn(DoctorVisit $visit) => $visit->only_lab == 0);
+        $visits = $doctorShift->visits->reverse()->filter(fn (DoctorVisit $visit) => $visit->only_lab == 0);
 
         $safi_total_placeholder = 0; // This variable wasn't clearly used for a grand total in your original
 
         foreach ($visits as $doctorvisit) {
-            $isCompanyPatient = !!$doctorvisit->patient?->company_id;
+            $isCompanyPatient = (bool) $doctorvisit->patient?->company_id;
             if ($isCompanyPatient) {
                 $pdf->SetTextColor(200, 0, 0); // Red for company patients
             }
@@ -718,8 +713,8 @@ class ReportController extends Controller
                 number_format($doctorvisit->total_services(), 1), // Using model method
                 number_format($doctorvisit->total_paid_services($doctorShift->doctor) - $doctorvisit->bankak_service(), 1), // Cash
                 number_format($doctorvisit->bankak_service(), 1), // Bank
-                number_format($doctorShift->doctor->doctor_credit($doctorvisit), 1),
-                $doctorvisit->services_concatinated() // This will use MultiCell via DrawTableRow
+                number_format($doctorShift->doctor->doctor_credit($doctorvisit, $doctorShift), 1),
+                $doctorvisit->services_concatinated(), // This will use MultiCell via DrawTableRow
             ];
             $pdf->DrawTableRow($rowData, $h_widths, $h_aligns, ($index % 2 != 0)); // Alternating fill
 
@@ -740,7 +735,6 @@ class ReportController extends Controller
         $pdf->Cell($h_widths[6], 7, number_format($doctorShift->doctor_credit_cash() + $doctorShift->doctor_credit_company(), 1), 1, 0, 'C', true);
         $pdf->Cell($h_widths[7], 7, '', 1, 1, 'C', true); // Empty for services
         $pdf->Ln(5);
-
 
         // --- Costs Table Section (from your second table example) ---
         // This seems to list visits again, but with service_cost_name. This needs clarification.
@@ -775,18 +769,18 @@ class ReportController extends Controller
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
         */
 
-
         // --- Output PDF ---
-        $pdfFileName = 'clinic_report_doctorshift_' . $doctorShift->id . '_' . date('Ymd_His') . '.pdf';
+        $pdfFileName = 'clinic_report_doctorshift_'.$doctorShift->id.'_'.date('Ymd_His').'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     public function doctorCreditBreakdownPdf(DoctorShift $doctorShift, Request $request)
     {
-        if (!$request->hasValidSignature()) {
+        if (! $request->hasValidSignature()) {
             abort(403, 'رابط غير صالح أو منتهي الصلاحية.');
         }
 
@@ -794,7 +788,9 @@ class ReportController extends Controller
             'doctor.specificServices',
             'user',
             'visits.patient.company',
-            'visits.requestedServices.service',
+            'visits.requestedServices' => function ($query): void {
+                $query->with('service')->withSum('costs', 'amount');
+            },
         ]);
 
         $visitId = $request->query('visit');
@@ -803,6 +799,7 @@ class ReportController extends Controller
         $pdfContent = $pdf->generate();
 
         $suffix = $visitId ? "_visit_{$visitId}" : '';
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"doctor_credit_breakdown_{$doctorShift->id}{$suffix}.pdf\"");
@@ -811,39 +808,57 @@ class ReportController extends Controller
     public function clinicReport_old(Request $request)
     {
         $doctor_shift_id = $request->get('doctor_shift_id');
-        $doctorShift = DoctorShift::with(['user', 'doctor', 'visits.patient.company', 'visits.requestedServices.service'])->find($doctor_shift_id);
+        $doctorShift = DoctorShift::with([
+            'user',
+            'doctor.specialist',
+            'doctor.specificServices',
+            'visits.patient.company',
+            'visits.requestedServices' => function ($query): void {
+                $query->with('service')
+                    ->withSum('costs', 'amount')
+                    ->withSum('deposits', 'amount')
+                    ->withSum(['deposits as bank_deposits_sum' => fn ($q) => $q->where('is_bank', 1)], 'amount')
+                    ->withSum(['deposits as cash_deposits_sum' => fn ($q) => $q->where('is_bank', 0)], 'amount');
+            },
+        ])->find($doctor_shift_id);
 
-        if (!$doctorShift) {
+        if (! $doctorShift) {
             return response()->json(['message' => 'لم يتم العثور على مناوبة الطبيب المحددة.'], 404);
         }
 
         $report = new \App\Services\Pdf\ClinicShiftReport($doctorShift);
         $pdfContent = $report->generate();
 
-        $pdfFileName = 'clinic_report_' . date('Ymd_His') . '.pdf';
+        $pdfFileName = 'clinic_report_'.date('Ymd_His').'.pdf';
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     public function allclinicsReportNew(Request $request)
     {
         // --- Data Retrieval ---
         if ($request->has('shift')) {
             $shift = Shift::find($request->get('shift'));
-            if (!$shift) {
+            if (! $shift) {
                 // Handle case where requested shift doesn't exist, e.g., return error or default
                 return response()->json(['error' => 'Shift not found'], 404);
             }
         } else {
             $shift = Shift::orderByDesc('id')->first();
-            if (!$shift) {
+            if (! $shift) {
                 // Handle case where no shifts exist
                 return response()->json(['error' => 'No shifts available'], 404);
             }
         }
 
-        $doctorShiftsQuery = DoctorShift::with(['doctor.specialist', 'visits']) // Eager load specialist
+        $doctorShiftsQuery = DoctorShift::with([
+            'doctor.specialist',
+            'doctor.specificServices',
+            'visits.patient:id,company_id',
+            'visits.requestedServices',
+        ])
             ->where('shift_id', $shift->id);
 
         if ($request->has('user')) {
@@ -869,9 +884,9 @@ class ReportController extends Controller
         $logoPath = public_path('path/to/your/logo.png'); // IMPORTANT: Update this path
         $headerLogoWidth = 15; // Adjust as needed
         $headerTitle = config('app.name', 'Your Clinic Name'); // Or a more specific title
-        $headerString = "التقرير المالي للوردية رقم: " . $shift->id . "\n" .
-            "تاريخ: " . $shift->created_at->format('Y/m/d') . " - " .
-            "الوقت: " . $shift->created_at->format('H:i A');
+        $headerString = 'التقرير المالي للوردية رقم: '.$shift->id."\n".
+            'تاريخ: '.$shift->created_at->format('Y/m/d').' - '.
+            'الوقت: '.$shift->created_at->format('H:i A');
 
         if (file_exists($logoPath)) {
             $pdf->SetHeaderData($logoPath, $headerLogoWidth, $headerTitle, $headerString);
@@ -918,12 +933,11 @@ class ReportController extends Controller
         // Shift Information Table
         $pdf->SetFont('arial', 'B', 11);
         $infoTableWidth = $pageWidth / 2;
-        $pdf->Cell($infoTableWidth, 7, "التاريخ: " . $shift->created_at->format('Y/m/d'), 'LTR', 0, 'R');
-        $pdf->Cell($infoTableWidth, 7, "رقم الوردية المالي: " . $shift->id, 'LTR', 1, 'R');
-        $pdf->Cell($infoTableWidth, 7, "الوقت: " . $shift->created_at->format('H:i A'), 'LBR', 0, 'R');
-        $pdf->Cell($infoTableWidth, 7, "المستخدم المسؤول (إذا وجد): " . ($request->has('user') ? User::find($request->get('user'))->name ?? 'غير محدد' : 'جميع المستخدمين'), 'LBR', 1, 'R');
+        $pdf->Cell($infoTableWidth, 7, 'التاريخ: '.$shift->created_at->format('Y/m/d'), 'LTR', 0, 'R');
+        $pdf->Cell($infoTableWidth, 7, 'رقم الوردية المالي: '.$shift->id, 'LTR', 1, 'R');
+        $pdf->Cell($infoTableWidth, 7, 'الوقت: '.$shift->created_at->format('H:i A'), 'LBR', 0, 'R');
+        $pdf->Cell($infoTableWidth, 7, 'المستخدم المسؤول (إذا وجد): '.($request->has('user') ? User::find($request->get('user'))->name ?? 'غير محدد' : 'جميع المستخدمين'), 'LBR', 1, 'R');
         $pdf->Ln(5);
-
 
         // --- Section 1: Collections by User (المتحصلون) ---
         // This section might become cramped in portrait if there are many users or details.
@@ -935,28 +949,12 @@ class ReportController extends Controller
         $pdf->SetDrawColor(128, 128, 128); // Border color
         $pdf->SetLineWidth(0.2);
 
-        $users = User::all(); // Consider filtering users who actually had transactions in this shift
-        $userCollectionsPresented = false;
+        $userCollections = $shift->collectionsByUser();
+        $userCollectionsPresented = $userCollections->isNotEmpty();
 
-        foreach ($users as $user) {
-            $totalPaid = $shift->paidLab($user->id) + $shift->totalPaidService($user->id);
-            $totalBank = $shift->bankakLab($user->id) + $shift->totalPaidServiceBank($user->id);
-            // Costs specific to this user within this shift (if applicable)
-            $totalCostForUser = $shift->totalCost($user->id); // Ensure this method exists and is relevant
-            $totalCostBankForUser = $shift->totalCostBank($user->id);
-            $totalCost = $shift->totalCost($user->id);
-            $totalCostBank = $shift->totalCostBank($user->id);
-            $totalCash = $totalPaid - $totalBank;
-            $totalCostCash = $totalCost - $totalCostBank;
-            $netCash = $totalCash - $totalCostCash;
-
-            if ($totalPaid == 0 && $totalBank == 0) {
-                continue;
-            }
-            $userCollectionsPresented = true;
-
+        foreach ($userCollections as $row) {
             $pdf->SetFont('arial', 'B', 11);
-            $pdf->Cell(0, 7, 'المستخدم: ' . $user->name == '' ? $user->username : $user->name, 'B', 1, 'R');
+            $pdf->Cell(0, 7, 'المستخدم: '.$row['name'], 'B', 1, 'R');
             $pdf->Ln(2);
 
             $pdf->SetFont('arial', 'B', 10);
@@ -970,19 +968,18 @@ class ReportController extends Controller
 
             $pdf->SetFont('arial', '', 10);
             $pdf->Cell($headerColWidth, 6, 'إجمالي الإيرادات', 1, 0, 'R');
-            $pdf->Cell($headerColWidth, 6, number_format($totalPaid, 2), 1, 0, 'C');
-            $pdf->Cell($headerColWidth, 6, number_format($totalBank, 2), 1, 0, 'C');
-            $pdf->Cell($headerColWidth, 6, number_format($totalPaid - $totalBank, 2), 1, 0, 'C');
-            $pdf->Cell($headerColWidth, 6, number_format($totalBank - $totalCostBank, 2), 1, 0, 'C');
-            $pdf->Cell($headerColWidth, 6, number_format($netCash, 2), 1, 0, 'C');
+            $pdf->Cell($headerColWidth, 6, number_format($row['total_paid'], 2), 1, 0, 'C');
+            $pdf->Cell($headerColWidth, 6, number_format($row['total_bank'], 2), 1, 0, 'C');
+            $pdf->Cell($headerColWidth, 6, number_format($row['total_cash'], 2), 1, 0, 'C');
+            $pdf->Cell($headerColWidth, 6, number_format($row['net_bank'], 2), 1, 0, 'C');
+            $pdf->Cell($headerColWidth, 6, number_format($row['net_cash'], 2), 1, 0, 'C');
             $pdf->Ln(5);
         }
-        if (!$userCollectionsPresented) {
+        if (! $userCollectionsPresented) {
             $pdf->SetFont('arial', '', 10);
             $pdf->Cell(0, 7, 'لا توجد متحصلات لعرضها للمستخدمين المحددين في هذه الوردية.', 0, 1, 'C');
             $pdf->Ln(5);
         }
-
 
         // --- Section 2: Expenses (المصروفات) ---
         $pdf->SetFont('arial', 'B', 14);
@@ -1000,12 +997,16 @@ class ReportController extends Controller
         $totalBankExpenses = 0;
         if ($shift->cost->count() > 0) {
             foreach ($shift->cost as $c) {
-                $cashAmount = $c->amount - $c->amount_bankak;
+                // `amount` is the cash portion and `amount_bankak` the bank portion of a
+                // cost — they are additive, not "total minus bank" (see Shift::collectionsByUser
+                // and every other cost report in this codebase for the same convention).
+                $cashAmount = (float) $c->amount;
+                $totalForRow = $cashAmount + (float) $c->amount_bankak;
                 $pdf->Cell($expenseColWidth, 6, $c->description, 1, 0, 'R');
-                $pdf->Cell($expenseColWidth, 6, number_format($c->amount, 2), 1, 0, 'C');
+                $pdf->Cell($expenseColWidth, 6, number_format($totalForRow, 2), 1, 0, 'C');
                 $pdf->Cell($expenseColWidth, 6, number_format($cashAmount, 2), 1, 0, 'C');
                 $pdf->Cell($expenseColWidth, 6, number_format($c->amount_bankak, 2), 1, 1, 'C');
-                $totalExpenses += $c->amount;
+                $totalExpenses += $totalForRow;
                 $totalCashExpenses += $cashAmount;
                 $totalBankExpenses += $c->amount_bankak;
             }
@@ -1033,7 +1034,6 @@ class ReportController extends Controller
         // $pdf->Cell(0, 7, "للوردية رقم: " . $shift->id . " - تاريخ: " . $shift->created_at->format('Y/m/d'), 0, 1, 'C');
         // $pdf->Ln(3);
 
-
         $pdf->SetFont('arial', 'B', 9); // Adjusted font size for more columns
         $colCount = 6;
         $tableColWidth = $pageWidth / $colCount;
@@ -1058,10 +1058,11 @@ class ReportController extends Controller
                 $doctorName = $doctor_shift->doctor->name ?? 'N/A';
                 $specialistName = $doctor_shift->doctor->specialist->name ?? 'N/A';
 
-                $totalPaidForDoctor = $doctor_shift->total_paid_services();
-                $doctorCashDue = $doctor_shift->doctor_credit_cash();
-                $doctorInsuranceDue = $doctor_shift->doctor_credit_company();
-                $hospitalShare = $doctor_shift->hospital_credit();
+                $totals = $doctor_shift->reportTotals();
+                $totalPaidForDoctor = $totals['total_paid'];
+                $doctorCashDue = $totals['doctor_cash'];
+                $doctorInsuranceDue = $totals['doctor_insurance'];
+                $hospitalShare = $totals['hospital_share'];
 
                 $pdf->Cell($tableColWidth, 6, $specialistName, 1, 0, 'R');
                 // Making doctor name clickable if a link is intended
@@ -1098,17 +1099,15 @@ class ReportController extends Controller
         $pdf->MultiCell(0, 5, '*** ملاحظة: صافي المنشأة من خدمات الأطباء يتم احتسابه بعد خصم مستحقات الطبيب. المصروفات العامة للعيادة تخصم من إجمالي إيرادات الوردية.', 0, 'R', 0, 1);
         $pdf->Ln(5);
 
-
         // --- Final Summary Section (Optional, but good for a professional report) ---
         $pdf->SetFont('arial', 'B', 14);
         $pdf->Cell(0, 8, 'الملخص المالي النهائي للوردية', 0, 1, 'C');
         $pdf->SetFont('arial', 'B', 10);
 
         $summaryColWidth = $pageWidth / 2;
-        $totalRevenueAllUsers = 0;
-        foreach (User::all() as $u) { // Recalculate or use stored if already available
-            $totalRevenueAllUsers += ($shift->paidLab($u->id) + $shift->totalPaidService($u->id));
-        }
+        // Reuse the already-computed per-user collections instead of re-summing every
+        // user's lab/service payments from scratch (that loop was O(users × visits × labrequests)).
+        $totalRevenueAllUsers = (float) $userCollections->sum('total_paid');
 
         $data = [
             'إجمالي الإيرادات (جميع المستخدمين)' => number_format($totalRevenueAllUsers, 2),
@@ -1129,13 +1128,13 @@ class ReportController extends Controller
         }
         $pdf->Ln(5);
         $pdf->SetFont('arial', '', 8);
-        $pdf->Cell(0, 5, 'تم إنشاء هذا التقرير بواسطة: ' . config('app.name', 'نظام إدارة العيادات'), 0, 1, 'L');
-        $pdf->Cell(0, 5, 'تاريخ الإنشاء: ' . now()->format('Y/m/d H:i:s'), 0, 1, 'L');
-
+        $pdf->Cell(0, 5, 'تم إنشاء هذا التقرير بواسطة: '.config('app.name', 'نظام إدارة العيادات'), 0, 1, 'L');
+        $pdf->Cell(0, 5, 'تاريخ الإنشاء: '.now()->format('Y/m/d H:i:s'), 0, 1, 'L');
 
         // Output
-        $fileName = 'AllClinicsReport_Shift_' . $shift->id . '_' . now()->format('Ymd_His') . '.pdf';
+        $fileName = 'AllClinicsReport_Shift_'.$shift->id.'_'.now()->format('Ymd_His').'.pdf';
         $pdfContent = $pdf->Output($fileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$fileName}\"");
@@ -1145,12 +1144,14 @@ class ReportController extends Controller
     private function resolveShift(Request $request): ?Shift
     {
         $shift = Shift::find($request->get('shift'));
+
         return $shift;
     }
 
     private function shiftPdfResponse(MyCustomTCPDF $pdf, string $name): \Illuminate\Http\Response
     {
         $pdfContent = $pdf->Output($name, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$name}\"");
@@ -1159,22 +1160,24 @@ class ReportController extends Controller
     public function shiftProfitLossPdf(Request $request)
     {
         $shift = $this->resolveShift($request);
-        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+        if (! $shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
 
         $shift->load(['cost', 'patients.patient', 'doctorShifts.visits']);
 
         // ── Figures ───────────────────────────────────────────────
         $clinicRevenue = (float) $shift->totalPaidService();
-        $labRevenue    = (float) $shift->paidLab();
-        $totalRevenue  = $clinicRevenue + $labRevenue;
-        $totalExpenses = $shift->cost->sum(fn($c) => (float)$c->amount + (float)$c->amount_bankak);
-        $netProfit     = $totalRevenue - $totalExpenses;
-        $isProfit      = $netProfit >= 0;
+        $labRevenue = (float) $shift->paidLab();
+        $totalRevenue = $clinicRevenue + $labRevenue;
+        $totalExpenses = $shift->cost->sum(fn ($c) => (float) $c->amount + (float) $c->amount_bankak);
+        $netProfit = $totalRevenue - $totalExpenses;
+        $isProfit = $netProfit >= 0;
 
         // ── PDF init (uses clinic header/footer from Setting model) ─
-        $filterLine = 'وردية رقم: ' . $shift->id
-            . '   |   تاريخ الفتح: ' . $shift->created_at->format('Y/m/d  H:i')
-            . ($shift->closed_at ? '   |   تاريخ الإغلاق: ' . $shift->closed_at->format('Y/m/d  H:i') : '');
+        $filterLine = 'وردية رقم: '.$shift->id
+            .'   |   تاريخ الفتح: '.$shift->created_at->format('Y/m/d  H:i')
+            .($shift->closed_at ? '   |   تاريخ الإغلاق: '.$shift->closed_at->format('Y/m/d  H:i') : '');
 
         $pdf = new MyCustomTCPDF('قائمة الدخل (الأرباح والخسائر)', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
         $pdf->setPrintHeader(true);
@@ -1184,7 +1187,7 @@ class ReportController extends Controller
         $pdf->AddPage();
 
         $margins = $pdf->getMargins();
-        $W  = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+        $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
         $c1 = $W * 0.68;
         $c2 = $W * 0.32;
 
@@ -1200,7 +1203,7 @@ class ReportController extends Controller
             $pdf->SetLineWidth(0.2);
         };
 
-        $drawSectionTitle = function (string $title) use ($pdf, $W, $margins, $thickLine, $line) {
+        $drawSectionTitle = function (string $title) use ($pdf, $W, $thickLine, $line) {
             $pdf->Ln(5);
             $thickLine();
             $pdf->Ln(1);
@@ -1222,7 +1225,7 @@ class ReportController extends Controller
             $pdf->Cell($c2, 7, number_format($amount, 2), 0, 1, 'C');
         };
 
-        $drawTotalRow = function (string $label, float $amount) use ($pdf, $c1, $c2, $line, $thickLine) {
+        $drawTotalRow = function (string $label, float $amount) use ($pdf, $c1, $c2, $line) {
             $line();
             $pdf->Ln(1);
             $pdf->SetFont('arial', 'B', 11);
@@ -1239,7 +1242,7 @@ class ReportController extends Controller
 
         // Double underline under title
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
         $pdf->Ln(5);
@@ -1273,7 +1276,7 @@ class ReportController extends Controller
 
         // Bottom double-line (accounting standard)
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
         $pdf->SetLineWidth(0.2);
@@ -1284,22 +1287,24 @@ class ReportController extends Controller
         $sigW = $W / 3;
         $pdf->SetFont('arial', '', 9);
         $pdf->Cell($sigW, 5, 'المحاسب المسؤول', 0, 0, 'C');
-        $pdf->Cell($sigW, 5, 'مراجعة المدير',  0, 0, 'C');
-        $pdf->Cell($sigW, 5, 'الختم الرسمي',    0, 1, 'C');
+        $pdf->Cell($sigW, 5, 'مراجعة المدير', 0, 0, 'C');
+        $pdf->Cell($sigW, 5, 'الختم الرسمي', 0, 1, 'C');
         $pdf->Ln(8);
         $pdf->SetLineWidth(0.3);
-        $pdf->Line($margins['left'] + 5,           $pdf->GetY(), $margins['left'] + $sigW - 5,       $pdf->GetY());
-        $pdf->Line($margins['left'] + $sigW + 5,   $pdf->GetY(), $margins['left'] + 2*$sigW - 5,     $pdf->GetY());
-        $pdf->Line($margins['left'] + 2*$sigW + 5, $pdf->GetY(), $margins['left'] + 3*$sigW - 5,     $pdf->GetY());
+        $pdf->Line($margins['left'] + 5, $pdf->GetY(), $margins['left'] + $sigW - 5, $pdf->GetY());
+        $pdf->Line($margins['left'] + $sigW + 5, $pdf->GetY(), $margins['left'] + 2 * $sigW - 5, $pdf->GetY());
+        $pdf->Line($margins['left'] + 2 * $sigW + 5, $pdf->GetY(), $margins['left'] + 3 * $sigW - 5, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
 
-        return $this->shiftPdfResponse($pdf, 'ProfitLoss_Shift_' . $shift->id . '.pdf');
+        return $this->shiftPdfResponse($pdf, 'ProfitLoss_Shift_'.$shift->id.'.pdf');
     }
 
     public function shiftRevenuePdf(Request $request)
     {
         $shift = $this->resolveShift($request);
-        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+        if (! $shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
 
         $shift->load(['doctorShifts.doctor.specialist', 'doctorShifts.visits.requestedServices', 'patients.patient']);
 
@@ -1311,18 +1316,20 @@ class ReportController extends Controller
         foreach ($shift->doctorShifts as $ds) {
             $specialtyName = $ds->doctor->specialist->name ?? 'غير محدد';
             $amount = (float) $ds->total_paid_services();
-            if ($amount == 0) continue;
-            if (!isset($bySpecialty[$specialtyName])) {
+            if ($amount == 0) {
+                continue;
+            }
+            if (! isset($bySpecialty[$specialtyName])) {
                 $bySpecialty[$specialtyName] = 0;
             }
             $bySpecialty[$specialtyName] += $amount;
         }
         $clinicRevenue = array_sum($bySpecialty);
-        $grandTotal    = $labRevenue + $clinicRevenue;
+        $grandTotal = $labRevenue + $clinicRevenue;
 
         // ── PDF setup ─────────────────────────────────────────────
-        $filterLine = 'وردية رقم: ' . $shift->id
-            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+        $filterLine = 'وردية رقم: '.$shift->id
+            .'   |   تاريخ: '.$shift->created_at->format('Y/m/d  H:i');
 
         $pdf = new MyCustomTCPDF('تقرير الإيرادات', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
         $pdf->setPrintHeader(true);
@@ -1332,7 +1339,7 @@ class ReportController extends Controller
         $pdf->AddPage();
 
         $margins = $pdf->getMargins();
-        $W  = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+        $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
         $c1 = $W * 0.68;
         $c2 = $W * 0.32;
 
@@ -1385,7 +1392,7 @@ class ReportController extends Controller
         $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
         $pdf->Ln(2);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
         $pdf->Ln(5);
@@ -1421,33 +1428,35 @@ class ReportController extends Controller
         $pdf->Cell($c1, 7, 'إجمالي الإيرادات الكلي', 0, 0, 'R');
         $pdf->Cell($c2, 7, number_format($grandTotal, 2), 0, 1, 'C');
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
 
-        return $this->shiftPdfResponse($pdf, 'Revenue_Shift_' . $shift->id . '.pdf');
+        return $this->shiftPdfResponse($pdf, 'Revenue_Shift_'.$shift->id.'.pdf');
     }
 
     public function shiftExpensesPdf(Request $request)
     {
         $shift = $this->resolveShift($request);
-        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+        if (! $shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
 
         $shift->load(['cost.costCategory', 'cost.userCost']);
 
         $costs = $shift->cost;
 
         // ── Totals ────────────────────────────────────────────────
-        $totalCash  = $costs->sum(fn($c) => (float) $c->amount);
-        $totalBank  = $costs->sum(fn($c) => (float) $c->amount_bankak);
+        $totalCash = $costs->sum(fn ($c) => (float) $c->amount);
+        $totalBank = $costs->sum(fn ($c) => (float) $c->amount_bankak);
         $grandTotal = $totalCash + $totalBank;
 
         // ── Group by category ─────────────────────────────────────
-        $byCategory = $costs->groupBy(fn($c) => $c->costCategory->name ?? 'عام');
+        $byCategory = $costs->groupBy(fn ($c) => $c->costCategory->name ?? 'عام');
 
         // ── PDF ───────────────────────────────────────────────────
-        $filterLine = 'وردية رقم: ' . $shift->id
-            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+        $filterLine = 'وردية رقم: '.$shift->id
+            .'   |   تاريخ: '.$shift->created_at->format('Y/m/d  H:i');
 
         $pdf = new MyCustomTCPDF('تقرير المصروفات', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
         $pdf->setPrintHeader(true);
@@ -1457,16 +1466,16 @@ class ReportController extends Controller
         $pdf->AddPage();
 
         $margins = $pdf->getMargins();
-        $W  = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
+        $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
 
         // Column widths: #  |  الوصف  |  ملاحظة  |  المستخدم  |  نقدي  |  بنكي  |  الإجمالي
-        $wNo   = $W * 0.05;
+        $wNo = $W * 0.05;
         $wDesc = $W * 0.25;
         $wNote = $W * 0.17;
         $wUser = $W * 0.15;
         $wCash = $W * 0.13;
         $wBank = $W * 0.13;
-        $wTot  = $W * 0.12;
+        $wTot = $W * 0.12;
 
         // ── Helpers ───────────────────────────────────────────────
         $line = function () use ($pdf, $W, $margins) {
@@ -1482,13 +1491,13 @@ class ReportController extends Controller
 
         $drawTableHeader = function () use ($pdf, $wNo, $wDesc, $wNote, $wUser, $wCash, $wBank, $wTot) {
             $pdf->SetFont('arial', 'B', 9);
-            $pdf->Cell($wNo,   6, '#',        1, 0, 'C');
-            $pdf->Cell($wDesc, 6, 'الوصف',    1, 0, 'C');
-            $pdf->Cell($wNote, 6, 'ملاحظة',   1, 0, 'C');
+            $pdf->Cell($wNo, 6, '#', 1, 0, 'C');
+            $pdf->Cell($wDesc, 6, 'الوصف', 1, 0, 'C');
+            $pdf->Cell($wNote, 6, 'ملاحظة', 1, 0, 'C');
             $pdf->Cell($wUser, 6, 'المستخدم', 1, 0, 'C');
-            $pdf->Cell($wCash, 6, 'نقدي',     1, 0, 'C');
-            $pdf->Cell($wBank, 6, 'بنكي',     1, 0, 'C');
-            $pdf->Cell($wTot,  6, 'الإجمالي', 1, 1, 'C');
+            $pdf->Cell($wCash, 6, 'نقدي', 1, 0, 'C');
+            $pdf->Cell($wBank, 6, 'بنكي', 1, 0, 'C');
+            $pdf->Cell($wTot, 6, 'الإجمالي', 1, 1, 'C');
         };
 
         // ── Report title ──────────────────────────────────────────
@@ -1498,7 +1507,7 @@ class ReportController extends Controller
         $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
         $pdf->Ln(2);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
         $pdf->Ln(5);
@@ -1506,21 +1515,21 @@ class ReportController extends Controller
         // ── Summary box ───────────────────────────────────────────
         $sw = $W / 3;
         $pdf->SetFont('arial', 'B', 10);
-        $pdf->Cell($sw, 7, 'إجمالي نقدي: ' . number_format($totalCash, 2),  'B', 0, 'C');
-        $pdf->Cell($sw, 7, 'إجمالي بنكي: ' . number_format($totalBank, 2),  'B', 0, 'C');
-        $pdf->Cell($sw, 7, 'الإجمالي الكلي: ' . number_format($grandTotal, 2), 'B', 1, 'C');
+        $pdf->Cell($sw, 7, 'إجمالي نقدي: '.number_format($totalCash, 2), 'B', 0, 'C');
+        $pdf->Cell($sw, 7, 'إجمالي بنكي: '.number_format($totalBank, 2), 'B', 0, 'C');
+        $pdf->Cell($sw, 7, 'الإجمالي الكلي: '.number_format($grandTotal, 2), 'B', 1, 'C');
         $pdf->Ln(4);
 
         // ── Per-category sections ─────────────────────────────────
         foreach ($byCategory as $categoryName => $items) {
-            $catTotal = $items->sum(fn($c) => (float)$c->amount + (float)$c->amount_bankak);
+            $catTotal = $items->sum(fn ($c) => (float) $c->amount + (float) $c->amount_bankak);
 
             // Category banner
             $thickLine();
             $pdf->Ln(1);
             $pdf->SetFont('arial', 'B', 11);
             $pdf->Cell($W - $wTot, 6, $categoryName, 0, 0, 'R');
-            $pdf->Cell($wTot,      6, number_format($catTotal, 2), 0, 1, 'C');
+            $pdf->Cell($wTot, 6, number_format($catTotal, 2), 0, 1, 'C');
             $line();
             $pdf->Ln(1);
 
@@ -1528,25 +1537,25 @@ class ReportController extends Controller
 
             $i = 1;
             foreach ($items as $cost) {
-                $rowTotal = (float)$cost->amount + (float)$cost->amount_bankak;
+                $rowTotal = (float) $cost->amount + (float) $cost->amount_bankak;
                 $pdf->SetFont('arial', '', 9);
-                $pdf->Cell($wNo,   6, $i++,                                  1, 0, 'C');
-                $pdf->Cell($wDesc, 6, $cost->description ?? '—',             1, 0, 'R');
-                $pdf->Cell($wNote, 6, $cost->comment     ?? '—',             1, 0, 'R');
-                $pdf->Cell($wUser, 6, $cost->userCost->name ?? '—',          1, 0, 'C');
-                $pdf->Cell($wCash, 6, number_format((float)$cost->amount, 2),         1, 0, 'C');
-                $pdf->Cell($wBank, 6, number_format((float)$cost->amount_bankak, 2),  1, 0, 'C');
-                $pdf->Cell($wTot,  6, number_format($rowTotal, 2),           1, 1, 'C');
+                $pdf->Cell($wNo, 6, $i++, 1, 0, 'C');
+                $pdf->Cell($wDesc, 6, $cost->description ?? '—', 1, 0, 'R');
+                $pdf->Cell($wNote, 6, $cost->comment ?? '—', 1, 0, 'R');
+                $pdf->Cell($wUser, 6, $cost->userCost->name ?? '—', 1, 0, 'C');
+                $pdf->Cell($wCash, 6, number_format((float) $cost->amount, 2), 1, 0, 'C');
+                $pdf->Cell($wBank, 6, number_format((float) $cost->amount_bankak, 2), 1, 0, 'C');
+                $pdf->Cell($wTot, 6, number_format($rowTotal, 2), 1, 1, 'C');
             }
 
             // Category subtotal row
             $pdf->SetFont('arial', 'B', 9);
-            $catCash = $items->sum(fn($c) => (float)$c->amount);
-            $catBank = $items->sum(fn($c) => (float)$c->amount_bankak);
+            $catCash = $items->sum(fn ($c) => (float) $c->amount);
+            $catBank = $items->sum(fn ($c) => (float) $c->amount_bankak);
             $pdf->Cell($wNo + $wDesc + $wNote + $wUser, 6, 'المجموع', 1, 0, 'R');
-            $pdf->Cell($wCash, 6, number_format($catCash, 2),   1, 0, 'C');
-            $pdf->Cell($wBank, 6, number_format($catBank, 2),   1, 0, 'C');
-            $pdf->Cell($wTot,  6, number_format($catTotal, 2),  1, 1, 'C');
+            $pdf->Cell($wCash, 6, number_format($catCash, 2), 1, 0, 'C');
+            $pdf->Cell($wBank, 6, number_format($catBank, 2), 1, 0, 'C');
+            $pdf->Cell($wTot, 6, number_format($catTotal, 2), 1, 1, 'C');
 
             $pdf->Ln(3);
         }
@@ -1560,19 +1569,21 @@ class ReportController extends Controller
         $pdf->Ln(4);
         $pdf->SetFont('arial', 'B', 12);
         $pdf->Cell($W - $wTot, 7, 'الإجمالي الكلي للمصروفات', 0, 0, 'R');
-        $pdf->Cell($wTot,      7, number_format($grandTotal, 2), 0, 1, 'C');
+        $pdf->Cell($wTot, 7, number_format($grandTotal, 2), 0, 1, 'C');
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
 
-        return $this->shiftPdfResponse($pdf, 'Expenses_Shift_' . $shift->id . '.pdf');
+        return $this->shiftPdfResponse($pdf, 'Expenses_Shift_'.$shift->id.'.pdf');
     }
 
     public function shiftInsuranceStatsPdf(Request $request)
     {
         $shift = $this->resolveShift($request);
-        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+        if (! $shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
 
         $shift->load([
             'patients.patient.company',
@@ -1585,15 +1596,17 @@ class ReportController extends Controller
 
         foreach ($shift->patients as $visit) {
             $company = $visit->patient->company ?? null;
-            if (!$company) continue;
+            if (! $company) {
+                continue;
+            }
 
             $cid = $company->id;
-            if (!isset($companies[$cid])) {
+            if (! isset($companies[$cid])) {
                 $companies[$cid] = [
-                    'name'         => $company->name,
-                    'patient_ids'  => [],
-                    'lab_claim'    => 0.0,
-                    'service_claim'=> 0.0,
+                    'name' => $company->name,
+                    'patient_ids' => [],
+                    'lab_claim' => 0.0,
+                    'service_claim' => 0.0,
                 ];
             }
 
@@ -1608,8 +1621,8 @@ class ReportController extends Controller
         }
 
         // ── PDF ───────────────────────────────────────────────────
-        $filterLine = 'وردية رقم: ' . $shift->id
-            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+        $filterLine = 'وردية رقم: '.$shift->id
+            .'   |   تاريخ: '.$shift->created_at->format('Y/m/d  H:i');
 
         $pdf = new MyCustomTCPDF('إحصائيات التأمين', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
         $pdf->setPrintHeader(true);
@@ -1622,12 +1635,12 @@ class ReportController extends Controller
         $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
 
         // Column widths
-        $wNo      = $W * 0.05;
-        $wName    = $W * 0.25;
-        $wPat     = $W * 0.10;
-        $wLab     = $W * 0.20;
-        $wSvc     = $W * 0.20;
-        $wTotal   = $W * 0.20;
+        $wNo = $W * 0.05;
+        $wName = $W * 0.25;
+        $wPat = $W * 0.10;
+        $wLab = $W * 0.20;
+        $wSvc = $W * 0.20;
+        $wTotal = $W * 0.20;
 
         $line = function () use ($pdf, $W, $margins) {
             $pdf->SetLineWidth(0.2);
@@ -1641,7 +1654,7 @@ class ReportController extends Controller
         $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
         $pdf->Ln(2);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
         $pdf->Ln(5);
@@ -1649,17 +1662,18 @@ class ReportController extends Controller
         if (empty($companies)) {
             $pdf->SetFont('arial', '', 11);
             $pdf->Cell($W, 8, 'لا توجد مرضى تأمين في هذه الوردية', 0, 1, 'C');
-            return $this->shiftPdfResponse($pdf, 'InsuranceStats_Shift_' . $shift->id . '.pdf');
+
+            return $this->shiftPdfResponse($pdf, 'InsuranceStats_Shift_'.$shift->id.'.pdf');
         }
 
         // ── Table header ──────────────────────────────────────────
         $pdf->SetFont('arial', 'B', 9);
-        $pdf->Cell($wNo,    7, '#',                   1, 0, 'C');
-        $pdf->Cell($wName,  7, 'الشركة',              1, 0, 'C');
-        $pdf->Cell($wPat,   7, 'عدد المرضى',          1, 0, 'C');
-        $pdf->Cell($wLab,   7, 'مطالبة المختبر',      1, 0, 'C');
-        $pdf->Cell($wSvc,   7, 'مطالبة العيادات',     1, 0, 'C');
-        $pdf->Cell($wTotal, 7, 'الإجمالي',            1, 1, 'C');
+        $pdf->Cell($wNo, 7, '#', 1, 0, 'C');
+        $pdf->Cell($wName, 7, 'الشركة', 1, 0, 'C');
+        $pdf->Cell($wPat, 7, 'عدد المرضى', 1, 0, 'C');
+        $pdf->Cell($wLab, 7, 'مطالبة المختبر', 1, 0, 'C');
+        $pdf->Cell($wSvc, 7, 'مطالبة العيادات', 1, 0, 'C');
+        $pdf->Cell($wTotal, 7, 'الإجمالي', 1, 1, 'C');
 
         // ── Rows ──────────────────────────────────────────────────
         $totalPat = 0;
@@ -1675,36 +1689,38 @@ class ReportController extends Controller
             $totalSvc += $data['service_claim'];
 
             $pdf->SetFont('arial', '', 10);
-            $pdf->Cell($wNo,    6, $i++,                                   1, 0, 'C');
-            $pdf->Cell($wName,  6, $data['name'],                          1, 0, 'R');
-            $pdf->Cell($wPat,   6, $patCount,                              1, 0, 'C');
-            $pdf->Cell($wLab,   6, number_format($data['lab_claim'],   2), 1, 0, 'C');
-            $pdf->Cell($wSvc,   6, number_format($data['service_claim'],2), 1, 0, 'C');
-            $pdf->Cell($wTotal, 6, number_format($rowTotal,            2), 1, 1, 'C');
+            $pdf->Cell($wNo, 6, $i++, 1, 0, 'C');
+            $pdf->Cell($wName, 6, $data['name'], 1, 0, 'R');
+            $pdf->Cell($wPat, 6, $patCount, 1, 0, 'C');
+            $pdf->Cell($wLab, 6, number_format($data['lab_claim'], 2), 1, 0, 'C');
+            $pdf->Cell($wSvc, 6, number_format($data['service_claim'], 2), 1, 0, 'C');
+            $pdf->Cell($wTotal, 6, number_format($rowTotal, 2), 1, 1, 'C');
         }
 
         // ── Totals row ────────────────────────────────────────────
         $pdf->SetFont('arial', 'B', 10);
-        $pdf->Cell($wNo + $wName, 7, 'الإجمالي',                         1, 0, 'R');
-        $pdf->Cell($wPat,         7, $totalPat,                           1, 0, 'C');
-        $pdf->Cell($wLab,         7, number_format($totalLab, 2),         1, 0, 'C');
-        $pdf->Cell($wSvc,         7, number_format($totalSvc, 2),         1, 0, 'C');
-        $pdf->Cell($wTotal,       7, number_format($totalLab + $totalSvc, 2), 1, 1, 'C');
+        $pdf->Cell($wNo + $wName, 7, 'الإجمالي', 1, 0, 'R');
+        $pdf->Cell($wPat, 7, $totalPat, 1, 0, 'C');
+        $pdf->Cell($wLab, 7, number_format($totalLab, 2), 1, 0, 'C');
+        $pdf->Cell($wSvc, 7, number_format($totalSvc, 2), 1, 0, 'C');
+        $pdf->Cell($wTotal, 7, number_format($totalLab + $totalSvc, 2), 1, 1, 'C');
 
         // Double-line footer
         $pdf->Ln(4);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
 
-        return $this->shiftPdfResponse($pdf, 'InsuranceStats_Shift_' . $shift->id . '.pdf');
+        return $this->shiftPdfResponse($pdf, 'InsuranceStats_Shift_'.$shift->id.'.pdf');
     }
 
     public function shiftLabStatsPdf(Request $request)
     {
         $shift = $this->resolveShift($request);
-        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+        if (! $shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
 
         $shift->load(['patients.labRequests.mainTest.package']);
 
@@ -1714,37 +1730,39 @@ class ReportController extends Controller
 
         foreach ($shift->patients as $visit) {
             foreach ($visit->labRequests as $lr) {
-                if (!$lr->mainTest) continue;
+                if (! $lr->mainTest) {
+                    continue;
+                }
 
                 $packageName = $lr->mainTest->package->package_name ?? 'غير مصنف';
-                $testId      = $lr->main_test_id;
-                $testName    = $lr->mainTest->main_test_name;
-                $qty         = max(1, (int) $lr->count);
-                $price       = (float) $lr->price;
+                $testId = $lr->main_test_id;
+                $testName = $lr->mainTest->main_test_name;
+                $qty = max(1, (int) $lr->count);
+                $price = (float) $lr->price;
 
-                if (!isset($byPackage[$packageName][$testId])) {
+                if (! isset($byPackage[$packageName][$testId])) {
                     $byPackage[$packageName][$testId] = [
-                        'name'   => $testName,
+                        'name' => $testName,
                         'orders' => 0,
-                        'price'  => $price,
-                        'total'  => 0.0,
+                        'price' => $price,
+                        'total' => 0.0,
                     ];
                 }
 
                 $byPackage[$packageName][$testId]['orders'] += $qty;
-                $byPackage[$packageName][$testId]['total']  += $price * $qty;
+                $byPackage[$packageName][$testId]['total'] += $price * $qty;
             }
         }
 
         // Sort each package's tests by order count desc
         foreach ($byPackage as $pkg => &$tests) {
-            uasort($tests, fn($a, $b) => $b['orders'] <=> $a['orders']);
+            uasort($tests, fn ($a, $b) => $b['orders'] <=> $a['orders']);
         }
         unset($tests);
 
         // ── PDF ───────────────────────────────────────────────────
-        $filterLine = 'وردية رقم: ' . $shift->id
-            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+        $filterLine = 'وردية رقم: '.$shift->id
+            .'   |   تاريخ: '.$shift->created_at->format('Y/m/d  H:i');
 
         $pdf = new MyCustomTCPDF('إحصائيات التحاليل', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
         $pdf->setPrintHeader(true);
@@ -1757,11 +1775,11 @@ class ReportController extends Controller
         $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
 
         // Column widths: # | اسم التحليل | الفئة | عدد الطلبات | السعر | الإجمالي
-        $wNo     = $W * 0.06;
-        $wName   = $W * 0.36;
+        $wNo = $W * 0.06;
+        $wName = $W * 0.36;
         $wOrders = $W * 0.14;
-        $wPrice  = $W * 0.22;
-        $wTotal  = $W * 0.22;
+        $wPrice = $W * 0.22;
+        $wTotal = $W * 0.22;
 
         // ── Helpers ───────────────────────────────────────────────
         $thickLine = function () use ($pdf, $W, $margins) {
@@ -1777,11 +1795,11 @@ class ReportController extends Controller
 
         $drawTableHeader = function () use ($pdf, $wNo, $wName, $wOrders, $wPrice, $wTotal) {
             $pdf->SetFont('arial', 'B', 9);
-            $pdf->Cell($wNo,     6, '#',           1, 0, 'C');
-            $pdf->Cell($wName,   6, 'اسم التحليل', 1, 0, 'C');
+            $pdf->Cell($wNo, 6, '#', 1, 0, 'C');
+            $pdf->Cell($wName, 6, 'اسم التحليل', 1, 0, 'C');
             $pdf->Cell($wOrders, 6, 'عدد الطلبات', 1, 0, 'C');
-            $pdf->Cell($wPrice,  6, 'السعر',        1, 0, 'C');
-            $pdf->Cell($wTotal,  6, 'الإجمالي',     1, 1, 'C');
+            $pdf->Cell($wPrice, 6, 'السعر', 1, 0, 'C');
+            $pdf->Cell($wTotal, 6, 'الإجمالي', 1, 1, 'C');
         };
 
         // ── Report title ──────────────────────────────────────────
@@ -1791,7 +1809,7 @@ class ReportController extends Controller
         $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
         $pdf->Ln(2);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
         $pdf->Ln(5);
@@ -1799,24 +1817,25 @@ class ReportController extends Controller
         if (empty($byPackage)) {
             $pdf->SetFont('arial', '', 11);
             $pdf->Cell($W, 8, 'لا توجد تحاليل في هذه الوردية', 0, 1, 'C');
-            return $this->shiftPdfResponse($pdf, 'LabStats_Shift_' . $shift->id . '.pdf');
+
+            return $this->shiftPdfResponse($pdf, 'LabStats_Shift_'.$shift->id.'.pdf');
         }
 
         // ── Per-package sections ──────────────────────────────────
         $grandOrders = 0;
-        $grandTotal  = 0.0;
+        $grandTotal = 0.0;
 
         foreach ($byPackage as $packageName => $tests) {
             $pkgOrders = array_sum(array_column($tests, 'orders'));
-            $pkgTotal  = array_sum(array_column($tests, 'total'));
+            $pkgTotal = array_sum(array_column($tests, 'total'));
 
             // Package banner
             $thickLine();
             $pdf->Ln(1);
             $pdf->SetFont('arial', 'B', 11);
-            $pdf->Cell($W - $wOrders - $wTotal, 6, $packageName,              0, 0, 'R');
-            $pdf->Cell($wOrders,                6, $pkgOrders . ' طلب',        0, 0, 'C');
-            $pdf->Cell($wTotal,                 6, number_format($pkgTotal, 2), 0, 1, 'C');
+            $pdf->Cell($W - $wOrders - $wTotal, 6, $packageName, 0, 0, 'R');
+            $pdf->Cell($wOrders, 6, $pkgOrders.' طلب', 0, 0, 'C');
+            $pdf->Cell($wTotal, 6, number_format($pkgTotal, 2), 0, 1, 'C');
             $thinLine();
             $pdf->Ln(1);
 
@@ -1825,45 +1844,47 @@ class ReportController extends Controller
             $i = 1;
             foreach ($tests as $test) {
                 $pdf->SetFont('arial', '', 9);
-                $pdf->Cell($wNo,     6, $i++,                                       1, 0, 'C');
-                $pdf->Cell($wName,   6, $test['name'],                              1, 0, 'R');
-                $pdf->Cell($wOrders, 6, $test['orders'],                            1, 0, 'C');
-                $pdf->Cell($wPrice,  6, number_format($test['price'],  2),          1, 0, 'C');
-                $pdf->Cell($wTotal,  6, number_format($test['total'],  2),          1, 1, 'C');
+                $pdf->Cell($wNo, 6, $i++, 1, 0, 'C');
+                $pdf->Cell($wName, 6, $test['name'], 1, 0, 'R');
+                $pdf->Cell($wOrders, 6, $test['orders'], 1, 0, 'C');
+                $pdf->Cell($wPrice, 6, number_format($test['price'], 2), 1, 0, 'C');
+                $pdf->Cell($wTotal, 6, number_format($test['total'], 2), 1, 1, 'C');
             }
 
             // Package subtotal
             $pdf->SetFont('arial', 'B', 9);
-            $pdf->Cell($wNo + $wName, 6, 'مجموع الفئة',                            1, 0, 'R');
-            $pdf->Cell($wOrders,      6, $pkgOrders,                                1, 0, 'C');
-            $pdf->Cell($wPrice,       6, '—',                                       1, 0, 'C');
-            $pdf->Cell($wTotal,       6, number_format($pkgTotal, 2),               1, 1, 'C');
+            $pdf->Cell($wNo + $wName, 6, 'مجموع الفئة', 1, 0, 'R');
+            $pdf->Cell($wOrders, 6, $pkgOrders, 1, 0, 'C');
+            $pdf->Cell($wPrice, 6, '—', 1, 0, 'C');
+            $pdf->Cell($wTotal, 6, number_format($pkgTotal, 2), 1, 1, 'C');
 
             $grandOrders += $pkgOrders;
-            $grandTotal  += $pkgTotal;
+            $grandTotal += $pkgTotal;
             $pdf->Ln(3);
         }
 
         // ── Grand total ───────────────────────────────────────────
         $pdf->Ln(3);
         $pdf->SetFont('arial', 'B', 12);
-        $pdf->Cell($wNo + $wName, 7, 'الإجمالي الكلي',             0, 0, 'R');
-        $pdf->Cell($wOrders,      7, $grandOrders . ' طلب',          0, 0, 'C');
-        $pdf->Cell($wPrice,       7, '',                             0, 0, 'C');
-        $pdf->Cell($wTotal,       7, number_format($grandTotal, 2),  0, 1, 'C');
+        $pdf->Cell($wNo + $wName, 7, 'الإجمالي الكلي', 0, 0, 'R');
+        $pdf->Cell($wOrders, 7, $grandOrders.' طلب', 0, 0, 'C');
+        $pdf->Cell($wPrice, 7, '', 0, 0, 'C');
+        $pdf->Cell($wTotal, 7, number_format($grandTotal, 2), 0, 1, 'C');
 
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
 
-        return $this->shiftPdfResponse($pdf, 'LabStats_Shift_' . $shift->id . '.pdf');
+        return $this->shiftPdfResponse($pdf, 'LabStats_Shift_'.$shift->id.'.pdf');
     }
 
     public function shiftDiscountsPdf(Request $request)
     {
         $shift = $this->resolveShift($request);
-        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+        if (! $shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
 
         $shift->load([
             'patients.patient',
@@ -1878,39 +1899,41 @@ class ReportController extends Controller
         foreach ($shift->patients as $visit) {
             $labDiscount = 0.0;
             foreach ($visit->labRequests as $lr) {
-                $labDiscount += (float)$lr->price * max(1, (int)$lr->count) * ((int)$lr->discount_per / 100);
+                $labDiscount += (float) $lr->price * max(1, (int) $lr->count) * ((int) $lr->discount_per / 100);
             }
 
             $svcDiscount = 0.0;
             foreach ($visit->requestedServices as $rs) {
-                $fixed   = (float)$rs->discount;
-                $percent = (float)$rs->price * max(1, (int)$rs->count) * ((int)$rs->discount_per / 100);
+                $fixed = (float) $rs->discount;
+                $percent = (float) $rs->price * max(1, (int) $rs->count) * ((int) $rs->discount_per / 100);
                 $svcDiscount += $fixed + $percent;
             }
 
             $total = $labDiscount + $svcDiscount;
-            if ($total <= 0) continue;
+            if ($total <= 0) {
+                continue;
+            }
 
             $rows[] = [
-                'visit_id'    => $visit->id,
-                'patient'     => $visit->patient->name ?? '—',
-                'doctor'      => $visit->doctor->name  ?? '—',
-                'lab_dis'     => $labDiscount,
-                'svc_dis'     => $svcDiscount,
-                'total'       => $total,
+                'visit_id' => $visit->id,
+                'patient' => $visit->patient->name ?? '—',
+                'doctor' => $visit->doctor->name ?? '—',
+                'lab_dis' => $labDiscount,
+                'svc_dis' => $svcDiscount,
+                'total' => $total,
             ];
         }
 
         // Sort by total desc
-        usort($rows, fn($a, $b) => $b['total'] <=> $a['total']);
+        usort($rows, fn ($a, $b) => $b['total'] <=> $a['total']);
 
-        $sumLab  = array_sum(array_column($rows, 'lab_dis'));
-        $sumSvc  = array_sum(array_column($rows, 'svc_dis'));
-        $sumTot  = array_sum(array_column($rows, 'total'));
+        $sumLab = array_sum(array_column($rows, 'lab_dis'));
+        $sumSvc = array_sum(array_column($rows, 'svc_dis'));
+        $sumTot = array_sum(array_column($rows, 'total'));
 
         // ── PDF ───────────────────────────────────────────────────
-        $filterLine = 'وردية رقم: ' . $shift->id
-            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+        $filterLine = 'وردية رقم: '.$shift->id
+            .'   |   تاريخ: '.$shift->created_at->format('Y/m/d  H:i');
 
         $pdf = new MyCustomTCPDF('تقرير التخفيضات', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
         $pdf->setPrintHeader(true);
@@ -1923,21 +1946,21 @@ class ReportController extends Controller
         $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
 
         // Column widths: # | المريض | الطبيب | تخفيض المختبر | تخفيض العيادات | الإجمالي
-        $wNo    = $W * 0.05;
-        $wPat   = $W * 0.26;
-        $wDoc   = $W * 0.23;
-        $wLab   = $W * 0.18;
-        $wSvc   = $W * 0.18;
-        $wTot   = $W * 0.10;
+        $wNo = $W * 0.05;
+        $wPat = $W * 0.26;
+        $wDoc = $W * 0.23;
+        $wLab = $W * 0.18;
+        $wSvc = $W * 0.18;
+        $wTot = $W * 0.10;
 
         $drawTableHeader = function () use ($pdf, $wNo, $wPat, $wDoc, $wLab, $wSvc, $wTot) {
             $pdf->SetFont('arial', 'B', 9);
-            $pdf->Cell($wNo,  6, '#',               1, 0, 'C');
-            $pdf->Cell($wPat, 6, 'المريض',          1, 0, 'C');
-            $pdf->Cell($wDoc, 6, 'الطبيب',          1, 0, 'C');
-            $pdf->Cell($wLab, 6, 'تخفيض المختبر',  1, 0, 'C');
+            $pdf->Cell($wNo, 6, '#', 1, 0, 'C');
+            $pdf->Cell($wPat, 6, 'المريض', 1, 0, 'C');
+            $pdf->Cell($wDoc, 6, 'الطبيب', 1, 0, 'C');
+            $pdf->Cell($wLab, 6, 'تخفيض المختبر', 1, 0, 'C');
             $pdf->Cell($wSvc, 6, 'تخفيض العيادات', 1, 0, 'C');
-            $pdf->Cell($wTot, 6, 'الإجمالي',        1, 1, 'C');
+            $pdf->Cell($wTot, 6, 'الإجمالي', 1, 1, 'C');
         };
 
         // ── Report title ──────────────────────────────────────────
@@ -1947,7 +1970,7 @@ class ReportController extends Controller
         $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
         $pdf->Ln(2);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
         $pdf->Ln(5);
@@ -1955,15 +1978,16 @@ class ReportController extends Controller
         // ── Summary box ───────────────────────────────────────────
         $sw = $W / 3;
         $pdf->SetFont('arial', 'B', 10);
-        $pdf->Cell($sw, 7, 'تخفيض المختبر: '   . number_format($sumLab, 2), 'B', 0, 'C');
-        $pdf->Cell($sw, 7, 'تخفيض العيادات: '  . number_format($sumSvc, 2), 'B', 0, 'C');
-        $pdf->Cell($sw, 7, 'إجمالي التخفيضات: '. number_format($sumTot, 2), 'B', 1, 'C');
+        $pdf->Cell($sw, 7, 'تخفيض المختبر: '.number_format($sumLab, 2), 'B', 0, 'C');
+        $pdf->Cell($sw, 7, 'تخفيض العيادات: '.number_format($sumSvc, 2), 'B', 0, 'C');
+        $pdf->Cell($sw, 7, 'إجمالي التخفيضات: '.number_format($sumTot, 2), 'B', 1, 'C');
         $pdf->Ln(4);
 
         if (empty($rows)) {
             $pdf->SetFont('arial', '', 11);
             $pdf->Cell($W, 8, 'لا توجد تخفيضات في هذه الوردية', 0, 1, 'C');
-            return $this->shiftPdfResponse($pdf, 'Discounts_Shift_' . $shift->id . '.pdf');
+
+            return $this->shiftPdfResponse($pdf, 'Discounts_Shift_'.$shift->id.'.pdf');
         }
 
         // ── Table ─────────────────────────────────────────────────
@@ -1977,35 +2001,37 @@ class ReportController extends Controller
             }
 
             $pdf->SetFont('arial', '', 9);
-            $pdf->Cell($wNo,  6, $idx + 1,                              1, 0, 'C');
-            $pdf->Cell($wPat, 6, $row['patient'],                       1, 0, 'R');
-            $pdf->Cell($wDoc, 6, $row['doctor'],                        1, 0, 'R');
+            $pdf->Cell($wNo, 6, $idx + 1, 1, 0, 'C');
+            $pdf->Cell($wPat, 6, $row['patient'], 1, 0, 'R');
+            $pdf->Cell($wDoc, 6, $row['doctor'], 1, 0, 'R');
             $pdf->Cell($wLab, 6, $row['lab_dis'] > 0 ? number_format($row['lab_dis'], 2) : '—', 1, 0, 'C');
             $pdf->Cell($wSvc, 6, $row['svc_dis'] > 0 ? number_format($row['svc_dis'], 2) : '—', 1, 0, 'C');
-            $pdf->Cell($wTot, 6, number_format($row['total'], 2),       1, 1, 'C');
+            $pdf->Cell($wTot, 6, number_format($row['total'], 2), 1, 1, 'C');
         }
 
         // ── Totals row ────────────────────────────────────────────
         $pdf->SetFont('arial', 'B', 10);
-        $pdf->Cell($wNo + $wPat + $wDoc, 7, 'الإجمالي',                1, 0, 'R');
-        $pdf->Cell($wLab, 7, number_format($sumLab, 2),                 1, 0, 'C');
-        $pdf->Cell($wSvc, 7, number_format($sumSvc, 2),                 1, 0, 'C');
-        $pdf->Cell($wTot, 7, number_format($sumTot, 2),                 1, 1, 'C');
+        $pdf->Cell($wNo + $wPat + $wDoc, 7, 'الإجمالي', 1, 0, 'R');
+        $pdf->Cell($wLab, 7, number_format($sumLab, 2), 1, 0, 'C');
+        $pdf->Cell($wSvc, 7, number_format($sumSvc, 2), 1, 0, 'C');
+        $pdf->Cell($wTot, 7, number_format($sumTot, 2), 1, 1, 'C');
 
         // Double-line
         $pdf->Ln(4);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
 
-        return $this->shiftPdfResponse($pdf, 'Discounts_Shift_' . $shift->id . '.pdf');
+        return $this->shiftPdfResponse($pdf, 'Discounts_Shift_'.$shift->id.'.pdf');
     }
 
     public function shiftDoctorLabPdf(Request $request)
     {
         $shift = $this->resolveShift($request);
-        if (!$shift) return response()->json(['error' => 'Shift not found'], 404);
+        if (! $shift) {
+            return response()->json(['error' => 'Shift not found'], 404);
+        }
 
         $shift->load(['patients.doctor:id,name', 'patients.labRequests.mainTest']);
 
@@ -2013,12 +2039,14 @@ class ReportController extends Controller
         $doctors = [];   // [ doctor_id => [ name, tests(count), total ] ]
 
         foreach ($shift->patients as $visit) {
-            if (!$visit->doctor) continue;
+            if (! $visit->doctor) {
+                continue;
+            }
 
             $did = $visit->doctor->id;
-            if (!isset($doctors[$did])) {
+            if (! isset($doctors[$did])) {
                 $doctors[$did] = [
-                    'name'  => $visit->doctor->name,
+                    'name' => $visit->doctor->name,
                     'count' => 0,
                     'total' => 0.0,
                 ];
@@ -2032,14 +2060,14 @@ class ReportController extends Controller
         }
 
         // Sort by total desc
-        uasort($doctors, fn($a, $b) => $b['total'] <=> $a['total']);
+        uasort($doctors, fn ($a, $b) => $b['total'] <=> $a['total']);
 
         $grandCount = array_sum(array_column($doctors, 'count'));
         $grandTotal = array_sum(array_column($doctors, 'total'));
 
         // ── PDF ───────────────────────────────────────────────────
-        $filterLine = 'وردية رقم: ' . $shift->id
-            . '   |   تاريخ: ' . $shift->created_at->format('Y/m/d  H:i');
+        $filterLine = 'وردية رقم: '.$shift->id
+            .'   |   تاريخ: '.$shift->created_at->format('Y/m/d  H:i');
 
         $pdf = new MyCustomTCPDF('أداء الأطباء - المختبر', null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterLine);
         $pdf->setPrintHeader(true);
@@ -2051,8 +2079,8 @@ class ReportController extends Controller
         $margins = $pdf->getMargins();
         $W = $pdf->getPageWidth() - $margins['left'] - $margins['right'];
 
-        $wNo    = $W * 0.07;
-        $wName  = $W * 0.43;
+        $wNo = $W * 0.07;
+        $wName = $W * 0.43;
         $wCount = $W * 0.20;
         $wTotal = $W * 0.30;
 
@@ -2063,7 +2091,7 @@ class ReportController extends Controller
         $pdf->Cell($W, 5, $filterLine, 0, 1, 'C');
         $pdf->Ln(2);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
         $pdf->Ln(5);
@@ -2071,40 +2099,41 @@ class ReportController extends Controller
         if (empty($doctors)) {
             $pdf->SetFont('arial', '', 11);
             $pdf->Cell($W, 8, 'لا توجد فحوصات مختبرية في هذه الوردية', 0, 1, 'C');
-            return $this->shiftPdfResponse($pdf, 'DoctorLab_Shift_' . $shift->id . '.pdf');
+
+            return $this->shiftPdfResponse($pdf, 'DoctorLab_Shift_'.$shift->id.'.pdf');
         }
 
         // ── Table header ──────────────────────────────────────────
         $pdf->SetFont('arial', 'B', 10);
-        $pdf->Cell($wNo,    7, '#',                    1, 0, 'C');
-        $pdf->Cell($wName,  7, 'اسم الطبيب',           1, 0, 'C');
-        $pdf->Cell($wCount, 7, 'عدد الفحوصات',         1, 0, 'C');
+        $pdf->Cell($wNo, 7, '#', 1, 0, 'C');
+        $pdf->Cell($wName, 7, 'اسم الطبيب', 1, 0, 'C');
+        $pdf->Cell($wCount, 7, 'عدد الفحوصات', 1, 0, 'C');
         $pdf->Cell($wTotal, 7, 'إجمالي قيمة الفحوصات', 1, 1, 'C');
 
         // ── Rows ──────────────────────────────────────────────────
         $i = 1;
         foreach ($doctors as $data) {
             $pdf->SetFont('arial', '', 10);
-            $pdf->Cell($wNo,    6, $i++,                                1, 0, 'C');
-            $pdf->Cell($wName,  6, $data['name'],                       1, 0, 'R');
-            $pdf->Cell($wCount, 6, $data['count'],                      1, 0, 'C');
-            $pdf->Cell($wTotal, 6, number_format($data['total'], 2),    1, 1, 'C');
+            $pdf->Cell($wNo, 6, $i++, 1, 0, 'C');
+            $pdf->Cell($wName, 6, $data['name'], 1, 0, 'R');
+            $pdf->Cell($wCount, 6, $data['count'], 1, 0, 'C');
+            $pdf->Cell($wTotal, 6, number_format($data['total'], 2), 1, 1, 'C');
         }
 
         // ── Totals row ────────────────────────────────────────────
         $pdf->SetFont('arial', 'B', 10);
-        $pdf->Cell($wNo + $wName, 7, 'الإجمالي',                       1, 0, 'R');
-        $pdf->Cell($wCount,       7, $grandCount,                       1, 0, 'C');
-        $pdf->Cell($wTotal,       7, number_format($grandTotal, 2),     1, 1, 'C');
+        $pdf->Cell($wNo + $wName, 7, 'الإجمالي', 1, 0, 'R');
+        $pdf->Cell($wCount, 7, $grandCount, 1, 0, 'C');
+        $pdf->Cell($wTotal, 7, number_format($grandTotal, 2), 1, 1, 'C');
 
         // Double-line
         $pdf->Ln(4);
         $pdf->SetLineWidth(0.5);
-        $pdf->Line($margins['left'], $pdf->GetY(),     $margins['left'] + $W, $pdf->GetY());
+        $pdf->Line($margins['left'], $pdf->GetY(), $margins['left'] + $W, $pdf->GetY());
         $pdf->SetLineWidth(0.2);
         $pdf->Line($margins['left'], $pdf->GetY() + 2, $margins['left'] + $W, $pdf->GetY() + 2);
 
-        return $this->shiftPdfResponse($pdf, 'DoctorLab_Shift_' . $shift->id . '.pdf');
+        return $this->shiftPdfResponse($pdf, 'DoctorLab_Shift_'.$shift->id.'.pdf');
     }
 
     public function generateThermalServiceReceipt(Request $request, DoctorVisit $visit)
@@ -2117,7 +2146,7 @@ class ReportController extends Controller
         $pdfContent = $report->generate();
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
-        $filename = 'ServiceReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+        $filename = 'ServiceReceipt_Visit_'.$visit->id.'_'.$patientNameSanitized.'.pdf';
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
@@ -2135,7 +2164,7 @@ class ReportController extends Controller
         $pdfContent = $report->generate();
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name ?? 'Patient');
-        $filename = 'clinic-invoice-visit-' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+        $filename = 'clinic-invoice-visit-'.$visit->id.'_'.$patientNameSanitized.'.pdf';
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
@@ -2160,7 +2189,7 @@ class ReportController extends Controller
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
         $serviceNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $requestedService->service->name ?? 'Service');
-        $filename = 'ServiceReceipt_Visit_' . $visit->id . '_' . $serviceNameSanitized . '_' . $patientNameSanitized . '.pdf';
+        $filename = 'ServiceReceipt_Visit_'.$visit->id.'_'.$serviceNameSanitized.'_'.$patientNameSanitized.'.pdf';
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
@@ -2176,14 +2205,16 @@ class ReportController extends Controller
         $labelWidth = $pageUsableWidth * 0.60;
         $valueWidth = $pageUsableWidth * 0.40;
 
-        if ($isBoldValue)
-            $pdf->SetFont($fontName, 'B', $currentFontSize + 0.5); // Slightly larger if bold
+        if ($isBoldValue) {
+            $pdf->SetFont($fontName, 'B', $currentFontSize + 0.5);
+        } // Slightly larger if bold
 
         $pdf->Cell($labelWidth, 4, $label, 0, 0, $pdf->getRTL() ? 'R' : 'L');
         $pdf->Cell($valueWidth, 4, number_format($value, 2), 0, 1, $pdf->getRTL() ? 'L' : 'R');
 
-        if ($isBoldValue)
-            $pdf->SetFont($fontName, $currentStyle, $currentFontSize); // Reset
+        if ($isBoldValue) {
+            $pdf->SetFont($fontName, $currentStyle, $currentFontSize);
+        } // Reset
     }
 
     // // Helper for drawing total rows in thermal receipt style
@@ -2194,7 +2225,6 @@ class ReportController extends Controller
     //     $currentStyle = $pdf->getFontStyle();
     //     $currentFontFamily = $pdf->getFontFamily();
     //     $currentFontSize = $pdf->getFontSizePt();
-
 
     //     $pdf->Cell($labelWidth, 4, $label, 0, 0, 'R'); // Label aligned right
     //     if ($isBoldValue) $pdf->SetFont($currentFontFamily, 'B', $currentFontSize);
@@ -2214,12 +2244,15 @@ class ReportController extends Controller
         $currentStyle = $pdf->getFontStyle();
 
         $pdf->Cell($labelWidth, 5, $label, 0, 0, 'R');
-        if ($isBoldValue)
+        if ($isBoldValue) {
             $pdf->SetFont($currentFont, 'B', $pdf->getFontSizePt());
+        }
         $pdf->Cell($valueWidth, 5, number_format($value, 2), 0, 1, 'L'); // Align value to left for numbers
-        if ($isBoldValue)
-            $pdf->SetFont($currentFont, $currentStyle, $pdf->getFontSizePt()); // Reset
+        if ($isBoldValue) {
+            $pdf->SetFont($currentFont, $currentStyle, $pdf->getFontSizePt());
+        } // Reset
     }
+
     public function generateCostsReportPdf(Request $request)
     {
         // Permission Check: e.g., can('print cost_report')
@@ -2241,56 +2274,59 @@ class ReportController extends Controller
         ]);
 
         // --- Fetch Data (same logic as CostController@index) ---
-        $query = Cost::with(['costCategory:id,name', 'userCost:id,name', 'shift:id', /* 'doctorShift.doctor:id,name' */]);
+        $query = Cost::with(['costCategory:id,name', 'userCost:id,name', 'shift:id'/* 'doctorShift.doctor:id,name' */]);
         $filterCriteria = []; // To build a string for PDF header
 
         if ($request->filled('date_from')) {
             $from = Carbon::parse($request->date_from)->startOfDay();
             $query->whereDate('created_at', '>=', $from);
-            $filterCriteria[] = "From: " . $from->format('d-M-Y');
+            $filterCriteria[] = 'From: '.$from->format('d-M-Y');
         }
         if ($request->filled('date_to')) {
             $to = Carbon::parse($request->date_to)->endOfDay();
             $query->whereDate('created_at', '<=', $to);
-            $filterCriteria[] = "To: " . $to->format('d-M-Y');
+            $filterCriteria[] = 'To: '.$to->format('d-M-Y');
         }
         if ($request->filled('cost_category_id')) {
             $query->where('cost_category_id', $request->cost_category_id);
-            if ($cat = CostCategory::find($request->cost_category_id))
-                $filterCriteria[] = "Category: " . $cat->name;
+            if ($cat = CostCategory::find($request->cost_category_id)) {
+                $filterCriteria[] = 'Category: '.$cat->name;
+            }
         }
         if ($request->filled('user_cost_id')) {
             $query->where('user_cost', $request->user_cost_id); // Assuming 'user_cost' is the FK column name to users.id
-            if ($user = User::find($request->user_cost_id))
-                $filterCriteria[] = "User: " . $user->name;
+            if ($user = User::find($request->user_cost_id)) {
+                $filterCriteria[] = 'User: '.$user->name;
+            }
         }
         if ($request->filled('shift_id')) {
             $query->where('shift_id', $request->shift_id);
-            if ($shift = Shift::find($request->shift_id))
-                $filterCriteria[] = "Shift: #" . ($shift->name ?? $shift->id);
+            if ($shift = Shift::find($request->shift_id)) {
+                $filterCriteria[] = 'Shift: #'.($shift->name ?? $shift->id);
+            }
         }
         if ($request->filled('payment_method') && $request->payment_method !== 'all') {
             $method = $request->payment_method;
             if ($method === 'cash') {
                 $query->where('amount', '>', 0)->where('amount_bankak', '=', 0);
-                $filterCriteria[] = "Payment: Cash";
+                $filterCriteria[] = 'Payment: Cash';
             } elseif ($method === 'bank') {
                 $query->where('amount_bankak', '>', 0)->where('amount', '=', 0);
-                $filterCriteria[] = "Payment: Bank";
+                $filterCriteria[] = 'Payment: Bank';
             } elseif ($method === 'mixed') {
                 $query->where('amount', '>', 0)->where('amount_bankak', '>', 0);
-                $filterCriteria[] = "Payment: Mixed";
+                $filterCriteria[] = 'Payment: Mixed';
             }
         }
         if ($request->filled('search_description')) {
-            $query->where('description', 'LIKE', '%' . $request->search_description . '%');
-            $filterCriteria[] = "Desc: " . $request->search_description;
+            $query->where('description', 'LIKE', '%'.$request->search_description.'%');
+            $filterCriteria[] = 'Desc: '.$request->search_description;
         }
 
         $sortBy = $request->input('sort_by', 'created_at');
         $sortDirection = $request->input('sort_direction', 'desc');
         if ($sortBy === 'total_cost') {
-            $query->orderByRaw('(amount + amount_bankak) ' . $sortDirection);
+            $query->orderByRaw('(amount + amount_bankak) '.$sortDirection);
         } else {
             $query->orderBy($sortBy, $sortDirection);
         }
@@ -2303,12 +2339,12 @@ class ReportController extends Controller
         // Calculate Summary Totals (for the filtered dataset)
         $totalCashPaid = $costs->sum('amount');
         $totalBankPaid = $costs->sum('amount_bankak');
-        $grandTotalPaid = $costs->sum(fn($cost) => $cost->amount + $cost->amount_bankak);
+        $grandTotalPaid = $costs->sum(fn ($cost) => $cost->amount + $cost->amount_bankak);
 
         // --- PDF Generation ---
         $appSettings = Setting::instance(); // For letterhead details
         $reportTitle = 'تقرير المصروفات'; // "Costs Report"
-        $filterCriteriaString = !empty($filterCriteria) ? implode(' | ', $filterCriteria) : "جميع المصروفات";
+        $filterCriteriaString = ! empty($filterCriteria) ? implode(' | ', $filterCriteria) : 'جميع المصروفات';
 
         $pdf = new MyCustomTCPDF(
             $reportTitle,
@@ -2333,9 +2369,9 @@ class ReportController extends Controller
         $pdf->Ln(1);
         $pdf->SetFont($defaultFont, '', 9);
         $summaryCellWidth = ($pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right']) / 3;
-        $pdf->Cell($summaryCellWidth, 6, 'إجمالي المصروفات النقدية: ' . number_format($totalCashPaid, 2), 1, 0, 'C');
-        $pdf->Cell($summaryCellWidth, 6, 'إجمالي المصروفات البنكية: ' . number_format($totalBankPaid, 2), 1, 0, 'C');
-        $pdf->Cell($summaryCellWidth, 6, 'إجمالي المصروفات الكلي: ' . number_format($grandTotalPaid, 2), 1, 1, 'C');
+        $pdf->Cell($summaryCellWidth, 6, 'إجمالي المصروفات النقدية: '.number_format($totalCashPaid, 2), 1, 0, 'C');
+        $pdf->Cell($summaryCellWidth, 6, 'إجمالي المصروفات البنكية: '.number_format($totalBankPaid, 2), 1, 0, 'C');
+        $pdf->Cell($summaryCellWidth, 6, 'إجمالي المصروفات الكلي: '.number_format($grandTotalPaid, 2), 1, 1, 'C');
         $pdf->Ln(4);
 
         // --- Detailed Costs Table ---
@@ -2358,12 +2394,13 @@ class ReportController extends Controller
         foreach ($costs as $cost) {
             $totalCostForRow = $cost->amount + $cost->amount_bankak;
             $paymentMethodDisplay = '-';
-            if ($cost->amount > 0 && $cost->amount_bankak > 0)
+            if ($cost->amount > 0 && $cost->amount_bankak > 0) {
                 $paymentMethodDisplay = 'مختلط';
-            else if ($cost->amount > 0)
+            } elseif ($cost->amount > 0) {
                 $paymentMethodDisplay = 'نقداً';
-            else if ($cost->amount_bankak > 0)
+            } elseif ($cost->amount_bankak > 0) {
                 $paymentMethodDisplay = 'بنك';
+            }
 
             $rowData = [
                 Carbon::parse($cost->created_at)->format('Y-m-d H:i'),
@@ -2376,7 +2413,7 @@ class ReportController extends Controller
                 number_format($totalCostForRow, 2),
             ];
             $pdf->DrawTableRow($rowData, null, null, $fill, 6); // Use stored widths/alignments, base height 6
-            $fill = !$fill;
+            $fill = ! $fill;
         }
         // Draw final line under the table data
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
@@ -2384,22 +2421,22 @@ class ReportController extends Controller
         // Grand Total Row for the table (optional, as summary is at top)
         // You can use $pdf->DrawSummaryRow here if you defined it in MyCustomTCPDF
 
-
         // --- Output PDF ---
-        $pdfFileName = 'Costs_Report_' . ($request->date_from ?? 'all') . '_to_' . ($request->date_to ?? 'all') . '.pdf';
+        $pdfFileName = 'Costs_Report_'.($request->date_from ?? 'all').'_to_'.($request->date_to ?? 'all').'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     public function monthlyServiceDepositsIncome(Request $request)
     {
         // $this->authorize('view monthly_service_income_report'); // Permission check
 
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2000|max:' . (date('Y') + 5),
+            'year' => 'required|integer|min:2000|max:'.(date('Y') + 5),
             // Add other filters if needed, e.g., specific user who processed deposits
             // 'user_id' => 'nullable|integer|exists:users,id',
         ]);
@@ -2444,7 +2481,7 @@ class ReportController extends Controller
                 return Carbon::parse($cost->created_at)->format('Y-m-d') === $currentDateStr;
             });
 
-            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && !$request->input('show_empty_days', false)) {
+            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && ! $request->input('show_empty_days', false)) {
                 continue; // Skip days with no activity unless explicitly requested
             }
 
@@ -2485,7 +2522,6 @@ class ReportController extends Controller
         // $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount'); // Total cash costs for month
         $grandTotals['net_bank_flow'] = $grandTotals['total_bank_deposits'] - $allCostsForMonth->sum('amount_bankak'); // Total bank costs for month
 
-
         return response()->json([
             'daily_data' => $dailyData,
             'summary' => $grandTotals,
@@ -2493,9 +2529,10 @@ class ReportController extends Controller
                 'month_name' => $startDate->translatedFormat('F Y'), // Localized month name
                 'from' => $startDate->toDateString(),
                 'to' => $endDate->toDateString(),
-            ]
+            ],
         ]);
     }
+
     /**
      * Helper function to get monthly service deposit income data.
      * This will be used by both the JSON API endpoint and the export functions.
@@ -2504,7 +2541,7 @@ class ReportController extends Controller
     {
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2000|max:' . (date('Y') + 5),
+            'year' => 'required|integer|min:2000|max:'.(date('Y') + 5),
             // 'user_id' => 'nullable|integer|exists:users,id', // Optional filter
             'show_empty_days' => 'nullable|boolean', // For PDF/Excel, you might always want to show all days
         ]);
@@ -2537,10 +2574,10 @@ class ReportController extends Controller
         foreach ($period as $date) {
             $currentDateStr = $date->format('Y-m-d');
 
-            $depositsOnThisDay = $allDepositsForMonth->filter(fn($d) => Carbon::parse($d->created_at)->isSameDay($date));
-            $costsOnThisDay = $allCostsForMonth->filter(fn($c) => Carbon::parse($c->created_at)->isSameDay($date));
+            $depositsOnThisDay = $allDepositsForMonth->filter(fn ($d) => Carbon::parse($d->created_at)->isSameDay($date));
+            $costsOnThisDay = $allCostsForMonth->filter(fn ($c) => Carbon::parse($c->created_at)->isSameDay($date));
 
-            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && !$request->input('show_empty_days', true)) { // Default to true for reports
+            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && ! $request->input('show_empty_days', true)) { // Default to true for reports
                 continue;
             }
 
@@ -2584,10 +2621,9 @@ class ReportController extends Controller
                 'month_name' => $startDate->translatedFormat('F Y'),
                 'from' => $startDate->toDateString(),
                 'to' => $endDate->toDateString(),
-            ]
+            ],
         ];
     }
-
 
     public function exportMonthlyServiceDepositsIncomePdf(Request $request)
     {
@@ -2608,16 +2644,15 @@ class ReportController extends Controller
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
         $pdf->AddPage();
         $pdf->SetLineWidth(0.1);
-        //rtl
+        // rtl
         $pdf->SetRTL(true);
-
 
         // Table Header
         $headers = ['التاريخ', 'إجمالي الإيداعات', 'إيداعات نقدية', 'إيداعات بنكية', 'إجمالي المصروفات', 'صافي النقدية', 'صافي البنك', 'صافي الدخل اليومي'];
         $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
         $colWidths = array_fill(0, count($headers), $pageWidth / count($headers)); // Equal width
         // Or define specific widths:
-        // $colWidths = [35, 35, 35, 35, 35, 35, 35, 0]; 
+        // $colWidths = [35, 35, 35, 35, 35, 35, 35, 0];
         // $colWidths[count($colWidths)-1] = $pageWidth - array_sum(array_slice($colWidths,0,-1));
         $alignments = array_fill(0, count($headers), 'C');
         $alignments[0] = 'R'; // Date align right
@@ -2639,7 +2674,7 @@ class ReportController extends Controller
                 number_format($day['net_income_for_day'], 2),
             ];
             $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
-            $fill = !$fill;
+            $fill = ! $fill;
         }
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
@@ -2657,8 +2692,9 @@ class ReportController extends Controller
         ];
         $pdf->DrawTableRow($summaryRow, $colWidths, $alignments, true, 10); // Filled, height 10
 
-        $pdfFileName = 'monthly_service_income_' . $reportPeriod['from'] . '_' . $reportPeriod['to'] . '.pdf';
+        $pdfFileName = 'monthly_service_income_'.$reportPeriod['from'].'_'.$reportPeriod['to'].'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
@@ -2690,18 +2726,19 @@ class ReportController extends Controller
         ])
             ->whereBetween('start_time', [$startDate, $endDate]); // Filter by DoctorShift start time
 
-        $filterCriteria = ["الفترة من: " . $startDate->format('Y-m-d') . " إلى: " . $endDate->format('Y-m-d')];
+        $filterCriteria = ['الفترة من: '.$startDate->format('Y-m-d').' إلى: '.$endDate->format('Y-m-d')];
 
         if ($request->filled('user_id_opened')) {
             $query->where('user_id', $validated['user_id_opened']);
             $user = User::find($validated['user_id_opened']);
-            if ($user)
-                $filterCriteria[] = "المستخدم: " . $user->name;
+            if ($user) {
+                $filterCriteria[] = 'المستخدم: '.$user->name;
+            }
         }
         if ($request->filled('doctor_name_search')) {
             $searchTerm = $validated['doctor_name_search'];
-            $query->whereHas('doctor', fn($q) => $q->where('name', 'LIKE', "%{$searchTerm}%"));
-            $filterCriteria[] = "بحث عن طبيب: " . $searchTerm;
+            $query->whereHas('doctor', fn ($q) => $q->where('name', 'LIKE', "%{$searchTerm}%"));
+            $filterCriteria[] = 'بحث عن طبيب: '.$searchTerm;
         }
         // if ($request->filled('status') && $request->status !== 'all') {
         //     $query->where('status', (bool)$validated['status']);
@@ -2727,8 +2764,9 @@ class ReportController extends Controller
         ];
 
         foreach ($doctorShifts as $ds) {
-            if (!$ds->doctor)
-                continue; // Skip if doctor somehow not loaded
+            if (! $ds->doctor) {
+                continue;
+            } // Skip if doctor somehow not loaded
 
             // Reuse logic from DoctorShift model or controller financial summary
             // For simplicity, assuming these methods are available on $ds or can be called:
@@ -2754,7 +2792,6 @@ class ReportController extends Controller
             $grandTotals['cash_entitlement'] += $cashEntitlement;
             $grandTotals['insurance_entitlement'] += $insuranceEntitlement;
         }
-
 
         // --- PDF Generation ---
         $reportTitle = 'تقرير مستحقات الأطباء';
@@ -2788,7 +2825,7 @@ class ReportController extends Controller
                 $row['opened_by'],
             ];
             $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 6, 10); // Height 6
-            $fill = !$fill;
+            $fill = ! $fill;
         }
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
@@ -2810,16 +2847,17 @@ class ReportController extends Controller
             $summaryRowPdf[2],
             $summaryRowPdf[3],
             $summaryRowPdf[4],
-            $summaryRowPdf[5]
+            $summaryRowPdf[5],
         ], $colWidths, $totalAlignments, true, 7);
 
-
-        $pdfFileName = 'doctor_reclaims_report_' . $validated['date_from'] . '_to_' . $validated['date_to'] . '.pdf';
+        $pdfFileName = 'doctor_reclaims_report_'.$validated['date_from'].'_to_'.$validated['date_to'].'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     public function doctorStatisticsReport(Request $request)
     {
         // $this->authorize('view doctor_statistics_report'); // Permission
@@ -2855,10 +2893,10 @@ class ReportController extends Controller
                 $query->where('doctor_id', $doctor->id);
             })
                 ->whereBetween('created_at', [$startDate, $endDate])
-                ->with(['patient', 'requestedServices']) // Eager load for calculations
+                ->with(['patient', 'requestedServices', 'doctorShift']) // Eager load for calculations
                 ->get();
 
-            if ($visits->isEmpty() && !$request->filled('doctor_id')) { // Skip if no visits and not filtering for a specific doctor
+            if ($visits->isEmpty() && ! $request->filled('doctor_id')) { // Skip if no visits and not filtering for a specific doctor
                 continue;
             }
 
@@ -2901,13 +2939,12 @@ class ReportController extends Controller
         $sortDirection = $validated['sort_direction'] ?? 'asc';
         $reportData = collect($reportData)->sortBy($sortBy, SORT_REGULAR, $sortDirection === 'desc')->values()->all();
 
-
         return response()->json([
             'data' => $reportData,
             'report_period' => [
                 'from' => $startDate->toDateString(),
                 'to' => $endDate->toDateString(),
-            ]
+            ],
         ]);
     }
 
@@ -2925,11 +2962,11 @@ class ReportController extends Controller
         $reportData = $responseData['data'] ?? [];
         $reportPeriod = $responseData['report_period'] ?? [
             'from' => $request->date_from,
-            'to' => $request->date_to
+            'to' => $request->date_to,
         ];
 
         $reportTitle = 'تقرير إحصائيات الأطباء';
-        $filterCriteria = "الفترة من: " . $reportPeriod['from'] . " إلى: " . $reportPeriod['to'];
+        $filterCriteria = 'الفترة من: '.$reportPeriod['from'].' إلى: '.$reportPeriod['to'];
         // Append other applied filters to filterCriteria string
 
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
@@ -2965,7 +3002,7 @@ class ReportController extends Controller
                     number_format($row['total_entitlement'], 2),
                 ];
                 $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 7);
-                $fill = !$fill;
+                $fill = ! $fill;
 
                 $grandTotals['patients'] += $row['patient_count'];
                 $grandTotals['income'] += $row['total_income_generated'];
@@ -2977,7 +3014,7 @@ class ReportController extends Controller
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
         // Summary Footer for Table
-        if (!empty($reportData)) {
+        if (! empty($reportData)) {
             $pdf->SetFont($fontname, 'B', 8.5);
             $summaryRowPdf = [
                 'الإجمالي العام:',
@@ -2995,16 +3032,18 @@ class ReportController extends Controller
                 $summaryRowPdf[3],
                 $summaryRowPdf[4],
                 $summaryRowPdf[5],
-                $summaryRowPdf[6]
+                $summaryRowPdf[6],
             ], $colWidths, $alignments, true, 8);
         }
 
-        $pdfFileName = 'doctor_statistics_report_' . $reportPeriod['from'] . '_to_' . $reportPeriod['to'] . '.pdf';
+        $pdfFileName = 'doctor_statistics_report_'.$reportPeriod['from'].'_to_'.$reportPeriod['to'].'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     public function companyPerformanceReport(Request $request)
     {
         // $this->authorize('view company_performance_report'); // Permission
@@ -3038,7 +3077,7 @@ class ReportController extends Controller
                 ->with(['requestedServices', 'patientLabRequests']) // Eager load for calculations
                 ->get();
 
-            if ($visitsForCompany->isEmpty() && !$request->filled('company_id')) {
+            if ($visitsForCompany->isEmpty() && ! $request->filled('company_id')) {
                 continue; // Skip if no visits and not filtering for this specific company
             }
 
@@ -3098,7 +3137,7 @@ class ReportController extends Controller
             'report_period' => [
                 'from' => $startDate->toDateString(),
                 'to' => $endDate->toDateString(),
-            ]
+            ],
         ]);
     }
 
@@ -3115,15 +3154,16 @@ class ReportController extends Controller
         $reportData = $responseData['data'] ?? [];
         $reportPeriod = $responseData['report_period'] ?? [
             'from' => $request->date_from,
-            'to' => $request->date_to
+            'to' => $request->date_to,
         ];
 
         $reportTitle = 'تقرير أداء شركات التأمين';
-        $filterCriteria = "الفترة من: " . $reportPeriod['from'] . " إلى: " . $reportPeriod['to'];
+        $filterCriteria = 'الفترة من: '.$reportPeriod['from'].' إلى: '.$reportPeriod['to'];
         if ($request->filled('company_id')) {
             $company = Company::find($request->company_id);
-            if ($company)
-                $filterCriteria .= " | الشركة: " . $company->name;
+            if ($company) {
+                $filterCriteria .= ' | الشركة: '.$company->name;
+            }
         }
 
         $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4');
@@ -3154,7 +3194,7 @@ class ReportController extends Controller
                     number_format($row['net_income_from_company_patients'], 2),
                 ];
                 $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 7);
-                $fill = !$fill;
+                $fill = ! $fill;
 
                 $grandTotals['patients'] += $row['patient_count'];
                 $grandTotals['income'] += $row['total_income_generated'];
@@ -3164,7 +3204,7 @@ class ReportController extends Controller
         }
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
-        if (!empty($reportData)) {
+        if (! empty($reportData)) {
             $pdf->SetFont($fontname, 'B', 8.5);
             $summaryRowPdf = [
                 'الإجمالي العام:',
@@ -3176,12 +3216,14 @@ class ReportController extends Controller
             $pdf->DrawTableRow($summaryRowPdf, $colWidths, $alignments, true, 8);
         }
 
-        $pdfFileName = 'company_performance_report_' . $reportPeriod['from'] . '_to_' . $reportPeriod['to'] . '.pdf';
+        $pdfFileName = 'company_performance_report_'.$reportPeriod['from'].'_to_'.$reportPeriod['to'].'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     /**
      * Get doctor's entitlement from insurance companies for a given period.
      */
@@ -3206,13 +3248,13 @@ class ReportController extends Controller
             'doctor', // Needed for doctor_credit method context
             'visits.patient.company', // Crucial for grouping by company and for doctor_credit context
             'visits.requestedServices.service', // Needed if doctor_credit delves into services
-            'visits.patientLabRequests.mainTest'   // Needed if doctor_credit delves into labs
+            'visits.patientLabRequests.mainTest',   // Needed if doctor_credit delves into labs
         ])
             ->where('doctor_id', $doctorId)
             // Filter shifts that were active *during* any part of the date range
             ->where(function ($query) use ($startDate, $endDate) {
                 $query->whereBetween('start_time', [$startDate, $endDate]) // Shifts started within period
-                    ->orWhere(function ($q) use ($startDate, $endDate) { // Shifts started before but ended in period or are still open and started before end
+                    ->orWhere(function ($q) use ($startDate) { // Shifts started before but ended in period or are still open and started before end
                         $q->where('start_time', '<', $startDate)
                             ->where(function ($q2) use ($startDate) {
                                 $q2->whereNull('end_time')
@@ -3227,8 +3269,9 @@ class ReportController extends Controller
         foreach ($doctorShifts as $shift) {
             // Ensure the doctor context for doctor_credit is the one from the shift
             $currentShiftDoctor = $shift->doctor;
-            if (!$currentShiftDoctor)
+            if (! $currentShiftDoctor) {
                 continue;
+            }
 
             $visitsForCompanyPatients = $shift->visits->filter(function ($visit) {
                 return $visit->patient && $visit->patient->company_id;
@@ -3236,14 +3279,15 @@ class ReportController extends Controller
 
             foreach ($visitsForCompanyPatients as $visit) {
                 $company = $visit->patient->company; // Company model instance
-                if (!$company)
+                if (! $company) {
                     continue;
+                }
 
                 $companyId = $company->id;
                 // The doctor_credit method on Doctor model should calculate entitlement for THIS visit
-                $entitlementFromThisVisit = $currentShiftDoctor->doctor_credit($visit); // Pass 'company' if method requires type
+                $entitlementFromThisVisit = $currentShiftDoctor->doctor_credit($visit, $shift); // Pass 'company' if method requires type
 
-                if (!isset($companyTotals[$companyId])) {
+                if (! isset($companyTotals[$companyId])) {
                     $companyTotals[$companyId] = [
                         'company_id' => $companyId,
                         'company_name' => $company->name,
@@ -3256,7 +3300,7 @@ class ReportController extends Controller
 
         $reportData = array_values($companyTotals);
         // Sort by company name or amount
-        usort($reportData, fn($a, $b) => $request->input('sort_by', 'company_name') === 'amount'
+        usort($reportData, fn ($a, $b) => $request->input('sort_by', 'company_name') === 'amount'
             ? ($b['total_entitlement'] <=> $a['total_entitlement']) // Desc by amount
             : ($a['company_name'] <=> $b['company_name'])); // Asc by name
 
@@ -3267,7 +3311,7 @@ class ReportController extends Controller
                 'from' => $startDate->toDateString(),
                 'to' => $endDate->toDateString(),
             ],
-            'grand_total_entitlement' => collect($reportData)->sum('total_entitlement')
+            'grand_total_entitlement' => collect($reportData)->sum('total_entitlement'),
         ];
     }
 
@@ -3275,6 +3319,7 @@ class ReportController extends Controller
     {
         // $this->authorize('view doctor_company_entitlement_report');
         $data = $this->getDoctorCompanyEntitlementData($request);
+
         return response()->json($data);
     }
 
@@ -3317,12 +3362,12 @@ class ReportController extends Controller
                     number_format($row['total_entitlement'], 2),
                 ];
                 $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 7);
-                $fill = !$fill;
+                $fill = ! $fill;
             }
         }
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
-        if (!empty($dataForPdf)) {
+        if (! empty($dataForPdf)) {
             $pdf->SetFont($fontname, 'B', 10);
             $summaryRowPdf = [
                 'الإجمالي العام للمستحقات:',
@@ -3331,18 +3376,20 @@ class ReportController extends Controller
             $pdf->DrawTableRow($summaryRowPdf, $colWidths, $alignments, true, 8);
         }
 
-        $pdfFileName = 'DoctorCompanyEntitlement_' . preg_replace('/[^A-Za-z0-9_]/', '_', $doctorName) . '_' . $reportPeriod['from'] . '_to_' . $reportPeriod['to'] . '.pdf';
+        $pdfFileName = 'DoctorCompanyEntitlement_'.preg_replace('/[^A-Za-z0-9_]/', '_', $doctorName).'_'.$reportPeriod['from'].'_to_'.$reportPeriod['to'].'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     public function yearlyIncomeComparisonByMonth(Request $request)
     {
         // $this->authorize('view yearly_income_comparison_report'); // Permission
 
         $validated = $request->validate([
-            'year' => 'required|integer|digits:4|min:2000|max:' . (date('Y') + 5),
+            'year' => 'required|integer|digits:4|min:2000|max:'.(date('Y') + 5),
         ]);
 
         $year = $validated['year'];
@@ -3375,7 +3422,6 @@ class ReportController extends Controller
         $totalYearlyIncome = $monthlyIncomeData->sum('total_income');
         $averageMonthlyIncome = $totalYearlyIncome / 12;
 
-
         return response()->json([
             'data' => $chartData, // Array of { month_name: 'January', total_income: 12345.67 }
             'meta' => [
@@ -3383,15 +3429,16 @@ class ReportController extends Controller
                 'total_yearly_income' => round($totalYearlyIncome, 2),
                 'average_monthly_income' => round($averageMonthlyIncome, 2),
                 // 'month_labels_for_chart' => $monthNames, // Frontend can generate this too
-            ]
+            ],
         ]);
     }
+
     public function yearlyPatientFrequencyByMonth(Request $request)
     {
         // $this->authorize('view yearly_patient_frequency_report'); // Permission
 
         $validated = $request->validate([
-            'year' => 'required|integer|digits:4|min:2000|max:' . (date('Y') + 5),
+            'year' => 'required|integer|digits:4|min:2000|max:'.(date('Y') + 5),
         ]);
 
         $year = $validated['year'];
@@ -3421,14 +3468,13 @@ class ReportController extends Controller
         // If you want average of monthly sums (different from distinct yearly patients / 12):
         // $averageMonthlyPatientsAlternative = $monthlyPatientCounts->avg('patient_count') ?? 0;
 
-
         return response()->json([
             'data' => $chartData, // Array of { month_name: 'January', patient_count: 150 }
             'meta' => [
                 'year' => (int) $year,
                 'total_unique_patients_yearly' => $totalUniquePatientsYearly,
                 'average_monthly_patients' => $averageMonthlyPatients,
-            ]
+            ],
         ]);
     }
 
@@ -3442,18 +3488,18 @@ class ReportController extends Controller
             'report_type' => 'required|string|in:full_lab_report,thermal_lab_receipt',
         ]);
 
-        if (!$this->whatsAppService->isConfigured()) {
+        if (! $this->whatsAppService->isConfigured()) {
             return response()->json(['message' => 'WhatsApp service is not configured on the server.'], 503);
         }
 
         $patient = $visit->patient;
-        if (!$patient) {
+        if (! $patient) {
             return response()->json(['message' => 'Patient not found for this visit.'], 404);
         }
 
         // Format phone number using your service (it uses default country code from settings)
         $formattedChatId = UltramsgService::formatPhoneNumber($validated['chat_id']);
-        if (!$formattedChatId) {
+        if (! $formattedChatId) {
             return response()->json(['message' => 'Invalid phone number format for WhatsApp.'], 422);
         }
 
@@ -3465,28 +3511,29 @@ class ReportController extends Controller
             if ($validated['report_type'] === 'full_lab_report') {
                 // Get the PDF content directly by modifying how generateLabVisitReportPdf works
                 $pdfContent = $this->generateLabVisitReportPdfContent($request, $visit);
-                $pdfFileName = 'Lab_Report_Visit_' . $visit->id . '.pdf';
+                $pdfFileName = 'Lab_Report_Visit_'.$visit->id.'.pdf';
             } elseif ($validated['report_type'] === 'thermal_lab_receipt') {
                 // Get the PDF content directly by modifying how generateLabThermalReceiptPdf works
                 $pdfContent = $this->generateLabThermalReceiptPdfContent($request, $visit);
-                $pdfFileName = 'Lab_Receipt_Visit_' . $visit->id . '.pdf';
+                $pdfFileName = 'Lab_Receipt_Visit_'.$visit->id.'.pdf';
             } else {
                 return response()->json(['message' => 'Invalid report type specified.'], 422);
             }
 
             if (empty($pdfContent)) {
                 Log::error("WhatsApp Send: PDF generation failed or returned empty for visit {$visit->id}, type {$validated['report_type']}.");
+
                 return response()->json(['message' => 'Failed to generate PDF content.'], 500);
             }
 
             $pdfContentBase64 = base64_encode($pdfContent);
         } catch (\Exception $e) {
-            Log::error("WhatsApp Send: PDF generation error for visit {$visit->id}, type {$validated['report_type']}: " . $e->getMessage());
-            return response()->json(['message' => 'Failed to generate PDF content: ' . $e->getMessage()], 500);
+            Log::error("WhatsApp Send: PDF generation error for visit {$visit->id}, type {$validated['report_type']}: ".$e->getMessage());
+
+            return response()->json(['message' => 'Failed to generate PDF content: '.$e->getMessage()], 500);
         }
 
         $caption = $validated['caption'] ?? "Lab results for {$patient->name}";
-
 
         $result = $this->whatsAppService->sendMediaMessage(
             $formattedChatId,
@@ -3515,10 +3562,12 @@ class ReportController extends Controller
         $doctorvisit->loadDefaultLabReportRelations();
 
         $labRequestsToReport = $doctorvisit->patientLabRequests->filter(function ($lr) {
-            if (!$lr->mainTest)
-                return false; // Skip if mainTest relation isn't loaded properly
-            return $lr->results->where(fn($r) => $r->result !== null && $r->result !== '')->isNotEmpty() ||
-                !$lr->mainTest->divided ||
+            if (! $lr->mainTest) {
+                return false;
+            } // Skip if mainTest relation isn't loaded properly
+
+            return $lr->results->where(fn ($r) => $r->result !== null && $r->result !== '')->isNotEmpty() ||
+                ! $lr->mainTest->divided ||
                 $lr->requestedOrganisms->isNotEmpty();
         });
 
@@ -3543,17 +3592,18 @@ class ReportController extends Controller
 
         foreach ($labRequestsToReport as $labRequest) {
             $mainTest = $labRequest->mainTest;
-            if (!$mainTest)
+            if (! $mainTest) {
                 continue;
+            }
 
             $estimatedHeight = $this->estimateMainTestBlockHeightForReport($pdf, $labRequest);
 
             if (
-                !$firstTestOnPage &&
+                ! $firstTestOnPage &&
                 ($mainTest->pageBreak || ($pdf->GetY() + $estimatedHeight > ($pdf->getPageHeight() - $pdf->getBreakMargin())))
             ) {
                 $pdf->AddPage(); // This also calls MyCustomTCPDF::Header()
-            } elseif (!$firstTestOnPage) {
+            } elseif (! $firstTestOnPage) {
                 $pdf->Ln(3); // Space between main test blocks on the same page
             }
 
@@ -3563,7 +3613,8 @@ class ReportController extends Controller
         }
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $doctorvisit->patient->name);
-        $pdfFileName = 'LabReport_Visit_' . $doctorvisit->id . '_' . $patientNameSanitized . '.pdf';
+        $pdfFileName = 'LabReport_Visit_'.$doctorvisit->id.'_'.$patientNameSanitized.'.pdf';
+
         return $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
     }
 
@@ -3589,7 +3640,7 @@ class ReportController extends Controller
         }
 
         $appSettings = Setting::instance();
-        $isCompanyPatient = !empty($visit->patient->company_id);
+        $isCompanyPatient = ! empty($visit->patient->company_id);
         $cashierName = Auth::user()?->name ?? $visit->user?->name ?? $labRequestsToPrint->first()?->depositUser?->name ?? 'System';
 
         $pdf = new MyCustomTCPDF('Lab Receipt', $visit);
@@ -3614,35 +3665,41 @@ class ReportController extends Controller
             }
         }
         if ($logoData) {
-            $pdf->Image('@' . $logoData, '', $pdf->GetY() + 1, 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0);
+            $pdf->Image('@'.$logoData, '', $pdf->GetY() + 1, 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0);
             $pdf->Ln($logoData ? 10 : 1);
         }
         $pdf->SetFont($fontName, 'B', $logoData ? 8 : 9);
         $pdf->MultiCell(0, $lineHeight, $appSettings?->hospital_name ?: ($appSettings?->lab_name ?: config('app.name')), 0, $alignCenter, false, 1);
         $pdf->SetFont($fontName, '', 6);
-        if ($appSettings?->address)
+        if ($appSettings?->address) {
             $pdf->MultiCell(0, $lineHeight - 0.5, $appSettings->address, 0, $alignCenter, false, 1);
-        if ($appSettings?->phone)
-            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? "هاتف: " : "Tel: ") . $appSettings->phone, 0, $alignCenter, false, 1);
-        if ($appSettings?->vatin)
-            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? "ر.ض: " : "VAT: ") . $appSettings->vatin, 0, $alignCenter, false, 1);
+        }
+        if ($appSettings?->phone) {
+            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? 'هاتف: ' : 'Tel: ').$appSettings->phone, 0, $alignCenter, false, 1);
+        }
+        if ($appSettings?->vatin) {
+            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? 'ر.ض: ' : 'VAT: ').$appSettings->vatin, 0, $alignCenter, false, 1);
+        }
         $pdf->Ln(1);
         $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
         $pdf->Ln(1);
 
         // Receipt Info
         $pdf->SetFont($fontName, '', 6.5);
-        $receiptNumber = "LAB-" . $visit->id . "-" . $labRequestsToPrint->first()?->id;
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "زيارة رقم: " : "Visit #: ") . $visit->id, 0, 1, $alignStart);
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "التاريخ: " : "Date: ") . Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignStart);
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "المريض: " : "Patient: ") . $visit->patient->name, 0, 1, $alignStart);
-        if ($visit->patient->phone)
-            $pdf->Cell(0, $lineHeight, ($isRTL ? "الهاتف: " : "Phone: ") . $visit->patient->phone, 0, 1, $alignStart);
-        if ($isCompanyPatient && $visit->patient->company)
-            $pdf->Cell(0, $lineHeight, ($isRTL ? "الشركة: " : "Company: ") . $visit->patient->company->name, 0, 1, $alignStart);
-        if ($visit->doctor)
-            $pdf->Cell(0, $lineHeight, ($isRTL ? "الطبيب: " : "Doctor: ") . $visit->doctor->name, 0, 1, $alignStart);
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "الكاشير: " : "Cashier: ") . $cashierName, 0, 1, $alignStart);
+        $receiptNumber = 'LAB-'.$visit->id.'-'.$labRequestsToPrint->first()?->id;
+        $pdf->Cell(0, $lineHeight, ($isRTL ? 'زيارة رقم: ' : 'Visit #: ').$visit->id, 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? 'التاريخ: ' : 'Date: ').Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? 'المريض: ' : 'Patient: ').$visit->patient->name, 0, 1, $alignStart);
+        if ($visit->patient->phone) {
+            $pdf->Cell(0, $lineHeight, ($isRTL ? 'الهاتف: ' : 'Phone: ').$visit->patient->phone, 0, 1, $alignStart);
+        }
+        if ($isCompanyPatient && $visit->patient->company) {
+            $pdf->Cell(0, $lineHeight, ($isRTL ? 'الشركة: ' : 'Company: ').$visit->patient->company->name, 0, 1, $alignStart);
+        }
+        if ($visit->doctor) {
+            $pdf->Cell(0, $lineHeight, ($isRTL ? 'الطبيب: ' : 'Doctor: ').$visit->doctor->name, 0, 1, $alignStart);
+        }
+        $pdf->Cell(0, $lineHeight, ($isRTL ? 'الكاشير: ' : 'Cashier: ').$cashierName, 0, 1, $alignStart);
 
         if ($appSettings?->barcode && $labRequestsToPrint->first()?->id) { /* ... Barcode ... */
         }
@@ -3696,14 +3753,16 @@ class ReportController extends Controller
         $pdf->SetFont($fontName, '', 7);
         $netAfterDiscount = $subTotalLab - $totalDiscountOnLab;
         $netPayableByPatient = $netAfterDiscount - ($isCompanyPatient ? $totalEnduranceOnLab : 0);
-        $totalActuallyPaidForTheseLabs = $labRequestsToPrint->sum(fn($lr) => (float) $lr->amount_paid);
+        $totalActuallyPaidForTheseLabs = $labRequestsToPrint->sum(fn ($lr) => (float) $lr->amount_paid);
         $balanceDueForTheseLabs = $netPayableByPatient - $totalActuallyPaidForTheseLabs;
 
         $this->drawThermalTotalRow($pdf, ($isRTL ? 'الإجمالي الفرعي:' : 'Subtotal:'), $subTotalLab, $pageUsableWidth);
-        if ($totalDiscountOnLab > 0)
+        if ($totalDiscountOnLab > 0) {
             $this->drawThermalTotalRow($pdf, ($isRTL ? 'الخصم:' : 'Discount:'), -$totalDiscountOnLab, $pageUsableWidth);
-        if ($isCompanyPatient && $totalEnduranceOnLab > 0)
+        }
+        if ($isCompanyPatient && $totalEnduranceOnLab > 0) {
             $this->drawThermalTotalRow($pdf, ($isRTL ? 'تحمل الشركة:' : 'Company Share:'), -$totalEnduranceOnLab, $pageUsableWidth);
+        }
         $pdf->SetFont($fontName, 'B', 7.5);
         $this->drawThermalTotalRow($pdf, ($isRTL ? 'الصافي المطلوب:' : 'Net Payable:'), $netPayableByPatient, $pageUsableWidth, true);
         $pdf->SetFont($fontName, '', 7);
@@ -3721,7 +3780,8 @@ class ReportController extends Controller
         $pdf->Ln(3);
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
-        $pdfFileName = 'LabReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+        $pdfFileName = 'LabReceipt_Visit_'.$visit->id.'_'.$patientNameSanitized.'.pdf';
+
         return $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
     }
 
@@ -3750,7 +3810,7 @@ class ReportController extends Controller
         }
 
         $appSettings = Setting::instance();
-        $isCompanyPatient = !empty($visit->patient->company_id);
+        $isCompanyPatient = ! empty($visit->patient->company_id);
         $cashierName = Auth::user()?->name ?? $visit->user?->name ?? $labRequestsToPrint->first()?->depositUser?->name ?? 'System';
 
         $pdf = new MyCustomTCPDF('Lab Receipt', $visit);
@@ -3775,36 +3835,42 @@ class ReportController extends Controller
             }
         }
         if ($logoData) {
-            $pdf->Image('@' . $logoData, '', $pdf->GetY() + 1, 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0);
+            $pdf->Image('@'.$logoData, '', $pdf->GetY() + 1, 15, 0, '', '', 'T', false, 300, $alignCenter, false, false, 0);
             $pdf->Ln($logoData ? 10 : 1);
         }
         $pdf->SetFont($fontName, 'B', $logoData ? 8 : 9);
         $pdf->MultiCell(0, $lineHeight, $appSettings?->hospital_name ?: ($appSettings?->lab_name ?: config('app.name')), 0, $alignCenter, false, 1);
         $pdf->SetFont($fontName, '', 6);
-        if ($appSettings?->address)
+        if ($appSettings?->address) {
             $pdf->MultiCell(0, $lineHeight - 0.5, $appSettings->address, 0, $alignCenter, false, 1);
-        if ($appSettings?->phone)
-            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? "هاتف: " : "Tel: ") . $appSettings->phone, 0, $alignCenter, false, 1);
-        if ($appSettings?->vatin)
-            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? "ر.ض: " : "VAT: ") . $appSettings->vatin, 0, $alignCenter, false, 1);
+        }
+        if ($appSettings?->phone) {
+            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? 'هاتف: ' : 'Tel: ').$appSettings->phone, 0, $alignCenter, false, 1);
+        }
+        if ($appSettings?->vatin) {
+            $pdf->MultiCell(0, $lineHeight - 0.5, ($isRTL ? 'ر.ض: ' : 'VAT: ').$appSettings->vatin, 0, $alignCenter, false, 1);
+        }
         $pdf->Ln(1);
         $pdf->Cell(0, 0.1, '', 'T', 1, 'C');
         $pdf->Ln(1);
 
         // Receipt Info
         $pdf->SetFont($fontName, '', 6.5);
-        $receiptNumber = "LAB-" . $visit->id . "-" . $labRequestsToPrint->first()?->id;
+        $receiptNumber = 'LAB-'.$visit->id.'-'.$labRequestsToPrint->first()?->id;
         // $pdf->Cell(0, $lineHeight, ($isRTL ? "إيصال رقم: " : "Receipt #: ") . $receiptNumber, 0, 1, $alignStart);
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "زيارة رقم: " : "Visit #: ") . $visit->id, 0, 1, $alignStart);
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "التاريخ: " : "Date: ") . Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignStart);
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "المريض: " : "Patient: ") . $visit->patient->name, 0, 1, $alignStart);
-        if ($visit->patient->phone)
-            $pdf->Cell(0, $lineHeight, ($isRTL ? "الهاتف: " : "Phone: ") . $visit->patient->phone, 0, 1, $alignStart);
-        if ($isCompanyPatient && $visit->patient->company)
-            $pdf->Cell(0, $lineHeight, ($isRTL ? "الشركة: " : "Company: ") . $visit->patient->company->name, 0, 1, $alignStart);
-        if ($visit->doctor)
-            $pdf->Cell(0, $lineHeight, ($isRTL ? "الطبيب: " : "Doctor: ") . $visit->doctor->name, 0, 1, $alignStart);
-        $pdf->Cell(0, $lineHeight, ($isRTL ? "الكاشير: " : "Cashier: ") . $cashierName, 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? 'زيارة رقم: ' : 'Visit #: ').$visit->id, 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? 'التاريخ: ' : 'Date: ').Carbon::now()->format('Y/m/d H:i A'), 0, 1, $alignStart);
+        $pdf->Cell(0, $lineHeight, ($isRTL ? 'المريض: ' : 'Patient: ').$visit->patient->name, 0, 1, $alignStart);
+        if ($visit->patient->phone) {
+            $pdf->Cell(0, $lineHeight, ($isRTL ? 'الهاتف: ' : 'Phone: ').$visit->patient->phone, 0, 1, $alignStart);
+        }
+        if ($isCompanyPatient && $visit->patient->company) {
+            $pdf->Cell(0, $lineHeight, ($isRTL ? 'الشركة: ' : 'Company: ').$visit->patient->company->name, 0, 1, $alignStart);
+        }
+        if ($visit->doctor) {
+            $pdf->Cell(0, $lineHeight, ($isRTL ? 'الطبيب: ' : 'Doctor: ').$visit->doctor->name, 0, 1, $alignStart);
+        }
+        $pdf->Cell(0, $lineHeight, ($isRTL ? 'الكاشير: ' : 'Cashier: ').$cashierName, 0, 1, $alignStart);
 
         if ($appSettings?->barcode && $labRequestsToPrint->first()?->id) { /* ... Barcode ... */
         }
@@ -3858,14 +3924,16 @@ class ReportController extends Controller
         $pdf->SetFont($fontName, '', 7);
         $netAfterDiscount = $subTotalLab - $totalDiscountOnLab;
         $netPayableByPatient = $netAfterDiscount - ($isCompanyPatient ? $totalEnduranceOnLab : 0);
-        $totalActuallyPaidForTheseLabs = $labRequestsToPrint->sum(fn($lr) => (float) $lr->amount_paid);
+        $totalActuallyPaidForTheseLabs = $labRequestsToPrint->sum(fn ($lr) => (float) $lr->amount_paid);
         $balanceDueForTheseLabs = $netPayableByPatient - $totalActuallyPaidForTheseLabs;
 
         $this->drawThermalTotalRow($pdf, ($isRTL ? 'الإجمالي الفرعي:' : 'Subtotal:'), $subTotalLab, $pageUsableWidth);
-        if ($totalDiscountOnLab > 0)
+        if ($totalDiscountOnLab > 0) {
             $this->drawThermalTotalRow($pdf, ($isRTL ? 'الخصم:' : 'Discount:'), -$totalDiscountOnLab, $pageUsableWidth);
-        if ($isCompanyPatient && $totalEnduranceOnLab > 0)
+        }
+        if ($isCompanyPatient && $totalEnduranceOnLab > 0) {
             $this->drawThermalTotalRow($pdf, ($isRTL ? 'تحمل الشركة:' : 'Company Share:'), -$totalEnduranceOnLab, $pageUsableWidth);
+        }
         $pdf->SetFont($fontName, 'B', 7.5);
         $this->drawThermalTotalRow($pdf, ($isRTL ? 'الصافي المطلوب:' : 'Net Payable:'), $netPayableByPatient, $pageUsableWidth, true);
         $pdf->SetFont($fontName, '', 7);
@@ -3883,8 +3951,9 @@ class ReportController extends Controller
         $pdf->Ln(3);
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
-        $pdfFileName = 'LabReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+        $pdfFileName = 'LabReceipt_Visit_'.$visit->id.'_'.$patientNameSanitized.'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)->header('Content-Type', 'application/pdf')->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
 
@@ -3921,12 +3990,13 @@ class ReportController extends Controller
         $pdf->SetFont('helvetica', '', $fontSize);
 
         foreach ($visit->patientLabRequests as $lr) {
-            if (!$lr->sample_id) {
+            if (! $lr->sample_id) {
                 $lr->sample_id = LabRequest::generateSampleId($visit); // Use model helper
                 $lr->saveQuietly();
             }
-            if (!$lr->sample_id)
+            if (! $lr->sample_id) {
                 continue;
+            }
 
             $pdf->AddPage();
             $currentY = $pdf->GetY();
@@ -3934,19 +4004,19 @@ class ReportController extends Controller
             $alignStart = $isRTL ? 'R' : 'L';
             $cellLineHeight = $fontSize * 0.4;
 
-            $patientNameShort = mb_substr($visit->patient->name, 0, 15) . (mb_strlen($visit->patient->name) > 15 ? '...' : '');
+            $patientNameShort = mb_substr($visit->patient->name, 0, 15).(mb_strlen($visit->patient->name) > 15 ? '...' : '');
             $pdf->SetFont('helvetica', 'B', $fontSize);
             $pdf->MultiCell($labelWidth - (2 * $labelMargin) - 15, $cellLineHeight, $patientNameShort, 0, $alignStart, false, 0, '', $currentY, true, 0, true);
-            $pdf->MultiCell(15, $cellLineHeight, "SID:" . $lr->sample_id, 0, ($isRTL ? 'L' : 'R'), false, 1, $pdf->GetX(), $currentY, true, 0, true);
+            $pdf->MultiCell(15, $cellLineHeight, 'SID:'.$lr->sample_id, 0, ($isRTL ? 'L' : 'R'), false, 1, $pdf->GetX(), $currentY, true, 0, true);
             $currentY = $pdf->GetY();
 
             $pdf->SetFont('helvetica', '', $fontSize - 1);
-            $ageGender = ($visit->patient->age_year ?? 'NA') . 'Y/' . strtoupper(substr($visit->patient->gender ?? 'U', 0, 1));
-            $pdf->MultiCell($labelWidth / 2 - $labelMargin, $cellLineHeight, "PID:" . $visit->patient->id, 0, $alignStart, false, 0, '', $currentY, true, 0, false);
+            $ageGender = ($visit->patient->age_year ?? 'NA').'Y/'.strtoupper(substr($visit->patient->gender ?? 'U', 0, 1));
+            $pdf->MultiCell($labelWidth / 2 - $labelMargin, $cellLineHeight, 'PID:'.$visit->patient->id, 0, $alignStart, false, 0, '', $currentY, true, 0, false);
             $pdf->MultiCell(0, $cellLineHeight, $ageGender, 0, ($isRTL ? 'L' : 'R'), false, 1, $labelWidth / 2 + $labelMargin / 2, $currentY, true, 0, false);
             $currentY = $pdf->GetY();
 
-            $testNameShort = mb_substr($lr->mainTest?->main_test_name ?? 'Test', 0, 20) . (mb_strlen($lr->mainTest?->main_test_name ?? '') > 20 ? '...' : '');
+            $testNameShort = mb_substr($lr->mainTest?->main_test_name ?? 'Test', 0, 20).(mb_strlen($lr->mainTest?->main_test_name ?? '') > 20 ? '...' : '');
             $pdf->MultiCell(0, $cellLineHeight, $testNameShort, 0, $alignStart, false, 1, '', $currentY, true, 0, false);
             $currentY = $pdf->GetY();
 
@@ -3960,18 +4030,11 @@ class ReportController extends Controller
             }
         }
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
-        $pdfFileName = 'LabLabels_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+        $pdfFileName = 'LabLabels_Visit_'.$visit->id.'_'.$patientNameSanitized.'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)->header('Content-Type', 'application/pdf')->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
-
-
-
-
-
-
-
-
 
     public function result(Request $request, $id = null, $base64 = false)
     {
@@ -3983,12 +4046,12 @@ class ReportController extends Controller
             $doctorvisit = Doctorvisit::find($request->get('pid'));
         }
 
-        $labResultReport = new LabResultReport();
+        $labResultReport = new LabResultReport;
         $pdfContent = $labResultReport->generate($doctorvisit, $base64);
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', "inline; filename=\"name.pdf\"")
+            ->header('Content-Disposition', 'inline; filename="name.pdf"')
             ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0');
@@ -3998,22 +4061,20 @@ class ReportController extends Controller
      * Mark lab report as printed/viewed
      * Updates the patient's result_print_date and emits a realtime event
      *
-     * @param Request $request
-     * @param DoctorVisit $doctorvisit
      * @return \Illuminate\Http\JsonResponse
      */
     public function markReportPrinted(Request $request, DoctorVisit $doctorvisit)
     {
         $patient = $doctorvisit->patient;
 
-        if (!$patient) {
+        if (! $patient) {
             return response()->json([
                 'message' => 'Patient not found for this visit.',
             ], 404);
         }
 
         // Update print date if not already set
-        if (!$patient->result_print_date) {
+        if (! $patient->result_print_date) {
             $patient->result_print_date = now();
             $patient->save();
         }
@@ -4023,7 +4084,7 @@ class ReportController extends Controller
             'patient',
             'patientLabRequests',
             'patientLabRequests.mainTest',
-            'patientLabRequests.results'
+            'patientLabRequests.results',
         ]);
 
         // Set test_count attribute (expected by PatientLabQueueItemResource)
@@ -4044,37 +4105,36 @@ class ReportController extends Controller
             $payload = [
                 'queueItem' => $queueItemResource->resolve(),
             ];
-            $url = config('services.realtime.url') . '/emit/lab-queue-item-updated';
+            $url = config('services.realtime.url').'/emit/lab-queue-item-updated';
             HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
                 ->post($url, $payload);
         } catch (\Throwable $e) {
-            Log::warning('Failed to emit lab-queue-item-updated realtime event: ' . $e->getMessage());
+            Log::warning('Failed to emit lab-queue-item-updated realtime event: '.$e->getMessage());
         }
 
         return response()->json([
-            'message' => "Lab report marked as printed.",
-            'data' => $queueItemResource
+            'message' => 'Lab report marked as printed.',
+            'data' => $queueItemResource,
         ]);
     }
+
     /**
      * Generate PDF barcode labels for lab containers (Ahmed Altamayoz config for printer ZY809)
-     * 
-     * @param Request $request
-     * @param Doctorvisit $doctorvisit
+     *
      * @return mixed
      */
     public function printBarcodeWithViewer(Request $request, Doctorvisit $doctorvisit)
     {
         try {
             // Validate doctor visit has patient and lab requests
-            if (!$doctorvisit->patient) {
+            if (! $doctorvisit->patient) {
                 return response()->json(['status' => false, 'message' => 'No patient found for this visit'], 400);
             }
 
             /** @var Patient $patient */
             $patient = $doctorvisit->patient;
 
-            if (!$patient->labrequests || $patient->labrequests->isEmpty()) {
+            if (! $patient->labrequests || $patient->labrequests->isEmpty()) {
                 return response()->json(['status' => false, 'message' => 'No lab requests found for this patient'], 400);
             }
 
@@ -4083,10 +4143,10 @@ class ReportController extends Controller
             $height = $request->input('height', 25);
 
             // Validate dimensions
-            $width = max(10, min(200, (float)$width));
-            $height = max(10, min(200, (float)$height));
+            $width = max(10, min(200, (float) $width));
+            $height = max(10, min(200, (float) $height));
 
-            $custom_layout = array($width, $height);
+            $custom_layout = [$width, $height];
             $settings = Setting::all()->first();
 
             $pdf = new Pdf('landscape', PDF_UNIT, $custom_layout, true, 'UTF-8', false);
@@ -4096,7 +4156,7 @@ class ReportController extends Controller
             $pdf->setTitle('ايصال المختبر');
             $pdf->setSubject('ايصال المختبر');
             $page_width = $width; // Use the dynamic width
-            $pdf->setAutoPageBreak(TRUE, 0);
+            $pdf->setAutoPageBreak(true, 0);
             $pdf->setMargins(0, 0, 0);
 
             // Try to add custom font, fallback to helvetica if fails
@@ -4121,7 +4181,7 @@ class ReportController extends Controller
                 })->map(function (LabRequest $labRequest) {
                     return $labRequest->mainTest;
                 });
-                $tests = "";
+                $tests = '';
                 /** @var MainTest $maintest */
                 $i = 0;
                 foreach ($tests_accoriding_to_container as $maintest) {
@@ -4130,13 +4190,13 @@ class ReportController extends Controller
                         $tests .= $main_test_name;
                     } else {
                         $main_test_name = $maintest->main_test_name;
-                        $tests .= '- ' . $main_test_name;
+                        $tests .= '- '.$main_test_name;
                     }
 
                     $i++;
                 }
                 $pdf->SetFillColor(240, 240, 240);
-                $style = array(
+                $style = [
                     'position' => 'C',
                     'align' => 'C',
                     'stretch' => false,
@@ -4145,27 +4205,27 @@ class ReportController extends Controller
                     'border' => false,
                     'hpadding' => 0,
                     'vpadding' => 0,
-                    'fgcolor' => array(0, 0, 0),
+                    'fgcolor' => [0, 0, 0],
                     'bgcolor' => false,
                     'text' => false,
                     'font' => 'helvetica',
                     'fontsize' => 10,
-                    'stretchtext' => 4
-                );
+                    'stretchtext' => 4,
+                ];
 
                 $pdf->SetFont('helvetica', '', 10, '', true);
                 $col = $page_width / 2;
                 $pdf->Cell(5, 3, '', 0, 0, 'C');
                 $pdf->Ln(5);
 
-                $pdf->Cell(15, 3, 'PID ' . $doctorvisit->id, 0, 0, '');
+                $pdf->Cell(15, 3, 'PID '.$doctorvisit->id, 0, 0, '');
                 $pdf->SetFont('helvetica', '', 7, '', true);
 
                 // $pdf->Cell(0, 3, $patient->created_at->format('Y-m-d H:i A'), 0, 1, 'R');
 
                 $pdf->Cell(5, 3, '', 0, 0, 'C');
                 $y = $pdf->getY();
-                $pdf->Cell(10, 3, 'No ' . $patient->visit_number, 1, 0, 'C');
+                $pdf->Cell(10, 3, 'No '.$patient->visit_number, 1, 0, 'C');
                 $pdf->SetFont($arial, '', 9, '', true);
                 $pdf->Cell(5, 3, '', 0, 0, 'C');
                 $pdf->Ln(5);
@@ -4180,42 +4240,38 @@ class ReportController extends Controller
 
             if ($request->has('base64')) {
                 $result_as_bs64 = $pdf->output('name.pdf', 'E');
+
                 return $result_as_bs64;
             } else {
                 // Return PDF as response with proper headers
                 $pdfContent = $pdf->output('barcode_labels.pdf', 'S');
+
                 return response($pdfContent, 200, [
                     'Content-Type' => 'application/pdf',
                     'Content-Disposition' => 'inline; filename="barcode_labels.pdf"',
                     'Cache-Control' => 'no-cache, no-store, must-revalidate',
                     'Pragma' => 'no-cache',
-                    'Expires' => '0'
+                    'Expires' => '0',
                 ]);
             }
         } catch (\Exception $e) {
-            Log::error('PDF barcode generation failed: ' . $e->getMessage(), [
+            Log::error('PDF barcode generation failed: '.$e->getMessage(), [
                 'doctor_visit_id' => $doctorvisit->id,
                 'patient_id' => $doctorvisit->patient?->id,
-                'error' => $e->getTraceAsString()
+                'error' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'status' => false,
-                'message' => 'Failed to generate PDF barcode labels: ' . $e->getMessage()
+                'message' => 'Failed to generate PDF barcode labels: '.$e->getMessage(),
             ], 500);
         }
     }
 
     /**
      * Generate PDF label for a specific container
-     * 
-     * @param Pdf $pdf
-     * @param Patient $patient
-     * @param Doctorvisit $doctorvisit
-     * @param object $container
-     * @param string $arialFont
-     * @param int $pageWidth
-     * @return void
+     *
+     * @param  object  $container
      */
     private function generatePdfLabelForContainer(Pdf $pdf, Patient $patient, Doctorvisit $doctorvisit, $container, string $arialFont, int $pageWidth): void
     {
@@ -4234,7 +4290,7 @@ class ReportController extends Controller
         $testNames = $testsForContainer
             ->pluck('main_test_name')
             ->map(function ($name, $index) {
-                return $index === 0 ? $name : '- ' . $name;
+                return $index === 0 ? $name : '- '.$name;
             })
             ->implode('');
 
@@ -4253,7 +4309,7 @@ class ReportController extends Controller
             'text' => false,
             'font' => 'helvetica',
             'fontsize' => 10,
-            'stretchtext' => 4
+            'stretchtext' => 4,
         ];
 
         // Generate label content
@@ -4262,18 +4318,18 @@ class ReportController extends Controller
 
         // Header row with PID and date
         $pdf->Cell(5, 3, '', 0, 0, 'C');
-        $pdf->Cell(15, 3, 'PID ' . $doctorvisit->id, 0, 0, '');
+        $pdf->Cell(15, 3, 'PID '.$doctorvisit->id, 0, 0, '');
         $pdf->Cell(0, 3, $patient->created_at->format('Y-m-d H:i A'), 0, 1, 'R');
 
         // Visit number and patient name row
         $pdf->Cell(5, 3, '', 0, 0, 'C');
-        $pdf->Cell(10, 3, 'No ' . $patient->visit_number, 1, 0, 'C');
+        $pdf->Cell(10, 3, 'No '.$patient->visit_number, 1, 0, 'C');
         $pdf->SetFont($arialFont, '', 9, '', true);
         $pdf->Cell(5, 3, '', 0, 0, 'C');
         $pdf->Cell(0, 3, $patient->name, 0, 1, 'C');
 
         // Generate barcode
-        $pdf->write1DBarcode((string)$doctorvisit->id, 'C128', 30, '', 25, 10, 0.4, $barcodeStyle, 'N');
+        $pdf->write1DBarcode((string) $doctorvisit->id, 'C128', 30, '', 25, 10, 0.4, $barcodeStyle, 'N');
 
         // Test names
         $pdf->SetFont('helvetica', 'u', 7, '', true);
@@ -4295,10 +4351,12 @@ class ReportController extends Controller
         $doctorvisit->loadDefaultLabReportRelations();
 
         $labRequestsToReport = $doctorvisit->patientLabRequests->filter(function ($lr) {
-            if (!$lr->mainTest)
-                return false; // Skip if mainTest relation isn't loaded properly
-            return $lr->results->where(fn($r) => $r->result !== null && $r->result !== '')->isNotEmpty() ||
-                !$lr->mainTest->divided ||
+            if (! $lr->mainTest) {
+                return false;
+            } // Skip if mainTest relation isn't loaded properly
+
+            return $lr->results->where(fn ($r) => $r->result !== null && $r->result !== '')->isNotEmpty() ||
+                ! $lr->mainTest->divided ||
                 $lr->requestedOrganisms->isNotEmpty();
         });
 
@@ -4330,17 +4388,18 @@ class ReportController extends Controller
 
         foreach ($labRequestsToReport as $labRequest) {
             $mainTest = $labRequest->mainTest;
-            if (!$mainTest)
+            if (! $mainTest) {
                 continue;
+            }
 
             $estimatedHeight = $this->estimateMainTestBlockHeightForReport($pdf, $labRequest);
 
             if (
-                !$firstTestOnPage &&
+                ! $firstTestOnPage &&
                 ($mainTest->pageBreak || ($pdf->GetY() + $estimatedHeight > ($pdf->getPageHeight() - $pdf->getBreakMargin())))
             ) {
                 $pdf->AddPage(); // This also calls MyCustomTCPDF::Header()
-            } elseif (!$firstTestOnPage) {
+            } elseif (! $firstTestOnPage) {
                 $pdf->Ln(3); // Space between main test blocks on the same page
             }
 
@@ -4352,7 +4411,7 @@ class ReportController extends Controller
         // MyCustomTCPDF::Footer() will be called automatically by TCPDF on Output or AddPage.
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $doctorvisit->patient->name);
-        $pdfFileName = 'LabReport_Visit_' . $doctorvisit->id . '_' . $patientNameSanitized . '.pdf';
+        $pdfFileName = 'LabReport_Visit_'.$doctorvisit->id.'_'.$patientNameSanitized.'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
 
         return response($pdfContent, 200)
@@ -4371,22 +4430,25 @@ class ReportController extends Controller
             $height += ($lineHeight + 1); // For child test table headers
             foreach ($labRequest->results as $result) {
                 $childTest = $result->childTest;
-                if (!$childTest)
+                if (! $childTest) {
                     continue;
+                }
                 $texts = [
                     $childTest->child_test_name,
                     $result->result ?? '-',
                     $result->unit?->name ?? $childTest->unit?->name ?? '-',
                     $result->normal_range ?? '-',
-                    $result->flags ?? '-'
+                    $result->flags ?? '-',
                 ];
                 $maxLines = 1;
                 // Estimate lines for each cell (rough estimate)
-                for ($i = 0; $i < count($texts); $i++)
-                    $maxLines = max($maxLines, ceil(strlen($texts[$i]) / 20)); // Assume ~20 chars per line
+                for ($i = 0; $i < count($texts); $i++) {
+                    $maxLines = max($maxLines, ceil(strlen($texts[$i]) / 20));
+                } // Assume ~20 chars per line
                 $height += $maxLines * ($lineHeight - 1);
-                if (!empty($result->result_comment))
+                if (! empty($result->result_comment)) {
                     $height += $lineHeight - 1;
+                }
             }
         }
         if ($labRequest->requestedOrganisms->isNotEmpty()) {
@@ -4398,8 +4460,10 @@ class ReportController extends Controller
                 $height += $maxRowsAB * ($lineHeight - 1.5);
             }
         }
-        if ($labRequest->comment)
-            $height += ($lineHeight * 2); // Comment + heading
+        if ($labRequest->comment) {
+            $height += ($lineHeight * 2);
+        } // Comment + heading
+
         return $height;
     }
 
@@ -4421,15 +4485,15 @@ class ReportController extends Controller
         // Child Results Table
         if ($mainTest->divided && $labRequest->results->isNotEmpty()) {
             $this->drawChildResultsTableForReport($pdf, $labRequest->results, $fontMain, $pageUsableWidth, $lineHeight, $isRTL, true);
-        } elseif (!$mainTest->divided && $labRequest->results->isNotEmpty()) { // Non-divided but uses RequestedResult
+        } elseif (! $mainTest->divided && $labRequest->results->isNotEmpty()) { // Non-divided but uses RequestedResult
             $this->drawChildResultsTableForReport($pdf, $labRequest->results, $fontMain, $pageUsableWidth, $lineHeight, $isRTL, false); // No headers
         } elseif ($mainTest->divided && $labRequest->results->isEmpty()) { // Divided but no results entered
             $pdf->SetFont($fontMain, 'I', 8);
             $pdf->Cell(0, $lineHeight, ($isRTL ? 'لم يتم إدخال نتائج فرعية بعد.' : 'No sub-results entered yet.'), 0, 1, 'C');
-        } elseif (!$mainTest->divided && $labRequest->comment) { // Non-divided, result might be in main comment
+        } elseif (! $mainTest->divided && $labRequest->comment) { // Non-divided, result might be in main comment
             $pdf->SetFont($fontMain, '', 9);
             $pdf->SetX($pdf->GetX() + ($isRTL ? 0 : 5));
-            $pdf->MultiCell(0, $lineHeight, ($isRTL ? "النتيجة: " : "Result: ") . $labRequest->comment, 0, $isRTL ? 'R' : 'L', false, 1);
+            $pdf->MultiCell(0, $lineHeight, ($isRTL ? 'النتيجة: ' : 'Result: ').$labRequest->comment, 0, $isRTL ? 'R' : 'L', false, 1);
         }
         $pdf->Ln(0.5);
 
@@ -4439,10 +4503,10 @@ class ReportController extends Controller
         }
 
         // Overall Main Test Comment (if it's distinct from a non-divided result)
-        if ($labRequest->comment && ($mainTest->divided || (!$mainTest->divided && $labRequest->results->isNotEmpty()))) {
+        if ($labRequest->comment && ($mainTest->divided || (! $mainTest->divided && $labRequest->results->isNotEmpty()))) {
             $pdf->Ln(1.5);
             $pdf->SetFont($fontMain, 'B', 8.5);
-            $pdf->Cell(0, $lineHeight, ($isRTL ? "ملاحظات إضافية:" : "Additional Comment:"), 0, 1, $isRTL ? 'R' : 'L');
+            $pdf->Cell(0, $lineHeight, ($isRTL ? 'ملاحظات إضافية:' : 'Additional Comment:'), 0, 1, $isRTL ? 'R' : 'L');
             $pdf->SetFont($fontMain, '', 8.5);
             $pdf->SetX($pdf->GetX() + ($isRTL ? 0 : 3));
             $pdf->MultiCell(0, $lineHeight - 1, $labRequest->comment, 0, $isRTL ? 'R' : 'L', false, 1);
@@ -4450,7 +4514,7 @@ class ReportController extends Controller
 
         // Watermark (using method from MyCustomTCPDF)
         if ($settings?->show_water_mark && $labRequest->approve) {
-            $pdf->drawTextWatermark(($isRTL ? "معتمد" : "AUTHORIZED"), $fontMain);
+            $pdf->drawTextWatermark(($isRTL ? 'معتمد' : 'AUTHORIZED'), $fontMain);
         }
         $pdf->Ln(1);
     }
@@ -4464,11 +4528,11 @@ class ReportController extends Controller
             $pdf->SetFont($fontMain, 'B', 7.5);
             $pdf->SetFillColor(240, 240, 240);
             $pdf->SetLineWidth(0.15);
-            $pdf->Cell($colWidths[0], $baseLineHeight, ($isRTL ? 'الفحص' : "Test"), 'TB', 0, 'C', true);
-            $pdf->Cell($colWidths[1], $baseLineHeight, ($isRTL ? 'النتيجة' : "Result"), 'TB', 0, 'C', true);
-            $pdf->Cell($colWidths[2], $baseLineHeight, ($isRTL ? 'الوحدة' : "Unit"), 'TB', 0, 'C', true);
-            $pdf->Cell($colWidths[3], $baseLineHeight, ($isRTL ? 'المعدل الطبيعي' : "Normal Range"), 'TB', 0, 'C', true);
-            $pdf->Cell($colWidths[4], $baseLineHeight, ($isRTL ? 'علامات' : "Flags"), 'TB', 1, 'C', true);
+            $pdf->Cell($colWidths[0], $baseLineHeight, ($isRTL ? 'الفحص' : 'Test'), 'TB', 0, 'C', true);
+            $pdf->Cell($colWidths[1], $baseLineHeight, ($isRTL ? 'النتيجة' : 'Result'), 'TB', 0, 'C', true);
+            $pdf->Cell($colWidths[2], $baseLineHeight, ($isRTL ? 'الوحدة' : 'Unit'), 'TB', 0, 'C', true);
+            $pdf->Cell($colWidths[3], $baseLineHeight, ($isRTL ? 'المعدل الطبيعي' : 'Normal Range'), 'TB', 0, 'C', true);
+            $pdf->Cell($colWidths[4], $baseLineHeight, ($isRTL ? 'علامات' : 'Flags'), 'TB', 1, 'C', true);
             $pdf->Ln(0.2);
             $pdf->SetLineWidth(0.1);
         }
@@ -4477,15 +4541,17 @@ class ReportController extends Controller
 
         foreach ($results as $result) {
             $childTest = $result->childTest;
-            if (!$childTest)
+            if (! $childTest) {
                 continue;
+            }
 
             $isAbnormal = false;
             $numericResult = filter_var($result->result, FILTER_VALIDATE_FLOAT);
             if ($numericResult !== false && $childTest->low !== null && $childTest->upper !== null) {
-                if ($numericResult < (float) $childTest->low || $numericResult > (float) $childTest->upper)
+                if ($numericResult < (float) $childTest->low || $numericResult > (float) $childTest->upper) {
                     $isAbnormal = true;
-            } elseif (!empty($result->flags) && in_array(strtoupper($result->flags), ['H', 'L', 'A', 'ABN', 'ABNORMAL', '+', '++'])) {
+                }
+            } elseif (! empty($result->flags) && in_array(strtoupper($result->flags), ['H', 'L', 'A', 'ABN', 'ABNORMAL', '+', '++'])) {
                 $isAbnormal = true;
             }
 
@@ -4494,7 +4560,7 @@ class ReportController extends Controller
                 $result->result ?? '-',
                 $result->unit?->name ?? $childTest->unit?->name ?? '-',
                 $result->normal_range ?? '-',
-                $result->flags ?? '-'
+                $result->flags ?? '-',
             ];
 
             // --- CORRECTED DYNAMIC ROW HEIGHT CALCULATION ---
@@ -4517,12 +4583,13 @@ class ReportController extends Controller
             // $dynamicRowHeight = $maxLines * $singleLineHeight + ($pdf->getCellPaddings()['T'] + $pdf->getCellPaddings()['B']);
             // Fallback to a simpler estimation or a slightly generous fixed height if GetNumLines is problematic with MultiCell auto-height
             $dynamicRowHeight = $baseLineHeight * $maxLines;
-            if ($maxLines > 1)
-                $dynamicRowHeight += ($maxLines - 1) * 0.5; // Small padding for multi-lines
-            if ($dynamicRowHeight < $baseLineHeight)
+            if ($maxLines > 1) {
+                $dynamicRowHeight += ($maxLines - 1) * 0.5;
+            } // Small padding for multi-lines
+            if ($dynamicRowHeight < $baseLineHeight) {
                 $dynamicRowHeight = $baseLineHeight;
+            }
             // --- END OF CORRECTION ---
-
 
             if ($pdf->GetY() + $dynamicRowHeight > ($pdf->getPageHeight() - $pdf->getBreakMargin())) {
                 $pdf->AddPage();
@@ -4530,11 +4597,11 @@ class ReportController extends Controller
                     $pdf->SetFont($fontMain, 'B', 7.5);
                     $pdf->SetFillColor(240, 240, 240);
                     $pdf->SetLineWidth(0.15);
-                    $pdf->Cell($colWidths[0], $baseLineHeight, ($isRTL ? 'الفحص' : "Test"), 'TB', 0, 'C', true);
-                    $pdf->Cell($colWidths[1], $baseLineHeight, ($isRTL ? 'النتيجة' : "Result"), 'TB', 0, 'C', true);
-                    $pdf->Cell($colWidths[2], $baseLineHeight, ($isRTL ? 'الوحدة' : "Unit"), 'TB', 0, 'C', true);
-                    $pdf->Cell($colWidths[3], $baseLineHeight, ($isRTL ? 'المعدل الطبيعي' : "Normal Range"), 'TB', 0, 'C', true);
-                    $pdf->Cell($colWidths[4], $baseLineHeight, ($isRTL ? 'علامات' : "Flags"), 'TB', 1, 'C', true);
+                    $pdf->Cell($colWidths[0], $baseLineHeight, ($isRTL ? 'الفحص' : 'Test'), 'TB', 0, 'C', true);
+                    $pdf->Cell($colWidths[1], $baseLineHeight, ($isRTL ? 'النتيجة' : 'Result'), 'TB', 0, 'C', true);
+                    $pdf->Cell($colWidths[2], $baseLineHeight, ($isRTL ? 'الوحدة' : 'Unit'), 'TB', 0, 'C', true);
+                    $pdf->Cell($colWidths[3], $baseLineHeight, ($isRTL ? 'المعدل الطبيعي' : 'Normal Range'), 'TB', 0, 'C', true);
+                    $pdf->Cell($colWidths[4], $baseLineHeight, ($isRTL ? 'علامات' : 'Flags'), 'TB', 1, 'C', true);
                     $pdf->Ln(0.2);
                     $pdf->SetLineWidth(0.1);
                 }
@@ -4559,30 +4626,32 @@ class ReportController extends Controller
             $pdf->MultiCell($colWidths[4], $dynamicRowHeight, $texts[4], 1, $colAligns[4], $fill, 1, $curX, $curY, true, 0, false, true, $dynamicRowHeight, 'M');
 
             // No explicit $pdf->Line needed after each row if MultiCell border is '1' or 'LTRB'
-            $fill = !$fill;
+            $fill = ! $fill;
 
-            if (!empty($result->result_comment)) {
+            if (! empty($result->result_comment)) {
                 $pdf->SetFont($fontMain, 'I', 7.5);
                 $pdf->SetFillColor($fill ? 248 : 255, $fill ? 248 : 255, $fill ? 248 : 255);
-                $pdf->MultiCell(0, $baseLineHeight - 1.5, ($isRTL ? "تعليق: " : "Comment: ") . $result->result_comment, 'LRB', $isRTL ? 'R' : 'L', $fill, 1); // Changed to LRB to connect to previous row
+                $pdf->MultiCell(0, $baseLineHeight - 1.5, ($isRTL ? 'تعليق: ' : 'Comment: ').$result->result_comment, 'LRB', $isRTL ? 'R' : 'L', $fill, 1); // Changed to LRB to connect to previous row
                 $pdf->SetFont($fontMain, '', 8);
-                $fill = !$fill;
+                $fill = ! $fill;
             }
         }
     }
 
     protected function drawOrganismsSection(MyCustomTCPDF $pdf, $organisms, $fontMain, $pageWidth, $baseLineHeight, $isRTL)
     {
-        if ($organisms->isEmpty())
+        if ($organisms->isEmpty()) {
             return;
+        }
         $pdf->Ln(2);
         $pdf->SetFont($fontMain, 'B', 10);
-        $pdf->Cell(0, $baseLineHeight, ($isRTL ? "مزرعة وحساسية:" : "Culture & Sensitivity:"), 0, 1, $isRTL ? 'R' : 'L');
+        $pdf->Cell(0, $baseLineHeight, ($isRTL ? 'مزرعة وحساسية:' : 'Culture & Sensitivity:'), 0, 1, $isRTL ? 'R' : 'L');
         $pdf->Ln(0.5);
 
         foreach ($organisms as $org) {
-            if ($pdf->GetY() + 40 > ($pdf->getPageHeight() - $pdf->getBreakMargin()))
+            if ($pdf->GetY() + 40 > ($pdf->getPageHeight() - $pdf->getBreakMargin())) {
                 $pdf->AddPage();
+            }
 
             $pdf->SetFont($fontMain, 'BU', 9);
             $pdf->Cell($pageWidth, $baseLineHeight, $org->organism, 0, 1, 'C'); // Organism Name centered
@@ -4594,11 +4663,12 @@ class ReportController extends Controller
             $pdf->Cell($halfWidth, $baseLineHeight - 1, ($isRTL ? 'مقاوم لـ:' : 'Resistant To:'), 'B', 1, 'C');
 
             $pdf->SetFont($fontMain, '', 7.5);
-            $sensArr = !empty($org->sensitive) ? array_filter(array_map('trim', preg_split('/[\n,]+/', $org->sensitive))) : [];
-            $resArr = !empty($org->resistant) ? array_filter(array_map('trim', preg_split('/[\n,]+/', $org->resistant))) : [];
+            $sensArr = ! empty($org->sensitive) ? array_filter(array_map('trim', preg_split('/[\n,]+/', $org->sensitive))) : [];
+            $resArr = ! empty($org->resistant) ? array_filter(array_map('trim', preg_split('/[\n,]+/', $org->resistant))) : [];
             $maxRows = max(count($sensArr), count($resArr));
-            if ($maxRows == 0)
+            if ($maxRows == 0) {
                 $maxRows = 1;
+            }
             $cellH = $baseLineHeight - 2; // Reduced height for antibiotic list items
 
             for ($i = 0; $i < $maxRows; $i++) {
@@ -4625,6 +4695,7 @@ class ReportController extends Controller
             $pdf->Ln(2); // Space after an organism block
         }
     }
+
     /**
      * Get monthly shifts financial summary: one row per shift with revenue, cost, net.
      */
@@ -4632,7 +4703,7 @@ class ReportController extends Controller
     {
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'nullable|integer|min:2000|max:' . (date('Y') + 5),
+            'year' => 'nullable|integer|min:2000|max:'.(date('Y') + 5),
         ]);
 
         $year = $validated['year'] ?? (int) date('Y');
@@ -4721,7 +4792,7 @@ class ReportController extends Controller
 
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2000|max:' . (date('Y') + 5),
+            'year' => 'required|integer|min:2000|max:'.(date('Y') + 5),
             // 'user_id_deposited' => 'nullable|integer|exists:users,id', // Optional filter by user who handled payment
         ]);
 
@@ -4766,9 +4837,8 @@ class ReportController extends Controller
                 // For simplicity, let's assume amount_paid already reflects this net amount
                 return (float) $lr->amount_paid;
             });
-            $dailyCashPaid = $requestsOnThisDay->where('is_bankak', false)->sum(fn($lr) => (float) $lr->amount_paid);
-            $dailyBankPaid = $requestsOnThisDay->where('is_bankak', true)->sum(fn($lr) => (float) $lr->amount_paid);
-
+            $dailyCashPaid = $requestsOnThisDay->where('is_bankak', false)->sum(fn ($lr) => (float) $lr->amount_paid);
+            $dailyBankPaid = $requestsOnThisDay->where('is_bankak', true)->sum(fn ($lr) => (float) $lr->amount_paid);
 
             if ($dailyTotalPaid > 0 || $request->boolean('show_empty_days', false)) {
                 $dailyData[] = [
@@ -4791,7 +4861,7 @@ class ReportController extends Controller
                 'month_name' => $startDate->translatedFormat('F Y'),
                 'from' => $startDate->toDateString(),
                 'to' => $endDate->toDateString(),
-            ]
+            ],
         ]);
     }
 
@@ -4806,7 +4876,7 @@ class ReportController extends Controller
 
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2000|max:' . (date('Y') + 1),
+            'year' => 'required|integer|min:2000|max:'.(date('Y') + 1),
         ]);
 
         // Use the same data fetching logic as the JSON endpoint by calling it internally
@@ -4818,12 +4888,12 @@ class ReportController extends Controller
         $summary = $jsonData['summary'] ?? [
             'total_lab_income_paid' => 0,
             'total_lab_cash_paid' => 0,
-            'total_lab_bank_paid' => 0
+            'total_lab_bank_paid' => 0,
         ];
         $reportPeriod = $jsonData['report_period'] ?? [
             'month_name' => Carbon::create($validated['year'], $validated['month'])->translatedFormat('F Y'),
             'from' => Carbon::create($validated['year'], $validated['month'], 1)->toDateString(),
-            'to' => Carbon::create($validated['year'], $validated['month'], 1)->endOfMonth()->toDateString()
+            'to' => Carbon::create($validated['year'], $validated['month'], 1)->endOfMonth()->toDateString(),
         ];
 
         // --- PDF Generation ---
@@ -4858,7 +4928,7 @@ class ReportController extends Controller
                     number_format((float) $day['total_lab_bank_paid'], 2),
                 ];
                 $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
-                $fill = !$fill;
+                $fill = ! $fill;
             }
         }
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
@@ -4873,12 +4943,14 @@ class ReportController extends Controller
         ];
         $pdf->DrawSummaryRow($summaryRow, $colWidths, $alignments, 8, [220, 220, 220]); // Use DrawSummaryRow
 
-        $pdfFileName = 'monthly_lab_income_paid_' . $reportPeriod['from'] . '_' . $reportPeriod['to'] . '.pdf';
+        $pdfFileName = 'monthly_lab_income_paid_'.$reportPeriod['from'].'_'.$reportPeriod['to'].'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
+
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
+
     public function labTestStatistics(Request $request)
     {
         // if (!Auth::user()->can('view lab_test_statistics_report')) { /* ... */ }
@@ -4898,21 +4970,21 @@ class ReportController extends Controller
             ->select([
                 'labrequests.main_test_id',
                 'main_tests.main_test_name',
-                DB::raw('COUNT(labrequests.id) as request_count')
+                DB::raw('COUNT(labrequests.id) as request_count'),
             ])
             ->groupBy('labrequests.main_test_id', 'main_tests.main_test_name');
 
         // Apply date filters on labrequests.created_at
         if ($request->filled('date_from')) {
-            $query->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+            $query->where('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            $query->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+            $query->where('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
 
         // Filter by test name (search) directly on the joined main_tests table
         if ($request->filled('search_test_name')) {
-            $query->where('main_tests.main_test_name', 'LIKE', '%' . $request->search_test_name . '%');
+            $query->where('main_tests.main_test_name', 'LIKE', '%'.$request->search_test_name.'%');
         }
 
         // Remove container_id and package_id filters if they are not part of the requirement anymore
@@ -4936,7 +5008,6 @@ class ReportController extends Controller
         if ($sortBy !== 'main_test_name') {
             $query->orderBy('main_tests.main_test_name', 'asc');
         }
-
 
         $perPage = $request->input('per_page', 15);
         $statistics = $query->paginate($perPage);
@@ -4999,8 +5070,9 @@ class ReportController extends Controller
 
         // Calculate percentages
         $totalResults = $resultsGrouped->sum('count');
-        $statistics = $resultsGrouped->map(function ($item) use ($totalResults, $totalRequests) {
+        $statistics = $resultsGrouped->map(function ($item) use ($totalResults) {
             $percentage = $totalResults > 0 ? ($item->count / $totalResults) * 100 : 0;
+
             return [
                 'result' => $item->result,
                 'count' => $item->count,
@@ -5054,7 +5126,7 @@ class ReportController extends Controller
                 DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_amount_bank'),
                 'companies.name as company_name',
                 'patients.created_at',
-                DB::raw('GROUP_CONCAT(DISTINCT main_tests.main_test_name SEPARATOR ", ") as main_tests_names')
+                DB::raw('GROUP_CONCAT(DISTINCT main_tests.main_test_name SEPARATOR ", ") as main_tests_names'),
             ])
             ->leftJoin('main_tests', 'labrequests.main_test_id', '=', 'main_tests.id')
             ->groupBy('doctorvisits.id', 'patients.id', 'patients.name', 'doctors.name', 'users.name', 'companies.name', 'patients.created_at');
@@ -5066,15 +5138,15 @@ class ReportController extends Controller
 
         // Apply date filters
         if ($request->filled('date_from')) {
-            $query->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+            $query->where('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            $query->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+            $query->where('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
 
         // Filter by patient name
         if ($request->filled('patient_name')) {
-            $query->where('patients.name', 'LIKE', '%' . $request->patient_name . '%');
+            $query->where('patients.name', 'LIKE', '%'.$request->patient_name.'%');
         }
 
         // Filter by user (who requested the lab)
@@ -5107,7 +5179,7 @@ class ReportController extends Controller
                 DB::raw('SUM(labrequests.amount_paid) as total_paid'),
                 DB::raw('SUM(labrequests.price * labrequests.discount_per / 100) as total_discount'),
                 DB::raw('SUM(CASE WHEN labrequests.is_bankak = 0 THEN labrequests.amount_paid ELSE 0 END) as total_cash'),
-                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_bank')
+                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_bank'),
             ])
             ->groupBy('users.id', 'users.name');
 
@@ -5116,13 +5188,13 @@ class ReportController extends Controller
             $userRevenueQuery->where('doctorvisits.shift_id', $request->shift_id);
         }
         if ($request->filled('date_from')) {
-            $userRevenueQuery->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+            $userRevenueQuery->where('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            $userRevenueQuery->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+            $userRevenueQuery->where('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
         if ($request->filled('patient_name')) {
-            $userRevenueQuery->where('patients.name', 'LIKE', '%' . $request->patient_name . '%');
+            $userRevenueQuery->where('patients.name', 'LIKE', '%'.$request->patient_name.'%');
         }
         if ($request->filled('user_id')) {
             $userRevenueQuery->where('labrequests.user_requested', $request->user_id);
@@ -5149,7 +5221,7 @@ class ReportController extends Controller
                 'per_page' => $results->perPage(),
                 'to' => $results->lastItem(),
                 'total' => $results->total(),
-            ]
+            ],
         ]);
     }
 
@@ -5168,6 +5240,8 @@ class ReportController extends Controller
             'patient_name' => 'nullable|string|max:255',
             'user_id' => 'nullable|integer|exists:users,id',
             'per_page' => 'nullable|integer|min:5|max:100',
+            'start_time' => 'nullable|string|max:255',
+            'end_time' => 'nullable|string|max:255',
         ]);
 
         $query = Patient::query()
@@ -5185,7 +5259,7 @@ class ReportController extends Controller
                 DB::raw('SUM(labrequests.price * labrequests.discount_per / 100) as discount'),
                 DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_amount_bank'),
                 'companies.name as company_name',
-                DB::raw('GROUP_CONCAT(DISTINCT main_tests.main_test_name SEPARATOR ", ") as main_tests_names')
+                DB::raw('GROUP_CONCAT(DISTINCT main_tests.main_test_name SEPARATOR ", ") as main_tests_names'),
             ])
             ->leftJoin('main_tests', 'labrequests.main_test_id', '=', 'main_tests.id')
             ->groupBy('doctorvisits.id', 'patients.id', 'patients.name', 'doctors.name', 'companies.name');
@@ -5197,20 +5271,28 @@ class ReportController extends Controller
 
         // Apply date filters
         if ($request->filled('date_from')) {
-            $query->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+            $query->where('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            $query->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+            $query->where('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
 
         // Filter by patient name
         if ($request->filled('patient_name')) {
-            $query->where('patients.name', 'LIKE', '%' . $request->patient_name . '%');
+            $query->where('patients.name', 'LIKE', '%'.$request->patient_name.'%');
         }
 
         // Filter by user (who requested the lab)
         if ($request->filled('user_id')) {
             $query->where('labrequests.user_requested', $request->user_id);
+        }
+
+        // Apply time filters (same as the on-screen report)
+        if ($request->filled('start_time')) {
+            $query->whereTime('patients.created_at', '>=', $request->start_time);
+        }
+        if ($request->filled('end_time')) {
+            $query->whereTime('patients.created_at', '<=', $request->end_time);
         }
 
         // Order by patient name
@@ -5229,7 +5311,7 @@ class ReportController extends Controller
                 DB::raw('SUM(labrequests.amount_paid) as total_paid'),
                 DB::raw('SUM(labrequests.price * labrequests.discount_per / 100) as total_discount'),
                 DB::raw('SUM(CASE WHEN labrequests.is_bankak = 0 THEN labrequests.amount_paid ELSE 0 END) as total_cash'),
-                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_bank')
+                DB::raw('SUM(CASE WHEN labrequests.is_bankak = 1 THEN labrequests.amount_paid ELSE 0 END) as total_bank'),
             ])
             ->groupBy('users.id', 'users.name');
 
@@ -5237,16 +5319,22 @@ class ReportController extends Controller
             $userRevenueQuery->where('doctorvisits.shift_id', $request->shift_id);
         }
         if ($request->filled('date_from')) {
-            $userRevenueQuery->whereDate('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
+            $userRevenueQuery->where('labrequests.created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
         if ($request->filled('date_to')) {
-            $userRevenueQuery->whereDate('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+            $userRevenueQuery->where('labrequests.created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
         }
         if ($request->filled('patient_name')) {
-            $userRevenueQuery->where('patients.name', 'LIKE', '%' . $request->patient_name . '%');
+            $userRevenueQuery->where('patients.name', 'LIKE', '%'.$request->patient_name.'%');
         }
         if ($request->filled('user_id')) {
             $userRevenueQuery->where('labrequests.user_requested', $request->user_id);
+        }
+        if ($request->filled('start_time')) {
+            $userRevenueQuery->whereTime('patients.created_at', '>=', $request->start_time);
+        }
+        if ($request->filled('end_time')) {
+            $userRevenueQuery->whereTime('patients.created_at', '<=', $request->end_time);
         }
 
         $userRevenues = $userRevenueQuery->get();
@@ -5259,7 +5347,7 @@ class ReportController extends Controller
 
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="lab_general_report_' . date('Y-m-d_H-i-s') . '.pdf"',
+            'Content-Disposition' => 'inline; filename="lab_general_report_'.date('Y-m-d_H-i-s').'.pdf"',
             'Cache-Control' => 'private, max-age=0, must-revalidate',
             'Pragma' => 'public',
         ]);
@@ -5274,28 +5362,31 @@ class ReportController extends Controller
 
         if ($request->has('shift')) {
             $shift = \App\Models\Shift::find($request->get('shift'));
-            if (!$shift) {
+            if (! $shift) {
                 ob_end_clean();
+
                 return response()->json(['error' => 'Shift not found'], 404);
             }
         } else {
             $shift = \App\Models\Shift::orderByDesc('id')->first();
-            if (!$shift) {
+            if (! $shift) {
                 ob_end_clean();
+
                 return response()->json(['error' => 'No shifts available'], 404);
             }
         }
 
-        $service = new \App\Services\Pdf\LabShiftReport();
+        $service = new \App\Services\Pdf\LabShiftReport;
         $pdfContent = $service->generate($shift);
 
-        $fileName = 'LabReport_Shift_' . $shift->id . '_' . now()->format('Ymd_His') . '.pdf';
+        $fileName = 'LabReport_Shift_'.$shift->id.'_'.now()->format('Ymd_His').'.pdf';
         $response = response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="' . $fileName . '"'
+            'Content-Disposition' => 'inline; filename="'.$fileName.'"',
         ]);
 
         ob_end_clean();
+
         return $response;
     }
 
@@ -5317,18 +5408,20 @@ class ReportController extends Controller
         $filterCriteria = [];
         if ($request->filled('search')) {
             $searchTerm = $request->search;
-            $query->where('name', 'LIKE', '%' . $searchTerm . '%');
-            $filterCriteria[] = "Search: " . $searchTerm;
+            $query->where('name', 'LIKE', '%'.$searchTerm.'%');
+            $filterCriteria[] = 'Search: '.$searchTerm;
         }
         if ($request->filled('service_group_id') && $request->service_group_id != 'all') {
             $groupId = $request->service_group_id;
             $query->where('service_group_id', $groupId);
             $group = \App\Models\ServiceGroup::find($groupId);
-            if ($group) $filterCriteria[] = "Group: " . $group->name;
+            if ($group) {
+                $filterCriteria[] = 'Group: '.$group->name;
+            }
         }
 
         $services = $query->get();
-        $filterCriteriaString = !empty($filterCriteria) ? implode(' | ', $filterCriteria) : "All Services";
+        $filterCriteriaString = ! empty($filterCriteria) ? implode(' | ', $filterCriteria) : 'All Services';
 
         // --- PDF Generation ---
         $reportTitle = 'Services List';
@@ -5365,18 +5458,18 @@ class ReportController extends Controller
                     $service->id,
                     $service->name,
                     $service->serviceGroup?->name ?? 'N/A',
-                    number_format((float)$service->price, 2),
+                    number_format((float) $service->price, 2),
                     $service->activate ? 'Active' : 'Inactive',
-                    $service->variable ? 'Yes' : 'No'
+                    $service->variable ? 'Yes' : 'No',
                 ];
                 $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 6); // Base height 6
-                $fill = !$fill;
+                $fill = ! $fill;
             }
         }
         // Draw final line under the table
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
-        $pdfFileName = 'Services_List_' . date('Y-m-d') . '.pdf';
+        $pdfFileName = 'Services_List_'.date('Y-m-d').'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S'); // 'S' returns as string
 
         return response($pdfContent, 200)
@@ -5399,14 +5492,14 @@ class ReportController extends Controller
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
-                $q->where('name', 'LIKE', '%' . $searchTerm . '%')
-                    ->orWhere('phone', 'LIKE', '%' . $searchTerm . '%');
+                $q->where('name', 'LIKE', '%'.$searchTerm.'%')
+                    ->orWhere('phone', 'LIKE', '%'.$searchTerm.'%');
             });
-            $filterCriteria[] = "Search: " . $searchTerm;
+            $filterCriteria[] = 'Search: '.$searchTerm;
         }
 
         $doctors = $query->get();
-        $filterCriteriaString = !empty($filterCriteria) ? implode(' | ', $filterCriteria) : "All Doctors";
+        $filterCriteriaString = ! empty($filterCriteria) ? implode(' | ', $filterCriteria) : 'All Doctors';
 
         $reportTitle = 'Doctors List';
         $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteriaString);
@@ -5431,18 +5524,18 @@ class ReportController extends Controller
                     $doctor->name,
                     $doctor->phone,
                     $doctor->specialist?->name ?? 'N/A',
-                    $doctor->cash_percentage !== null ? (string)$doctor->cash_percentage : 'N/A',
-                    $doctor->company_percentage !== null ? (string)$doctor->company_percentage : 'N/A',
-                    $doctor->static_wage !== null ? number_format((float)$doctor->static_wage, 2) : 'N/A',
+                    $doctor->cash_percentage !== null ? (string) $doctor->cash_percentage : 'N/A',
+                    $doctor->company_percentage !== null ? (string) $doctor->company_percentage : 'N/A',
+                    $doctor->static_wage !== null ? number_format((float) $doctor->static_wage, 2) : 'N/A',
                 ];
                 $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill, 6);
-                $fill = !$fill;
+                $fill = ! $fill;
             }
         }
 
         $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
 
-        $pdfFileName = 'Doctors_List_' . date('Y-m-d') . '.pdf';
+        $pdfFileName = 'Doctors_List_'.date('Y-m-d').'.pdf';
         $pdfContent = $pdf->Output($pdfFileName, 'S');
 
         return response($pdfContent, 200)

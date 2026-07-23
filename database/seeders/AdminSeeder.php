@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\User;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class AdminSeeder extends Seeder
 {
@@ -32,7 +32,6 @@ class AdminSeeder extends Seeder
         // $allPermissions = Permission::all();
         // $superAdminRole->syncPermissions($allPermissions);
 
-
         // --- Create Super Admin User ---
         $superAdminUser = User::firstOrCreate(
             ['username' => 'superadmin'], // Unique identifier for lookup
@@ -40,8 +39,6 @@ class AdminSeeder extends Seeder
                 'name' => 'Super Administrator',
                 'password' => Hash::make('12345678'), // CHANGE THIS TO A STRONG, SECURE PASSWORD
                 // Add other required fields from your 'users' table with sensible defaults
-                'is_nurse' => false,
-                'user_money_collector_type' => 'all', // Or whatever is appropriate for a super admin
                 // 'email' => 'superadmin@example.com', // If you have an email field
                 // 'doctor_id' => null, // Super admin is likely not a doctor profile
             ]
@@ -52,18 +49,17 @@ class AdminSeeder extends Seeder
         } else {
             $this->command->info('Super Admin user already exists.');
             // Ensure password is set if user exists but might have been created without it
-            if (!Hash::check('12345678', $superAdminUser->password)) {
-                 $superAdminUser->password = Hash::make('12345678'); // Update password if necessary
-                 $superAdminUser->save();
-                 $this->command->info('Super Admin password updated.');
+            if (! Hash::check('12345678', $superAdminUser->password)) {
+                $superAdminUser->password = Hash::make('12345678'); // Update password if necessary
+                $superAdminUser->save();
+                $this->command->info('Super Admin password updated.');
             }
         }
         // Assign the 'Super Admin' role if not already assigned
-        if (!$superAdminUser->hasRole('Super Admin')) {
+        if (! $superAdminUser->hasRole('Super Admin')) {
             $superAdminUser->assignRole($superAdminRole);
             $this->command->info("Super Admin role assigned to {$superAdminUser->username}.");
         }
-
 
         // --- Optional: Create a regular Admin User ---
         $adminUser = User::firstOrCreate(
@@ -71,8 +67,6 @@ class AdminSeeder extends Seeder
             [
                 'name' => 'Administrator',
                 'password' => Hash::make('AdminP@$$123'), // CHANGE THIS TO A STRONG, SECURE PASSWORD
-                'is_nurse' => false,
-                'user_money_collector_type' => 'clinic', // Example
                 // 'email' => 'admin@example.com',
             ]
         );
@@ -81,13 +75,13 @@ class AdminSeeder extends Seeder
             $this->command->info('Admin user created.');
         } else {
             $this->command->info('Admin user already exists.');
-             if (!Hash::check('AdminP@$$123', $adminUser->password)) {
-                 $adminUser->password = Hash::make('AdminP@$$123');
-                 $adminUser->save();
-                 $this->command->info('Admin password updated.');
+            if (! Hash::check('AdminP@$$123', $adminUser->password)) {
+                $adminUser->password = Hash::make('AdminP@$$123');
+                $adminUser->save();
+                $this->command->info('Admin password updated.');
             }
         }
-        if (!$adminUser->hasRole('Admin')) {
+        if (! $adminUser->hasRole('Admin')) {
             $adminUser->assignRole($adminRole);
             $this->command->info("Admin role assigned to {$adminUser->username}.");
         }

@@ -4,84 +4,83 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
-use App\Models\ServiceGroup;
 use App\Models\Cost;
-use App\Models\CostCategory;
+use App\Models\DoctorVisit;
 use App\Models\RequestedServiceDeposit;
 use App\Models\Service;
-use App\Models\DoctorVisit;
-use App\Models\User;
+use App\Models\ServiceGroup;
 use App\Models\Shift;
+use App\Models\User;
+use Carbon\Carbon;
+use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
-use Carbon\Carbon;
-use Carbon\CarbonPeriod;
-use Illuminate\Support\Facades\Log;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ExcelController extends Controller
 {
     public function reclaim(Request $request)
     {
-        $company = Company::find($request->query("company"));
-        if (!$company) {
+        $company = Company::find($request->query('company'));
+        if (! $company) {
             return response()->json(['error' => 'Company not found'], 404);
         }
 
-        $first      = $request->query('first');
-        $second     = $request->query('second');
-        $startDate  = Carbon::parse($first)->startOfDay();
-        $endDate    = Carbon::parse($second)->endOfDay();
+        $first = $request->query('first');
+        $second = $request->query('second');
+        $startDate = Carbon::parse($first)->startOfDay();
+        $endDate = Carbon::parse($second)->endOfDay();
 
         $serviceGroups = ServiceGroup::all();
 
-        $visits = DoctorVisit::whereHas('patient', fn($q) => $q->where('company_id', $company->id))
+        $visits = DoctorVisit::whereHas('patient', fn ($q) => $q->where('company_id', $company->id))
             ->whereBetween('created_at', [$startDate, $endDate])
             ->with(['patient.subCompany', 'patient.companyRelation'])
             ->get();
 
-        $colIdx = fn(int $n) => \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($n);
+        $colIdx = fn (int $n) => \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($n);
 
         // ── Column layout ─────────────────────────────────────────────────
         // C(3)..J(10) = 8 fixed columns
         // K(11)..K+n-1 = service groups
         // K+n          = التحمل  (endurance / patient co-pay)
         // K+n+1        = صافي المطالبة  (net reclaim = lab + services − تحمل)
-        $fixedEnd        = 10; // J
-        $sgCount         = $serviceGroups->count();
-        $sgStartIdx      = $fixedEnd + 1;
-        $sgEndIdx        = $fixedEnd + $sgCount;
-        $enduranceIdx    = $sgEndIdx + 1;
-        $totalIdx        = $sgEndIdx + 2;
+        $fixedEnd = 10; // J
+        $sgCount = $serviceGroups->count();
+        $sgStartIdx = $fixedEnd + 1;
+        $sgEndIdx = $fixedEnd + $sgCount;
+        $enduranceIdx = $sgEndIdx + 1;
+        $totalIdx = $sgEndIdx + 2;
 
-        $sgStartCol      = $colIdx($sgStartIdx);
-        $sgEndCol        = $colIdx($sgEndIdx);
-        $enduranceCol    = $colIdx($enduranceIdx);
-        $totalCol        = $colIdx($totalIdx);
-        $firstCol        = 'C';
-        $lastCol         = $totalCol;
+        $sgStartCol = $colIdx($sgStartIdx);
+        $sgEndCol = $colIdx($sgEndIdx);
+        $enduranceCol = $colIdx($enduranceIdx);
+        $totalCol = $colIdx($totalIdx);
+        $firstCol = 'C';
+        $lastCol = $totalCol;
 
         // ── Row layout ────────────────────────────────────────────────────
-        $headerRow   = 5;
-        $dataStart   = 6;
+        $headerRow = 5;
+        $dataStart = 6;
         $patientCount = $visits->count();
-        $dataEnd     = $dataStart + $patientCount - 1;
-        $totalsRow   = $dataEnd + 2; // one blank buffer
+        $dataEnd = $dataStart + $patientCount - 1;
+        $totalsRow = $dataEnd + 2; // one blank buffer
 
         // ── Spreadsheet setup ─────────────────────────────────────────────
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setRightToLeft(true);
-        $spreadsheet->getProperties()->setTitle('مطالبة التأمين - ' . $company->name);
+        $spreadsheet->getProperties()->setTitle('مطالبة التأمين - '.$company->name);
 
         // ── Title block ───────────────────────────────────────────────────
         $sheet->mergeCells("C1:{$lastCol}1");
         $sheet->setCellValue('C1', 'كشف مطالبة التأمين');
         $sheet->getStyle('C1')->applyFromArray([
-            'font'      => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '1A3C6B']],
+            'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '1A3C6B']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
         $sheet->getRowDimension(1)->setRowHeight(26);
@@ -89,32 +88,32 @@ class ExcelController extends Controller
         $sheet->mergeCells("C2:{$lastCol}2");
         $sheet->setCellValue('C2', $company->name);
         $sheet->getStyle('C2')->applyFromArray([
-            'font'      => ['bold' => true, 'size' => 22, 'color' => ['rgb' => '1A3C6B']],
+            'font' => ['bold' => true, 'size' => 22, 'color' => ['rgb' => '1A3C6B']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
-            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'EBF3FB']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'EBF3FB']],
         ]);
         $sheet->getRowDimension(2)->setRowHeight(36);
 
         $sheet->mergeCells("C3:{$lastCol}3");
-        $sheet->setCellValue('C3', Carbon::parse($first)->format('Y-m-d') . '  —  ' . Carbon::parse($second)->format('Y-m-d'));
+        $sheet->setCellValue('C3', Carbon::parse($first)->format('Y-m-d').'  —  '.Carbon::parse($second)->format('Y-m-d'));
         $sheet->getStyle('C3')->applyFromArray([
-            'font'      => ['size' => 11, 'color' => ['rgb' => '444444']],
+            'font' => ['size' => 11, 'color' => ['rgb' => '444444']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
         $sheet->getRowDimension(3)->setRowHeight(20);
 
         $sheet->mergeCells("C4:{$lastCol}4");
-        $sheet->setCellValue('C4', 'عدد المرضى: ' . $patientCount);
+        $sheet->setCellValue('C4', 'عدد المرضى: '.$patientCount);
         $sheet->getStyle('C4')->applyFromArray([
-            'font'      => ['size' => 10, 'italic' => true, 'color' => ['rgb' => '777777']],
+            'font' => ['size' => 10, 'italic' => true, 'color' => ['rgb' => '777777']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
         ]);
         $sheet->getRowDimension(4)->setRowHeight(18);
 
         // ── Header row ────────────────────────────────────────────────────
         $headerStyle = [
-            'font'      => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
-            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E5799']],
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => 11],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E5799']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
         ];
         $sheet->getStyle("{$firstCol}{$headerRow}:{$lastCol}{$headerRow}")->applyFromArray($headerStyle);
@@ -131,7 +130,7 @@ class ExcelController extends Controller
 
         $i = 0;
         foreach ($serviceGroups as $sg) {
-            $sheet->setCellValue($colIdx($sgStartIdx + $i) . $headerRow, $sg->name);
+            $sheet->setCellValue($colIdx($sgStartIdx + $i).$headerRow, $sg->name);
             $i++;
         }
 
@@ -177,7 +176,7 @@ class ExcelController extends Controller
             $row[] = $visit->created_at->format('Y-m-d');
             $row[] = $visit->patient->insurance_no ?? '';
             $row[] = $visit->patient->total_lab_value_unpaid();
-            $row[] = $visit->patient->subCompany->name  ?? '';
+            $row[] = $visit->patient->subCompany->name ?? '';
             $row[] = $visit->patient->companyRelation->name ?? '';
             $row[] = $visit->patient->guarantor ?? '';
 
@@ -191,7 +190,7 @@ class ExcelController extends Controller
             foreach ($serviceGroups as $sg) {
                 $total = $visit->total_services_according_to_service_group($sg->id);
                 if ($total > 0) {
-                    $svcComment = $sheet->getComment($colIdx($sgStartIdx + $sgIdx) . $dataRow);
+                    $svcComment = $sheet->getComment($colIdx($sgStartIdx + $sgIdx).$dataRow);
                     $svcComment->getText()->createTextRun($visit->services_concatinated());
                     $svcComment->setAuthor('System');
                 }
@@ -206,7 +205,7 @@ class ExcelController extends Controller
             $rowIdx++;
         }
 
-        if (!empty($patientsCells)) {
+        if (! empty($patientsCells)) {
             $sheet->fromArray($patientsCells, null, 'C6');
         }
 
@@ -229,10 +228,10 @@ class ExcelController extends Controller
 
         // ── Totals row ────────────────────────────────────────────────────
         $totalsStyle = [
-            'font'      => ['bold' => true, 'size' => 12, 'color' => ['rgb' => 'CC0000']],
-            'fill'      => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF2CC']],
+            'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => 'CC0000']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFF2CC']],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
-            'borders'   => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM, 'color' => ['rgb' => '000000']]],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_MEDIUM, 'color' => ['rgb' => '000000']]],
         ];
 
         $sheet->setCellValue("D{$totalsRow}", 'الإجمالي');
@@ -265,13 +264,13 @@ class ExcelController extends Controller
 
         // ── Output ────────────────────────────────────────────────────────
         $writer = new Xlsx($spreadsheet);
-        $filename = 'insurance_reclaim_' . $company->name . '_' . date('Y-m-d') . '.xlsx';
+        $filename = 'insurance_reclaim_'.$company->name.'_'.date('Y-m-d').'.xlsx';
 
         return response()->streamDownload(function () use ($writer) {
             $writer->save('php://output');
         }, $filename, [
-            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . urlencode($filename) . '"',
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="'.urlencode($filename).'"',
         ]);
     }
 
@@ -279,7 +278,7 @@ class ExcelController extends Controller
     {
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2000|max:' . (date('Y') + 5),
+            'year' => 'required|integer|min:2000|max:'.(date('Y') + 5),
             // 'user_id' => 'nullable|integer|exists:users,id', // Optional filter
             'show_empty_days' => 'nullable|boolean', // For PDF/Excel, you might always want to show all days
         ]);
@@ -310,18 +309,18 @@ class ExcelController extends Controller
 
         foreach ($period as $date) {
             $currentDateStr = $date->format('Y-m-d');
-            
+
             $depositsOnThisDay = $allDepositsForMonth->filter(fn ($d) => Carbon::parse($d->created_at)->isSameDay($date));
             $costsOnThisDay = $allCostsForMonth->filter(fn ($c) => Carbon::parse($c->created_at)->isSameDay($date));
 
-            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && !$request->input('show_empty_days', true)) { // Default to true for reports
+            if ($depositsOnThisDay->isEmpty() && $costsOnThisDay->isEmpty() && ! $request->input('show_empty_days', true)) { // Default to true for reports
                 continue;
             }
 
             $dailyTotalDeposits = $depositsOnThisDay->sum('amount');
             $dailyCashDeposits = $depositsOnThisDay->where('is_bank', false)->sum('amount');
             $dailyBankDeposits = $depositsOnThisDay->where('is_bank', true)->sum('amount');
-            
+
             $dailyCashCosts = $costsOnThisDay->sum('amount');
             $dailyBankCosts = $costsOnThisDay->sum('amount_bankak');
             $dailyTotalCosts = $dailyCashCosts + $dailyBankCosts;
@@ -343,7 +342,7 @@ class ExcelController extends Controller
             $grandTotals['total_bank_deposits'] += $dailyBankDeposits;
             $grandTotals['total_costs_for_days_with_activity'] += $dailyTotalCosts;
         }
-        
+
         $grandTotals['net_total_income'] = $grandTotals['total_deposits'] - $grandTotals['total_costs_for_days_with_activity'];
         $grandTotals['net_cash_flow'] = $grandTotals['total_cash_deposits'] - $allCostsForMonth->sum('amount');
         $grandTotals['net_bank_flow'] = $grandTotals['total_bank_deposits'] - $allCostsForMonth->sum('amount_bankak');
@@ -355,7 +354,7 @@ class ExcelController extends Controller
                 'month_name' => $startDate->translatedFormat('F Y'),
                 'from' => $startDate->toDateString(),
                 'to' => $endDate->toDateString(),
-            ]
+            ],
         ];
     }
 
@@ -363,7 +362,7 @@ class ExcelController extends Controller
     {
         // $this->authorize('export monthly_service_income_report');
         $data = $this->getMonthlyServiceDepositsIncomeData(new Request($request->all() + ['show_empty_days' => true]));
-        
+
         $dailyData = $data['daily_data'];
         $summary = $data['summary'];
         $reportPeriod = $data['report_period'];
@@ -372,26 +371,26 @@ class ExcelController extends Controller
             return response()->json(['message' => 'لا توجد بيانات لإنشاء التقرير.'], 404);
         }
 
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setRightToLeft(true);
 
         $spreadsheet->getProperties()->setTitle('تقرير الإيرادات الشهرية من الخدمات');
-        
-        $headerStyle = [ /* Same as ExcelController */];
-        $totalRowStyle = [ /* Same as ExcelController */];
-         $headerStyle = [
-                'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E90FF']],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '000000']]],
-            ];
-            $totalRowStyle = [
-                'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => 'FF0000']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFFF99']],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
-                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THICK, 'color' => ['rgb' => '000000']]],
-            ];
+
+        $headerStyle = [/* Same as ExcelController */];
+        $totalRowStyle = [/* Same as ExcelController */];
+        $headerStyle = [
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E90FF']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '000000']]],
+        ];
+        $totalRowStyle = [
+            'font' => ['bold' => true, 'size' => 12, 'color' => ['rgb' => 'FF0000']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFFF99']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THICK, 'color' => ['rgb' => '000000']]],
+        ];
 
         $sheet->setCellValue('A1', 'تقرير الإيرادات الشهرية من الخدمات');
         $sheet->mergeCells('A1:H1');
@@ -410,51 +409,51 @@ class ExcelController extends Controller
         foreach ($dailyData as $day) {
             $dataRows[] = [
                 Carbon::parse($day['date'])->translatedFormat('D, M j, Y'),
-                (float)$day['total_income'],
-                (float)$day['total_cash_income'],
-                (float)$day['total_bank_income'],
-                (float)$day['total_cost'],
-                (float)$day['net_cash'],
-                (float)$day['net_bank'],
-                (float)$day['net_income_for_day'],
+                (float) $day['total_income'],
+                (float) $day['total_cash_income'],
+                (float) $day['total_bank_income'],
+                (float) $day['total_cost'],
+                (float) $day['net_cash'],
+                (float) $day['net_bank'],
+                (float) $day['net_income_for_day'],
             ];
         }
         $sheet->fromArray($dataRows, null, 'A5');
-        
+
         $lastDataRow = 4 + count($dataRows);
-        
+
         // Column widths and number formats
         $sheet->getColumnDimension('A')->setWidth(25);
         for ($col = 'B'; $col <= 'H'; $col++) {
             $sheet->getColumnDimension($col)->setWidth(18);
-            $sheet->getStyle($col . '5:' . $col . $lastDataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle($col.'5:'.$col.$lastDataRow)->getNumberFormat()->setFormatCode('#,##0.00');
         }
 
         // Totals Row
         $totalRowIdx = $lastDataRow + 1;
-        $sheet->setCellValue('A' . $totalRowIdx, 'الإجمالي الشهري:');
-        $sheet->setCellValue('B' . $totalRowIdx, "=SUM(B5:B{$lastDataRow})");
-        $sheet->setCellValue('C' . $totalRowIdx, "=SUM(C5:C{$lastDataRow})");
-        $sheet->setCellValue('D' . $totalRowIdx, "=SUM(D5:D{$lastDataRow})");
-        $sheet->setCellValue('E' . $totalRowIdx, "=SUM(E5:E{$lastDataRow})");
-        $sheet->setCellValue('F' . $totalRowIdx, "=SUM(F5:F{$lastDataRow})");
-        $sheet->setCellValue('G' . $totalRowIdx, "=SUM(G5:G{$lastDataRow})");
-        $sheet->setCellValue('H' . $totalRowIdx, "=SUM(H5:H{$lastDataRow})");
-        $sheet->getStyle('A' . $totalRowIdx . ':H' . $totalRowIdx)->applyFromArray($totalRowStyle);
+        $sheet->setCellValue('A'.$totalRowIdx, 'الإجمالي الشهري:');
+        $sheet->setCellValue('B'.$totalRowIdx, "=SUM(B5:B{$lastDataRow})");
+        $sheet->setCellValue('C'.$totalRowIdx, "=SUM(C5:C{$lastDataRow})");
+        $sheet->setCellValue('D'.$totalRowIdx, "=SUM(D5:D{$lastDataRow})");
+        $sheet->setCellValue('E'.$totalRowIdx, "=SUM(E5:E{$lastDataRow})");
+        $sheet->setCellValue('F'.$totalRowIdx, "=SUM(F5:F{$lastDataRow})");
+        $sheet->setCellValue('G'.$totalRowIdx, "=SUM(G5:G{$lastDataRow})");
+        $sheet->setCellValue('H'.$totalRowIdx, "=SUM(H5:H{$lastDataRow})");
+        $sheet->getStyle('A'.$totalRowIdx.':H'.$totalRowIdx)->applyFromArray($totalRowStyle);
         $sheet->getRowDimension($totalRowIdx)->setRowHeight(22);
-        
+
         // Borders for data
         $sheet->getStyle('A5:H'.$lastDataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
         $sheet->getStyle('A5:H'.$lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         $writer = new Xlsx($spreadsheet);
-        $fileName = 'monthly_service_income_' . $reportPeriod['from'] . '_' . $reportPeriod['to'] . '.xlsx';
-        
+        $fileName = 'monthly_service_income_'.$reportPeriod['from'].'_'.$reportPeriod['to'].'.xlsx';
+
         // Clear any output buffers
         if (ob_get_level()) {
             ob_end_clean();
         }
-        
+
         // Create temporary file
         $tempFile = tempnam(sys_get_temp_dir(), 'excel_');
         $writer->save($tempFile);
@@ -470,9 +469,10 @@ class ExcelController extends Controller
             }
         }, $fileName, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
         ]);
     }
+
     /**
      * Export the list of services to an Excel file.
      */
@@ -490,19 +490,22 @@ class ExcelController extends Controller
         $query = Service::with('serviceGroup:id,name')->orderBy('name');
 
         if ($request->filled('search')) {
-            $query->where('name', 'LIKE', '%' . $request->search . '%');
+            $query->where('name', 'LIKE', '%'.$request->search.'%');
         }
 
+        if ($request->filled('service_group_id') && $request->service_group_id != 'all') {
+            $query->where('service_group_id', $request->service_group_id);
+        }
 
         $services = $query->get();
-        
+
         if ($services->isEmpty()) {
             // It's better to return an empty Excel sheet with headers than a 404
             // return response()->json(['message' => 'No services found to export.'], 404);
         }
 
         try {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $isRTL = app()->getLocale() === 'ar'; // Check for RTL
             $sheet->setRightToLeft($isRTL);
@@ -528,9 +531,9 @@ class ExcelController extends Controller
                 'مجموعة الخدمة',
                 'السعر',
                 'الحالة',
-                'متغيرة السعر؟'
+                'متغيرة السعر؟',
             ];
-            
+
             $sheet->fromArray($headers, null, 'A3');
             $sheet->getStyle('A3:F3')->applyFromArray($headerStyle);
             $sheet->getRowDimension(3)->setRowHeight(18);
@@ -542,19 +545,19 @@ class ExcelController extends Controller
             $sheet->getColumnDimension('D')->setWidth(15);
             $sheet->getColumnDimension('E')->setWidth(15);
             $sheet->getColumnDimension('F')->setWidth(18);
-            
+
             // --- Data Rows ---
             $dataRowNumber = 4;
             foreach ($services as $service) {
-                $sheet->setCellValue('A' . $dataRowNumber, $service->id);
-                $sheet->setCellValue('B' . $dataRowNumber, $service->name);
-                $sheet->setCellValue('C' . $dataRowNumber, $service->serviceGroup?->name ?? 'N/A');
-                $sheet->setCellValue('D' . $dataRowNumber, (float)$service->price);
-                $sheet->setCellValue('E' . $dataRowNumber, $service->activate ? 'نشطة' : 'غير نشطة');
-                $sheet->setCellValue('F' . $dataRowNumber, $service->variable ? 'نعم' : 'لا');
+                $sheet->setCellValue('A'.$dataRowNumber, $service->id);
+                $sheet->setCellValue('B'.$dataRowNumber, $service->name);
+                $sheet->setCellValue('C'.$dataRowNumber, $service->serviceGroup?->name ?? 'N/A');
+                $sheet->setCellValue('D'.$dataRowNumber, (float) $service->price);
+                $sheet->setCellValue('E'.$dataRowNumber, $service->activate ? 'نشطة' : 'غير نشطة');
+                $sheet->setCellValue('F'.$dataRowNumber, $service->variable ? 'نعم' : 'لا');
                 $dataRowNumber++;
             }
-            
+
             // Apply styles to data rows
             $lastDataRow = $dataRowNumber - 1;
             if ($lastDataRow >= 4) {
@@ -565,7 +568,7 @@ class ExcelController extends Controller
             }
 
             $writer = new Xlsx($spreadsheet);
-            $fileName = 'Services_List_' . date('Y-m-d') . '.xlsx';
+            $fileName = 'Services_List_'.date('Y-m-d').'.xlsx';
 
             // Clear any output buffers
             if (ob_get_level()) {
@@ -587,14 +590,16 @@ class ExcelController extends Controller
                 }
             }, $fileName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Services List Excel Export Error: " . $e->getMessage());
+            Log::error('Services List Excel Export Error: '.$e->getMessage());
+
             return response()->json(['message' => 'An error occurred while generating the Excel file.'], 500);
         }
     }
+
     /**
      * Export doctor shifts report to Excel.
      */
@@ -603,10 +608,11 @@ class ExcelController extends Controller
         // if (!Auth::user()->can('print doctor_shift_reports')) { /* ... */ }
 
         try {
-            $doctorShiftsReport = new \App\Services\Excel\DoctorShiftsReport();
+            $doctorShiftsReport = new \App\Services\Excel\DoctorShiftsReport;
             $excelContent = $doctorShiftsReport->generate($request);
-            
-            $excelFileName = 'Doctor_Shifts_Report_' . date('Ymd_His') . '.xlsx';
+
+            $excelFileName = 'Doctor_Shifts_Report_'.date('Ymd_His').'.xlsx';
+
             return response($excelContent, 200)
                 ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                 ->header('Content-Disposition', "attachment; filename=\"{$excelFileName}\"");
@@ -623,12 +629,13 @@ class ExcelController extends Controller
         // if (!Auth::user()->can('print specialist_shift_reports')) { /* ... */ }
 
         try {
-            $specialistShiftsReport = new \App\Services\Excel\SpecialistShiftsReport();
+            $specialistShiftsReport = new \App\Services\Excel\SpecialistShiftsReport;
             $includeBreakdown = $request->get('include_breakdown', 'true') === 'true';
             $excelContent = $specialistShiftsReport->generate($request, $includeBreakdown);
-            
+
             $fileNameSuffix = $includeBreakdown ? 'With_Breakdown' : 'Summary_Only';
-            $excelFileName = 'Specialist_Shifts_Report_' . $fileNameSuffix . '_' . date('Ymd_His') . '.xlsx';
+            $excelFileName = 'Specialist_Shifts_Report_'.$fileNameSuffix.'_'.date('Ymd_His').'.xlsx';
+
             return response($excelContent, 200)
                 ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                 ->header('Content-Disposition', "attachment; filename=\"{$excelFileName}\"");
@@ -691,13 +698,13 @@ class ExcelController extends Controller
             }
         }
         if ($request->filled('search_description')) {
-            $query->where('description', 'LIKE', '%' . $request->search_description . '%');
+            $query->where('description', 'LIKE', '%'.$request->search_description.'%');
         }
 
         $sortBy = $request->input('sort_by', 'created_at');
         $sortDirection = $request->input('sort_direction', 'desc');
         if ($sortBy === 'total_cost') {
-            $query->orderByRaw('(amount + amount_bankak) ' . $sortDirection);
+            $query->orderByRaw('(amount + amount_bankak) '.$sortDirection);
         } else {
             $query->orderBy($sortBy, $sortDirection);
         }
@@ -710,10 +717,10 @@ class ExcelController extends Controller
         // Calculate Summary Totals
         $totalCashPaid = $costs->sum('amount');
         $totalBankPaid = $costs->sum('amount_bankak');
-        $grandTotalPaid = $costs->sum(fn($cost) => $cost->amount + $cost->amount_bankak);
+        $grandTotalPaid = $costs->sum(fn ($cost) => $cost->amount + $cost->amount_bankak);
 
         try {
-            $spreadsheet = new Spreadsheet();
+            $spreadsheet = new Spreadsheet;
             $sheet = $spreadsheet->getActiveSheet();
             $isRTL = app()->getLocale() === 'ar';
             $sheet->setRightToLeft($isRTL);
@@ -761,9 +768,9 @@ class ExcelController extends Controller
                 'طريقة الدفع',
                 'نقداً',
                 'بنك/شبكة',
-                'الإجمالي'
+                'الإجمالي',
             ];
-            
+
             $sheet->fromArray($headers, null, 'A5');
             $sheet->getStyle('A5:H5')->applyFromArray($headerStyle);
             $sheet->getRowDimension(5)->setRowHeight(18);
@@ -791,14 +798,14 @@ class ExcelController extends Controller
                     $paymentMethodDisplay = 'بنك';
                 }
 
-                $sheet->setCellValue('A' . $dataRowNumber, Carbon::parse($cost->created_at)->format('Y-m-d H:i'));
-                $sheet->setCellValue('B' . $dataRowNumber, $cost->description);
-                $sheet->setCellValue('C' . $dataRowNumber, $cost->costCategory?->name ?? '-');
-                $sheet->setCellValue('D' . $dataRowNumber, $cost->userCost?->name ?? '-');
-                $sheet->setCellValue('E' . $dataRowNumber, $paymentMethodDisplay);
-                $sheet->setCellValue('F' . $dataRowNumber, (float)$cost->amount);
-                $sheet->setCellValue('G' . $dataRowNumber, (float)$cost->amount_bankak);
-                $sheet->setCellValue('H' . $dataRowNumber, (float)$totalCostForRow);
+                $sheet->setCellValue('A'.$dataRowNumber, Carbon::parse($cost->created_at)->format('Y-m-d H:i'));
+                $sheet->setCellValue('B'.$dataRowNumber, $cost->description);
+                $sheet->setCellValue('C'.$dataRowNumber, $cost->costCategory?->name ?? '-');
+                $sheet->setCellValue('D'.$dataRowNumber, $cost->userCost?->name ?? '-');
+                $sheet->setCellValue('E'.$dataRowNumber, $paymentMethodDisplay);
+                $sheet->setCellValue('F'.$dataRowNumber, (float) $cost->amount);
+                $sheet->setCellValue('G'.$dataRowNumber, (float) $cost->amount_bankak);
+                $sheet->setCellValue('H'.$dataRowNumber, (float) $totalCostForRow);
                 $dataRowNumber++;
             }
 
@@ -806,27 +813,27 @@ class ExcelController extends Controller
             $lastDataRow = $dataRowNumber - 1;
             if ($lastDataRow >= 6) {
                 // Number format for currency columns
-                $sheet->getStyle('F6:H' . $lastDataRow)->getNumberFormat()->setFormatCode('#,##0.00');
+                $sheet->getStyle('F6:H'.$lastDataRow)->getNumberFormat()->setFormatCode('#,##0.00');
                 // Alignment
-                $sheet->getStyle('A6:A' . $lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('B6:D' . $lastDataRow)->getAlignment()->setHorizontal($isRTL ? Alignment::HORIZONTAL_RIGHT : Alignment::HORIZONTAL_LEFT);
-                $sheet->getStyle('E6:H' . $lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('A6:A'.$lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('B6:D'.$lastDataRow)->getAlignment()->setHorizontal($isRTL ? Alignment::HORIZONTAL_RIGHT : Alignment::HORIZONTAL_LEFT);
+                $sheet->getStyle('E6:H'.$lastDataRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 // Borders
-                $sheet->getStyle('A6:H' . $lastDataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('E0E0E0'));
+                $sheet->getStyle('A6:H'.$lastDataRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('E0E0E0'));
             }
 
             // Grand Total Row
-            $sheet->setCellValue('A' . $dataRowNumber, 'الإجمالي');
-            $sheet->setCellValue('F' . $dataRowNumber, $totalCashPaid);
-            $sheet->setCellValue('G' . $dataRowNumber, $totalBankPaid);
-            $sheet->setCellValue('H' . $dataRowNumber, $grandTotalPaid);
-            $sheet->getStyle('A' . $dataRowNumber . ':H' . $dataRowNumber)->getFont()->setBold(true);
-            $sheet->getStyle('F' . $dataRowNumber . ':H' . $dataRowNumber)->getNumberFormat()->setFormatCode('#,##0.00');
-            $sheet->getStyle('A' . $dataRowNumber . ':H' . $dataRowNumber)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E0E0E0');
-            $sheet->getStyle('A' . $dataRowNumber . ':H' . $dataRowNumber)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            $sheet->setCellValue('A'.$dataRowNumber, 'الإجمالي');
+            $sheet->setCellValue('F'.$dataRowNumber, $totalCashPaid);
+            $sheet->setCellValue('G'.$dataRowNumber, $totalBankPaid);
+            $sheet->setCellValue('H'.$dataRowNumber, $grandTotalPaid);
+            $sheet->getStyle('A'.$dataRowNumber.':H'.$dataRowNumber)->getFont()->setBold(true);
+            $sheet->getStyle('F'.$dataRowNumber.':H'.$dataRowNumber)->getNumberFormat()->setFormatCode('#,##0.00');
+            $sheet->getStyle('A'.$dataRowNumber.':H'.$dataRowNumber)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E0E0E0');
+            $sheet->getStyle('A'.$dataRowNumber.':H'.$dataRowNumber)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 
             $writer = new Xlsx($spreadsheet);
-            $fileName = 'Costs_Report_' . ($request->date_from ?? 'all') . '_to_' . ($request->date_to ?? 'all') . '.xlsx';
+            $fileName = 'Costs_Report_'.($request->date_from ?? 'all').'_to_'.($request->date_to ?? 'all').'.xlsx';
 
             // Clear any output buffers
             if (ob_get_level()) {
@@ -848,11 +855,12 @@ class ExcelController extends Controller
                 }
             }, $fileName, [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Costs Report Excel Export Error: " . $e->getMessage());
+            Log::error('Costs Report Excel Export Error: '.$e->getMessage());
+
             return response()->json(['message' => 'An error occurred while generating the Excel file.'], 500);
         }
     }

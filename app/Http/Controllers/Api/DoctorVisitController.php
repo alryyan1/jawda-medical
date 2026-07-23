@@ -3,17 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\DoctorVisit;
-use App\Models\Patient;
-use App\Models\Doctor;
-use App\Models\Shift;
-use Illuminate\Http\Request;
 use App\Http\Resources\DoctorVisitResource;
 use App\Http\Resources\PatientVisitSummaryResource;
+use App\Models\Doctor;
 use App\Models\DoctorShift;
-use App\Models\File;
-use Illuminate\Support\Facades\Auth;
+use App\Models\DoctorVisit;
+use App\Models\Patient;
+use App\Models\Shift;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -83,8 +82,8 @@ class DoctorVisitController extends Controller
                 'labrequests.is_paid',
             ),
         ])
-        ->select('id', 'number', 'created_at', 'patient_id', 'doctor_id', 'doctor_shift_id', 'shift_id', 'status')
-        ->latest('created_at');
+            ->select('id', 'number', 'created_at', 'patient_id', 'doctor_id', 'doctor_shift_id', 'shift_id', 'status')
+            ->latest('created_at');
 
         if ($request->filled('date_from') && $request->filled('date_to')) {
             $query->whereBetween('created_at', [
@@ -110,20 +109,17 @@ class DoctorVisitController extends Controller
         }
         if ($request->filled('search')) {
             $term = $request->search;
-            $query->whereHas('patient', fn ($q) =>
-                $q->where('name', 'LIKE', "%{$term}%")
-                  ->orWhere('phone', 'LIKE', "%{$term}%")
-                  ->orWhere('id', $term)
+            $query->whereHas('patient', fn ($q) => $q->where('name', 'LIKE', "%{$term}%")
+                ->orWhere('phone', 'LIKE', "%{$term}%")
+                ->orWhere('id', $term)
             );
         }
         if ($request->filled('service_id')) {
-            $query->whereHas('requestedServices', fn ($q) =>
-                $q->where('service_id', $request->service_id)
+            $query->whereHas('requestedServices', fn ($q) => $q->where('service_id', $request->service_id)
             );
         }
         if ($request->filled('diagnosis_user_id')) {
-            $query->whereHas('requestedServices.diagnosis', fn ($q) =>
-                $q->where('user_id', $request->diagnosis_user_id)
+            $query->whereHas('requestedServices.diagnosis', fn ($q) => $q->where('user_id', $request->diagnosis_user_id)
             );
         }
 
@@ -140,7 +136,7 @@ class DoctorVisitController extends Controller
             'doctor_id' => 'nullable|integer|exists:doctors,id',
             'company_id' => 'nullable|integer|exists:companies,id',
             'has_company' => ['nullable', function ($attribute, $value, $fail) {
-                if (!in_array($value, ['true', 'false', true, false, '1', '0', 1, 0], true)) {
+                if (! in_array($value, ['true', 'false', true, false, '1', '0', 1, 0], true)) {
                     $fail('The has company field must be true or false.');
                 }
             }],
@@ -148,7 +144,7 @@ class DoctorVisitController extends Controller
             'search' => 'nullable|string|max:255',
             'per_page' => 'nullable|integer',
         ]);
-        
+
         // Normalize has_company to boolean
         if ($request->has('has_company')) {
             $hasCompany = $request->has_company;
@@ -166,24 +162,23 @@ class DoctorVisitController extends Controller
             'doctor:id,name', // Eager load direct doctor relationship
             'createdByUser:id,name',
             'requestedServices.service', // For calculating totals
-            'patientLabRequests.mainTest' ,
+            'patientLabRequests.mainTest',
             // 'doctorShift:id,doctor_id',
             'doctorShift.doctor:id,name',
-            'patient.user:id,username,name'        // Eager load user for patient
+            'patient.user:id,username,name',        // Eager load user for patient
         ])
-        ->latest('created_at'); // Or created_at if visit_time is not reliable
+            ->latest('created_at'); // Or created_at if visit_time is not reliable
 
         if ($request->filled('date_from') && $request->filled('date_to')) {
             $query->whereBetween('created_at', [
                 Carbon::parse($request->date_from)->startOfDay(),
-                Carbon::parse($request->date_to)->endOfDay()
+                Carbon::parse($request->date_to)->endOfDay(),
             ]);
         } elseif ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         } elseif ($request->filled('date_to')) {
-             $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
-        }
-         else {
+            $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        } else {
             // Default to today if no date range is specified
             $query->whereDate('created_at', Carbon::today());
         }
@@ -216,8 +211,8 @@ class DoctorVisitController extends Controller
             $searchTerm = $request->search;
             $query->whereHas('patient', function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('id', $searchTerm);
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                    ->orWhere('id', $searchTerm);
             });
         }
         if ($request->filled('service_id')) {
@@ -236,7 +231,7 @@ class DoctorVisitController extends Controller
         // The DoctorVisitResource will need to calculate/include total_discount
         return DoctorVisitResource::collection($visits);
     }
-    
+
     public function store(Request $request)
     {
         $validatedData = $request->validate([
@@ -273,16 +268,16 @@ class DoctorVisitController extends Controller
             : 1
         );
 
-        if(isset($validatedData['shift_id'])){
+        if (isset($validatedData['shift_id'])) {
             $shift_id = $validatedData['shift_id'];
-        }else{
+        } else {
             $shift_id = Shift::open()->latest()->first()->id;
         }
         $visit = DoctorVisit::create([
             'patient_id' => $validatedData['patient_id'],
             'doctor_id' => $validatedData['doctor_id'],
             'user_id' => Auth::id(),
-            'shift_id' => $shift_id, 
+            'shift_id' => $shift_id,
             'doctor_shift_id' => $validatedData['doctor_shift_id'] ?? null,
             // 'appointment_id' => $validatedData['appointment_id'] ?? null,
             'file_id' => $validatedData['file_id'] ?? null,
@@ -308,7 +303,8 @@ class DoctorVisitController extends Controller
     {
         // Load all relevant data for displaying a single visit's details
         // $doctorVisit->load(['patient', 'doctor', 'createdByUser', 'generalShift', 'doctorShift', 'requestedServices.service.serviceGroup', 'doctorShift.doctor', 'patientLabRequests']);
-        $doctorVisit->load(['patient.subcompany', 'patient.doctor','patientLabRequests','doctor','patientLabRequests.mainTest','createdByUser']);
+        $doctorVisit->load(['patient.subcompany', 'patient.doctor', 'patientLabRequests', 'doctor', 'patientLabRequests.mainTest', 'createdByUser']);
+
         return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor']));
     }
 
@@ -329,6 +325,7 @@ class DoctorVisitController extends Controller
         ]);
 
         $doctorVisit->update($validatedData);
+
         return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor']));
     }
 
@@ -350,7 +347,6 @@ class DoctorVisitController extends Controller
         return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor']));
     }
 
-
     /**
      * Remove the specified doctor visit from storage.
      * Use with caution. Usually, visits are 'cancelled' rather than deleted.
@@ -362,20 +358,19 @@ class DoctorVisitController extends Controller
             return response()->json(['message' => 'لا يمكن حذف الزيارة لارتباطها بخدمات مطلوبة أو مدفوعات.'], 403);
         }
         $doctorVisit->delete();
+
         return response()->json(null, 204);
     }
-    
+
     /**
      * Reassign a doctor visit to a different doctor's shift.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\DoctorVisit  $doctorVisit
      * @return \App\Http\Resources\DoctorVisitResource|\Illuminate\Http\JsonResponse
      */
     public function reassignToShift(Request $request, DoctorVisit $doctorVisit)
     {
         // Authorization check: Ensure user can perform this action
-        // Example: $this->authorize('reassign', $doctorVisit); 
+        // Example: $this->authorize('reassign', $doctorVisit);
         // Or a more general 'manage clinic_workspace' permission
         // if (!Auth::user()->can('manage_visit_assignments')) { // Example permission
         //     return response()->json(['message' => 'Unauthorized to reassign visits.'], 403);
@@ -387,7 +382,7 @@ class DoctorVisitController extends Controller
 
         $targetDoctorShift = DoctorShift::with('doctor')->find($validated['target_doctor_shift_id']);
 
-        if (!$targetDoctorShift) {
+        if (! $targetDoctorShift) {
             // Should be caught by 'exists' rule, but good to double check
             return response()->json(['message' => ' المناوبة المستهدفة للطبيب غير موجودة.'], 404);
         }
@@ -396,19 +391,19 @@ class DoctorVisitController extends Controller
             return response()->json(['message' => 'الزيارة موجودة بالفعل في هذه المناوبة المحددة.'], 409); // Conflict
         }
 
-        if (!$targetDoctorShift->status) { // Target shift is not active/open
-             return response()->json(['message' => 'لا يمكن نقل الزيارة إلى مناوبة طبيب مغلقة.'], 400);
+        if (! $targetDoctorShift->status) { // Target shift is not active/open
+            return response()->json(['message' => 'لا يمكن نقل الزيارة إلى مناوبة طبيب مغلقة.'], 400);
         }
-        
+
         // Business Rule Example: Only allow reassignment if the target doctor shift's general shift is the same as the visit's current general shift
         // OR if the target doctor shift's general shift is currently open.
         $currentGeneralShiftOfVisit = $doctorVisit->generalShift;
         $targetGeneralShiftOfDoctorShift = $targetDoctorShift->generalShift;
 
-        if (!$targetGeneralShiftOfDoctorShift || $targetGeneralShiftOfDoctorShift->is_closed) {
+        if (! $targetGeneralShiftOfDoctorShift || $targetGeneralShiftOfDoctorShift->is_closed) {
             return response()->json(['message' => 'الوردية العامة للمناوبة المستهدفة مغلقة.'], 400);
         }
-        
+
         // Optional: Check if the target doctor is different and if user has permission to assign to any doctor
         // if ($doctorVisit->doctor_id !== $targetDoctorShift->doctor_id && !Auth::user()->can('reassign_visit_to_any_doctor')) {
         //     return response()->json(['message' => 'غير مصرح لك بنقل الزيارة لطبيب آخر.'], 403);
@@ -419,23 +414,22 @@ class DoctorVisitController extends Controller
             // Update the visit
             $doctorVisit->doctor_shift_id = $targetDoctorShift->id;
             $doctorVisit->doctor_id = $targetDoctorShift->doctor_id; // Assign to the doctor of the new shift
-            
+
             // Recalculate queue number for the new shift
             // Note: This simple count might lead to race conditions in a high-traffic system.
             // More robust queue numbering might involve a dedicated sequence or atomic operations.
             $newQueueNumber = DoctorVisit::where('doctor_shift_id', $targetDoctorShift->id)
-                                        ->count() + 1;
+                ->count() + 1;
             $doctorVisit->queue_number = $newQueueNumber;
             $doctorVisit->number = $newQueueNumber; // Assuming 'number' is also queue number
 
             // Optionally, reset status to 'waiting' for the new shift, or keep current status
             // If keeping current status, ensure it's valid for a new shift (e.g., not 'completed')
-            if (!in_array($doctorVisit->status, ['completed', 'cancelled', 'no_show'])) {
+            if (! in_array($doctorVisit->status, ['completed', 'cancelled', 'no_show'])) {
                 $doctorVisit->status = 'waiting';
             }
             // Or, if you always want to reset:
             // $doctorVisit->status = 'waiting';
-
 
             $doctorVisit->save();
 
@@ -448,17 +442,19 @@ class DoctorVisitController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to reassign visit ID {$doctorVisit->id} to doctor shift ID {$targetDoctorShift->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Failed to reassign visit ID {$doctorVisit->id} to doctor shift ID {$targetDoctorShift->id}: ".$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'فشل نقل الزيارة.', 'error' => 'خطأ داخلي.'], 500);
         }
     }
-      /**
-     * Create a new patient record (snapshot) and a new DoctorVisit 
+
+    /**
+     * Create a new patient record (snapshot) and a new DoctorVisit
      * assigned to a specified target DoctorShift, based on an existing patient.
      * This is typically used when a patient from one active visit needs to be
      * immediately seen by another doctor in a different active shift.
      */
-    public function  createCopiedVisitForNewShift(Request $request, Patient $sourcePatient) // $sourcePatient is the patient from the current visit
+    public function createCopiedVisitForNewShift(Request $request, Patient $sourcePatient) // $sourcePatient is the patient from the current visit
     {
         // Authorization: User needs permission to create patients and visits,
         // and potentially to assign visits to the target doctor/shift.
@@ -473,15 +469,15 @@ class DoctorVisitController extends Controller
 
         $targetDoctorShift = DoctorShift::with('doctor')->find($validatedData['target_doctor_shift_id']);
 
-        if (!$targetDoctorShift || !$targetDoctorShift->status) {
+        if (! $targetDoctorShift || ! $targetDoctorShift->status) {
             return response()->json(['message' => 'المناوبة المستهدفة للطبيب غير موجودة أو مغلقة.'], 400);
         }
 
         $currentGeneralShift = Shift::open()->latest('created_at')->first();
-        if (!$currentGeneralShift) {
+        if (! $currentGeneralShift) {
             return response()->json(['message' => 'لا توجد وردية عيادة عامة مفتوحة حالياً.'], 400);
         }
-        
+
         // Ensure the target doctor is not the same as the original visit's doctor if it's the same shift
         // Or handle cases where patient is simply being "moved" to a new queue spot under same doctor but different shift record
         // For this "copy and create new" flow, it's often for a *different* doctor.
@@ -490,13 +486,12 @@ class DoctorVisitController extends Controller
         //     return response()->json(['message' => 'لا يمكن نسخ الزيارة لنفس الطبيب في نفس المناوبة.'], 409);
         // }
 
-
         DB::beginTransaction();
         try {
             $doctorvist = DoctorVisit::whereHas('patient', function ($query) use ($sourcePatient) {
                 $query->where('id', $sourcePatient->id);
             })->latest('created_at')->first();
-            if (!$doctorvist) {
+            if (! $doctorvist) {
                 return response()->json(['message' => 'لا يوجد زيارة للمريض.'], 400);
             }
             $fileToUseId = $doctorvist->file_id;
@@ -510,7 +505,7 @@ class DoctorVisitController extends Controller
                 'doctor_id' => $targetDoctorShift->doctor_id, // Link to the new doctor
                 'visit_number' => DoctorVisit::where('shift_id', $currentGeneralShift->id)->count() + 1, // Visit number within general shift
                 'result_auth' => false, // Reset audit/result related flags
-                 // Reset any visit-specific flags that might have been on the sourcePatient snapshot
+                // Reset any visit-specific flags that might have been on the sourcePatient snapshot
                 'is_lab_paid' => false, 'lab_paid' => 0,
                 'result_is_locked' => false, 'sample_collected' => false,
                 'doctor_finish' => false,
@@ -524,7 +519,7 @@ class DoctorVisitController extends Controller
 
             // 3. Create the new DoctorVisit for this new patient snapshot and target shift
             $newQueueNumber = DoctorVisit::where('doctor_shift_id', $targetDoctorShift->id)
-                                        ->count() + 1;
+                ->count() + 1;
 
             $newDoctorVisit = $newPatientSnapshot->doctorVisit()->create([
                 'doctor_id' => $targetDoctorShift->doctor_id,
@@ -537,11 +532,11 @@ class DoctorVisitController extends Controller
                 'status' => 'waiting', // New visit starts as waiting for the new doctor
                 'reason_for_visit' => $validatedData['reason_for_visit'] ?? 'تحويل من طبيب آخر / زيارة جديدة',
                 'is_new' => true, // Considered a "new" encounter for this doctor/shift context
-                'number' => $newQueueNumber, 
+                'number' => $newQueueNumber,
                 'queue_number' => $newQueueNumber,
                 'only_lab' => false, // Assuming it's not just for lab by default
             ]);
-            
+
             // TODO (Future): Option to copy original_requested_services to the new visit's requested_services
             // if ($request->input('copy_all_original_services') && $originalVisit) {
             //    foreach($originalVisit->requestedServices as $orig_rs) {
@@ -550,14 +545,39 @@ class DoctorVisitController extends Controller
             // }
 
             DB::commit();
-            
+
             // Return the new DoctorVisit, eager loading what the frontend might need
             return new DoctorVisitResource($newDoctorVisit->load(['patient.subcompany', 'patient.doctor', 'file']));
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to create copied visit for patient {$sourcePatient->id} to doctor shift {$targetDoctorShift->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Failed to create copied visit for patient {$sourcePatient->id} to doctor shift {$targetDoctorShift->id}: ".$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'فشل إنشاء زيارة جديدة للمريض.', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    /**
+     * GET /doctor-visits/{doctorVisit}/summary-pdf
+     */
+    public function generateSummaryPdf(DoctorVisit $doctorVisit): \Illuminate\Http\Response
+    {
+        $doctorVisit->load([
+            'patient',
+            'doctor',
+            'diagnosis.user',
+            'attachments',
+            'requestedServices.service',
+            'vitals',
+            'prescriptions.items',
+        ]);
+
+        $pdfContent = (new \App\Services\Pdf\VisitSummaryPdf($doctorVisit))->generate();
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="VisitSummary.pdf"',
+            'Content-Length' => strlen($pdfContent),
+        ]);
     }
 }

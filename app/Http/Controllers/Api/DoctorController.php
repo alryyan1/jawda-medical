@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\DoctorCollection;
+use App\Http\Resources\DoctorResource;
 use App\Models\Doctor;
 use Illuminate\Http\Request;
-use App\Http\Resources\DoctorResource;
-use App\Http\Resources\DoctorCollection;
-use Illuminate\Support\Facades\Storage; // If handling image uploads
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\DB; // If handling image uploads
+use Illuminate\Support\Facades\Storage;
 
 class DoctorController extends Controller
 {
@@ -20,26 +19,26 @@ class DoctorController extends Controller
         // Apply search filter if search parameter is present
         if ($request->has('search')) {
             $searchTerm = $request->search;
-            $query->where(function($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', "%{$searchTerm}%")
-                  ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+                    ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
             });
         }
 
         // Eager load relationships for efficiency
-        $doctors = $query->with(['specialist', 'subSpecialist', 'user'])->orderBy('id', 'desc')
-                        ->paginate(15);
-                        
+        $doctors = $query->with(['specialist', 'user'])->orderBy('id', 'desc')
+            ->paginate(15);
+
         return new DoctorCollection($doctors);
     }
 
-     public function indexList()
+    public function indexList()
     {
         // Returns a simple list of doctors (id and name) for dropdowns
         // Eager load specialist to include specialist name if needed for display in dropdown
         $doctors = Doctor::with('specialist:id,name') // Only select id and name from specialist
-                         ->orderBy('name')
-                         ->get(['id', 'name', 'specialist_id', 'is_default']);
+            ->orderBy('name')
+            ->get(['id', 'name', 'specialist_id', 'is_default']);
 
         return DoctorResource::collection($doctors);
         // If DoctorResource is too heavy for just a list, you could return directly:
@@ -50,16 +49,17 @@ class DoctorController extends Controller
         //     ];
         // }));
     }
+
     public function allDoctors()
     {
         $doctors = Doctor::with('specialist:id,name')
-                         ->orderBy('name')
-                         ->get(['id', 'name', 'specialist_id']);
+            ->orderBy('name')
+            ->get(['id', 'name', 'specialist_id']);
 
         return response()->json([
-            'data' => $doctors->map(fn($d) => [
-                'id'              => $d->id,
-                'name'            => $d->name,
+            'data' => $doctors->map(fn ($d) => [
+                'id' => $d->id,
+                'name' => $d->name,
                 'specialist_name' => $d->specialist?->name,
             ]),
         ]);
@@ -75,7 +75,6 @@ class DoctorController extends Controller
             'static_wage' => 'required|numeric|min:0',
             'lab_percentage' => 'required|numeric|min:0|max:100',
             'specialist_id' => 'required|exists:specialists,id',
-            'sub_specialist_id' => 'nullable|exists:sub_specialists,id',
             'start' => 'required|integer',
             'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // For file upload
             'calc_insurance' => 'required|boolean',
@@ -92,9 +91,10 @@ class DoctorController extends Controller
 
         $doctor = DB::transaction(function () use ($validatedData) {
             $doc = Doctor::create($validatedData);
-            if (!empty($validatedData['is_default'])) {
+            if (! empty($validatedData['is_default'])) {
                 Doctor::where('id', '!=', $doc->id)->update(['is_default' => false]);
             }
+
             return $doc;
         });
 
@@ -104,25 +104,24 @@ class DoctorController extends Controller
         // OR create a new user:
         // User::create(['name' => $doctor->name, 'username' => ..., 'password' => ..., 'doctor_id' => $doctor->id]);
 
-        return new DoctorResource($doctor->load(['specialist', 'subSpecialist', 'user']));
+        return new DoctorResource($doctor->load(['specialist', 'user']));
     }
 
     public function show(Doctor $doctor)
     {
-        return new DoctorResource($doctor->load(['specialist', 'subSpecialist', 'user']));
+        return new DoctorResource($doctor->load(['specialist', 'user']));
     }
 
     public function update(Request $request, Doctor $doctor)
     {
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'phone' => ['sometimes','required','string'],
+            'phone' => ['sometimes', 'required', 'string'],
             'cash_percentage' => 'sometimes|required|numeric|min:0|max:100',
             'company_percentage' => 'sometimes|required|numeric|min:0|max:100',
             'static_wage' => 'sometimes|required|numeric|min:0',
             'lab_percentage' => 'sometimes|required|numeric|min:0|max:100',
             'specialist_id' => 'sometimes|required|exists:specialists,id',
-            'sub_specialist_id' => 'nullable|exists:sub_specialists,id',
             'start' => 'sometimes|required|integer',
             'image_file' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'calc_insurance' => 'sometimes|required|boolean',
@@ -142,22 +141,27 @@ class DoctorController extends Controller
 
         DB::transaction(function () use (&$doctor, $validatedData) {
             $doctor->update($validatedData);
-            if (!empty($validatedData['is_default'])) {
+            if (! empty($validatedData['is_default'])) {
                 Doctor::where('id', '!=', $doctor->id)->update(['is_default' => false]);
             }
         });
 
-        return new DoctorResource($doctor->load(['specialist', 'subSpecialist', 'user']));
+        return new DoctorResource($doctor->load(['specialist', 'user']));
     }
 
     public function destroy(Doctor $doctor)
     {
-        // Consider implications: what happens to appointments, user links, etc.?
-        // You might need to handle related records or prevent deletion if dependencies exist.
+        // Deleting a doctor cascades at the DB level (patients.doctor_id → ON DELETE CASCADE,
+        // then doctorvisits.patient_id cascades too), so block deletion when history exists.
+        if ($doctor->patients()->exists() || $doctor->doctorVisits()->exists()) {
+            return response()->json(['message' => 'لا يمكن حذف هذا الطبيب لارتباطه بمرضى أو زيارات.'], 403);
+        }
+
         if ($doctor->image) {
             Storage::disk('public')->delete($doctor->image);
         }
         $doctor->delete();
+
         return response()->json(null, 204);
     }
 }

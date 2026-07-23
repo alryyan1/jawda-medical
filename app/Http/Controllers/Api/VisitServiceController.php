@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\DoctorVisit;
-use App\Models\Service;
-use App\Models\RequestedService;
-use App\Models\Company;
-use App\Http\Resources\ServiceResource;
 use App\Http\Resources\RequestedServiceResource;
+use App\Http\Resources\ServiceResource;
+use App\Models\Company;
+use App\Models\DoctorVisit;
+use App\Models\RequestedService;
+use App\Models\Service;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,12 +33,12 @@ class VisitServiceController extends Controller
             'file' => $e->getFile(),
             'line' => $e->getLine(),
             'message' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
+            'trace' => $e->getTraceAsString(),
         ];
 
-        Log::error("VisitServiceController Error: " . $e->getMessage(), [
+        Log::error('VisitServiceController Error: '.$e->getMessage(), [
             'exception' => $e,
-            'context' => $errorContext
+            'context' => $errorContext,
         ]);
 
         return response()->json([
@@ -46,7 +46,7 @@ class VisitServiceController extends Controller
             'error' => $e->getMessage(),
             'file' => basename($e->getFile()),
             'line' => $e->getLine(),
-            'context' => $errorContext
+            'context' => $errorContext,
         ], $statusCode);
     }
 
@@ -75,7 +75,6 @@ class VisitServiceController extends Controller
             return response()->json(['message' => 'لا يمكن حذف  لأن ورديه الطبيب غير مفتوحة.'], 403);
         }
 
-
         return null;
     }
 
@@ -87,6 +86,7 @@ class VisitServiceController extends Controller
             ->with('serviceGroup')
             ->orderBy('name')
             ->get();
+
         return ServiceResource::collection($availableServices);
     }
 
@@ -100,8 +100,10 @@ class VisitServiceController extends Controller
                 'performingDoctor:id,name',
                 'doneByUser:id,name',
             ])
+            ->withSum('costs', 'amount')
             ->orderBy('created_at', 'desc')
             ->get();
+
         return RequestedServiceResource::collection($requested);
     }
 
@@ -129,8 +131,9 @@ class VisitServiceController extends Controller
         try {
             foreach ($validated['service_ids'] as $index => $serviceId) {
                 $service = Service::find($serviceId);
-                if (!$service) {
+                if (! $service) {
                     Log::warning("Service ID {$serviceId} not found during visit service request.");
+
                     continue;
                 }
                 if ($company == null) {
@@ -170,38 +173,36 @@ class VisitServiceController extends Controller
                                 $companyEnduranceAmount = $price - $companyServiceEndurance;
                             } else {
                                 // return $company;
-                                //compnay relation
+                                // compnay relation
                                 $patient->load('subCompany'); // Ensure subCompany is loaded
                                 if ($patient->companyRelation != null) {
-                                    //add log here
-                                    Log::info("Patient has a company relation.");
+                                    // add log here
+                                    Log::info('Patient has a company relation.');
                                     $companyRelation = $patient->companyRelation;
                                     $companyServiceEndurance = ($price * (float) ($companyRelation->service_endurance ?? 0)) / 100;
                                     $companyEnduranceAmount = $price - $companyServiceEndurance;
                                 } elseif ($patient->subCompany != null) {
-                                    Log::info("Patient does  have a subcompany , using subcompany default endurance.",[
+                                    Log::info('Patient does  have a subcompany , using subcompany default endurance.', [
                                         'patient' => $patient,
-                                            'subCompany' => $patient->subCompany,
+                                        'subCompany' => $patient->subCompany,
                                     ]);
-                                        $subCompany = $patient->subCompany;
-                                        $companyServiceEndurance = ($price * (float) ($subCompany->service_endurance ?? 0)) / 100; 
-                                        Log::info("Subcompany endurance calculation", [
-                                            'price' => $price,
-                                            'subCompanyServiceEndurancePercentage' => $subCompany->service_endurance,
-                                            'calculatedSubCompanyServiceEndurance' => $companyServiceEndurance,
-                                        ]);
-                                        $companyEnduranceAmount = $price - $companyServiceEndurance;
-                                }else{
-                                    Log::info("Patient does not have a company relation or subcompany, using company default endurance.",[
+                                    $subCompany = $patient->subCompany;
+                                    $companyServiceEndurance = ($price * (float) ($subCompany->service_endurance ?? 0)) / 100;
+                                    Log::info('Subcompany endurance calculation', [
+                                        'price' => $price,
+                                        'subCompanyServiceEndurancePercentage' => $subCompany->service_endurance,
+                                        'calculatedSubCompanyServiceEndurance' => $companyServiceEndurance,
+                                    ]);
+                                    $companyEnduranceAmount = $price - $companyServiceEndurance;
+                                } else {
+                                    Log::info('Patient does not have a company relation or subcompany, using company default endurance.', [
                                         'patient0' => $patient,
                                     ]);
-                                     $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
+                                    $companyServiceEndurance = ($price * (float) ($company->service_endurance ?? 0)) / 100;
                                     $companyEnduranceAmount = $price - $companyServiceEndurance;
                                 }
                             }
-                            //then use $company->service_endurance which is percentage
-
-
+                            // then use $company->service_endurance which is percentage
 
                         }
                         // }
@@ -232,6 +233,7 @@ class VisitServiceController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+
             return $this->createErrorResponse($e, 'فشل إضافة الخدمات للزيارة.', 500);
         }
 
@@ -261,6 +263,7 @@ class VisitServiceController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+
             return $this->createErrorResponse($e, 'فشل حذف الخدمة.', 500);
         }
 
@@ -271,7 +274,7 @@ class VisitServiceController extends Controller
     {
         // Find the visit this requested service belongs to for authorization or context if needed
         $visit = $requestedService->doctorVisit;
-        if (!$visit) {
+        if (! $visit) {
             return response()->json(['message' => 'Visit not found for this service request.'], 404);
         }
 
@@ -287,6 +290,7 @@ class VisitServiceController extends Controller
             'discount' => 'sometimes|numeric|min:0',
             'price' => 'sometimes|numeric|min:0',
             'endurance' => 'sometimes|numeric|min:0', // Allow updating endurance if rules permit
+            'tooth_id' => 'sometimes|nullable|integer|between:1,32',
             // Add other editable fields like 'doctor_note', 'nurse_note', 'approval'
             'approval' => 'sometimes|boolean',
             'done' => 'sometimes|boolean',
@@ -320,7 +324,6 @@ class VisitServiceController extends Controller
             }
         }
 
-
         if (\array_key_exists('done', $validated)) {
             if ($validated['done']) {
                 $validated['done_by_user_id'] = Auth::id();
@@ -332,6 +335,7 @@ class VisitServiceController extends Controller
         }
 
         $requestedService->update($validated);
+
         return new RequestedServiceResource($requestedService->load(['service.serviceGroup', 'requestingUser', 'doneByUser']));
     }
 }

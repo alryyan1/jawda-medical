@@ -1,8 +1,10 @@
 <?php
 
 // app/Http/Requests/StorePatientRequest.php
+
 namespace App\Http\Requests;
 
+use App\Models\Setting;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,27 +22,33 @@ class StorePatientRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $phone = $this->input('phone');
-        if($phone == '249') {
+        if ($phone == '249') {
             $phone = '0';
             $this->merge([
                 'phone' => $phone,
             ]);
-        }else{
-               // If the phone number exists and starts with 249, remove the first 3 characters
-        if ($phone && str_starts_with($phone, '249')) {
-            $this->merge([
-                'phone' => substr($phone, 3),
-            ]);
-        }
+        } else {
+            // If the phone number exists and starts with 249, remove the first 3 characters
+            if ($phone && str_starts_with($phone, '249')) {
+                $this->merge([
+                    'phone' => substr($phone, 3),
+                ]);
+            }
         }
 
-     
     }
+
     public function rules(): array
     {
         return [
             'name' => 'required|string|max:255',
-            'phone' => ['required', 'string', 'max:20', /* Rule::unique('patients','phone') -> consider if phone must be unique system-wide or just a warning */],
+            'phone' => [
+                Rule::requiredIf(fn () => (bool) (Setting::first()?->require_patient_phone ?? true)),
+                'nullable',
+                'string',
+                'max:20',
+                /* Rule::unique('patients','phone') -> consider if phone must be unique system-wide or just a warning */
+            ],
             'gender' => ['required', Rule::in(['male', 'female', 'other'])],
             'dob' => 'nullable|date',
             'age_year' => 'nullable|integer|min:0|max:150',

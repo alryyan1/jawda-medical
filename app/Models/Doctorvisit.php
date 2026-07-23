@@ -6,8 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property int $patient_id
  * @property int $doctor_id
@@ -37,6 +35,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read \App\Models\Patient $patient
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RequestedService> $requestedServices
  * @property-read int|null $requested_services_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit completed()
  * @method static \Database\Factories\DoctorVisitFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit newModelQuery()
@@ -65,6 +64,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereVisitTime($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit whereVisitType($value)
  * @method static \Illuminate\Database\Eloquent\Builder|DoctorVisit withDoctor()
+ *
  * @mixin \Eloquent
  */
 class DoctorVisit extends Model
@@ -153,14 +153,13 @@ class DoctorVisit extends Model
         return $this->belongsTo(File::class); // Assuming File model exists
     }
 
-
     /**
      * Get all requested services for this visit.
      */
     public function requestedServices()
     {
         // Adjust FK name if your requested_services table uses 'doctor_visit_id'
-        return $this->hasMany(RequestedService::class, 'doctorvisits_id'); 
+        return $this->hasMany(RequestedService::class, 'doctorvisits_id');
     }
 
     public function patientLabRequests()
@@ -174,11 +173,30 @@ class DoctorVisit extends Model
             'id'                // Local key on Patient
         );
     }
-    
-    
+
     public function labRequests()
     {
         return $this->hasMany(LabRequest::class, 'doctor_visit_id');
+    }
+
+    public function attachments()
+    {
+        return $this->hasMany(MedicalAttachment::class, 'doctor_visit_id');
+    }
+
+    public function diagnosis()
+    {
+        return $this->hasOne(VisitDiagnosis::class, 'doctor_visit_id');
+    }
+
+    public function prescriptions()
+    {
+        return $this->hasMany(VisitPrescription::class, 'doctor_visit_id');
+    }
+
+    public function vitals()
+    {
+        return $this->hasMany(VisitVital::class, 'doctor_visit_id');
     }
 
     // Scopes
@@ -206,16 +224,17 @@ class DoctorVisit extends Model
     {
         return $query->where('status', 'completed');
     }
+
     public function calculateVisitCredit(DoctorVisit $visit, string $paymentType): float
     {
         $credit = 0;
         $cashPercentage = $this->cash_percentage / 100;
         $companyPercentage = $this->company_percentage / 100;
         // Potentially $labPercentage = $this->lab_percentage / 100;
-    
+
         // For Requested Services
         foreach ($visit->requestedServices as $rs) {
-            $amountForCalc = (float)$rs->amount_paid; // Or net payable after endurance
+            $amountForCalc = (float) $rs->amount_paid; // Or net payable after endurance
             // If $paymentType is determined by patient, not by service payment method
             if ($paymentType === 'cash') {
                 $credit += $amountForCalc * $cashPercentage;
@@ -223,10 +242,10 @@ class DoctorVisit extends Model
                 $credit += $amountForCalc * $companyPercentage;
             }
         }
-    
+
         // For Lab Requests
         foreach ($visit->labRequests as $lr) {
-            $amountForCalc = (float)$lr->amount_paid; // Or net payable after endurance
+            $amountForCalc = (float) $lr->amount_paid; // Or net payable after endurance
             // Assuming lab requests follow the same percentage rules as services.
             // If lab has its own percentage ($this->lab_percentage), apply it here.
             if ($paymentType === 'cash') {
@@ -235,18 +254,21 @@ class DoctorVisit extends Model
                 $credit += $amountForCalc * $companyPercentage; // Or $labPercentage
             }
         }
+
         return $credit;
     }
-        public function bankak_service()
+
+    public function bankak_service()
     {
         $total = 0;
         foreach ($this->requestedServices as $service) {
-            $total+= $service->totalDepositsBank();
+            $total += $service->totalDepositsBank();
         }
+
         return $total;
     }
- 
-    public function total_paid_services(Doctor|null $doctor  = null, $user = null)
+
+    public function total_paid_services(?Doctor $doctor = null, $user = null)
     {
         $total = 0;
         //        dd($this->services);
@@ -259,35 +281,42 @@ class DoctorVisit extends Model
             // }
             // if($service->service->variable) continue;
             if ($user != null) {
-                
-               if ($service->user_deposited != $user) continue;
+
+                if ($service->user_deposited != $user) {
+                    continue;
+                }
                 $total += $service->amount_paid;
             } else {
-                
+
                 $total += $service->amount_paid;
             }
         }
+
         return $total;
     }
-    public function total_services(Doctor|null $doctor  = null, $user = null)
+
+    public function total_services(?Doctor $doctor = null, $user = null)
     {
         $total = 0;
         //        dd($this->services);
         foreach ($this->requestedServices as $service) {
 
             //            if (!$service->is_paid) continue;
-            if (!is_null($doctor)) {
+            if (! is_null($doctor)) {
                 if ($doctor->id != $service->doctor_id) {
                     continue;
                 }
             }
             if ($user != null) {
-                if ($service->user_deposited != $user) continue;
+                if ($service->user_deposited != $user) {
+                    continue;
+                }
                 $total += $service->price;
             } else {
                 $total += $service->price * $service->count;
             }
         }
+
         return $total;
     }
 
@@ -298,7 +327,7 @@ class DoctorVisit extends Model
     public function hospital_credit(): float
     {
         $grossPaid = (float) $this->total_paid_services();
-        $doctorCredit = (float) ($this->doctorShift->doctor->doctor_credit($this) ?? 0);
+        $doctorCredit = (float) ($this->doctorShift->doctor->doctor_credit($this, $this->doctorShift) ?? 0);
 
         return $grossPaid - $doctorCredit;
     }
@@ -307,6 +336,7 @@ class DoctorVisit extends Model
     {
         return $this->total_paid_services() + $this->patient->paid_lab();
     }
+
     /**
      * Calculate total amount paid for services/labs in this visit.
      */
@@ -314,20 +344,23 @@ class DoctorVisit extends Model
     {
         $totalPaid = 0;
         foreach ($this->requestedServices as $rs) {
-            $totalPaid += (float)$rs->amount_paid;
+            $totalPaid += (float) $rs->amount_paid;
         }
         foreach ($this->labRequests as $lr) {
-            $totalPaid += (float)$lr->amount_paid;
+            $totalPaid += (float) $lr->amount_paid;
         }
+
         return $totalPaid;
     }
-    //discount on services
+
+    // discount on services
     public function discountOnServices()
     {
         $totalDiscount = 0;
         foreach ($this->requestedServices as $rs) {
-            $totalDiscount += (float)$rs->discount;
+            $totalDiscount += (float) $rs->discount;
         }
+
         return $totalDiscount;
     }
 
@@ -337,33 +370,38 @@ class DoctorVisit extends Model
     public function services_concatinated(): string
     {
         return $this->requestedServices()->with('service:id,name')
-                    ->get()->pluck('service.name')->implode(', ');
+            ->get()->pluck('service.name')->implode(', ');
     }
 
- 
     public function hasCbc(): bool
     {
         if ($this->relationLoaded('sysmexResults')) {
             return $this->sysmexResults->isNotEmpty();
         }
+
         return $this->sysmexResults()->exists();
     }
+
     public function hasChemistry()
     {
         return Mindray::where('doctorvisit_id', '=', $this->id)->get()->count() > 0;
     }
+
     public function hasHormone()
     {
         return HormoneResult::where('doctorvisit_id', '=', $this->id)->exists();
     }
+
     public function getHasChemistryAttribute()
     {
         return $this->hasChemistry();
     }
+
     public function getHascbcAttribute()
     {
         return $this->hasCbc();
     }
+
     public function getHasHormoneAttribute()
     {
         return $this->hasHormone();
@@ -379,69 +417,84 @@ class DoctorVisit extends Model
             }
             $total += $service->price * $service->count;
         }
+
         return $total;
     }
-    public function total_paid_services_insurance(Doctor|null $doctor  = null, $user = null)
+
+    public function total_paid_services_insurance(?Doctor $doctor = null, $user = null)
     {
         $total = 0;
-        if (!$this->patient->company) return  0;
+        if (! $this->patient->company) {
+            return 0;
+        }
         //        dd($this->services);
         foreach ($this->requestedServices as $service) {
 
             //            if (!$service->is_paid) continue;
-            if (!is_null($doctor)) {
+            if (! is_null($doctor)) {
                 if ($doctor->id != $service->doctor_id) {
                     continue;
                 }
             }
             if ($user != null) {
-                if ($service->user_deposited != $user) continue;
+                if ($service->user_deposited != $user) {
+                    continue;
+                }
                 $total += $service->amount_paid;
             } else {
                 $total += $service->amount_paid;
             }
         }
-        return $total;
-    }
-    public function totalEnduranceWillPay(){
-        $total = 0;
-        /**@var RequestedService $rs */
-        foreach($this->requestedServices as $rs){
-            $total += $rs->endurance;
-        }
+
         return $total;
     }
 
-    public function amountRemaining(){
+    public function totalEnduranceWillPay()
+    {
+        $total = 0;
+        /** @var RequestedService $rs */
+        foreach ($this->requestedServices as $rs) {
+            $total += $rs->endurance;
+        }
+
+        return $total;
+    }
+
+    public function amountRemaining()
+    {
         $total_paid = 0;
-        /**@var RequestedService $rs */
-        foreach($this->requestedServices as $rs){
+        /** @var RequestedService $rs */
+        foreach ($this->requestedServices as $rs) {
             $total_paid += $rs->totalDeposits();
         }
-       if($this->patient->company_id){
-          return $total_paid   - $this->totalEnduranceWillPay();
-       }
-       return $this->total_services() - $total_paid - $this->discountOnServices();
+        if ($this->patient->company_id) {
+            return $total_paid - $this->totalEnduranceWillPay();
+        }
+
+        return $this->total_services() - $total_paid - $this->discountOnServices();
     }
-    public function user(){
+
+    public function user()
+    {
         return $this->belongsTo(User::class, 'user_id');
     }
-    public function scopeLoadDefaultLabReportRelations($query) {
+
+    public function scopeLoadDefaultLabReportRelations($query)
+    {
         return $query->with([
-            'patient.company', 
+            'patient.company',
             'doctor:id,name',
             'patient.labRequests' => fn ($q) => $q->where('hidden', false)->orderBy('id'),
-            'patient.labRequests.mainTest.childTests' => fn($q_ct) => $q_ct->with(['unit:id,name', 'childGroup:id,name'])->orderBy('test_order')->orderBy('id'),
+            'patient.labRequests.mainTest.childTests' => fn ($q_ct) => $q_ct->with(['unit:id,name', 'childGroup:id,name'])->orderBy('test_order')->orderBy('id'),
             'patient.labRequests.mainTest.package:package_id,package_name',
             'patient.labRequests.requestingUser:id,name',
             'patient.labRequests.results.unit:id,name',      // For result's own unit snapshot
             'patient.labRequests.results.childTest',        // For child test definition context
             'patient.labRequests.results.enteredBy:id,name', // If you have this field on RequestedResult
-            'patient.labRequests.results.authorizedBy:id,name',// If you have this field on RequestedResult
+            'patient.labRequests.results.authorizedBy:id,name', // If you have this field on RequestedResult
             'patient.labRequests.authorizedBy:id,name',     // For overall LabRequest authorization
             'patient.labRequests.requestedOrganisms',
-            'user:id,name' // User who created visit
+            'user:id,name', // User who created visit
         ]);
     }
-
 }

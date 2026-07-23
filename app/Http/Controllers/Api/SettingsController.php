@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\SettingResource;
 use App\Models\Setting;
 use Illuminate\Http\Request;
-use App\Http\Resources\SettingResource;
 use Illuminate\Support\Facades\Storage; // For handling file uploads (stamps, logo)
 
 class SettingsController extends Controller
@@ -25,7 +25,7 @@ class SettingsController extends Controller
     {
         $settings = Setting::first();
 
-        if (!$settings) {
+        if (! $settings) {
             // Optionally, create a default settings record if none exists
             $settings = Setting::create([
                 'is_header' => false,
@@ -59,6 +59,7 @@ class SettingsController extends Controller
             // For now, return empty or an error if setup is expected
             return response()->json(['message' => 'الإعدادات غير مهيأة بعد.'], 404);
         }
+
         return new SettingResource($settings);
     }
 
@@ -68,7 +69,7 @@ class SettingsController extends Controller
     public function update(Request $request)
     {
         $settings = Setting::first();
-        if (!$settings) {
+        if (! $settings) {
             // Or create if it doesn't exist: $settings = new Setting;
             return response()->json(['message' => 'الإعدادات غير مهيأة.'], 404);
         }
@@ -128,6 +129,8 @@ class SettingsController extends Controller
             'settings_enable_Sms_front' => 'sometimes|boolean',
             'prevent_backdated_entry' => 'sometimes|boolean',
             'enforce_shift_hours' => 'sometimes|boolean',
+            'require_patient_phone' => 'sometimes|boolean',
+            'show_patient_address_field' => 'sometimes|boolean',
             'whatsapp_number' => 'nullable|string|max:20',
             'firebase_upload_target' => 'sometimes|string|in:sales,hospital,both',
             'lab_to_lab_firebase_source' => 'sometimes|string|in:sales,hospital',
@@ -164,17 +167,17 @@ class SettingsController extends Controller
         foreach ($fileFields as $requestField => $dbField) {
             if ($request->hasFile($requestField)) {
                 // Delete old file if storing paths and one exists
-                if ($settings->$dbField && !str_starts_with($settings->$dbField, 'data:image')) { // Basic check if it's not base64 already
+                if ($settings->$dbField && ! str_starts_with($settings->$dbField, 'data:image')) { // Basic check if it's not base64 already
                     Storage::disk('public')->delete($settings->$dbField);
                 }
                 // Store new file and get path
                 // $path = $request->file($requestField)->store('settings_uploads', 'public');
-                // $updateData[$dbField] = $path; 
+                // $updateData[$dbField] = $path;
 
                 // OR if storing as base64 (as per your schema for logo/header/footer)
-                $updateData[$dbField] = 'data:' . $request->file($requestField)->getMimeType() . ';base64,' . base64_encode(file_get_contents($request->file($requestField)->getRealPath()));
-            } elseif ($request->input("clear_" . $dbField)) { // Add input like clear_logo_base64
-                if ($settings->$dbField && !str_starts_with($settings->$dbField, 'data:image')) {
+                $updateData[$dbField] = 'data:'.$request->file($requestField)->getMimeType().';base64,'.base64_encode(file_get_contents($request->file($requestField)->getRealPath()));
+            } elseif ($request->input('clear_'.$dbField)) { // Add input like clear_logo_base64
+                if ($settings->$dbField && ! str_starts_with($settings->$dbField, 'data:image')) {
                     Storage::disk('public')->delete($settings->$dbField);
                 }
                 $updateData[$dbField] = null;
@@ -183,10 +186,10 @@ class SettingsController extends Controller
 
         // Handle Report Header Logo Upload (if storing as base64)
         if ($request->hasFile('report_header_logo_file')) {
-            $updateData['report_header_logo_base64'] = 'data:' .
-                $request->file('report_header_logo_file')->getMimeType() . ';base64,' .
+            $updateData['report_header_logo_base64'] = 'data:'.
+                $request->file('report_header_logo_file')->getMimeType().';base64,'.
                 base64_encode(file_get_contents($request->file('report_header_logo_file')->getRealPath()));
-        } elseif ($request->input("clear_report_header_logo_base64")) { // Check for clear flag
+        } elseif ($request->input('clear_report_header_logo_base64')) { // Check for clear flag
             $updateData['report_header_logo_base64'] = null;
             // If storing path and need to delete old file:
             // if ($settings->report_header_logo_path) {

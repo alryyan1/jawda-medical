@@ -2,13 +2,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Carbon\Carbon;
 
 /**
- * 
- *
  * @property int $id
  * @property int|null $file_id
  * @property string $name
@@ -62,6 +60,7 @@ use Carbon\Carbon;
  * @property-read \App\Models\Shift $shift
  * @property-read \App\Models\Subcompany|null $subcompany
  * @property-read \App\Models\User $user
+ *
  * @method static \Database\Factories\PatientFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder|Patient newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Patient newQuery()
@@ -105,6 +104,7 @@ use Carbon\Carbon;
  * @method static \Illuminate\Database\Eloquent\Builder|Patient whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Patient whereUserId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|Patient whereVisitNumber($value)
+ *
  * @mixin \Eloquent
  */
 class Patient extends Model
@@ -268,17 +268,20 @@ class Patient extends Model
     {
         return $this->belongsTo(Company::class);
     }
-    public function total_lab_value_will_pay(){
-        $total =0;
-        foreach ($this->labrequests as $requested) {
-            if ($this->company){
-                $total+= $requested->endurance;
 
-            }else{
-                $total+= $requested->price ;
+    public function total_lab_value_will_pay()
+    {
+        $total = 0;
+        foreach ($this->labrequests as $requested) {
+            if ($this->company) {
+                $total += $requested->endurance;
+
+            } else {
+                $total += $requested->price;
 
             }
         }
+
         return $total;
     }
 
@@ -294,11 +297,12 @@ class Patient extends Model
     {
         return $this->belongsTo(Doctor::class);
     }
-    
+
     public function doctorVisit()
     {
         return $this->hasOne(DoctorVisit::class);
     }
+
     /**
      * Get the company relation associated with this patient.
      */
@@ -307,15 +311,42 @@ class Patient extends Model
         return $this->belongsTo(CompanyRelation::class);
     }
 
-
-
-
     public function labRequests()
     {
         return $this->hasMany(LabRequest::class, 'pid'); // 'pid' is the FK in labrequests table
     }
 
+    public function attachments()
+    {
+        return $this->hasMany(MedicalAttachment::class, 'patient_id');
+    }
 
+    public function vitals()
+    {
+        return $this->hasMany(VisitVital::class, 'patient_id')->orderBy('recorded_at');
+    }
+
+    /**
+     * IDs of every Patient row that shares this patient's File — the
+     * persistent identity (doctorvisits.file_id) linking a real person's
+     * separate visit records together, since each visit gets its own
+     * Patient row. Includes this patient's own id. Falls back to just this
+     * patient's id when the current visit hasn't been linked to a File yet.
+     *
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    public function siblingPatientIds(): \Illuminate\Support\Collection
+    {
+        $fileId = $this->doctorVisit?->file_id;
+
+        if (! $fileId) {
+            return collect([$this->id]);
+        }
+
+        return static::query()
+            ->whereHas('doctorVisit', fn ($query) => $query->where('file_id', $fileId))
+            ->pluck('id');
+    }
 
     // Accessors & Mutators (Examples)
 
@@ -327,16 +358,18 @@ class Patient extends Model
     {
         $parts = [];
         if (isset($this->age_year) && $this->age_year > 0) {
-            $parts[] = $this->age_year . ' Y';
+            $parts[] = $this->age_year.' Y';
         }
         if (isset($this->age_month) && $this->age_month > 0) {
-            $parts[] = $this->age_month . ' M';
+            $parts[] = $this->age_month.' M';
         }
         if (isset($this->age_day) && $this->age_day > 0) {
-            $parts[] = $this->age_day . ' D';
+            $parts[] = $this->age_day.' D';
         }
+
         return empty($parts) ? 'N/A' : implode(' / ', $parts);
     }
+
     public function paid_lab($user = null)
     {
         $total = 0;
@@ -344,73 +377,98 @@ class Patient extends Model
         foreach ($this->labrequests as $labrequest) {
 
             if ($user) {
-                if ($labrequest->user_deposited != $user) continue;
+                if ($labrequest->user_deposited != $user) {
+                    continue;
+                }
             }
-            if (!$labrequest->is_paid) continue;
+            if (! $labrequest->is_paid) {
+                continue;
+            }
 
             $total += $labrequest->amount_paid;
         }
+
         return $total;
     }
-    public function total_lab_value_unpaid(){
 
+    public function total_lab_value_unpaid()
+    {
 
         return $this->labrequests()->sum('labrequests.price');
-  
-      }
-    public function lab_bank($user = null){
+
+    }
+
+    public function lab_bank($user = null)
+    {
 
         $total = 0;
-        foreach ($this->labrequests as $labrequest){
-            if ($user){
-                if ($labrequest->user_deposited != $user) continue;
+        foreach ($this->labrequests as $labrequest) {
+            if ($user) {
+                if ($labrequest->user_deposited != $user) {
+                    continue;
+                }
 
             }
-            if ($labrequest->is_paid){
-                if ($labrequest->is_bankak == 1){
+            if ($labrequest->is_paid) {
+                if ($labrequest->is_bankak == 1) {
 
-                    $total+=$labrequest->amount_paid;
+                    $total += $labrequest->amount_paid;
                 }
 
             }
 
         }
+
         return $total;
 
     }
-    
+
     public function file()
     {
         return $this->belongsTo(File::class);
     }
-    public function total_price($user = null){
+
+    public function total_price($user = null)
+    {
         $total = 0;
         /** @var LabRequest $labrequest */
-        foreach ($this->labrequests as $labrequest){
+        foreach ($this->labrequests as $labrequest) {
 
-            if ($user){
-                if ($labrequest->user_deposited != $user) continue;
+            if ($user) {
+                if ($labrequest->user_deposited != $user) {
+                    continue;
+                }
 
             }
-            if(!$labrequest->is_paid) continue;
+            if (! $labrequest->is_paid) {
+                continue;
+            }
 
-                $total+=$labrequest->price;
+            $total += $labrequest->price;
         }
+
         return $total;
     }
-    public function tests_concatinated(){
-        return join(',',$this->labRequests->pluck('name')->all());
-     }
-     public function discountAmount($user=null){
+
+    public function tests_concatinated()
+    {
+        return implode(',', $this->labRequests->pluck('name')->all());
+    }
+
+    public function discountAmount($user = null)
+    {
         $total = 0;
-        foreach ($this->labrequests as $labrequest){
-            if ($user){
-                if ($labrequest->user_deposited != $user) continue;
+        foreach ($this->labrequests as $labrequest) {
+            if ($user) {
+                if ($labrequest->user_deposited != $user) {
+                    continue;
+                }
             }
             $amount_discounted = $labrequest->price * $labrequest->discount_per / 100;
             $total += $amount_discounted;
 
         }
+
         return $total;
 
     }
