@@ -28,9 +28,12 @@ class DoctorVisitListItemResource extends JsonResource
             'only_lab' => (bool) $this->only_lab,
             'balance_due' => $balanceDue,
             'requested_services_count' => $this->requested_services_count,
+            'has_lab_requests' => $this->relationLoaded('patientLabRequests') ? $this->patientLabRequests->isNotEmpty() : false,
+            'result_auth' => (bool) ($this->patient?->result_auth ?? false),
             'doctor_id' => $this->doctor_id,
             'doctor_shift_id' => $this->doctor_shift_id,
             'file_id' => $this->file_id,
+            'file_visits_count' => (int) ($this->file_visits_count ?? 0),
 
             // Truthy company check for card styling — full object not needed
             'company' => $this->patient?->company

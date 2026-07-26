@@ -153,6 +153,24 @@ app.post('/emit/lab-payment', verifyAuth, (req, res) => {
   return res.json({ ok: true });
 });
 
+// Emit lab-request-added — doctor sent lab tests to the lab reception queue
+app.post('/emit/lab-request-added', verifyAuth, (req, res) => {
+  const payload = req.body; // Expecting { visit, patient, labRequests }
+  console.log('lab-request-added', payload);
+  io.emit('lab-request-added', payload);
+  console.log('lab-request-added emitted');
+  return res.json({ ok: true });
+});
+
+// Emit patient-results-authenticated — lab authorized results, notify the doctor
+app.post('/emit/patient-results-authenticated', verifyAuth, (req, res) => {
+  const payload = req.body; // Expecting { visit_id, patient_id, doctor_id, patient_name, file_id }
+  console.log('patient-results-authenticated', payload);
+  io.emit('patient-results-authenticated', payload);
+  console.log('patient-results-authenticated emitted');
+  return res.json({ ok: true });
+});
+
 // Print lab thermal receipt
 app.post('/emit/print-lab-receipt', verifyAuth, async (req, res) => {
   try {
@@ -415,6 +433,20 @@ app.post('/emit/doctor-shift-closed', verifyAuth, (req, res) => {
   } catch (err) {
     console.error('Error emitting doctor-shift-closed:', err?.message || err);
     return res.status(500).json({ error: 'Failed to emit doctor-shift-closed' });
+  }
+});
+
+// Emit doctor-shift-opened
+app.post('/emit/doctor-shift-opened', verifyAuth, (req, res) => {
+  try {
+    const payload = req.body; // Expecting { doctor_shift: DoctorShift }
+    console.log('doctor-shift-opened', payload);
+    io.emit('doctor-shift-opened', payload);
+    console.log('doctor-shift-opened emitted');
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error emitting doctor-shift-opened:', err?.message || err);
+    return res.status(500).json({ error: 'Failed to emit doctor-shift-opened' });
   }
 });
 

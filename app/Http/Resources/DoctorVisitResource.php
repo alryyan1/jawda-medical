@@ -2,9 +2,9 @@
 
 namespace App\Http\Resources;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Carbon\Carbon;
 
 class DoctorVisitResource extends JsonResource
 {
@@ -15,11 +15,13 @@ class DoctorVisitResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $isCompanyPatient = !empty($this->patient?->company_id);
+        $isCompanyPatient = ! empty($this->patient?->company_id);
         $financialSummary = $this->calculateFinancialSummary($isCompanyPatient);
 
         return [
             'id' => $this->id,
+            'file_id' => $this->file_id,
+            'visit_date' => $this->visit_date?->format('Y-m-d'),
             'visit_time' => $this->visit_time,
             'visit_time_formatted' => $this->formatVisitTime(),
             'status' => $this->status,
@@ -40,6 +42,7 @@ class DoctorVisitResource extends JsonResource
                 // Inject has_cbc from the visit-level withExists so PatientResource
                 // never needs to lazy-load doctorVisit or call hasCbc() per row.
                 $this->patient->has_cbc = (bool) ($this->has_cbc ?? false);
+
                 return $this->patient;
             })),
             'patient_subcompany' => $this->whenLoaded('patient', function () {
@@ -137,7 +140,7 @@ class DoctorVisitResource extends JsonResource
                     : $calc['price'] - $calc['discount'];
 
                 // Replaces patient->paid_lab() — only count paid requests
-                if (!empty($labRequest->is_paid)) {
+                if (! empty($labRequest->is_paid)) {
                     $labPaid += $calc['amount_paid'];
                 }
             }
@@ -161,24 +164,22 @@ class DoctorVisitResource extends JsonResource
     /**
      * Calculate financial details for a service
      *
-     * @param object $service
-     * @param bool $isCompanyPatient
-     * @return array
+     * @param  object  $service
      */
     private function calculateServiceFinancials($service, bool $isCompanyPatient): array
     {
         $price = (float) ($service->price ?? 0);
         $count = (int) ($service->count ?? 1);
         $subtotal = $price * $count;
-        
+
         // Calculate discounts
         $discountPercent = (float) ($service->discount_per ?? 0);
         $discountFixed = (float) ($service->discount ?? 0);
         $totalDiscount = ($subtotal * $discountPercent / 100) + $discountFixed;
-        
+
         // Calculate endurance (company coverage)
         $endurance = $isCompanyPatient ? (float) ($service->endurance ?? 0) * $count : 0;
-        
+
         $netPayable = $subtotal - $totalDiscount - $endurance;
         $amountPaid = (float) ($service->amount_paid ?? 0);
 
@@ -193,32 +194,31 @@ class DoctorVisitResource extends JsonResource
     /**
      * Calculate financial details for a lab request
      *
-     * @param object $labRequest
-     * @param bool $isCompanyPatient
-     * @return array
+     * @param  object  $labRequest
      */
     public function calculateLabRequestFinancials($labRequest, bool $isCompanyPatient): array
     {
         $price = (float) ($labRequest->price ?? 0);
-        
+
         // Calculate discount (only percentage for lab requests)
         $discountPercent = (float) ($labRequest->discount_per ?? 0);
         $totalDiscount = $price * $discountPercent / 100;
-        
+
         // Calculate endurance (company coverage)
         $endurance = $isCompanyPatient ? (float) ($labRequest->endurance ?? 0) : 0;
-        
-        if($isCompanyPatient){
-            $netPayable =  $endurance;
-        }else{
+
+        if ($isCompanyPatient) {
+            $netPayable = $endurance;
+        } else {
             $netPayable = $price - $totalDiscount;
         }
-        $amountPaid = (float) ($labRequest->amount_paid ?? 0);  
-        if($isCompanyPatient){
+        $amountPaid = (float) ($labRequest->amount_paid ?? 0);
+        if ($isCompanyPatient) {
             $balance = $endurance - $amountPaid;
-        }else{
+        } else {
             $balance = $price - $totalDiscount - $amountPaid;
         }
+
         return [
             'price' => $price,
             'net_payable' => $netPayable,
@@ -231,12 +231,10 @@ class DoctorVisitResource extends JsonResource
 
     /**
      * Format visit time for display
-     *
-     * @return string|null
      */
     private function formatVisitTime(): ?string
     {
-        if (!$this->visit_time) {
+        if (! $this->visit_time) {
             return null;
         }
 
@@ -254,7 +252,7 @@ class DoctorVisitResource extends JsonResource
      */
     private function getRequestedServicesSummary()
     {
-        return $this->whenLoaded('requestedServices', function() {
+        return $this->whenLoaded('requestedServices', function () {
             return $this->requestedServices->map(function ($service) {
                 return [
                     'id' => $service->id,
@@ -276,8 +274,6 @@ class DoctorVisitResource extends JsonResource
      * 1. doctorShift.doctor.name (if doctorShift is loaded)
      * 2. doctor.name (direct relationship)
      * 3. patient.doctor.name (patient's assigned doctor)
-     *
-     * @return string|null
      */
     private function getDoctorName(): ?string
     {
@@ -285,17 +281,17 @@ class DoctorVisitResource extends JsonResource
         if ($this->relationLoaded('doctorShift') && $this->doctorShift?->relationLoaded('doctor')) {
             return $this->doctorShift->doctor?->name;
         }
-        
+
         // Priority 2: Direct doctor relationship
         if ($this->relationLoaded('doctor')) {
             return $this->doctor?->name;
         }
-        
+
         // Priority 3: Patient's assigned doctor
         if ($this->relationLoaded('patient') && $this->patient?->relationLoaded('doctor')) {
             return $this->patient->doctor?->name;
         }
-        
+
         return null;
     }
 }

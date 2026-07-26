@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeviceChildTestNormalRangeController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DoctorController;
+use App\Http\Controllers\Api\DoctorLabTestProfileController;
 use App\Http\Controllers\Api\DoctorServiceController;
 use App\Http\Controllers\Api\DoctorShiftController;
 use App\Http\Controllers\Api\DoctorVisitController;
@@ -252,10 +253,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Visit vitals (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/vitals', [VisitVitalController::class, 'index']);
     Route::post('/doctor-visits/{doctorVisit}/vitals', [VisitVitalController::class, 'store']);
+    Route::put('/doctor-visits/{doctorVisit}/vitals/{vital}', [VisitVitalController::class, 'update']);
     Route::get('/patients/{patient}/vitals-trend', [VisitVitalController::class, 'trend']);
 
     // Visit summary PDF (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/summary-pdf', [DoctorVisitController::class, 'generateSummaryPdf']);
+
+    // Other visits sharing the same File (Doctor Portal medical file)
+    Route::get('/doctor-visits/{doctorVisit}/same-file', [DoctorVisitController::class, 'sameFile']);
 
     // Requested Service Costs
     Route::get('/requested-services/{requestedService}/costs', [RequestedServiceCostController::class, 'indexForRequestedService']);
@@ -375,7 +380,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Removed: container barcode and print-all-samples endpoints
     Route::get('/visits/{visit}/available-lab-tests', [LabRequestController::class, 'availableTestsForVisit']);
     Route::post('/visits/{visit}/lab-requests-batch', [LabRequestController::class, 'storeBatchForVisit']);
+    Route::post('/visits/{visit}/lab-requests/notify-lab', [LabRequestController::class, 'notifyLabReception']);
     Route::post('/discount-lab-requests', [\App\Http\Controllers\DiscountLabRequestController::class, 'store']);
+
+    // Doctor-owned saved lab test profiles/panels (Doctor Portal)
+    Route::get('/doctor-lab-test-profiles', [DoctorLabTestProfileController::class, 'index']);
+    Route::post('/doctor-lab-test-profiles', [DoctorLabTestProfileController::class, 'store']);
+    Route::put('/doctor-lab-test-profiles/{profile}', [DoctorLabTestProfileController::class, 'update']);
+    Route::delete('/doctor-lab-test-profiles/{profile}', [DoctorLabTestProfileController::class, 'destroy']);
 
     Route::put('/labrequests/{labrequest}', [LabRequestController::class, 'update']);
     Route::delete('/labrequests/{labrequest}', [LabRequestController::class, 'destroy']);

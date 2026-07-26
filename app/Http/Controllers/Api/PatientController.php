@@ -460,12 +460,38 @@ class PatientController extends Controller
             }
         }
 
+        if ($doctorVisit) {
+            $this->emitPatientResultsAuthenticated($doctorVisit, $patient);
+        }
+
         $responseData = [
             'message' => 'Patient results have been successfully authenticated.',
             'data' => $queueItemResource,
         ];
 
         return response()->json($responseData);
+    }
+
+    /**
+     * Notify the doctor (via the realtime service) that this patient's lab results
+     * have just been authenticated, so the Doctor Portal can flag the visit and
+     * play a sound cue without polling.
+     */
+    private function emitPatientResultsAuthenticated(DoctorVisit $doctorVisit, Patient $patient): void
+    {
+        try {
+            HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                ->timeout(3)->connectTimeout(2)
+                ->post(config('services.realtime.url').'/emit/patient-results-authenticated', [
+                    'visit_id' => $doctorVisit->id,
+                    'patient_id' => $patient->id,
+                    'doctor_id' => $doctorVisit->doctor_id,
+                    'patient_name' => $patient->name,
+                    'file_id' => $doctorVisit->file_id,
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to emit patient-results-authenticated realtime event: '.$e->getMessage());
+        }
     }
 
     /**
@@ -666,6 +692,10 @@ class PatientController extends Controller
             } catch (\Throwable $e) {
                 Log::warning('Failed to emit lab-queue-item-updated realtime event: '.$e->getMessage());
             }
+        }
+
+        if ($patient->result_auth && $doctorVisit) {
+            $this->emitPatientResultsAuthenticated($doctorVisit, $patient);
         }
 
         return response()->json([

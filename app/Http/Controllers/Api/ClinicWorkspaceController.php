@@ -25,7 +25,21 @@ class ClinicWorkspaceController extends Controller
             'requestedServices', // needed only for balance_due calculation
             'patientLabRequests', // needed only for balance_due calculation
         ])
-            ->withCount('requestedServices');
+            ->withCount('requestedServices')
+            ->addSelect([
+                // How many visits (including this one) share this visit's File — drives
+                // the "multiple visits on this file" hint icon on the queue card. The
+                // inner query is aliased so its "file_id" doesn't collide with the
+                // outer query's own doctorvisits.file_id — without the alias both
+                // sides resolve to the same table and it self-compares (x = x),
+                // returning the row count for the whole table on every row instead
+                // of a per-file count. A null file_id never matches itself here
+                // (NULL = NULL is false in SQL), so unfiled visits come back as 0.
+                'file_visits_count' => DoctorVisit::query()
+                    ->from('doctorvisits as file_siblings')
+                    ->selectRaw('count(*)')
+                    ->whereColumn('file_siblings.file_id', 'doctorvisits.file_id'),
+            ]);
 
         // Filter by general clinic shift (if your system has overarching shifts)
         if ($request->filled('clinic_shift_id')) {

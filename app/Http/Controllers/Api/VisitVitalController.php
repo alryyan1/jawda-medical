@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreVisitVitalRequest;
+use App\Http\Requests\UpdateVisitVitalRequest;
 use App\Http\Resources\VisitVitalResource;
 use App\Models\DoctorVisit;
 use App\Models\Patient;
@@ -35,6 +36,22 @@ class VisitVitalController extends Controller
             'recorded_by_user_id' => Auth::id(),
             'recorded_at' => now(),
         ]);
+
+        return new VisitVitalResource($vital);
+    }
+
+    /**
+     * PUT /doctor-visits/{doctorVisit}/vitals/{vital}
+     *
+     * Used by the auto-save form in the doctor portal to keep amending the
+     * same reading as the doctor fills in fields one by one, instead of
+     * creating a new row per field.
+     */
+    public function update(UpdateVisitVitalRequest $request, DoctorVisit $doctorVisit, VisitVital $vital): VisitVitalResource
+    {
+        abort_if($vital->doctor_visit_id !== $doctorVisit->id, 404);
+
+        $vital->update($request->validated());
 
         return new VisitVitalResource($vital);
     }

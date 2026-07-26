@@ -363,6 +363,28 @@ class DoctorVisitController extends Controller
     }
 
     /**
+     * All visits sharing this visit's File — the persistent identity
+     * (doctorvisits.file_id) that links a real person's separate
+     * registration records together, since each visit gets its own
+     * Patient row. Falls back to just this visit when it hasn't been
+     * linked to a File yet.
+     */
+    public function sameFile(DoctorVisit $doctorVisit)
+    {
+        $visits = DoctorVisit::query()
+            ->when(
+                $doctorVisit->file_id,
+                fn ($query) => $query->where('file_id', $doctorVisit->file_id),
+                fn ($query) => $query->where('id', $doctorVisit->id)
+            )
+            ->with(['doctor:id,name', 'requestedServices.service:id,name', 'patient', 'doctor'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return DoctorVisitResource::collection($visits);
+    }
+
+    /**
      * Reassign a doctor visit to a different doctor's shift.
      *
      * @return \App\Http\Resources\DoctorVisitResource|\Illuminate\Http\JsonResponse

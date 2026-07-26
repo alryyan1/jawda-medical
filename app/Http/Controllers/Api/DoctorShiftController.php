@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\DoctorShift;
-use App\Models\Doctor;
-use App\Models\Shift; // General clinic shift
-use Illuminate\Http\Request;
 use App\Http\Resources\DoctorShiftResource;
 use App\Http\Resources\DoctorVisitResource;
+use App\Models\Doctor; // General clinic shift
+use App\Models\DoctorShift;
 use App\Models\DoctorVisit;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
+use App\Models\Shift;
 use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http as HttpClient;
 use Illuminate\Support\Facades\Log;
 
@@ -25,7 +25,7 @@ class DoctorShiftController extends Controller
     {
         $currentGeneralShift = Shift::orderBy('id', 'desc')->first();
 
-        if (!$currentGeneralShift) {
+        if (! $currentGeneralShift) {
             return response()->json(['message' => 'لا توجد وردية   لبدء .'], 400);
         }
 
@@ -58,11 +58,11 @@ class DoctorShiftController extends Controller
 
         return DoctorShiftResource::collection($activeDoctorShifts);
     }
+
     public function moneyCash(Request $request, DoctorShift $doctorShift)
     {
         return $doctorShift->doctor_credit_cash();
     }
-
 
     /**
      * Start a new shift session for a doctor.
@@ -98,7 +98,7 @@ class DoctorShiftController extends Controller
             ->first();
 
         if ($existingActiveShift) {
-            //close all other shifts
+            // close all other shifts
             DoctorShift::where('doctor_id', $validated['doctor_id'])
                 ->where('status', true)
                 ->update(['status' => false]);
@@ -113,7 +113,10 @@ class DoctorShiftController extends Controller
             'status' => true, // Mark as active
         ]);
 
-        return new DoctorShiftResource($doctorShift->load('doctor'));
+        $doctorShift->load(['doctor', 'user', 'generalShift']);
+        $this->emitDoctorShiftOpened($doctorShift);
+
+        return new DoctorShiftResource($doctorShift);
     }
 
     /**
@@ -129,16 +132,16 @@ class DoctorShiftController extends Controller
         //     return response()->json(['message' => 'لا يمكنك إغلاق وردية هذا الطبيب لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
         // }
 
-        if (!$doctorShift->status) { // If already closed
+        if (! $doctorShift->status) { // If already closed
             return response()->json(['message' => 'وردية عمل هذا الطبيب مغلقة بالفعل.'], 400);
         }
 
-        if ($doctorShift->user_id !== Auth::id() && !Auth::user()->hasRole('admin')) {
+        if ($doctorShift->user_id !== Auth::id() && ! Auth::user()->hasRole('admin')) {
             $userwhoOpenedShift = User::find($doctorShift->user_id);
             $name = $userwhoOpenedShift->name;
+
             return response()->json(['message' => "فقط الموظف  $name يمكنه إغلاق وردية هذا الطبيب."], 403);
         }
-
 
         $validated = $request->validate([
             // 'end_time' => 'nullable|date_format:Y-m-d H:i:s|after_or_equal:start_time',
@@ -151,13 +154,17 @@ class DoctorShiftController extends Controller
             // Potentially update other fields like reconciled amounts by Auth::id()
         ]);
 
-        return new DoctorShiftResource($doctorShift->load('doctor'));
+        $doctorShift->load(['doctor', 'user', 'generalShift']);
+        $this->emitDoctorShiftClosed($doctorShift);
+
+        return new DoctorShiftResource($doctorShift);
     }
 
     public function moneyInsu(Request $request, DoctorShift $doctorShift)
     {
         return $doctorShift->doctor_credit_company;
     }
+
     public function totalMoney(Request $request, DoctorShift $doctorShift)
     {
         return $doctorShift->doctor_credit_cash() + $doctorShift->doctor_credit_company + $doctorShift->doctor->static_wage;
@@ -167,7 +174,6 @@ class DoctorShiftController extends Controller
      * Display a listing of the DoctorShift resources.
      * This serves as the data source for reports like the "Doctor Shifts Report".
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      */
     // public function index(Request $request)
@@ -256,7 +262,6 @@ class DoctorShiftController extends Controller
     //         $query->orderBy('start_time', 'desc');
     //     }
 
-
     //     $perPage = $request->input('per_page', 15); // Default items per page
     //     $doctorShifts = $query->paginate($perPage);
 
@@ -265,7 +270,6 @@ class DoctorShiftController extends Controller
     /**
      * Display a listing of the DoctorShift resources for reporting.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      */
     public function index(Request $request)
@@ -286,11 +290,11 @@ class DoctorShiftController extends Controller
         ]);
 
         $query = DoctorShift::with([
-                'doctor',
-                'doctor.specialist:id,name',
-                'user:id,name,username',
-                'generalShift:id,created_at,closed_at',
-            ])
+            'doctor',
+            'doctor.specialist:id,name',
+            'user:id,name,username',
+            'generalShift:id,created_at,closed_at',
+        ])
             ->withCount('doctorVisits as patients_count');
 
         // Filtering
@@ -307,7 +311,7 @@ class DoctorShiftController extends Controller
             $query->where('user_id', $request->user_id_opened);
         }
         if ($request->has('status') && $request->status !== 'all' && $request->status !== '') {
-            $query->where('status', (bool)$request->status);
+            $query->where('status', (bool) $request->status);
         }
         if ($request->filled('date_from')) {
             $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
@@ -344,30 +348,30 @@ class DoctorShiftController extends Controller
         }
         $query->orderBy('doctor_shifts.id', 'desc');
 
-        $perPage        = $request->input('per_page', 15);
-        $doctorShifts   = $query->paginate($perPage);
+        $perPage = $request->input('per_page', 15);
+        $doctorShifts = $query->paginate($perPage);
 
         if ($request->boolean('include_financials')) {
             foreach ($doctorShifts as $shift) {
                 $shift->precomputedFinancials = [
-                    'total_paid_services'     => (float) ($shift->snap_total_paid                  ?? 0),
-                    'clinic_cash'             => (float) ($shift->snap_total_cash_revenue           ?? 0),
-                    'clinic_endurance'        => (float) ($shift->snap_total_insurance_revenue      ?? 0),
-                    'total_bank'              => (float) ($shift->snap_total_bank                   ?? 0),
-                    'doctor_credit_cash'      => (float) ($shift->snap_doctor_cash_entitlement      ?? 0),
+                    'total_paid_services' => (float) ($shift->snap_total_paid ?? 0),
+                    'clinic_cash' => (float) ($shift->snap_total_cash_revenue ?? 0),
+                    'clinic_endurance' => (float) ($shift->snap_total_insurance_revenue ?? 0),
+                    'total_bank' => (float) ($shift->snap_total_bank ?? 0),
+                    'doctor_credit_cash' => (float) ($shift->snap_doctor_cash_entitlement ?? 0),
                     'doctor_credit_insurance' => (float) ($shift->snap_doctor_insurance_entitlement ?? 0),
-                    'doctor_fixed_share'      => (float) ($shift->snap_doctor_fixed_entitlement     ?? 0),
-                    'total_doctor_share'      => (float) ($shift->snap_total_doctor_entitlement     ?? 0),
+                    'doctor_fixed_share' => (float) ($shift->snap_doctor_fixed_entitlement ?? 0),
+                    'total_doctor_share' => (float) ($shift->snap_total_doctor_entitlement ?? 0),
                 ];
             }
         }
 
         return DoctorShiftResource::collection($doctorShifts);
     }
+
     /**
      * Display the specified doctor shift.
      *
-     * @param  \App\Models\DoctorShift  $doctorShift
      * @return \App\Http\Resources\DoctorShiftResource
      */
     public function show(DoctorShift $doctorShift)
@@ -378,6 +382,7 @@ class DoctorShiftController extends Controller
         // }
 
         $doctorShift->load(['doctor', 'user', 'generalShift']);
+
         return new DoctorShiftResource($doctorShift);
     }
 
@@ -390,7 +395,7 @@ class DoctorShiftController extends Controller
 
         $doctorShift->loadMissing('doctor');
 
-        if (!$doctorShift->doctor) {
+        if (! $doctorShift->doctor) {
             return response()->json(['message' => 'Doctor details not found for this shift.'], 404);
         }
 
@@ -399,28 +404,25 @@ class DoctorShiftController extends Controller
         $doctorShift->loadMissing(['visits.requestedServices', 'visits.patient:id,company_id']);
 
         $summary = [
-            'doctor_shift_id'             => $doctorShift->id,
-            'doctor_name'                 => $doctorShift->doctor->name,
-            'start_time'                  => $doctorShift->start_time?->toIso8601String(),
-            'end_time'                    => $doctorShift->end_time?->toIso8601String(),
-            'status'                      => $doctorShift->status ? 'Open' : 'Closed',
-            'total_patients'              => $doctorShift->visits()->count(),
-            'total_cash'                  => $fin['clinic_cash'],
-            'total_bank'                  => $fin['total_bank'],
-            'doctor_fixed_share_for_shift'=> $fin['doctor_fixed_share'],
-            'doctor_cash_share_total'     => $fin['doctor_credit_cash'],
-            'total_doctor_share'          => $fin['total_doctor_share'],
-            'doctor_insurance_share_total'=> $fin['doctor_credit_insurance'],
-            'total_insurance_services'    => $doctorShift->total_services_insurance(),
-            'patients_breakdown'          => [],
+            'doctor_shift_id' => $doctorShift->id,
+            'doctor_name' => $doctorShift->doctor->name,
+            'start_time' => $doctorShift->start_time?->toIso8601String(),
+            'end_time' => $doctorShift->end_time?->toIso8601String(),
+            'status' => $doctorShift->status ? 'Open' : 'Closed',
+            'total_patients' => $doctorShift->visits()->count(),
+            'total_cash' => $fin['clinic_cash'],
+            'total_bank' => $fin['total_bank'],
+            'doctor_fixed_share_for_shift' => $fin['doctor_fixed_share'],
+            'doctor_cash_share_total' => $fin['doctor_credit_cash'],
+            'total_doctor_share' => $fin['total_doctor_share'],
+            'doctor_insurance_share_total' => $fin['doctor_credit_insurance'],
+            'total_insurance_services' => $doctorShift->total_services_insurance(),
+            'patients_breakdown' => [],
         ];
-
-
-
-
 
         return response()->json(['data' => $summary]);
     }
+
     public function getDoctorsWithShiftStatus(Request $request)
     {
         // Permission check if needed
@@ -453,17 +455,19 @@ class DoctorShiftController extends Controller
 
         $doctorsWithStatus = $doctors->map(function ($doctor) use ($openDoctorShifts) {
             $activeShift = $openDoctorShifts->get($doctor->id);
+
             return [
                 'id' => $doctor->id,
                 'name' => $doctor->name,
                 'specialist_name' => $doctor->specialist->name ?? null,
-                'is_on_shift' => !!$activeShift, // True if an active shift exists for this doctor
+                'is_on_shift' => (bool) $activeShift, // True if an active shift exists for this doctor
                 'current_doctor_shift_id' => $activeShift->id ?? null, // The ID of their current DoctorShift record
             ];
         });
 
         return response()->json($doctorsWithStatus->values());
     }
+
     // In DoctorVisitController.php or a new VisitActionController.php
     public function reassignToShift(Request $request, DoctorVisit $visit)
     {
@@ -480,12 +484,11 @@ class DoctorShiftController extends Controller
         if ($visit->doctor_shift_id == $targetDoctorShift->id) {
             return response()->json(['message' => 'الزيارة موجودة بالفعل في هذه المناوبة.'], 409);
         }
-        if (!$targetDoctorShift->status) { // Target shift not active
+        if (! $targetDoctorShift->status) { // Target shift not active
             return response()->json(['message' => 'لا يمكن نقل الزيارة إلى مناوبة مغلقة.'], 400);
         }
         // Add more rules like: can only copy to same doctor's shift unless admin.
         // if ($visit->doctor_id !== $targetDoctorShift->doctor_id && !Auth::user()->can('reassign_visit_any_doctor')) { ... }
-
 
         // Option A: Move (update existing visit)
         $visit->update([
@@ -500,11 +503,12 @@ class DoctorShiftController extends Controller
 
         return new DoctorVisitResource($visit->fresh()->load(['patient.subcompany', 'doctor']));
     }
+
     // app/Http/Controllers/Api/DoctorShiftController.php
     public function updateProofingFlags(Request $request, DoctorShift $doctorShift)
     {
         $doctorShift->update([
-            'status'   => false,
+            'status' => false,
             'end_time' => Carbon::now(),
         ]);
 
@@ -513,30 +517,56 @@ class DoctorShiftController extends Controller
             $doctorShift->loadMissing('doctor');
             $doctorShift->saveFinancialSnapshot();
         } catch (\Exception $e) {
-            Log::warning('Failed to save financial snapshot for doctor shift ' . $doctorShift->id . ': ' . $e->getMessage());
+            Log::warning('Failed to save financial snapshot for doctor shift '.$doctorShift->id.': '.$e->getMessage());
         }
 
+        $doctorShift->load(['doctor', 'user', 'generalShift']);
+        $this->emitDoctorShiftClosed($doctorShift);
+
+        return new DoctorShiftResource($doctorShift);
+    }
+
+    /**
+     * Notify the realtime server that a doctor shift was opened (started or reopened).
+     */
+    private function emitDoctorShiftOpened(DoctorShift $doctorShift): void
+    {
         try {
-            $url = config('services.realtime.url') . '/emit/doctor-shift-closed';
+            $url = config('services.realtime.url').'/emit/doctor-shift-opened';
             HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
                 ->post($url, [
-                    'doctor_shift' => (new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift'])))->resolve(),
+                    'doctor_shift' => (new DoctorShiftResource($doctorShift))->resolve(),
                 ]);
         } catch (\Exception $e) {
-            Log::warning('Failed to emit doctor-shift-closed realtime event: ' . $e->getMessage());
+            Log::warning('Failed to emit doctor-shift-opened realtime event: '.$e->getMessage());
         }
-
-        return new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift']));
     }
+
+    /**
+     * Notify the realtime server that a doctor shift was closed.
+     */
+    private function emitDoctorShiftClosed(DoctorShift $doctorShift): void
+    {
+        try {
+            $url = config('services.realtime.url').'/emit/doctor-shift-closed';
+            HttpClient::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                ->post($url, [
+                    'doctor_shift' => (new DoctorShiftResource($doctorShift))->resolve(),
+                ]);
+        } catch (\Exception $e) {
+            Log::warning('Failed to emit doctor-shift-closed realtime event: '.$e->getMessage());
+        }
+    }
+
     public function computeSnapshotBatch(Request $request)
     {
         $request->validate([
-            'ids'   => 'required|array|min:1|max:200',
+            'ids' => 'required|array|min:1|max:200',
             'ids.*' => 'integer|exists:doctor_shifts,id',
         ]);
 
         $processed = 0;
-        $errors    = [];
+        $errors = [];
 
         DoctorShift::with('doctor')->whereIn('id', $request->input('ids'))->each(function (DoctorShift $shift) use (&$processed, &$errors) {
             try {
@@ -544,7 +574,7 @@ class DoctorShiftController extends Controller
                 $processed++;
             } catch (\Exception $e) {
                 $errors[] = ['id' => $shift->id, 'error' => $e->getMessage()];
-                Log::warning("Snapshot failed for shift {$shift->id}: " . $e->getMessage());
+                Log::warning("Snapshot failed for shift {$shift->id}: ".$e->getMessage());
             }
         });
 
@@ -562,7 +592,10 @@ class DoctorShiftController extends Controller
             'end_time' => null,
         ]);
 
-        return new DoctorShiftResource($doctorShift->load(['doctor', 'user', 'generalShift']));
+        $doctorShift->load(['doctor', 'user', 'generalShift']);
+        $this->emitDoctorShiftOpened($doctorShift);
+
+        return new DoctorShiftResource($doctorShift);
     }
 
     public function adjacent(DoctorShift $doctorShift)
@@ -605,6 +638,7 @@ class DoctorShiftController extends Controller
     public function markJournal(DoctorShift $doctorShift)
     {
         $doctorShift->update(['has_journal' => true]);
+
         return response()->json(['success' => true, 'has_journal' => true]);
     }
 }

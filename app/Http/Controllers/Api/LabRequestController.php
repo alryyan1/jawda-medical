@@ -2,37 +2,35 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Events\LabPaymentUpdated;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\DoctorVisitResource;
-use App\Models\LabRequest;
-use App\Models\DoctorVisit;
-use App\Models\MainTest;
-use App\Models\Patient;
-use App\Models\Company;
-use App\Models\RequestedResult;
-use App\Models\RequestedOrganism;
-use App\Models\ChildTest;
-use App\Models\Shift;
-use Illuminate\Http\Request;
 use App\Http\Resources\LabRequestResource;
 use App\Http\Resources\MainTestStrippedResource;
 use App\Http\Resources\PatientLabQueueItemResource;
 use App\Http\Resources\RequestedResultResource;
 use App\Models\CbcBinding;
-use App\Models\Setting;
+use App\Models\ChildTest;
+use App\Models\Company;
+use App\Models\DoctorVisit;
+use App\Models\LabRequest;
+use App\Models\MainTest;
+use App\Models\Patient;
+use App\Models\RequestedOrganism;
+use App\Models\RequestedResult;
+use App\Models\Shift;
 use App\Models\SysmexResult;
 use App\Services\Pdf\MyCustomTCPDF;
+use Carbon\Carbon;
 // If you create a specific resource for MainTestWithChildrenResults:
-// use App\Http\Resources\MainTestWithChildrenResultsResource; 
+// use App\Http\Resources\MainTestWithChildrenResultsResource;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Log; // For logging errors
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema; // For logging errors
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class LabRequestController extends Controller
 {
@@ -46,8 +44,9 @@ class LabRequestController extends Controller
         // $this->middleware('can:delete users')->only('destroy');
         // 'assign roles' permission is typically checked within store/update methods if request has roles
     }
+
     // Example in LabRequestController or VisitServiceController
-// app/Http/Controllers/Api/LabRequestController.php
+    // app/Http/Controllers/Api/LabRequestController.php
     public function clearPendingRequests(Request $request, DoctorVisit $visit)
     {
         // $this->authorize('cancel_multiple_lab_requests', $visit); // Permission
@@ -57,6 +56,7 @@ class LabRequestController extends Controller
             // Invalidate relevant caches or trigger events if needed
             return response()->json(['message' => "تم إلغاء {$count} طلب فحص  بنجاح.", 'deleted_count' => $count]);
         }
+
         return response()->json(['message' => 'لا توجد طلبات فحص  قابلة للإلغاء لهذه الزيارة.', 'deleted_count' => 0]);
     }
 
@@ -74,11 +74,10 @@ class LabRequestController extends Controller
     //         'per_page' => 'nullable|integer|min:5|max:100',
     //     ]);
 
-
     //     $query = DoctorVisit::query()
-    //         ->select('doctorvisits.id as visit_id', 
+    //         ->select('doctorvisits.id as visit_id',
     //                  'doctorvisits.created_at as visit_creation_time',
-    //                  'patients.id as patient_id', 
+    //                  'patients.id as patient_id',
     //                  'patients.name as patient_name'
     //         )
     //         ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
@@ -113,7 +112,7 @@ class LabRequestController extends Controller
 
     //     // This condition might be important to ensure only visits with truly pending tests are shown
     //     // It depends on how 'test_count' and the whereHas('labRequests'...) are defined.
-    //     // $query->having('test_count', '>', 0); 
+    //     // $query->having('test_count', '>', 0);
 
     //     $pendingVisits = $query->orderBy('doctorvisits.id','desc')->get();
     //     // return['sql' => $query->toSql(),'binds' => $query->getBindings()];
@@ -135,8 +134,8 @@ class LabRequestController extends Controller
         ]);
 
         // Determine shift_id early to use in indexed queries
-        $shiftId = $request->filled('shift_id') 
-            ? $request->shift_id 
+        $shiftId = $request->filled('shift_id')
+            ? $request->shift_id
             : Shift::max('id');
 
         // Build optimized query using direct labRequests relation (uses doctor_visit_id index)
@@ -153,21 +152,21 @@ class LabRequestController extends Controller
 
         // Apply filters using the direct labRequests relation
         if ($request->filled('main_test_id')) {
-            $query->whereHas('labRequests', fn($q) => $q->where('main_test_id', $request->main_test_id));
+            $query->whereHas('labRequests', fn ($q) => $q->where('main_test_id', $request->main_test_id));
         }
 
         if ($request->filled('package_id')) {
-            $query->whereHas('labRequests.mainTest', fn($q) => $q->where('pack_id', $request->package_id));
+            $query->whereHas('labRequests.mainTest', fn ($q) => $q->where('pack_id', $request->package_id));
         }
 
         if ($request->boolean('has_unfinished_results')) {
             $query->whereHas('labRequests.results', function ($q) {
-                $q->where(fn($sq) => $sq->whereNull('result')->orWhere('result', ''));
+                $q->where(fn ($sq) => $sq->whereNull('result')->orWhere('result', ''));
             });
         }
 
         if ($request->filled('company_id')) {
-            $query->whereHas('patient', fn($q) => $q->where('company_id', $request->company_id));
+            $query->whereHas('patient', fn ($q) => $q->where('company_id', $request->company_id));
         }
 
         if ($request->filled('doctor_id')) {
@@ -178,8 +177,8 @@ class LabRequestController extends Controller
         if ($request->filled('search')) {
             $searchTerm = $request->search;
             $query->where(function ($q) use ($searchTerm) {
-                $q->whereHas('patient', fn($pq) => $pq->where('name', 'LIKE', "%{$searchTerm}%"))
-                  ->orWhere('doctorvisits.id', $searchTerm);
+                $q->whereHas('patient', fn ($pq) => $pq->where('name', 'LIKE', "%{$searchTerm}%"))
+                    ->orWhere('doctorvisits.id', $searchTerm);
             });
         }
 
@@ -196,7 +195,7 @@ class LabRequestController extends Controller
             'labRequests:id,pid,doctor_visit_id,main_test_id,is_paid',
             'labRequests.results:id,lab_request_id,result',
         ]);
-        
+
         $pendingVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
 
         return PatientLabQueueItemResource::collection($pendingVisits);
@@ -219,10 +218,10 @@ class LabRequestController extends Controller
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
             ->where('doctorvisits.id', $visitId)
             ->whereHas('patientLabRequests') // Ensure the visit has lab requests
-            ->with(['patient.sampleCollectedBy:id,name','labRequests']) // Load patient with sampleCollectedBy relationship
+            ->with(['patient.sampleCollectedBy:id,name', 'labRequests']) // Load patient with sampleCollectedBy relationship
             ->first();
 
-        if (!$visit) {
+        if (! $visit) {
             return response()->json(['error' => 'Visit not found or has no lab requests'], 404);
         }
 
@@ -329,12 +328,12 @@ class LabRequestController extends Controller
         $query->withCount([
             'patientLabRequests as test_count' => function ($lrQuery) use ($request) {
                 if ($request->filled('package_id')) {
-                    $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
+                    $lrQuery->whereHas('mainTest', fn ($mt) => $mt->where('pack_id', $request->package_id));
                 }
                 if ($request->filled('main_test_id')) {
                     $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
                 }
-            }
+            },
         ]);
 
         // Get the oldest request time for this visit
@@ -445,12 +444,12 @@ class LabRequestController extends Controller
         $query->withCount([
             'patientLabRequests as test_count' => function ($lrQuery) use ($request) {
                 if ($request->filled('package_id')) {
-                    $lrQuery->whereHas('mainTest', fn($mt) => $mt->where('pack_id', $request->package_id));
+                    $lrQuery->whereHas('mainTest', fn ($mt) => $mt->where('pack_id', $request->package_id));
                 }
                 if ($request->filled('main_test_id')) {
                     $lrQuery->where('labrequests.main_test_id', $request->main_test_id);
                 }
-            }
+            },
         ]);
 
         // Get the oldest request time for this visit
@@ -509,7 +508,7 @@ class LabRequestController extends Controller
 
         if ($request->filled('doctor_id')) {
             $query->where('patients.doctor_id', $request->doctor_id);
-        }else{
+        } else {
             $query->where('patients.user_id', Auth::id());
 
         }
@@ -535,7 +534,7 @@ class LabRequestController extends Controller
             // ->withMin('patientLabRequests', 'labrequests.created_at', 'oldest_request_time') // Get time of first request
             ->with([
                 'patientLabRequests:labrequests.id,doctor_visit_id,is_paid', // Eager load for status check
-                'patient.sampleCollectedBy:id,name' // Load patient with sampleCollectedBy relationship
+                'patient.sampleCollectedBy:id,name', // Load patient with sampleCollectedBy relationship
             ]);
 
         // Log the raw SQL query
@@ -550,7 +549,6 @@ class LabRequestController extends Controller
         return PatientLabQueueItemResource::collection($pendingVisits);
     }
 
-
     /**
      * List lab requests for a specific visit. (For TestSelectionPanel)
      */
@@ -560,6 +558,7 @@ class LabRequestController extends Controller
             ->with(['mainTest:id,main_test_name,price,container_id', 'mainTest.container:id,container_name', 'requestingUser:id,name'])
             ->orderBy('created_at', 'asc') // Or by main_test.name
             ->get();
+
         return LabRequestResource::collection($labRequests);
     }
 
@@ -574,22 +573,22 @@ class LabRequestController extends Controller
 
             // Get container information
             $container = \App\Models\Container::find($containerId);
-            if (!$container) {
+            if (! $container) {
                 return response()->json(['message' => 'Container not found'], 404);
             }
 
             // Create barcode data (visit ID + container ID)
-            $barcodeData = $visit->id . '-' . $containerId;
+            $barcodeData = $visit->id.'-'.$containerId;
 
             // Generate PDF with barcode
-            $pdf = new \App\Mypdf\Pdf();
+            $pdf = new \App\Mypdf\Pdf;
             $pdf->AddPage();
             $pdf->SetFont('Arial', 'B', 16);
 
             // Add patient information
-            $pdf->Cell(0, 10, 'Patient: ' . $patient->name, 0, 1, 'C');
-            $pdf->Cell(0, 10, 'Visit ID: ' . $visit->id, 0, 1, 'C');
-            $pdf->Cell(0, 10, 'Container: ' . $container->container_name, 0, 1, 'C');
+            $pdf->Cell(0, 10, 'Patient: '.$patient->name, 0, 1, 'C');
+            $pdf->Cell(0, 10, 'Visit ID: '.$visit->id, 0, 1, 'C');
+            $pdf->Cell(0, 10, 'Container: '.$container->container_name, 0, 1, 'C');
             $pdf->Ln(10);
 
             // Add barcode
@@ -602,7 +601,7 @@ class LabRequestController extends Controller
                 'text' => true,
                 'font' => 'helvetica',
                 'fontsize' => 8,
-                'stretchtext' => 4
+                'stretchtext' => 4,
             ]);
 
             // Add barcode text
@@ -610,15 +609,16 @@ class LabRequestController extends Controller
             $pdf->SetFont('Arial', '', 10);
             $pdf->Cell(100, 10, $barcodeData, 0, 0, 'C');
 
-            $filename = 'container_barcode_' . $visit->id . '_' . $containerId . '.pdf';
+            $filename = 'container_barcode_'.$visit->id.'_'.$containerId.'.pdf';
 
             return response($pdf->Output('S'), 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="' . $filename . '"'
+                'Content-Disposition' => 'inline; filename="'.$filename.'"',
             ]);
 
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Error generating container barcode: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Error generating container barcode: '.$e->getMessage());
+
             return response()->json(['message' => 'Failed to generate barcode'], 500);
         }
     }
@@ -635,8 +635,10 @@ class LabRequestController extends Controller
             ->whereNotIn('id', $requestedTestIds)
             ->orderBy('main_test_name')
             ->get(['id', 'main_test_name', 'price']);
+
         return MainTestStrippedResource::collection($availableTests);
     }
+
     // app/Http/Controllers/Api/LabRequestController.php
     public function batchPayLabRequests(Request $request, DoctorVisit $visit)
     {
@@ -681,14 +683,13 @@ class LabRequestController extends Controller
             $paidRequestsCount = 0;
 
             foreach ($unpaidRequests as $labrequest) {
-                if ($remainingPaymentToDistribute <= 0)
+                if ($remainingPaymentToDistribute <= 0) {
                     break;
+                }
 
                 $doctorvisitResource = new DoctorVisitResource($visit);
                 $labCalculation = $doctorvisitResource->calculateLabRequestFinancials($labrequest, $visit->patient->company_id ? true : false);
                 $netPayableByPatient = $labCalculation['net_payable'];
-
-
 
                 // Create a deposit record if you have a lab_request_deposits table
                 // LabRequestDeposit::create([
@@ -705,7 +706,6 @@ class LabRequestController extends Controller
                 $labrequest->user_deposited = $userId;
                 $labrequest->is_paid = true;
 
-
                 $labrequest->save();
                 $paidRequestsCount++;
                 $remainingPaymentToDistribute -= $netPayableByPatient;
@@ -718,16 +718,16 @@ class LabRequestController extends Controller
                 'patientLabRequests.mainTest',
                 'patientLabRequests.requestingUser:id,name',
                 'patientLabRequests.depositUser:id,name',
-                'patient.doctor'
+                'patient.doctor',
             ]));
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Batch lab request payment failed for Visit ID {$visit->id}: " . $e->getMessage());
+            Log::error("Batch lab request payment failed for Visit ID {$visit->id}: ".$e->getMessage());
+
             return response()->json(['message' => 'فشل تسجيل الدفعة المجمعة.', 'error' => 'خطأ داخلي.', 'error_details' => $e->getMessage()], 500);
         }
     }
-
 
     /**
      * Reset all child test results for a given LabRequest to their default values.
@@ -741,7 +741,6 @@ class LabRequestController extends Controller
         // if ($labrequest->approve && !Auth::user()->can('edit_authorized_lab_results')) {
         //    return response()->json(['message' => 'Cannot reset results for an authorized request without specific permission.'], 403);
         // }
-
 
         DB::beginTransaction();
         try {
@@ -772,7 +771,7 @@ class LabRequestController extends Controller
             if ($updatedResultsCount > 0 || $labrequest->results()->doesntExist()) { // If any result changed or no results (all were blank)
                 // If all results are now effectively empty (matching their defval, which might be empty)
                 $allChildTestsCount = $labrequest->mainTest->childTests()->count();
-                $nonEmptyResultsCount = $labrequest->results()->where(fn($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
+                $nonEmptyResultsCount = $labrequest->results()->where(fn ($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
 
                 if ($nonEmptyResultsCount === 0) {
                     $labrequest->result_status = 'pending_entry';
@@ -804,10 +803,12 @@ class LabRequestController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Error resetting results to default for LabRequest ID {$labrequest->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Error resetting results to default for LabRequest ID {$labrequest->id}: ".$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'Failed to reset results to default values.', 'error' => $e->getMessage()], 500);
         }
     }
+
     // Store multiple lab requests for a visit
     public function storeBatchForVisit(Request $request, DoctorVisit $visit)
     {
@@ -822,8 +823,9 @@ class LabRequestController extends Controller
         ]);
 
         $patient = $visit->patient()->firstOrFail();
-        if ($patient->result_auth)
+        if ($patient->result_auth) {
             return response()->json(['message' => 'لا يمكن اضافه فحص بعد التحقيق.'], 400);
+        }
         $company = $patient->company_id ? Company::find($patient->company_id) : null;
 
         $createdLabRequests = []; // To hold the LabRequest models created
@@ -835,12 +837,13 @@ class LabRequestController extends Controller
                     return [(int) $key => (float) $value];
                 });
             foreach ($validated['main_test_ids'] as $mainTestId) {
-                $mainTest = MainTest::with(['childTests.unit', 'childTests.deviceNormalRanges' => fn($q) => $q->where('is_default', true)])->find($mainTestId);
-                if (!$mainTest)
+                $mainTest = MainTest::with(['childTests.unit', 'childTests.deviceNormalRanges' => fn ($q) => $q->where('is_default', true)])->find($mainTestId);
+                if (! $mainTest) {
                     continue;
+                }
 
                 $alreadyExists = $visit->patientLabRequests()->where('main_test_id', $mainTestId)->exists();
-                if ($alreadyExists && !$request->input('allow_duplicates', false)) {
+                if ($alreadyExists && ! $request->input('allow_duplicates', false)) {
                     // Handle or log duplicate, for now skipping
                     continue;
                 }
@@ -859,28 +862,29 @@ class LabRequestController extends Controller
                     $contract = $company->contractedMainTests()
                         ->where('main_tests.id', $mainTestId)
                         ->first();
-                    if (!$contract)
+                    if (! $contract) {
                         return response()->json(['message' => 'الفحص غير موجود في العقد الموقع مع الشركة.'], 400);
-                    if (!$contract->pivot->status) {
+                    }
+                    if (! $contract->pivot->status) {
                         return response()->json(['message' => 'الفحص غير مفعل في العقد الموقع مع الشركة.'], 400);
                     }
                     if ($contract && $contract->pivot->status) {
                         $price = $contract->pivot->price;
                         $approve = $contract->pivot->approve;
-                   
+
                         if ($contract->pivot->use_static) {
                             $endurance = $contract->pivot->endurance_static;
                         } else {
                             if ($contract->pivot->endurance_percentage > 0) {
                                 // return response()->json(['message' => 'العلاقة غير موجودة في الشركة.'], 400);
 
-                                //log here
-                                //log the contract
+                                // log here
+                                // log the contract
                                 $amount_company_will_endure = ($price * $contract->pivot->endurance_percentage) / 100;
                                 $endurance = $price - $amount_company_will_endure;
                             } else {
                                 $patient->load('companyRelation');
-                     
+
                                 if ($patient->companyRelation != null) {
                                     // return response()->json(['message' => $patient->companyRelation], 400);
 
@@ -898,7 +902,6 @@ class LabRequestController extends Controller
 
                                 }
                             }
-
 
                         }
                     }
@@ -937,14 +940,14 @@ class LabRequestController extends Controller
                             // Capture normal range and unit AT THE TIME OF REQUEST
                             'normal_range' => $childTest->deviceNormalRanges->firstWhere('is_default', true)?->normal_range
                                 ?? $childTest->normalRange
-                                ?? ($childTest->low !== null && $childTest->upper !== null ? $childTest->low . ' - ' . $childTest->upper : null),
+                                ?? ($childTest->low !== null && $childTest->upper !== null ? $childTest->low.' - '.$childTest->upper : null),
                             'unit_id' => $childTest->unit?->id, // From eager loaded unit
                             'created_at' => now(),
                             'updated_at' => now(),
                             // 'entered_by_user_id' => null, // Will be set upon result entry
                         ];
                     }
-                    if (!empty($requestedResultsData)) {
+                    if (! empty($requestedResultsData)) {
                         RequestedResult::insert($requestedResultsData); // Bulk insert for efficiency
                     }
                 }
@@ -955,13 +958,41 @@ class LabRequestController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+
             // Log::error("Failed to request lab tests for visit {$visit->id}: " . $e->getMessage());
             return response()->json(['message' => 'فشل طلب الفحوصات.', 'error' => $e->getMessage()], 500);
         }
 
-        $loadedLabRequests = collect($createdLabRequests)->map(fn($lr) => $lr->load(['mainTest.childTests.unit', 'requestingUser:id,name']));
+        $loadedLabRequests = collect($createdLabRequests)->map(fn ($lr) => $lr->load(['mainTest.childTests.unit', 'requestingUser:id,name']));
+
         return LabRequestResource::collection($loadedLabRequests);
     }
+
+    /**
+     * Notify the lab reception queue (via the realtime service) that this visit
+     * has lab requests ready for their attention. Fired explicitly by the doctor
+     * ("Send to Lab" button) rather than automatically on every batch add, so the
+     * doctor controls when the lab is actually alerted.
+     */
+    public function notifyLabReception(DoctorVisit $visit): \Illuminate\Http\JsonResponse
+    {
+        $visit->load(['patient', 'patientLabRequests.mainTest']);
+
+        try {
+            \Illuminate\Support\Facades\Http::withHeaders(['x-internal-token' => config('services.realtime.token')])
+                ->timeout(3)->connectTimeout(2)
+                ->post(config('services.realtime.url').'/emit/lab-request-added', [
+                    'visit' => new DoctorVisitResource($visit),
+                    'patient' => new \App\Http\Resources\PatientResource($visit->patient),
+                    'labRequests' => LabRequestResource::collection($visit->patientLabRequests),
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to emit lab-request-added realtime event: '.$e->getMessage());
+        }
+
+        return response()->json(['message' => 'تم إرسال الطلب إلى المختبر.']);
+    }
+
     /**
      * Display the specified lab request. (Generic show, can be used by getLabRequestForEntry)
      */
@@ -979,6 +1010,7 @@ class LabRequestController extends Controller
             'results.enteredBy:id,name',
             'results.authorizedBy:id,name',
         ]);
+
         return new LabRequestResource($labrequest);
     }
 
@@ -991,11 +1023,11 @@ class LabRequestController extends Controller
         $labrequest->load([
             'mainTest' => function ($query) {
                 $query->with([
-                    'childTests' => fn($q_ct) => $q_ct->orderBy('test_order')->orderBy('child_test_name'),
+                    'childTests' => fn ($q_ct) => $q_ct->orderBy('test_order')->orderBy('child_test_name'),
                     'childTests.unit:id,name',
                     'childTests.childGroup:id,name',
                     'childTests.options:id,child_test_id,name',
-                    'childTests.deviceNormalRanges.device:id,name'
+                    'childTests.deviceNormalRanges.device:id,name',
                 ]);
             },
             'results.childTest:id,child_test_name', // Needed to map existing results to child tests
@@ -1012,6 +1044,7 @@ class LabRequestController extends Controller
             'main_test_comment' => $labrequest->comment,
             'child_tests_with_results' => $labrequest->mainTest->childTests->map(function ($childTest) use ($labrequest) {
                 $existingResult = $labrequest->results->firstWhere('child_test_id', $childTest->id);
+
                 return [
                     'id' => $childTest->id, // ChildTest ID
                     'main_test_id' => $childTest->main_test_id,
@@ -1030,14 +1063,14 @@ class LabRequestController extends Controller
                     'child_group_id' => $childTest->child_group_id,
                     'child_group_name' => $childTest->childGroup->name ?? null,
                     'child_group' => $childTest->childGroup ? ['id' => $childTest->childGroup->id, 'name' => $childTest->childGroup->name] : null,
-                    'options' => $childTest->options->map(fn($opt) => ['id' => $opt->id, 'name' => $opt->name, 'child_test_id' => $opt->child_test_id])->all(),
-                    'device_normal_ranges' => $childTest->deviceNormalRanges->map(fn($dnr) => [
+                    'options' => $childTest->options->map(fn ($opt) => ['id' => $opt->id, 'name' => $opt->name, 'child_test_id' => $opt->child_test_id])->all(),
+                    'device_normal_ranges' => $childTest->deviceNormalRanges->map(fn ($dnr) => [
                         'id' => $dnr->id,
                         'device_id' => $dnr->device_id,
                         'device_name' => $dnr->device->name ?? null,
                         'normal_range' => $dnr->normal_range,
                         'is_default' => (bool) $dnr->is_default,
-                    ])->filter(fn($dnr) => $dnr['normal_range'] !== '')->values()->all(),
+                    ])->filter(fn ($dnr) => $dnr['normal_range'] !== '')->values()->all(),
                     'result_id' => $existingResult->id ?? null,
                     'result_value' => $existingResult->result ?? null,
                     'result_flags' => $existingResult->flags ?? null,
@@ -1055,9 +1088,9 @@ class LabRequestController extends Controller
                 ];
             })->all(),
         ];
+
         return response()->json(['data' => $mainTestWithChildrenResults]);
     }
-
 
     /**
      * Update a single requested result (autosave).
@@ -1078,7 +1111,7 @@ class LabRequestController extends Controller
             'result' => $result,
         ]);
 
-        return new RequestedResultResource($requestedResult->load(['childTest.unit', /* 'enteredBy' */]));
+        return new RequestedResultResource($requestedResult->load(['childTest.unit'/* 'enteredBy' */]));
     }
 
     /**
@@ -1112,7 +1145,7 @@ class LabRequestController extends Controller
 
         // Update only the normal_range field
         $requestedResult->update([
-            'normal_range' => $validated['normal_range']
+            'normal_range' => $validated['normal_range'],
         ]);
 
         return new RequestedResultResource($requestedResult->load(['childTest.unit']));
@@ -1138,7 +1171,7 @@ class LabRequestController extends Controller
             'patientLabRequests.mainTest:id,main_test_name',
             'patientLabRequests.depositUser:id,name',
             'user:id,name',
-            'doctor:id,name'
+            'doctor:id,name',
         ]);
 
         // Convert collection to array for the PDF class
@@ -1151,11 +1184,11 @@ class LabRequestController extends Controller
                 'endurance' => $lr->endurance,
                 'amount_paid' => $lr->amount_paid,
                 'main_test' => [
-                    'main_test_name' => $lr->mainTest?->main_test_name
+                    'main_test_name' => $lr->mainTest?->main_test_name,
                 ],
                 'deposit_user' => [
-                    'name' => $lr->depositUser?->name
-                ]
+                    'name' => $lr->depositUser?->name,
+                ],
             ];
         })->toArray();
 
@@ -1165,7 +1198,7 @@ class LabRequestController extends Controller
 
         // Output PDF
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $visit->patient->name);
-        $pdfFileName = 'LabReceipt_Visit_' . $visit->id . '_' . $patientNameSanitized . '.pdf';
+        $pdfFileName = 'LabReceipt_Visit_'.$visit->id.'_'.$patientNameSanitized.'.pdf';
 
         return response($pdfContent, 200)
             ->header('Content-Type', 'application/pdf')
@@ -1186,15 +1219,17 @@ class LabRequestController extends Controller
         $alignStart = $isRTL ? 'R' : 'L';
         $alignEnd = $isRTL ? 'L' : 'R';
 
-        if ($isBoldValue)
+        if ($isBoldValue) {
             $pdf->SetFont($fontName, 'B', $currentFontSizePt + 0.5);
+        }
         // Could add color logic based on valueCssClass if TCPDF supported it easily here
 
         $pdf->Cell($labelWidth, $lineHeight, $label, 0, 0, $alignStart);
         $pdf->Cell($valueWidth, $lineHeight, number_format($value, 2), 0, 1, $alignEnd);
 
-        if ($isBoldValue)
+        if ($isBoldValue) {
             $pdf->SetFont($fontName, $currentFontStyle, $currentFontSizePt);
+        }
     }
 
     /**
@@ -1243,10 +1278,12 @@ class LabRequestController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Full saveResults Error: " . $e->getMessage(), ['exception' => $e]);
+            Log::error('Full saveResults Error: '.$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'فشل حفظ النتائج.', 'error' => $e->getMessage()], 500);
         }
-        return new LabRequestResource($labrequest->fresh()->load(['mainTest.childTests.unit', 'results.childTest.unit', /* 'results.enteredBy' */]));
+
+        return new LabRequestResource($labrequest->fresh()->load(['mainTest.childTests.unit', 'results.childTest.unit'/* 'results.enteredBy' */]));
     }
 
     /**
@@ -1276,6 +1313,7 @@ class LabRequestController extends Controller
         // }
 
         $labrequest->update($validatedData);
+
         return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
     }
 
@@ -1285,7 +1323,7 @@ class LabRequestController extends Controller
     public function destroy(LabRequest $labrequest)
     {
         // ... (logic for cancellation/deletion with checks) ...
-        //start transaction
+        // start transaction
         DB::beginTransaction();
         try {
             $deleted = $labrequest->delete();
@@ -1295,9 +1333,11 @@ class LabRequestController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to delete lab request: " . $e->getMessage());
-            return response()->json(['message' => 'فشل حذف الطلب.' . $e->getMessage()], 500);
+            Log::error('Failed to delete lab request: '.$e->getMessage());
+
+            return response()->json(['message' => 'فشل حذف الطلب.'.$e->getMessage()], 500);
         }
+
         return response()->json(null, 204);
     }
 
@@ -1311,7 +1351,7 @@ class LabRequestController extends Controller
         ]);
 
         $labrequest->update([
-            'discount_per' => $validated['discount_per']
+            'discount_per' => $validated['discount_per'],
         ]);
 
         return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
@@ -1352,12 +1392,13 @@ class LabRequestController extends Controller
             return new DoctorVisitResource($visit->fresh()->load([
                 'patientLabRequests.mainTest',
                 'patientLabRequests.requestingUser:id,name',
-                'patientLabRequests.depositUser:id,name'
+                'patientLabRequests.depositUser:id,name',
             ]));
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Pay all lab requests failed for Visit ID {$visit->id}: " . $e->getMessage());
+            Log::error("Pay all lab requests failed for Visit ID {$visit->id}: ".$e->getMessage());
+
             return response()->json(['message' => 'فشل دفع جميع طلبات المختبر.', 'error' => 'خطأ داخلي.'], 500);
         }
     }
@@ -1367,7 +1408,7 @@ class LabRequestController extends Controller
      */
     public function cancelPayment(Request $request, LabRequest $labrequest)
     {
-        if (!$labrequest->is_paid) {
+        if (! $labrequest->is_paid) {
             return response()->json(['message' => 'هذا الطلب غير مدفوع.'], 400);
         }
 
@@ -1389,7 +1430,7 @@ class LabRequestController extends Controller
         ]);
 
         $labrequest->update([
-            'is_bankak' => $validated['is_bankak']
+            'is_bankak' => $validated['is_bankak'],
         ]);
 
         return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
@@ -1400,6 +1441,7 @@ class LabRequestController extends Controller
         $labrequest->is_paid = false;
         $labrequest->amount_paid = 0;
         $labrequest->save();
+
         return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser']));
     }
 
@@ -1419,7 +1461,6 @@ class LabRequestController extends Controller
 
         $validated = $request->validate([
             'is_bankak' => 'required|boolean', // Or 'is_bank' if that's your field name
-
 
             // 'payment_datetime' => 'nullable|date_format:Y-m-d H:i:s', // Optional: if payment time can be backdated
         ]);
@@ -1449,14 +1490,15 @@ class LabRequestController extends Controller
                 // $labrequest->payment_at = $request->input('payment_datetime', Carbon::now()); // If you add payment_at
                 $labrequest->save();
                 DB::commit();
+
                 return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser']));
             }
 
             if ($amountBeingPaidNow <= 0.009) { // No balance due
                 DB::rollBack(); // No actual payment to make
+
                 return response()->json(['message' => 'لا يوجد مبلغ مستحق لهذا الطلب.'], 400);
             }
-
 
             // Update LabRequest directly
             $labrequest->amount_paid = $netPayableByPatient; // Mark as fully paid up to net patient payable
@@ -1476,11 +1518,11 @@ class LabRequestController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Lab request payment failed for ID {$labrequest->id}: " . $e->getMessage());
+            Log::error("Lab request payment failed for ID {$labrequest->id}: ".$e->getMessage());
+
             return response()->json(['message' => 'فشل تسجيل الدفعة.', 'error' => 'خطأ داخلي.', 'error_message' => $e->getMessage()], 500);
         }
     }
-
 
     /**
      * Update all lab requests' is_bankak to 1 for a specific visit.
@@ -1510,12 +1552,13 @@ class LabRequestController extends Controller
             return new DoctorVisitResource($visit->fresh()->load([
                 'patientLabRequests.mainTest',
                 'patientLabRequests.requestingUser:id,name',
-                'patientLabRequests.depositUser:id,name'
+                'patientLabRequests.depositUser:id,name',
             ]));
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Update all lab requests bankak failed for Visit ID {$visit->id}: " . $e->getMessage());
+            Log::error("Update all lab requests bankak failed for Visit ID {$visit->id}: ".$e->getMessage());
+
             return response()->json(['message' => 'فشل تحديث طريقة الدفع لجميع طلبات المختبر.', 'error' => 'خطأ داخلي.', 'error_details' => $e->getMessage()], 500);
         }
     }
@@ -1529,6 +1572,7 @@ class LabRequestController extends Controller
         // ... (update LabRequest status to 'authorized') ...
         return new LabRequestResource($labrequest->load(['mainTest.childTests.unit', 'results.authorizedBy', 'requestingUser']));
     }
+
     public function populateCbcResultsFromSysmex(Request $request, LabRequest $labrequest)
     {
         $doctorvisit = Doctorvisit::find($request->get('doctor_visit_id_for_sysmex'));
@@ -1547,7 +1591,7 @@ class LabRequestController extends Controller
         foreach ($bindings as $binding) {
             $object[$binding->name_in_sysmex_table] = [
                 'child_id' => [$binding->child_id_array],
-                'result' => $sysmex[$binding->name_in_sysmex_table]
+                'result' => $sysmex[$binding->name_in_sysmex_table],
             ];
             $child_array = explode(',', $binding->child_id_array);
             foreach ($child_array as $child_id) {
@@ -1564,7 +1608,7 @@ class LabRequestController extends Controller
             'status' => true,
             'message' => 'CBC results populated successfully.',
             'data' => new LabRequestResource($labrequest), // Assuming loadDefaultRelations loads what UI needs
-            'cbcObj' => $object // Your debug object
+            'cbcObj' => $object, // Your debug object
         ]);
     }
 
@@ -1578,7 +1622,7 @@ class LabRequestController extends Controller
         ]);
 
         $labrequest->update([
-            'comment' => $validated['comment']
+            'comment' => $validated['comment'],
         ]);
 
         return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
@@ -1592,7 +1636,7 @@ class LabRequestController extends Controller
         $suggestions = \App\Models\LabCommentSuggestion::getPopularSuggestions(50);
 
         return response()->json([
-            'data' => $suggestions
+            'data' => $suggestions,
         ]);
     }
 
@@ -1610,7 +1654,7 @@ class LabRequestController extends Controller
         return response()->json([
             'message' => 'Suggestions processed successfully',
             'data' => $suggestions,
-            'count' => count($suggestions)
+            'count' => count($suggestions),
         ]);
     }
 
@@ -1624,11 +1668,12 @@ class LabRequestController extends Controller
         $result = [];
         if ($table == 'suggested_organisms') {
             $result = \App\Models\SuggestedOrganism::getSuggestions($limit);
-        } else if ($table == 'drugs') {
+        } elseif ($table == 'drugs') {
             $result = Db::table('drugs')->select('name')->get()->pluck('name')->toArray();
         }
+
         return response()->json([
-            'data' => $result
+            'data' => $result,
         ]);
     }
 
@@ -1645,7 +1690,7 @@ class LabRequestController extends Controller
 
         return response()->json([
             'message' => 'Suggestion added successfully',
-            'data' => $suggestion
+            'data' => $suggestion,
         ]);
     }
 
@@ -1683,7 +1728,7 @@ class LabRequestController extends Controller
                 \App\Models\SuggestedOrganism::addSuggestion($createData['organism']);
             } catch (\Exception $e) {
                 // Don't fail the main operation if suggestion save fails
-                \Log::warning('Failed to save organism suggestion: ' . $e->getMessage());
+                \Log::warning('Failed to save organism suggestion: '.$e->getMessage());
             }
 
             // Return the updated lab request with organisms
@@ -1694,16 +1739,17 @@ class LabRequestController extends Controller
                 'message' => 'تم إضافة الكائن الحي بنجاح',
                 'data' => [
                     'organism' => $organism,
-                    'lab_request' => new LabRequestResource($labrequest)
-                ]
+                    'lab_request' => new LabRequestResource($labrequest),
+                ],
             ]);
 
         } catch (\Exception $e) {
-            Log::error("Add organism failed for LabRequest ID {$labrequest->id}: " . $e->getMessage());
+            Log::error("Add organism failed for LabRequest ID {$labrequest->id}: ".$e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'فشل في إضافة الكائن الحي',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1718,14 +1764,15 @@ class LabRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $organisms
+                'data' => $organisms,
             ]);
         } catch (\Exception $e) {
-            Log::error("Get organisms failed for LabRequest ID {$labrequest->id}: " . $e->getMessage());
+            Log::error("Get organisms failed for LabRequest ID {$labrequest->id}: ".$e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'فشل في جلب الكائنات الحية',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1758,20 +1805,21 @@ class LabRequestController extends Controller
                 \App\Models\SuggestedOrganism::addSuggestion($organism->organism);
             } catch (\Exception $e) {
                 // Don't fail the main operation if suggestion save fails
-                \Log::warning('Failed to save organism suggestion: ' . $e->getMessage());
+                \Log::warning('Failed to save organism suggestion: '.$e->getMessage());
             }
 
             return response()->json([
                 'success' => true,
                 'message' => 'تم تحديث الكائن الحي بنجاح',
-                'data' => $organism
+                'data' => $organism,
             ]);
         } catch (\Exception $e) {
-            Log::error("Update organism failed for Organism ID {$organism->id}: " . $e->getMessage());
+            Log::error("Update organism failed for Organism ID {$organism->id}: ".$e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'فشل في تحديث الكائن الحي',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1786,14 +1834,15 @@ class LabRequestController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'تم حذف الكائن الحي بنجاح'
+                'message' => 'تم حذف الكائن الحي بنجاح',
             ]);
         } catch (\Exception $e) {
-            Log::error("Delete organism failed for Organism ID {$organism->id}: " . $e->getMessage());
+            Log::error("Delete organism failed for Organism ID {$organism->id}: ".$e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'فشل في حذف الكائن الحي',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1805,24 +1854,24 @@ class LabRequestController extends Controller
         ]);
 
         if ($labRequest->image_path) {
-            Storage::delete('public/' . $labRequest->image_path);
+            Storage::delete('public/'.$labRequest->image_path);
         }
 
-        $ext      = $request->file('image')->getClientOriginalExtension();
-        $filename = Str::uuid() . '.' . $ext;
+        $ext = $request->file('image')->getClientOriginalExtension();
+        $filename = Str::uuid().'.'.$ext;
         $request->file('image')->storeAs('public/lab-images', $filename);
 
-        $labRequest->update(['image_path' => 'lab-images/' . $filename]);
+        $labRequest->update(['image_path' => 'lab-images/'.$filename]);
 
         return response()->json([
-            'image_url' => asset('storage/lab-images/' . $filename),
+            'image_url' => asset('storage/lab-images/'.$filename),
         ]);
     }
 
     public function removeImage(LabRequest $labRequest)
     {
         if ($labRequest->image_path) {
-            Storage::delete('public/' . $labRequest->image_path);
+            Storage::delete('public/'.$labRequest->image_path);
             $labRequest->update(['image_path' => null]);
         }
 
