@@ -218,7 +218,11 @@ class LabRequestController extends Controller
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
             ->where('doctorvisits.id', $visitId)
             ->whereHas('patientLabRequests') // Ensure the visit has lab requests
-            ->with(['patient.sampleCollectedBy:id,name', 'labRequests']) // Load patient with sampleCollectedBy relationship
+            ->with([
+                'patient.sampleCollectedBy:id,name',
+                'labRequests:id,pid,doctor_visit_id,main_test_id,is_paid',
+                'labRequests.results:id,lab_request_id,result',
+            ])
             ->first();
 
         if (! $visit) {

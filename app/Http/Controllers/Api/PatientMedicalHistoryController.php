@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use App\Models\PatientMedicalHistory;
+use App\Services\Pdf\PatientMedicalHistoryPdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class PatientMedicalHistoryController extends Controller
 {
@@ -90,5 +92,24 @@ class PatientMedicalHistoryController extends Controller
         }
 
         return response()->json(['data' => $history]);
+    }
+
+    /**
+     * GET /patients/{patient}/medical-history-pdf
+     */
+    public function generatePdf(Patient $patient): Response
+    {
+        $history = PatientMedicalHistory::whereIn('patient_id', $patient->siblingPatientIds())
+            ->latest('updated_at')
+            ->first()
+            ?? PatientMedicalHistory::create(['patient_id' => $patient->id]);
+
+        $pdfContent = (new PatientMedicalHistoryPdf($patient, $history))->generate();
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="MedicalHistory.pdf"',
+            'Content-Length' => strlen($pdfContent),
+        ]);
     }
 }

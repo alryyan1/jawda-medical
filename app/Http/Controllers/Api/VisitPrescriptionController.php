@@ -9,6 +9,7 @@ use App\Http\Resources\VisitPrescriptionResource;
 use App\Models\DoctorVisit;
 use App\Models\VisitPrescription;
 use App\Services\Pdf\MyCustomTCPDF;
+use App\Services\Pdf\VisitPrescriptionsPdf;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
@@ -187,6 +188,24 @@ class VisitPrescriptionController extends Controller
         return response($pdfContent, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="Prescription.pdf"',
+            'Content-Length' => strlen($pdfContent),
+        ]);
+    }
+
+    /**
+     * GET /doctor-visits/{doctorVisit}/prescriptions-pdf
+     *
+     * Every prescription order recorded during this visit, combined into one document.
+     */
+    public function generateAllPdf(DoctorVisit $doctorVisit): Response
+    {
+        $doctorVisit->load(['patient', 'doctor', 'prescriptions.items']);
+
+        $pdfContent = (new VisitPrescriptionsPdf($doctorVisit))->generate();
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="VisitPrescriptions.pdf"',
             'Content-Length' => strlen($pdfContent),
         ]);
     }

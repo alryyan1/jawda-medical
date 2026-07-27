@@ -9,6 +9,7 @@ use App\Http\Resources\VisitVitalResource;
 use App\Models\DoctorVisit;
 use App\Models\Patient;
 use App\Models\VisitVital;
+use App\Services\Pdf\VisitVitalsPdf;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
@@ -83,5 +84,21 @@ class VisitVitalController extends Controller
             ->get();
 
         return VisitVitalResource::collection($vitals);
+    }
+
+    /**
+     * GET /doctor-visits/{doctorVisit}/vitals-pdf
+     */
+    public function generatePdf(DoctorVisit $doctorVisit): Response
+    {
+        $doctorVisit->load(['patient', 'doctor']);
+
+        $pdfContent = (new VisitVitalsPdf($doctorVisit))->generate();
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="VisitVitals.pdf"',
+            'Content-Length' => strlen($pdfContent),
+        ]);
     }
 }

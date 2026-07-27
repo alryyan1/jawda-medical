@@ -208,6 +208,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/clinic-active-patients', [ClinicWorkspaceController::class, 'getActivePatients']);
     Route::get('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'show']);
     Route::put('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'update']);
+    Route::get('/patients/{patient}/medical-history-pdf', [PatientMedicalHistoryController::class, 'generatePdf']);
 
     // Field text suggestions (per-field word autocomplete for clinical notes)
     Route::get('/field-text-suggestions/{fieldKey}', [FieldTextSuggestionController::class, 'index']);
@@ -249,6 +250,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/visit-prescriptions/{visitPrescription}', [VisitPrescriptionController::class, 'update']);
     Route::delete('/visit-prescriptions/{visitPrescription}', [VisitPrescriptionController::class, 'destroy']);
     Route::get('/visit-prescriptions/{visitPrescription}/pdf', [VisitPrescriptionController::class, 'generatePdf']);
+    Route::get('/doctor-visits/{doctorVisit}/prescriptions-pdf', [VisitPrescriptionController::class, 'generateAllPdf']);
 
     // Visit vitals (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/vitals', [VisitVitalController::class, 'index']);
@@ -256,6 +258,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/doctor-visits/{doctorVisit}/vitals/{vital}', [VisitVitalController::class, 'update']);
     Route::delete('/doctor-visits/{doctorVisit}/vitals/{vital}', [VisitVitalController::class, 'destroy']);
     Route::get('/patients/{patient}/vitals-trend', [VisitVitalController::class, 'trend']);
+    Route::get('/doctor-visits/{doctorVisit}/vitals-pdf', [VisitVitalController::class, 'generatePdf']);
 
     // Visit summary PDF (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/summary-pdf', [DoctorVisitController::class, 'generateSummaryPdf']);
