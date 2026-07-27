@@ -13,11 +13,17 @@ class ClinicVisitInvoiceA5 extends TCPDF
     protected DoctorVisit $visit;
 
     private const COLOR_TEXT = [0, 0, 0];
+
     private const COLOR_LINE = [85, 85, 85];
+
     private const COLOR_LABEL = [45, 45, 45];
+
     private const FS_SMALL = 8;
+
     private const FS_NORMAL = 10;
+
     private const FS_TITLE = 13;
+
     private const FS_SUBTITLE = 11;
 
     public function __construct(DoctorVisit $visit)
@@ -25,7 +31,7 @@ class ClinicVisitInvoiceA5 extends TCPDF
         parent::__construct('L', 'mm', 'A5', true, 'UTF-8', false, false);
 
         $this->visit = $visit->load([
-            'patient.country',
+            'patient',
             'doctor',
             'requestedServices.service',
             'createdByUser',
@@ -64,7 +70,7 @@ class ClinicVisitInvoiceA5 extends TCPDF
 
         // Visit date/time: prefer visit_date + visit_time, fallback to created_at
         $visitDateTime = $this->visit->visit_date
-            ? Carbon::parse($this->visit->visit_date->format('Y-m-d') . ' ' . ($this->visit->visit_time ?? '00:00:00'))
+            ? Carbon::parse($this->visit->visit_date->format('Y-m-d').' '.($this->visit->visit_time ?? '00:00:00'))
             : Carbon::parse($this->visit->created_at);
         $visitDateTimeStr = $visitDateTime->format('Y/m/d h:i A');
 
@@ -74,13 +80,28 @@ class ClinicVisitInvoiceA5 extends TCPDF
         $patientName = $patient->name ?? '—';
         $nationality = $patient->country?->name ?? '—';
         $contactNo = $patient->phone ?? '—';
-        $sexAndAge = ($patient->gender ?? '—') . ' & ' . ($patient->full_age ?? 'N/A');
+        $genderArabic = match ($patient->gender) {
+            'male' => 'ذكر',
+            'female' => 'أنثى',
+            default => '—',
+        };
+        $ageParts = [];
+        if (($patient->age_year ?? 0) > 0) {
+            $ageParts[] = $patient->age_year.' سنة';
+        }
+        if (($patient->age_month ?? 0) > 0) {
+            $ageParts[] = $patient->age_month.' شهر';
+        }
+        if (($patient->age_day ?? 0) > 0) {
+            $ageParts[] = $patient->age_day.' يوم';
+        }
+        $sexAndAge = $genderArabic.' - '.(empty($ageParts) ? '—' : implode(' / ', $ageParts));
         $printDateTime = Carbon::now()->format('Y/m/d h:i A');
         $printedBy = Auth::user()?->name ?? $this->visit->createdByUser?->name ?? '—';
         $hospitalName = $settings?->hospital_name ?? 'مركز ون كير التخصصي لجراحة اليوم الواحد';
 
         $clip = static fn (?string $text, int $max = 42): string => mb_strimwidth((string) ($text ?? '—'), 0, $max, '...');
-        $money = static fn (float $value): string => number_format($value, 0, '.', '');
+        $money = static fn (float $value): string => number_format($value, 0, '.', ',');
 
         $this->SetTextColor(...self::COLOR_TEXT);
         $this->SetDrawColor(...self::COLOR_LINE);
@@ -95,7 +116,7 @@ class ClinicVisitInvoiceA5 extends TCPDF
         $this->SetFont('arial', 'B', self::FS_TITLE);
         $this->Cell($contentWidth, 7, $hospitalName, 0, 1, 'C');
         $this->SetFont('arial', '', self::FS_SUBTITLE);
-        $this->Cell($contentWidth, 6, 'Invoice فاتوره', 0, 1, 'C');
+        $this->Cell($contentWidth, 6, 'فاتورة', 0, 1, 'C');
         $this->Line($lMargin, $this->GetY(), $lMargin + $contentWidth, $this->GetY());
         $this->Ln(2);
 
@@ -109,11 +130,11 @@ class ClinicVisitInvoiceA5 extends TCPDF
         $arValueW = $colWidth - $arLabelW;
 
         $leftRows = [
-            ['File No :', (string) $fileNo],
-            ['P. Name :', $patientName],
-            ['Nationality :', $nationality],
-            ['Contact No :', $contactNo],
-            ['Sex & Age :', $sexAndAge],
+            ['رقم الملف :', (string) $fileNo],
+            ['اسم المريض :', $patientName],
+            ['الجنسية :', $nationality],
+            ['رقم الهاتف :', $contactNo],
+            ['الجنس والعمر :', $sexAndAge],
         ];
         $rightRows = [
             ['كود المريض', $patientCode],
@@ -124,13 +145,13 @@ class ClinicVisitInvoiceA5 extends TCPDF
         ];
 
         for ($i = 0; $i < 5; $i++) {
-            // Left (English)
+            // Left column (Arabic)
             $this->SetFont('arial', 'B', 9);
             $this->SetTextColor(...self::COLOR_LABEL);
-            $this->Cell($engLabelW, $rowH, $leftRows[$i][0], 0, 0, 'L');
+            $this->Cell($engLabelW, $rowH, $leftRows[$i][0], 0, 0, 'R');
             $this->SetFont('arial', '', self::FS_NORMAL);
             $this->SetTextColor(...self::COLOR_TEXT);
-            $this->Cell($engValueW, $rowH, $clip((string) $leftRows[$i][1], 36), 0, 0, 'L');
+            $this->Cell($engValueW, $rowH, $clip((string) $leftRows[$i][1], 36), 0, 0, 'R');
 
             // Gap between columns
             $this->Cell($colGap, $rowH, '', 0, 0, 'L');
@@ -152,9 +173,7 @@ class ClinicVisitInvoiceA5 extends TCPDF
         $this->Ln(2);
         $this->SetFont('arial', 'B', self::FS_SUBTITLE);
         $this->SetTextColor(...self::COLOR_TEXT);
-        $this->Cell($colWidth, 5, 'Requested Services', 0, 0, 'C');
-        $this->Cell($colGap, 5, '', 0, 0, 'L');
-        $this->Cell($colWidth, 5, 'الخدمات المطلوبة', 0, 1, 'C');
+        $this->Cell($contentWidth, 5, 'الخدمات المطلوبة', 0, 1, 'C');
 
         // Services table (plain lines, no fills)
         $tableY = $this->GetY();
@@ -166,11 +185,6 @@ class ClinicVisitInvoiceA5 extends TCPDF
 
         $this->Line($tableX, $tableY, $tableEndX, $tableY);
         $this->SetFont('arial', 'B', self::FS_NORMAL);
-        $this->Cell($nameW, 5, 'Name', 0, 0, 'C');
-        $this->Cell($priceW, 5, 'Price', 0, 1, 'C');
-        $tableY = $this->GetY();
-        $this->Line($tableX, $tableY, $tableEndX, $tableY);
-        $this->SetFont('arial', 'B', 9);
         $this->Cell($nameW, 5, 'الاسم', 0, 0, 'C');
         $this->Cell($priceW, 5, 'السعر', 0, 1, 'C');
         $tableY = $this->GetY();
@@ -219,31 +233,23 @@ class ClinicVisitInvoiceA5 extends TCPDF
         $this->SetFont('arial', '', self::FS_NORMAL);
 
         // Left: print metadata (rendered in-row using Cell, no absolute positioning)
-        $metaEngW = 33;
-        $metaValW = 34;
-        $metaArW = 25;
-        $metaBlockW = $metaEngW + $metaValW + $metaArW;
+        $metaValW = 40;
+        $metaArW = 34;
+        $metaBlockW = $metaValW + $metaArW;
 
-        $this->SetFont('arial', 'B', 9);
-        $this->SetTextColor(...self::COLOR_LABEL);
-        $this->Cell($metaEngW, 6, 'Print Date & Time', 0, 0, 'L');
         $this->SetFont('arial', '', 9);
         $this->SetTextColor(...self::COLOR_TEXT);
-        $this->Cell($metaValW, 6, $clip($printDateTime, 22), 0, 0, 'L');
+        $this->Cell($metaValW, 6, $clip($printDateTime, 22), 0, 0, 'R');
         $this->SetFont('arial', 'B', 9);
         $this->SetTextColor(...self::COLOR_LABEL);
         $this->Cell($metaArW, 6, 'تاريخ الطباعة والزمن', 0, 0, 'R');
 
-        $sumEngW = 26;
-        $sumValW = 20;
-        $sumArW = 32;
-        $sumBlockW = $sumEngW + $sumValW + $sumArW;
+        $sumValW = 26;
+        $sumArW = 36;
+        $sumBlockW = $sumValW + $sumArW;
         $gapW = max(0, $contentWidth - $metaBlockW - $sumBlockW);
 
-        $this->SetFont('arial', 'B', 9);
-        $this->SetTextColor(...self::COLOR_LABEL);
         $this->Cell($gapW, 6, '', 0, 0, 'L');
-        $this->Cell($sumEngW, 6, 'Grand Total', 0, 0, 'L');
         $this->SetFont('arial', '', 9);
         $this->SetTextColor(...self::COLOR_TEXT);
         $this->Cell($sumValW, 6, $money($grandTotal), 0, 0, 'R');
@@ -252,20 +258,14 @@ class ClinicVisitInvoiceA5 extends TCPDF
         $this->Cell($sumArW, 6, 'المبلغ الاجمالي', 0, 1, 'R');
 
         // Row 2
-        $this->SetFont('arial', 'B', 9);
-        $this->SetTextColor(...self::COLOR_LABEL);
-        $this->Cell($metaEngW, 6, 'Printed By', 0, 0, 'L');
         $this->SetFont('arial', '', 9);
         $this->SetTextColor(...self::COLOR_TEXT);
-        $this->Cell($metaValW, 6, $clip($printedBy, 20), 0, 0, 'L');
+        $this->Cell($metaValW, 6, $clip($printedBy, 20), 0, 0, 'R');
         $this->SetFont('arial', 'B', 9);
         $this->SetTextColor(...self::COLOR_LABEL);
         $this->Cell($metaArW, 6, 'طبعت بواسطه', 0, 0, 'R');
 
-        $this->SetFont('arial', 'B', 9);
-        $this->SetTextColor(...self::COLOR_LABEL);
         $this->Cell($gapW, 6, '', 0, 0, 'L');
-        $this->Cell($sumEngW, 6, 'Discount', 0, 0, 'L');
         $this->SetFont('arial', '', 9);
         $this->SetTextColor(...self::COLOR_TEXT);
         $this->Cell($sumValW, 6, $money($totalDiscount), 0, 0, 'R');
@@ -275,15 +275,18 @@ class ClinicVisitInvoiceA5 extends TCPDF
 
         // Row 3 (totals only, leave left block blank)
         $this->Cell($metaBlockW + $gapW, 6, '', 0, 0, 'L');
-        $this->SetFont('arial', 'B', 9);
-        $this->SetTextColor(...self::COLOR_LABEL);
-        $this->Cell($sumEngW, 6, 'Paid Amount', 0, 0, 'L');
         $this->SetFont('arial', '', 9);
         $this->SetTextColor(...self::COLOR_TEXT);
         $this->Cell($sumValW, 6, $money($totalPaid), 0, 0, 'R');
         $this->SetFont('arial', 'B', 9);
         $this->SetTextColor(...self::COLOR_LABEL);
         $this->Cell($sumArW, 6, 'المبلغ المدفوع', 0, 1, 'R');
+
+        // Grand total spelled out in Arabic words
+        $this->Ln(2);
+        $this->SetFont('arial', 'B', 9);
+        $this->SetTextColor(...self::COLOR_LABEL);
+        $this->Cell($contentWidth, 5, 'المبلغ كتابة : '.$this->convertAmountToArabicWords((int) round($grandTotal)).' جنيه', 0, 1, 'R');
 
         // Barcode at bottom center
         $barcodeValue = (string) $this->visit->id;
@@ -299,7 +302,91 @@ class ClinicVisitInvoiceA5 extends TCPDF
         // Restore RTL default for any future content in this document class.
         $this->setRTL(true);
 
-        return $this->Output('clinic_invoice_visit_' . $this->visit->id . '.pdf', 'S');
+        return $this->Output('clinic_invoice_visit_'.$this->visit->id.'.pdf', 'S');
+    }
+
+    /**
+     * Spell out an integer amount in Arabic words (e.g. 3520 -> "ثلاثة آلاف وخمسمائة وعشرون").
+     */
+    private function convertAmountToArabicWords(int $number): string
+    {
+        if ($number === 0) {
+            return 'صفر';
+        }
+
+        $ones = [
+            '', 'واحد', 'اثنان', 'ثلاثة', 'أربعة', 'خمسة', 'ستة', 'سبعة', 'ثمانية', 'تسعة',
+            'عشرة', 'أحد عشر', 'اثنا عشر', 'ثلاثة عشر', 'أربعة عشر', 'خمسة عشر', 'ستة عشر', 'سبعة عشر', 'ثمانية عشر', 'تسعة عشر',
+        ];
+        $tens = ['', '', 'عشرون', 'ثلاثون', 'أربعون', 'خمسون', 'ستون', 'سبعون', 'ثمانون', 'تسعون'];
+        $hundreds = ['', 'مائة', 'مئتان', 'ثلاثمائة', 'أربعمائة', 'خمسمائة', 'ستمائة', 'سبعمائة', 'ثمانمائة', 'تسعمائة'];
+        $scaleNames = [
+            1 => ['ألف', 'ألفان', 'آلاف'],
+            2 => ['مليون', 'مليونان', 'ملايين'],
+            3 => ['مليار', 'ملياران', 'مليارات'],
+        ];
+
+        $convertUnderThousand = function (int $n) use ($ones, $tens, $hundreds, &$convertUnderThousand): string {
+            if ($n === 0) {
+                return '';
+            }
+            if ($n < 20) {
+                return $ones[$n];
+            }
+            if ($n < 100) {
+                $ten = intdiv($n, 10);
+                $one = $n % 10;
+
+                return $one === 0 ? $tens[$ten] : $ones[$one].' و'.$tens[$ten];
+            }
+            $hundred = intdiv($n, 100);
+            $remainder = $n % 100;
+            $result = $hundreds[$hundred];
+            if ($remainder > 0) {
+                $result .= ' و'.$convertUnderThousand($remainder);
+            }
+
+            return $result;
+        };
+
+        $scaleWord = static function (int $groupValue, int $scaleIndex) use ($scaleNames): string {
+            [$singular, $dual, $plural] = $scaleNames[$scaleIndex];
+            if ($groupValue === 1) {
+                return $singular;
+            }
+            if ($groupValue === 2) {
+                return $dual;
+            }
+            if ($groupValue >= 3 && $groupValue <= 10) {
+                return $plural;
+            }
+
+            return $singular;
+        };
+
+        $groups = [];
+        $remaining = $number;
+        while ($remaining > 0) {
+            $groups[] = $remaining % 1000;
+            $remaining = intdiv($remaining, 1000);
+        }
+
+        $parts = [];
+        for ($i = count($groups) - 1; $i >= 0; $i--) {
+            $groupValue = $groups[$i];
+            if ($groupValue === 0) {
+                continue;
+            }
+            if ($i === 0) {
+                $parts[] = $convertUnderThousand($groupValue);
+            } elseif ($groupValue <= 2) {
+                $parts[] = $scaleWord($groupValue, $i);
+            } else {
+                $parts[] = $convertUnderThousand($groupValue).' '.$scaleWord($groupValue, $i);
+            }
+        }
+
+        return implode(' و', $parts);
     }
 
     /**
@@ -307,12 +394,12 @@ class ClinicVisitInvoiceA5 extends TCPDF
      */
     private function addLogoFromSettings(?Setting $settings, ?string $logoName, string $logoPath, float $pageWidth): void
     {
-        if (!$settings || !$logoName) {
+        if (! $settings || ! $logoName) {
             return;
         }
 
-        $fullLogoPath = $logoPath . DIRECTORY_SEPARATOR . $logoName;
-        if (!file_exists($fullLogoPath)) {
+        $fullLogoPath = $logoPath.DIRECTORY_SEPARATOR.$logoName;
+        if (! file_exists($fullLogoPath)) {
             return;
         }
 
@@ -322,7 +409,7 @@ class ClinicVisitInvoiceA5 extends TCPDF
         } else {
             $shouldShow = (bool) $settings->is_logo || (bool) $settings->is_header;
         }
-        if (!$shouldShow) {
+        if (! $shouldShow) {
             return;
         }
 
@@ -330,9 +417,10 @@ class ClinicVisitInvoiceA5 extends TCPDF
 
         if ($type === 'logo') {
             // Backward-compatible behavior: if old "is_logo" mode and no explicit positioning, print both sides.
-            if ($settings->is_logo && !isset($settings->pdf_header_logo_position)) {
+            if ($settings->is_logo && ! isset($settings->pdf_header_logo_position)) {
                 $this->Image($fullLogoPath, 5, 5, 24, 24);
                 $this->Image($fullLogoPath, $this->getPageWidth() - 29, 5, 24, 24);
+
                 return;
             }
 
@@ -365,6 +453,7 @@ class ClinicVisitInvoiceA5 extends TCPDF
                 false,
                 false
             );
+
             return;
         }
 

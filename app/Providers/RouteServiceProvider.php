@@ -28,6 +28,10 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::none();
         });
 
+        RateLimiter::for('login', function (Request $request) {
+            return Limit::perMinute(5)->by($request->input('username').'|'.$request->ip());
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

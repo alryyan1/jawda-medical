@@ -44,9 +44,28 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | Left null intentionally: expiration is instead enforced per-token via
+    | the "expires_at" column (see AuthController@login and
+    | TouchTokenExpiration middleware), so an active user's token slides
+    | forward instead of hard-expiring "token_ttl" minutes after login.
+    |
     */
 
     'expiration' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Token Time-To-Live
+    |--------------------------------------------------------------------------
+    |
+    | The number of minutes an issued token remains valid without activity.
+    | Each authenticated request extends the token's "expires_at" by this
+    | many minutes (see TouchTokenExpiration middleware), so it only expires
+    | after this long of genuine inactivity.
+    |
+    */
+
+    'token_ttl' => (int) env('SANCTUM_TOKEN_TTL', 480),
 
     /*
     |--------------------------------------------------------------------------

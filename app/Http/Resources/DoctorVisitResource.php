@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\DoctorVisit;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -21,6 +22,9 @@ class DoctorVisitResource extends JsonResource
         return [
             'id' => $this->id,
             'file_id' => $this->file_id,
+            'file_visits_count' => $this->file_id
+                ? DoctorVisit::where('file_id', $this->file_id)->count()
+                : 0,
             'visit_date' => $this->visit_date?->format('Y-m-d'),
             'visit_time' => $this->visit_time,
             'visit_time_formatted' => $this->formatVisitTime(),

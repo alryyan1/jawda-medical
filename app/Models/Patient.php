@@ -37,7 +37,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property \Illuminate\Support\Carbon $auth_date
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property int|null $country_id
  * @property string|null $gov_id
  * @property string|null $address
  * @property string $discount
@@ -49,7 +48,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property string|null $lab_to_lab_object_id
  * @property-read \App\Models\Company|null $company
  * @property-read \App\Models\CompanyRelation|null $companyRelation
- * @property-read \App\Models\Country|null $country
  * @property-read \App\Models\Doctor|null $doctor
  * @property-read \App\Models\DoctorVisit|null $doctorVisit
  * @property-read \App\Models\File|null $file

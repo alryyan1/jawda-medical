@@ -2159,7 +2159,7 @@ class ReportController extends Controller
             return response()->json(['message' => 'لا توجد خدمات لإنشاء فاتورة لها في هذه الزيارة.'], 404);
         }
 
-        $visit->load(['patient.country', 'doctor', 'requestedServices.service', 'createdByUser']);
+        $visit->load(['patient', 'doctor', 'requestedServices.service', 'createdByUser']);
         $report = new \App\Services\Pdf\ClinicVisitInvoiceA5($visit);
         $pdfContent = $report->generate();
 

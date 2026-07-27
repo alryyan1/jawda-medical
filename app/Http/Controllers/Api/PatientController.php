@@ -229,7 +229,7 @@ class PatientController extends Controller
             $existingPatient = null;
             $fileToUseId = null;
 
-            if (! empty($patientSpecificData['phone']) && ! empty($patientSpecificData['name'])) {
+            if (($patientSpecificData['phone'] ?? '') !== '' && ! empty($patientSpecificData['name'])) {
                 $existingPatient = Patient::where('phone', $patientSpecificData['phone'])
                     ->latest()
                     ->limit(50)

@@ -25,7 +25,7 @@ class ClinicWorkspaceController extends Controller
             'requestedServices', // needed only for balance_due calculation
             'patientLabRequests', // needed only for balance_due calculation
         ])
-            ->withCount('requestedServices')
+            ->withCount(['requestedServices', 'patientLabRequests'])
             ->addSelect([
                 // How many visits (including this one) share this visit's File — drives
                 // the "multiple visits on this file" hint icon on the queue card. The

@@ -25,6 +25,10 @@ class Kernel extends ConsoleKernel
             ->sundays()
             ->at('02:30')
             ->appendOutputTo(storage_path('logs/backup.log'));
+
+        // Remove expired Sanctum tokens left behind by inactive/abandoned sessions
+        $schedule->command('sanctum:prune-expired --hours=24')
+            ->daily();
     }
 
     /**

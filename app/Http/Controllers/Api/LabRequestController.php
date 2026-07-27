@@ -639,6 +639,34 @@ class LabRequestController extends Controller
         return MainTestStrippedResource::collection($availableTests);
     }
 
+    /**
+     * The tests this visit's doctor requests most often, excluding ones already
+     * on this visit — a quick-add shortlist for the Doctor Portal.
+     */
+    public function topRequestedTestsForVisit(Request $request, DoctorVisit $visit)
+    {
+        $limit = (int) $request->integer('limit', 12);
+        $requestedTestIds = $visit->labRequests()->pluck('main_test_id')->toArray();
+
+        $topTestIds = LabRequest::query()
+            ->whereHas('doctorVisit', fn ($q) => $q->where('doctor_id', $visit->doctor_id))
+            ->whereNotIn('main_test_id', $requestedTestIds)
+            ->select('main_test_id')
+            ->selectRaw('COUNT(*) as requests_count')
+            ->groupBy('main_test_id')
+            ->orderByDesc('requests_count')
+            ->limit($limit)
+            ->pluck('main_test_id');
+
+        $topTests = MainTest::where('available', true)
+            ->whereIn('id', $topTestIds)
+            ->get(['id', 'main_test_name', 'price'])
+            ->sortBy(fn ($test) => array_search($test->id, $topTestIds->all()))
+            ->values();
+
+        return MainTestStrippedResource::collection($topTests);
+    }
+
     // app/Http/Controllers/Api/LabRequestController.php
     public function batchPayLabRequests(Request $request, DoctorVisit $visit)
     {

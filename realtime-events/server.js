@@ -15,10 +15,6 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173')
 const SERVER_AUTH_TOKEN = process.env.SERVER_AUTH_TOKEN || 'changeme';
 const API_BASE = process.env.VITE_API_BASE_URL || 'http://127.0.0.1/jawda-medical/public/api';
 const SANCTUM_TOKEN = process.env.SANCTUM_TOKEN || '';
-const HL7_SERVER_HOST = process.env.HL7_SERVER_HOST || '127.0.0.1';
-const HL7_SERVER_PORT = process.env.HL7_SERVER_PORT || 6400;
-console.log(API_BASE,'API_BASE')
-console.log('SANCTUM_TOKEN:', SANCTUM_TOKEN ? 'Set' : 'Not set')
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: (origin, cb) => cb(null, true), credentials: true }));
@@ -33,91 +29,15 @@ io.on('connection', (socket) => {
   socket.on('join', (room) => {
     if (room) socket.join(room);
   });
-  console.log('New connection from:', socket.id);
 
   // Handle disconnection
   socket.on('disconnect', (reason) => {
-    console.log('Client disconnected:', socket.id, 'Reason:', reason);
   });
 
-  // Handle HL7 test messages
-  socket.on('hl7-test-message', async (data) => {
-    try {
-      console.log('Received HL7 test message:', data.message?.substring(0, 100) + '...');
-      
-      const result = await sendHL7ToServer(data.message);
-      
-      socket.emit('hl7-test-response', {
-        success: result.success,
-        message: result.message,
-        error: result.error,
-        response: result.response
-      });
-    } catch (error) {
-      console.error('Error handling HL7 test message:', error);
-      socket.emit('hl7-test-response', {
-        success: false,
-        error: error.message || 'Unknown error occurred'
-      });
-    }
-  });
+
 });
 
-// Function to send HL7 message to TCP server
-function sendHL7ToServer(message) {
-  return new Promise((resolve) => {
-    const client = new net.Socket();
-    let responseData = '';
-    let hasResponded = false;
 
-    const timeout = setTimeout(() => {
-      if (!hasResponded) {
-        hasResponded = true;
-        client.destroy();
-        resolve({
-          success: false,
-          error: 'Connection timeout to HL7 server'
-        });
-      }
-    }, 10000); // 10 second timeout
-
-    client.connect(HL7_SERVER_PORT, HL7_SERVER_HOST, () => {
-      console.log(`Connected to HL7 server at ${HL7_SERVER_HOST}:${HL7_SERVER_PORT}`);
-      
-      // Send the HL7 message
-      client.write(message);
-    });
-
-    client.on('data', (data) => {
-      responseData += data.toString();
-      console.log('Received response from HL7 server:', data.toString().substring(0, 100) + '...');
-    });
-
-    client.on('close', () => {
-      clearTimeout(timeout);
-      if (!hasResponded) {
-        hasResponded = true;
-        resolve({
-          success: true,
-          message: 'Message sent successfully',
-          response: responseData || 'No response received'
-        });
-      }
-    });
-
-    client.on('error', (error) => {
-      clearTimeout(timeout);
-      if (!hasResponded) {
-        hasResponded = true;
-        console.error('HL7 server connection error:', error);
-        resolve({
-          success: false,
-          error: `Connection error: ${error.message}`
-        });
-      }
-    });
-  });
-}
 
 // Simple header token check for internal emits
 function verifyAuth(req, res, next) {
@@ -176,9 +96,9 @@ app.post('/emit/print-lab-receipt', verifyAuth, async (req, res) => {
   try {
     const payload = req.body; // Expecting { visit_id, patient_id, lab_request_ids }
     const { visit_id, patient_id, lab_request_ids } = payload;
-    
+
     console.log('print-lab-receipt', payload);
-    
+
     if (!visit_id) {
       return res.status(400).json({ error: 'visit_id is required' });
     }
@@ -193,22 +113,22 @@ app.post('/emit/print-lab-receipt', verifyAuth, async (req, res) => {
       responseType: 'arraybuffer',
       headers: SANCTUM_TOKEN ? { Authorization: `Bearer ${SANCTUM_TOKEN}` } : {},
     });
-    
+
     fs.writeFileSync(tmpFile, response.data);
     console.log(`[Print] PDF saved to: ${tmpFile}`);
 
     // Print the PDF using pdf-to-printer library
     try {
       console.log(`[Print] Printing PDF: ${tmpFile}`);
-      
+
       // Print to default printer
-      await print(tmpFile, { 
+      await print(tmpFile, {
         printer: undefined, // Use default printer
         unix: ['-o fit-to-page'] // Fit to page for thermal printers
       });
-      
+
       console.log(`[Print] Successfully printed lab receipt for visit ${visit_id}`);
-      
+
       // Clean up temporary file
       setTimeout(() => {
         try {
@@ -218,26 +138,26 @@ app.post('/emit/print-lab-receipt', verifyAuth, async (req, res) => {
           console.error(`[Print] Error cleaning up file: ${err.message}`);
         }
       }, 5000); // Clean up after 5 seconds
-      
-      return res.json({ 
-        ok: true, 
+
+      return res.json({
+        ok: true,
         message: `Lab receipt printed successfully for visit ${visit_id}`,
         temp_file: tmpFile
       });
-      
+
     } catch (printError) {
       console.error(`[Print] Error printing PDF: ${printError.message}`);
-      return res.status(500).json({ 
-        error: 'Failed to print PDF', 
-        details: printError.message 
+      return res.status(500).json({
+        error: 'Failed to print PDF',
+        details: printError.message
       });
     }
 
   } catch (err) {
     console.error('[Print] Error handling print request:', err?.message || err);
-    return res.status(500).json({ 
-      error: 'Failed to process print request', 
-      details: err?.message || err 
+    return res.status(500).json({
+      error: 'Failed to process print request',
+      details: err?.message || err
     });
   }
 });
@@ -248,14 +168,14 @@ app.post('/emit/print-services-receipt', verifyAuth, async (req, res) => {
   try {
     const payload = req.body; // Expecting { visit_id, patient_id }
     const { visit_id, patient_id } = payload;
-    
+
     console.log('print-services-receipt', payload);
     console.log('visit_id type:', typeof visit_id, 'value:', visit_id);
-    
+
     if (!visit_id) {
       return res.status(400).json({ error: 'visit_id is required' });
     }
-    
+
     // Ensure visit_id is a number
     const numericVisitId = parseInt(visit_id);
     if (isNaN(numericVisitId)) {
@@ -272,7 +192,7 @@ app.post('/emit/print-services-receipt', verifyAuth, async (req, res) => {
     const tmpFile = path.join(os.tmpdir(), `services-receipt-${visit_id}-${Date.now()}.pdf`);
     console.log(`[Print] Making request to: ${pdfUrl}`);
     console.log(`[Print] Using SANCTUM_TOKEN: ${SANCTUM_TOKEN ? 'Yes' : 'No'}`);
-    
+
     const response = await axios.get(pdfUrl, {
       responseType: 'arraybuffer',
       headers: SANCTUM_TOKEN ? { Authorization: `Bearer ${SANCTUM_TOKEN}` } : {},
@@ -282,29 +202,29 @@ app.post('/emit/print-services-receipt', verifyAuth, async (req, res) => {
         return status >= 200 && status < 600;
       }
     });
-    
+
     // Check if the response is an error
     if (response.status >= 400) {
       console.error(`[Print] API returned error status: ${response.status}`);
       console.error(`[Print] Response data:`, response.data.toString());
       throw new Error(`API returned ${response.status}: ${response.data.toString()}`);
     }
-    
+
     fs.writeFileSync(tmpFile, response.data);
     console.log(`[Print] Services PDF saved to: ${tmpFile}`);
 
     // Print the PDF using pdf-to-printer library
     try {
       console.log(`[Print] Printing services PDF: ${tmpFile}`);
-      
+
       // Print to default printer
-      await print(tmpFile, { 
+      await print(tmpFile, {
         printer: undefined, // Use default printer
         unix: ['-o fit-to-page'] // Fit to page for thermal printers
       });
-      
+
       console.log(`[Print] Successfully printed services receipt for visit ${visit_id}`);
-      
+
       // Clean up temporary file
       setTimeout(() => {
         try {
@@ -314,24 +234,24 @@ app.post('/emit/print-services-receipt', verifyAuth, async (req, res) => {
           console.error(`[Print] Error cleaning up file: ${err.message}`);
         }
       }, 5000); // Clean up after 5 seconds
-      
-      return res.json({ 
-        ok: true, 
+
+      return res.json({
+        ok: true,
         message: `Services receipt printed successfully for visit ${visit_id}`,
         temp_file: tmpFile
       });
-      
+
     } catch (printError) {
       console.error(`[Print] Error printing services PDF: ${printError.message}`);
-      return res.status(500).json({ 
-        error: 'Failed to print services PDF', 
-        details: printError.message 
+      return res.status(500).json({
+        error: 'Failed to print services PDF',
+        details: printError.message
       });
     }
 
   } catch (err) {
     console.error('[Print] Error handling services print request:', err?.message || err);
-    
+
     // Log more details about the error
     if (err.response) {
       console.error('[Print] API Response Error:', {
@@ -344,9 +264,9 @@ app.post('/emit/print-services-receipt', verifyAuth, async (req, res) => {
     } else {
       console.error('[Print] General Error:', err.message);
     }
-    
-    return res.status(500).json({ 
-      error: 'Failed to process services print request', 
+
+    return res.status(500).json({
+      error: 'Failed to process services print request',
       details: err?.message || err,
       apiError: err.response?.data || null,
       statusCode: err.response?.status || null
@@ -380,33 +300,7 @@ app.post('/emit/open-general-shift', verifyAuth, (req, res) => {
   }
 });
 
-// Emit sysmex-result-inserted
-app.post('/emit/sysmex-result-inserted', verifyAuth, (req, res) => {
-  try {
-    const payload = req.body; // Expecting { sysmexResult, doctorVisit, patient }
-    console.log('sysmex-result-inserted', payload);
-    io.emit('sysmex-result-inserted', payload);
-    console.log('sysmex-result-inserted emitted');
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error('Error emitting sysmex-result-inserted:', err?.message || err);
-    return res.status(500).json({ error: 'Failed to emit sysmex-result-inserted' });
-  }
-});
 
-// Emit bankak-image-inserted
-app.post('/emit/bankak-image-inserted', verifyAuth, (req, res) => {
-  try {
-    const payload = req.body; // Expecting bankak image data
-    console.log('bankak-image-inserted', payload);
-    io.emit('bankak-image-inserted', payload);
-    console.log('bankak-image-inserted emitted');
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error('Error emitting bankak-image-inserted:', err?.message || err);
-    return res.status(500).json({ error: 'Failed to emit bankak-image-inserted' });
-  }
-});
 
 // Emit lab-queue-item-updated
 app.post('/emit/lab-queue-item-updated', verifyAuth, (req, res) => {
@@ -450,19 +344,7 @@ app.post('/emit/doctor-shift-opened', verifyAuth, (req, res) => {
   }
 });
 
-// Emit whatsapp-status-updated
-app.post('/emit/whatsapp-status-updated', verifyAuth, (req, res) => {
-  try {
-    const payload = req.body; // Expecting { message_id, status, error? }
-    console.log('whatsapp-status-updated', payload);
-    io.emit('whatsapp-status-updated', payload);
-    console.log('whatsapp-status-updated emitted');
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error('Error emitting whatsapp-status-updated:', err?.message || err);
-    return res.status(500).json({ error: 'Failed to emit whatsapp-status-updated' });
-  }
-});
+
 
 server.listen(PORT, () => {
   console.log(`Realtime server listening on :${PORT}`);

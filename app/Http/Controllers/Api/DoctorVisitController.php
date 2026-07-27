@@ -302,10 +302,10 @@ class DoctorVisitController extends Controller
     public function show(DoctorVisit $doctorVisit) // Route model binding
     {
         // Load all relevant data for displaying a single visit's details
-        // $doctorVisit->load(['patient', 'doctor', 'createdByUser', 'generalShift', 'doctorShift', 'requestedServices.service.serviceGroup', 'doctorShift.doctor', 'patientLabRequests']);
-        $doctorVisit->load(['patient.subcompany', 'patient.doctor', 'patientLabRequests', 'doctor', 'patientLabRequests.mainTest', 'createdByUser']);
+        $doctorVisit->load(['patient.subcompany', 'patient.doctor', 'patientLabRequests', 'doctor', 'patientLabRequests.mainTest', 'createdByUser', 'requestedServices.service.serviceGroup'])
+            ->loadCount('requestedServices');
 
-        return new DoctorVisitResource($doctorVisit->load(['patient.subcompany', 'patient.doctor']));
+        return new DoctorVisitResource($doctorVisit);
     }
 
     /**

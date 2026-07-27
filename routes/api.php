@@ -92,8 +92,8 @@ Route::post('/doctors/{doctor}/configure-services/by-group', [DoctorServiceContr
 |--------------------------------------------------------------------------
 */
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:10,1');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 /*
 |--------------------------------------------------------------------------
@@ -254,6 +254,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/doctor-visits/{doctorVisit}/vitals', [VisitVitalController::class, 'index']);
     Route::post('/doctor-visits/{doctorVisit}/vitals', [VisitVitalController::class, 'store']);
     Route::put('/doctor-visits/{doctorVisit}/vitals/{vital}', [VisitVitalController::class, 'update']);
+    Route::delete('/doctor-visits/{doctorVisit}/vitals/{vital}', [VisitVitalController::class, 'destroy']);
     Route::get('/patients/{patient}/vitals-trend', [VisitVitalController::class, 'trend']);
 
     // Visit summary PDF (Doctor Portal medical file)
@@ -379,6 +380,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Lab Requests
     // Removed: container barcode and print-all-samples endpoints
     Route::get('/visits/{visit}/available-lab-tests', [LabRequestController::class, 'availableTestsForVisit']);
+    Route::get('/visits/{visit}/top-requested-lab-tests', [LabRequestController::class, 'topRequestedTestsForVisit']);
     Route::post('/visits/{visit}/lab-requests-batch', [LabRequestController::class, 'storeBatchForVisit']);
     Route::post('/visits/{visit}/lab-requests/notify-lab', [LabRequestController::class, 'notifyLabReception']);
     Route::post('/discount-lab-requests', [\App\Http\Controllers\DiscountLabRequestController::class, 'store']);

@@ -10,6 +10,7 @@ use App\Models\DoctorVisit;
 use App\Models\Patient;
 use App\Models\VisitVital;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 
 class VisitVitalController extends Controller
@@ -54,6 +55,18 @@ class VisitVitalController extends Controller
         $vital->update($request->validated());
 
         return new VisitVitalResource($vital);
+    }
+
+    /**
+     * DELETE /doctor-visits/{doctorVisit}/vitals/{vital}
+     */
+    public function destroy(DoctorVisit $doctorVisit, VisitVital $vital): Response
+    {
+        abort_if($vital->doctor_visit_id !== $doctorVisit->id, 404);
+
+        $vital->delete();
+
+        return response()->noContent();
     }
 
     /**
