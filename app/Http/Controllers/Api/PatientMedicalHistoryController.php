@@ -76,6 +76,10 @@ class PatientMedicalHistoryController extends Controller
             'chronic_lymphadenopathy' => 'nullable|boolean',
             'chronic_peripheral_pulses_issue' => 'nullable|boolean',
             'chronic_feet_ulcer_history' => 'nullable|boolean',
+            'chronic_hypertension' => 'nullable|boolean',
+            'chronic_diabetes' => 'nullable|boolean',
+            'chronic_heart_disease' => 'nullable|boolean',
+            'chronic_ibs' => 'nullable|boolean',
             'overall_care_plan_summary' => 'nullable|string',
             'general_prescription_notes_summary' => 'nullable|string',
         ]);

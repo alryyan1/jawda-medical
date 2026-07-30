@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $id
@@ -187,6 +188,11 @@ class DoctorVisit extends Model
     public function diagnosis()
     {
         return $this->hasOne(VisitDiagnosis::class, 'doctor_visit_id');
+    }
+
+    public function medicalReport(): HasOne
+    {
+        return $this->hasOne(VisitMedicalReport::class, 'doctor_visit_id');
     }
 
     public function prescriptions()

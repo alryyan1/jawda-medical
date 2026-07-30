@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -322,6 +323,11 @@ class Patient extends Model
     public function vitals()
     {
         return $this->hasMany(VisitVital::class, 'patient_id')->orderBy('recorded_at');
+    }
+
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(PatientAppointment::class, 'patient_id');
     }
 
     /**

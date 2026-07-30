@@ -19,6 +19,7 @@ class VisitVital extends Model
         'temperature',
         'heart_rate',
         'respiratory_rate',
+        'pain_scale',
         'spo2',
         'weight',
         'height',

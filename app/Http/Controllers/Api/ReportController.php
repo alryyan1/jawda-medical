@@ -31,7 +31,7 @@ use App\Mypdf\Pdf;
 use App\Services\Pdf\CashReconciliationReport;
 use App\Services\Pdf\LabResultReport;
 use App\Services\Pdf\MyCustomTCPDF;
-use App\Services\UltramsgService;
+use App\Services\WhatsAppCloudApiService;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\Request;
@@ -73,11 +73,11 @@ class ReportController extends Controller
     }
 
     // ... (other report methods) ...
-    protected UltramsgService $ultramsgService;
+    protected WhatsAppCloudApiService $whatsAppService;
 
-    public function __construct(UltramsgService $ultramsgService)
+    public function __construct(WhatsAppCloudApiService $whatsAppService)
     {
-        $this->ultramsgService = $ultramsgService;
+        $this->whatsAppService = $whatsAppService;
     }
 
     public function serviceStatistics(Request $request)
@@ -3498,12 +3498,11 @@ class ReportController extends Controller
         }
 
         // Format phone number using your service (it uses default country code from settings)
-        $formattedChatId = UltramsgService::formatPhoneNumber($validated['chat_id']);
+        $formattedChatId = WhatsAppCloudApiService::formatPhoneNumber($validated['chat_id']);
         if (! $formattedChatId) {
             return response()->json(['message' => 'Invalid phone number format for WhatsApp.'], 422);
         }
 
-        $pdfContentBase64 = null;
         $pdfFileName = 'report.pdf';
 
         try {
@@ -3525,8 +3524,6 @@ class ReportController extends Controller
 
                 return response()->json(['message' => 'Failed to generate PDF content.'], 500);
             }
-
-            $pdfContentBase64 = base64_encode($pdfContent);
         } catch (\Exception $e) {
             Log::error("WhatsApp Send: PDF generation error for visit {$visit->id}, type {$validated['report_type']}: ".$e->getMessage());
 
@@ -3535,12 +3532,12 @@ class ReportController extends Controller
 
         $caption = $validated['caption'] ?? "Lab results for {$patient->name}";
 
-        $result = $this->whatsAppService->sendMediaMessage(
+        $result = $this->whatsAppService->sendDocumentBytes(
             $formattedChatId,
-            $pdfContentBase64,
+            $pdfContent,
+            'application/pdf',
             $pdfFileName,
-            $caption,
-            true // asDocument = true for PDFs
+            $caption
         );
 
         if ($result['success']) {

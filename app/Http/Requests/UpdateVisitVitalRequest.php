@@ -19,6 +19,7 @@ class UpdateVisitVitalRequest extends FormRequest
             'temperature' => ['nullable', 'numeric', 'min:30', 'max:45'],
             'heart_rate' => ['nullable', 'integer', 'min:0', 'max:300'],
             'respiratory_rate' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'pain_scale' => ['nullable', 'integer', 'min:0', 'max:10'],
             'spo2' => ['nullable', 'integer', 'min:0', 'max:100'],
             'weight' => ['nullable', 'numeric', 'min:0', 'max:500'],
             'height' => ['nullable', 'numeric', 'min:0', 'max:300'],

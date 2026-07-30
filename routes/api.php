@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\OfferController;
 use App\Http\Controllers\Api\PackageController;
 use App\Http\Controllers\Api\PartyController;
 use App\Http\Controllers\Api\PartyServiceCostController;
+use App\Http\Controllers\Api\PatientAppointmentController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PatientMedicalHistoryController;
 use App\Http\Controllers\Api\ReportController;
@@ -56,11 +57,11 @@ use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
 use App\Http\Controllers\Api\VisitDiagnosisController;
+use App\Http\Controllers\Api\VisitDocumentsWhatsAppController;
+use App\Http\Controllers\Api\VisitMedicalReportController;
 use App\Http\Controllers\Api\VisitPrescriptionController;
 use App\Http\Controllers\Api\VisitServiceController;
 use App\Http\Controllers\Api\VisitVitalController;
-use App\Http\Controllers\WebHookController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -243,6 +244,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/doctor-visits/{doctorVisit}/diagnosis', [VisitDiagnosisController::class, 'store']);
     Route::put('/visit-diagnoses/{visitDiagnosis}', [VisitDiagnosisController::class, 'update']);
     Route::get('/visit-diagnoses/{visitDiagnosis}/pdf', [VisitDiagnosisController::class, 'generatePdf']);
+
+    // Visit medical report (Doctor Portal medical file)
+    Route::get('/doctor-visits/{doctorVisit}/medical-report', [VisitMedicalReportController::class, 'show']);
+    Route::post('/doctor-visits/{doctorVisit}/medical-report', [VisitMedicalReportController::class, 'store']);
+    Route::put('/visit-medical-reports/{visitMedicalReport}', [VisitMedicalReportController::class, 'update']);
+    Route::get('/visit-medical-reports/{visitMedicalReport}/pdf', [VisitMedicalReportController::class, 'generatePdf']);
+
+    // Patient appointments (Doctor Portal medical file)
+    Route::get('/patients/{patient}/appointments', [PatientAppointmentController::class, 'index']);
+    Route::post('/patients/{patient}/appointments', [PatientAppointmentController::class, 'store']);
+    Route::post('/patient-appointments/{patientAppointment}/resend-whatsapp', [PatientAppointmentController::class, 'resendWhatsapp']);
+    Route::put('/patient-appointments/{patientAppointment}/cancel', [PatientAppointmentController::class, 'cancel']);
+
+    // Visit documents WhatsApp menu (Doctor Portal medical file)
+    Route::post('/doctor-visits/{doctorVisit}/send-documents-whatsapp', [VisitDocumentsWhatsAppController::class, 'sendMenu']);
 
     // Visit prescriptions (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/prescriptions', [VisitPrescriptionController::class, 'index']);
@@ -650,20 +666,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     /*
       |--------------------------------------------------------------------------
-      | Ultramsg WhatsApp API Routes
-      |--------------------------------------------------------------------------
-      */
-    Route::prefix('ultramsg')->group(function () {
-        Route::post('/send-text', [\App\Http\Controllers\UltramsgController::class, 'sendTextMessage']);
-        Route::post('/send-document', [\App\Http\Controllers\UltramsgController::class, 'sendDocument']);
-        Route::post('/send-document-file', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFile']);
-        Route::post('/send-document-url', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromUrl']);
-        Route::get('/instance-status', [\App\Http\Controllers\UltramsgController::class, 'getInstanceStatus']);
-        Route::get('/configured', [\App\Http\Controllers\UltramsgController::class, 'isConfigured']);
-    });
-
-    /*
-      |--------------------------------------------------------------------------
       | WhatsApp Cloud API Routes
       |--------------------------------------------------------------------------
       */
@@ -680,10 +682,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/configured', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'isConfigured']);
     });
 });
-
-// Ultramsg routes with custom credentials (no auth required since credentials are in request)
-Route::post('/ultramsg/send-text-message-with-credentials', [\App\Http\Controllers\UltramsgController::class, 'sendTextMessageWithCredentials']);
-Route::post('/ultramsg/send-document-with-credentials', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentWithCredentials']);
 
 // Image proxy for cross-origin images -> base64
 Route::get('/image-proxy/base64', [ImageProxyController::class, 'fetchBase64']);
@@ -706,16 +704,10 @@ Route::post('/reports/cash-reconciliation/pdf', [ReportController::class, 'gener
 Route::post('/firestore/update-document', [App\Http\Controllers\Api\FirestoreController::class, 'updateFirestoreDocument'])->middleware('auth:sanctum');
 Route::post('/firestore/update-patient-pdf', [App\Http\Controllers\Api\FirestoreController::class, 'updatePatientPdf']);
 
-// send from firebase storage using visit_id and settings.storage_name
-Route::post('/ultramsg/send-document-from-firebase', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFirebase']);
-
 // WhatsApp Cloud API Webhook endpoints (no CSRF protection needed)
 Route::get('/whatsapp-cloud/webhook', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'verifyWebhook']);
 Route::post('/whatsapp-cloud/webhook', [\App\Http\Controllers\Api\WhatsAppCloudApiController::class, 'webhook']);
 
-// Webhook endpoints (no CSRF protection needed)
-Route::get('/webhook', [WebHookController::class, 'webhook']);
-Route::post('/webhook', [WebHookController::class, 'webhook']);
 Route::post('populatePatientChemistryData/{doctorvisit}', [PatientController::class, 'populatePatientChemistryData']);
 Route::post('populatePatientHormoneData/{doctorvisit}', [PatientController::class, 'populatePatientHormoneData']);
 

@@ -3,14 +3,21 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\WhatsAppCloudApiService;
+use App\Models\DoctorVisit;
+use App\Models\Setting;
+use App\Models\VisitDiagnosis;
+use App\Models\VisitMedicalReport;
 use App\Services\FirebaseService;
-use Illuminate\Http\Request;
+use App\Services\Pdf\VisitDiagnosisPdf;
+use App\Services\Pdf\VisitMedicalReportPdf;
+use App\Services\Pdf\VisitPrescriptionsPdf;
+use App\Services\WhatsAppCloudApiService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class WhatsAppCloudApiController extends Controller
 {
@@ -48,7 +55,7 @@ class WhatsAppCloudApiController extends Controller
 
         // Format phone number to international format
         $to = WhatsAppCloudApiService::formatPhoneNumber($to);
-        if (!$to) {
+        if (! $to) {
             return response()->json([
                 'success' => false,
                 'error' => 'Invalid phone number format',
@@ -91,7 +98,7 @@ class WhatsAppCloudApiController extends Controller
 
         // Format phone number to international format
         $to = WhatsAppCloudApiService::formatPhoneNumber($to);
-        if (!$to) {
+        if (! $to) {
             return response()->json([
                 'success' => false,
                 'error' => 'Invalid phone number format',
@@ -141,7 +148,7 @@ class WhatsAppCloudApiController extends Controller
 
         // Format phone number to international format
         $to = WhatsAppCloudApiService::formatPhoneNumber($to);
-        if (!$to) {
+        if (! $to) {
             return response()->json([
                 'success' => false,
                 'error' => 'Invalid phone number format',
@@ -189,7 +196,7 @@ class WhatsAppCloudApiController extends Controller
 
         // Format phone number to international format
         $to = WhatsAppCloudApiService::formatPhoneNumber($to);
-        if (!$to) {
+        if (! $to) {
             return response()->json([
                 'success' => false,
                 'error' => 'Invalid phone number format',
@@ -233,7 +240,7 @@ class WhatsAppCloudApiController extends Controller
         $phoneNumberId = $request->input('phone_number_id') ?? $this->whatsappService->getPhoneNumberId();
 
         $to = WhatsAppCloudApiService::formatPhoneNumber($to);
-        if (!$to) {
+        if (! $to) {
             return response()->json(['success' => false, 'error' => 'Invalid phone number format'], 400);
         }
 
@@ -270,7 +277,7 @@ class WhatsAppCloudApiController extends Controller
         $phoneNumberId = $request->input('phone_number_id') ?? $this->whatsappService->getPhoneNumberId();
 
         $to = WhatsAppCloudApiService::formatPhoneNumber($to);
-        if (!$to) {
+        if (! $to) {
             return response()->json(['success' => false, 'error' => 'Invalid phone number format'], 400);
         }
 
@@ -311,7 +318,7 @@ class WhatsAppCloudApiController extends Controller
         $phoneNumberId = $request->input('phone_number_id') ?? $this->whatsappService->getPhoneNumberId();
 
         $to = WhatsAppCloudApiService::formatPhoneNumber($to);
-        if (!$to) {
+        if (! $to) {
             return response()->json(['success' => false, 'error' => 'Invalid phone number format'], 400);
         }
 
@@ -420,7 +427,7 @@ class WhatsAppCloudApiController extends Controller
         $data = $request->all();
 
         // Validate the webhook signature (X-Hub-Signature-256)
-        if (!$this->validateWebhookSignature($request, $payload)) {
+        if (! $this->validateWebhookSignature($request, $payload)) {
             Log::warning('WhatsApp Cloud API: Webhook signature validation failed.', [
                 'signature_header' => $request->header('X-Hub-Signature-256'),
                 'ip' => $request->ip(),
@@ -442,30 +449,36 @@ class WhatsAppCloudApiController extends Controller
                         $value = $change['value'] ?? [];
                         $recipientPhoneNumberId = $value['metadata']['phone_number_id'] ?? null;
 
-                        Log::info('WhatsApp Cloud API: Recipient phone number ID: ' . ($recipientPhoneNumberId ?? 'null'));
+                        Log::info('WhatsApp Cloud API: Recipient phone number ID: '.($recipientPhoneNumberId ?? 'null'));
 
                         // Handle incoming messages
-                        if (!isset($value['messages']) || !is_array($value['messages'])) {
+                        if (! isset($value['messages']) || ! is_array($value['messages'])) {
                             continue;
                         }
 
                         foreach ($value['messages'] as $message) {
-                            if (!is_array($message)) {
+                            if (! is_array($message)) {
                                 Log::warning('WhatsApp Cloud API: Skipping invalid message format.', ['message' => $message]);
+
                                 continue;
                             }
 
-                            $isOneCare = $recipientPhoneNumberId !== null
+                            $jawdaMedicalPhoneNumberId = config('services.whatsapp_cloud.phone_number_id');
+                            $isJawdaMedical = $recipientPhoneNumberId !== null
+                                && $jawdaMedicalPhoneNumberId !== null
+                                && (string) $recipientPhoneNumberId === (string) $jawdaMedicalPhoneNumberId;
+
+                            $isOneCare = ! $isJawdaMedical && $recipientPhoneNumberId !== null
                                 && (string) $recipientPhoneNumberId === '1036370259552771';
 
-                            $collection = $isOneCare ? 'one_care' : 'alsamar';
+                            $collection = $isJawdaMedical ? 'jawda_medical' : ($isOneCare ? 'one_care' : 'alsamar');
 
                             try {
                                 if ($isOneCare) {
                                     // Notify on non-text messages (images, etc.)
-                                    if (($message['type'] ?? '') !== 'text' || !isset($message['text']['body'])) {
+                                    if (($message['type'] ?? '') !== 'text' || ! isset($message['text']['body'])) {
                                         $from = $message['from'] ?? 'unknown';
-                                        $msg = 'استعلام جديد لصيدليه ون كير من الرقم ' . $from;
+                                        $msg = 'استعلام جديد لصيدليه ون كير من الرقم '.$from;
                                         $this->sendTextToUser('249991961111', $msg, $recipientPhoneNumberId);
                                     }
                                 }
@@ -504,8 +517,9 @@ class WhatsAppCloudApiController extends Controller
     {
         $signatureHeader = $request->header('X-Hub-Signature-256');
 
-        if (!$signatureHeader) {
+        if (! $signatureHeader) {
             Log::warning('WhatsApp Cloud API: Missing X-Hub-Signature-256 header.');
+
             return false;
         }
 
@@ -517,8 +531,9 @@ class WhatsAppCloudApiController extends Controller
 
         $appSecret = config('services.whatsapp_cloud.app_secret');
 
-        if (!$appSecret) {
+        if (! $appSecret) {
             Log::warning('WhatsApp Cloud API: App Secret not configured. Skipping signature validation.');
+
             return true;
         }
 
@@ -526,10 +541,10 @@ class WhatsAppCloudApiController extends Controller
 
         $isValid = hash_equals($expectedSignature, $signature);
 
-        if (!$isValid) {
+        if (! $isValid) {
             Log::error('WhatsApp Cloud API: Signature mismatch.', [
-                'expected' => substr($expectedSignature, 0, 10) . '...',
-                'received' => substr($signature, 0, 10) . '...',
+                'expected' => substr($expectedSignature, 0, 10).'...',
+                'received' => substr($signature, 0, 10).'...',
             ]);
         }
 
@@ -552,11 +567,10 @@ class WhatsAppCloudApiController extends Controller
             'type' => $type,
             'timestamp' => $timestamp,
         ]);
-         // Handle Image Messages
+        // Handle Image Messages
         if ($type === 'image' && isset($message['image'])) {
             $this->handleImageMessage($message['image'], $from, $messageId);
         }
-
 
         if (($type ?? '') === 'text' && isset($message['text']['body'])) {
             // \App\Events\WhatsAppMessageReceived::dispatch([
@@ -594,63 +608,67 @@ class WhatsAppCloudApiController extends Controller
             }
         }
 
+        if ($collection === 'jawda_medical') {
+            $textBody = $type === 'text' ? ($message['text']['body'] ?? null) : null;
+            $this->handleJawdaMedicalMessage($isButtonMessage, $buttonData, $textBody, $from, $phoneNumberId);
+
+            return;
+        }
+
         if ($collection === 'one_care') {
             if ($isButtonMessage && $buttonData !== null) {
-                
-                   $payloadString = $buttonData['payload'] ?? $buttonData['text'] ?? $buttonData['title'] ?? null;
-            $visitId = null;
 
-            if ($payloadString) {
-                // Try to decode as JSON
-                $payloadData = json_decode($payloadString, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($payloadData)) {
-                    $visitId = $payloadData['visitId'] ?? null;
-                    if (isset($payloadData['collection'])) {
-                        $collection = $payloadData['collection'];
-                        Log::info('collection name in payload '.$collection);
+                $payloadString = $buttonData['payload'] ?? $buttonData['text'] ?? $buttonData['title'] ?? null;
+                $visitId = null;
+
+                if ($payloadString) {
+                    // Try to decode as JSON
+                    $payloadData = json_decode($payloadString, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($payloadData)) {
+                        $visitId = $payloadData['visitId'] ?? null;
+                        if (isset($payloadData['collection'])) {
+                            $collection = $payloadData['collection'];
+                            Log::info('collection name in payload '.$collection);
+                        }
+
+                        if ($visitId && is_numeric($visitId)) {
+                            // Fetch PDF URL from Firestore using the visit ID
+                            $pdfUrl = $this->getResultUrlFromFirestore($visitId, $collection);
+                            // log pdfurl
+                            Log::info('PDF URL: '.$pdfUrl);
+
+                            if ($pdfUrl) {
+                                // Send notification message before sending the PDF document
+                                $this->sendTextToUser($from, 'سيتم إرسال النتيجة إليكم خلال لحظات', $phoneNumberId);
+                                // Send the PDF document back to the sender
+                                $this->sendDocumentToUser($from, $pdfUrl, $visitId, $phoneNumberId);
+                            } else {
+                                // Send error message if PDF not found
+                                $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة للزيارة رقم: {$visitId}", $phoneNumberId);
+                            }
+                        } else {
+                            Log::warning('WhatsApp Cloud API: Invalid or missing visit ID from button payload.', [
+                                'button_data' => $buttonData,
+                            ]);
+                            $this->sendTextToUser($from, 'عذراً، لم نتمكن من التعرف على رقم الزيارة.', $phoneNumberId);
+                        }
+                    } else {
+                        // Fallback to old behavior (just a numeric ID)
+                        $visitId = $payloadString;
                     }
-                    
-                     if ($visitId && is_numeric($visitId)) {
-                // Fetch PDF URL from Firestore using the visit ID
-                $pdfUrl = $this->getResultUrlFromFirestore($visitId, $collection);
-                //log pdfurl
-                Log::info('PDF URL: ' . $pdfUrl);
+                }
 
-                if ($pdfUrl) {
-                    // Send notification message before sending the PDF document
-                    $this->sendTextToUser($from, "سيتم إرسال النتيجة إليكم خلال لحظات", $phoneNumberId);
-                    // Send the PDF document back to the sender
-                    $this->sendDocumentToUser($from, $pdfUrl, $visitId, $phoneNumberId);
-                } else {
-                    // Send error message if PDF not found
-                    $this->sendTextToUser($from, "عذراً، لم يتم العثور على النتيجة للزيارة رقم: {$visitId}", $phoneNumberId);
-                }
-            } else {
-                Log::warning('WhatsApp Cloud API: Invalid or missing visit ID from button payload.', [
-                    'button_data' => $buttonData
-                ]);
-                $this->sendTextToUser($from, "عذراً، لم نتمكن من التعرف على رقم الزيارة.", $phoneNumberId);
-            }
-                } else {
-                    // Fallback to old behavior (just a numeric ID)
-                    $visitId = $payloadString;
-                }
-            }
-                
-                
-                
-                
                 // Determine which button was pressed by its title or payload
                 $buttonTitle = strtolower(trim($buttonData['title'] ?? $buttonData['text'] ?? $buttonData['id'] ?? ''));
                 $buttonPayload = strtolower(trim($buttonData['payload'] ?? $buttonData['id'] ?? ''));
 
                 // Identify the report type from the button
-                $isSalesReport   = str_contains($buttonTitle, 'مبيعات')   && !str_contains($buttonTitle, 'مردود') && !str_contains($buttonTitle, 'اصناف');
-                $isSoldItems     = str_contains($buttonTitle, 'اصناف')    || str_contains($buttonPayload, 'sold');
-                $isReturns       = str_contains($buttonTitle, 'مردود')    || str_contains($buttonPayload, 'return');
+                $isSalesReport = str_contains($buttonTitle, 'مبيعات') && ! str_contains($buttonTitle, 'مردود') && ! str_contains($buttonTitle, 'اصناف');
+                $isSoldItems = str_contains($buttonTitle, 'اصناف') || str_contains($buttonPayload, 'sold');
+                $isReturns = str_contains($buttonTitle, 'مردود') || str_contains($buttonPayload, 'return');
 
                 // Fallback: try button payload keywords
-                if (!$isSalesReport && !$isSoldItems && !$isReturns) {
+                if (! $isSalesReport && ! $isSoldItems && ! $isReturns) {
                     $isSalesReport = str_contains($buttonPayload, 'sales') || str_contains($buttonPayload, 'report');
                 }
 
@@ -663,10 +681,10 @@ class WhatsAppCloudApiController extends Controller
                     $shiftId = $m[1];
                 }
 
-                \Illuminate\Support\Facades\Log::info('WhatsApp Cloud API: Shift ID: ' . $shiftId);
+                \Illuminate\Support\Facades\Log::info('WhatsApp Cloud API: Shift ID: '.$shiftId);
 
                 if ($shiftId) {
-                    \Illuminate\Support\Facades\Log::info('WhatsApp Cloud API: Shift ID found: ' . $shiftId);
+                    \Illuminate\Support\Facades\Log::info('WhatsApp Cloud API: Shift ID found: '.$shiftId);
                     $shiftPdfs = $this->getShiftPdfUrlsFromFirestore($shiftId, $collection);
                 } else {
                     \Illuminate\Support\Facades\Log::info('WhatsApp Cloud API: Shift ID not found.');
@@ -675,15 +693,15 @@ class WhatsAppCloudApiController extends Controller
 
                 if ($shiftPdfs) {
                     if ($isSoldItems) {
-                        $pdfUrl  = $shiftPdfs['sold_items_pdf_url'] ?? null;
-                        $label   = 'تقرير الأصناف المباعة';
+                        $pdfUrl = $shiftPdfs['sold_items_pdf_url'] ?? null;
+                        $label = 'تقرير الأصناف المباعة';
                     } elseif ($isReturns) {
-                        $pdfUrl  = $shiftPdfs['returns_pdf_url'] ?? null;
-                        $label   = 'تقرير مردودات المبيعات';
+                        $pdfUrl = $shiftPdfs['returns_pdf_url'] ?? null;
+                        $label = 'تقرير مردودات المبيعات';
                     } else {
                         // Default: main sales report
-                        $pdfUrl  = $shiftPdfs['pdf_url'] ?? null;
-                        $label   = 'تقرير المبيعات';
+                        $pdfUrl = $shiftPdfs['pdf_url'] ?? null;
+                        $label = 'تقرير المبيعات';
                     }
 
                     if ($pdfUrl) {
@@ -715,7 +733,7 @@ class WhatsAppCloudApiController extends Controller
                 }
             }
 
-            \Illuminate\Support\Facades\Log::info('WhatsApp Cloud API: Extracted Order ID: ' . ($orderId ?? 'Not found'));
+            \Illuminate\Support\Facades\Log::info('WhatsApp Cloud API: Extracted Order ID: '.($orderId ?? 'Not found'));
 
             if ($orderId) {
                 $pdfUrl = $this->getPdfUrlUsingOrderId($orderId);
@@ -727,33 +745,213 @@ class WhatsAppCloudApiController extends Controller
                     $this->sendTextToUser($from, "عذراً، لم يتم العثور على فاتورة مكتملة للطلب رقم {$orderId}، أو لم تكتمل الفاتورة بعد.", $phoneNumberId);
                 }
             } elseif ($textBody !== null) {
-                $this->sendTextToUser($from, "مرحباً بك في جودة لخدمات الغسيل! للحصول على فاتورتك، يرجى إرسال رقم الطلب الخاص بك (أرقام فقط).", $phoneNumberId);
+                $this->sendTextToUser($from, 'مرحباً بك في جودة لخدمات الغسيل! للحصول على فاتورتك، يرجى إرسال رقم الطلب الخاص بك (أرقام فقط).', $phoneNumberId);
             }
         }
     }
-       /**
+
+    /**
+     * Handle a button reply on the "visit_documents_menu" template: parse
+     * the "{type}:{visitId}" payload sent in VisitDocumentsWhatsAppController,
+     * generate the matching PDF on the fly, and send it back as a document.
+     */
+    protected function handleJawdaMedicalMessage(bool $isButtonMessage, ?array $buttonData, ?string $textBody, ?string $from, $phoneNumberId): void
+    {
+        if (! $from) {
+            return;
+        }
+
+        if ($isButtonMessage && $buttonData !== null) {
+            $this->handleJawdaMedicalButtonReply($buttonData, $from, $phoneNumberId);
+
+            return;
+        }
+
+        if ($textBody !== null) {
+            $this->handleJawdaMedicalTextReply($textBody, $from, $phoneNumberId);
+        }
+    }
+
+    /**
+     * Quick-reply buttons from the "visit_documents_menu" template — payload
+     * is "{type}:{visitId}", generated on the fly and sent back as a document.
+     */
+    protected function handleJawdaMedicalButtonReply(array $buttonData, string $from, $phoneNumberId): void
+    {
+        $payload = $buttonData['payload'] ?? null;
+        if (! $payload || ! str_contains($payload, ':')) {
+            return;
+        }
+
+        [$docType, $visitId] = explode(':', $payload, 2);
+        $visit = DoctorVisit::find((int) $visitId);
+
+        if (! $visit) {
+            $this->sendTextToUser($from, 'عذراً، تعذر العثور على بيانات الزيارة.', $phoneNumberId);
+
+            return;
+        }
+
+        [$fileContent, $filename, $label] = match ($docType) {
+            'medical_report' => $this->buildMedicalReportDocument($visit),
+            'diagnosis' => $this->buildDiagnosisDocument($visit),
+            'prescription' => $this->buildPrescriptionDocument($visit),
+            default => [null, null, null],
+        };
+
+        if (! $fileContent) {
+            $this->sendTextToUser($from, 'عذراً، نوع المستند غير معروف.', $phoneNumberId);
+
+            return;
+        }
+
+        $this->sendTextToUser($from, "سيتم إرسال {$label} خلال لحظات...", $phoneNumberId);
+        $this->sendGeneratedDocumentToUser($from, $fileContent, $filename, $label, $phoneNumberId);
+    }
+
+    /**
+     * Self-service lab result lookup: patient texts back their visit/file
+     * number and receives their lab report PDF. Reads from the same
+     * Firestore collection (Setting::firestore_result_collection) that the
+     * Lab Workstation already writes results into when a result is uploaded
+     * (see UploadLabResultToFirebase::storeResultUrlInFirestore).
+     */
+    protected function handleJawdaMedicalTextReply(string $textBody, string $from, $phoneNumberId): void
+    {
+        $visitId = trim($textBody);
+
+        if (! ctype_digit($visitId)) {
+            $this->sendTextToUser($from, 'مرحباً، يرجى إرسال رقم الزيارة فقط للحصول على نتيجة المختبر.', $phoneNumberId);
+
+            return;
+        }
+
+        $collection = Setting::first()?->firestore_result_collection;
+        if (! $collection) {
+            Log::warning('WhatsApp Cloud API: firestore_result_collection not configured in settings.');
+            $this->sendTextToUser($from, 'عذراً، حدث خطأ في النظام. يرجى مراجعة العيادة.', $phoneNumberId);
+
+            return;
+        }
+
+        $resultUrl = $this->getResultUrlFromFirestore($visitId, $collection);
+
+        if (! $resultUrl) {
+            $this->sendTextToUser($from, 'عذراً، لم يتم العثور على نتيجة لهذا الرقم بعد. يرجى المحاولة لاحقاً.', $phoneNumberId);
+
+            return;
+        }
+
+        $this->sendTextToUser($from, 'سيتم إرسال نتيجة المختبر خلال لحظات...', $phoneNumberId);
+        $this->sendDocumentToUser($from, $resultUrl, $visitId, $phoneNumberId);
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
+    protected function buildMedicalReportDocument(DoctorVisit $visit): array
+    {
+        $visit->loadMissing(['patient', 'doctor', 'medicalReport.user']);
+        $report = $visit->medicalReport ?? new VisitMedicalReport(['doctor_visit_id' => $visit->id]);
+        if (! $report->relationLoaded('doctorVisit')) {
+            $report->setRelation('doctorVisit', $visit);
+        }
+
+        $content = (new VisitMedicalReportPdf($report))->generate();
+
+        return [$content, 'medical_report.pdf', 'التقرير الطبي'];
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
+    protected function buildDiagnosisDocument(DoctorVisit $visit): array
+    {
+        $visit->loadMissing(['patient', 'doctor', 'diagnosis.user']);
+        $diagnosis = $visit->diagnosis ?? new VisitDiagnosis;
+        if (! $diagnosis->relationLoaded('doctorVisit')) {
+            $diagnosis->setRelation('doctorVisit', $visit);
+        }
+
+        $content = (new VisitDiagnosisPdf($diagnosis))->generate();
+
+        return [$content, 'diagnosis.pdf', 'التشخيص'];
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
+    protected function buildPrescriptionDocument(DoctorVisit $visit): array
+    {
+        $visit->load(['patient', 'doctor', 'prescriptions.items']);
+        $content = (new VisitPrescriptionsPdf($visit))->generate();
+
+        return [$content, 'prescription.pdf', 'الوصفة العلاجية'];
+    }
+
+    /**
+     * Send raw, freshly generated bytes (e.g. a PDF that has no public URL
+     * yet) as a WhatsApp document, uploading to Meta's Media API first.
+     */
+    protected function sendGeneratedDocumentToUser(string $to, string $fileContent, string $filename, ?string $caption, $phoneNumberId = null): void
+    {
+        try {
+            $accessToken = $this->whatsappService->getAccessToken();
+            $result = $this->whatsappService->sendDocumentBytes(
+                $to,
+                $fileContent,
+                'application/pdf',
+                $filename,
+                $caption,
+                $accessToken,
+                $phoneNumberId
+            );
+
+            if ($result['success']) {
+                Log::info('WhatsApp Cloud API: Generated document sent successfully.', [
+                    'to' => $to,
+                    'filename' => $filename,
+                    'message_id' => $result['message_id'] ?? null,
+                ]);
+            } else {
+                Log::error('WhatsApp Cloud API: Failed to send generated document.', [
+                    'to' => $to,
+                    'filename' => $filename,
+                    'error' => $result['error'] ?? 'Unknown error',
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('WhatsApp Cloud API: Exception while sending generated document.', [
+                'to' => $to,
+                'filename' => $filename,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * Get result URL from Firestore using visit ID/code.
-     * Based on UltramsgController::getResultUrlFromFirestore method.
      *
-     * @param string $visitId The visit ID or code to look up
-     * @param string|null $collection Optional collection name (defaults to settings.firestore_result_collection)
+     * @param  string  $visitId  The visit ID or code to look up
+     * @param  string|null  $collection  Optional collection name (defaults to settings.firestore_result_collection)
      * @return string|null The result URL or null if not found
      */
     protected function getResultUrlFromFirestore(string $visitId, ?string $collection = null): ?string
     {
         try {
             $projectId = config('firebase.project_id');
-            if (!$projectId) {
+            if (! $projectId) {
                 Log::warning('Firebase project ID not configured for Firestore read');
+
                 return null;
             }
 
             $accessToken = FirebaseService::getAccessToken();
-            if (!$accessToken) {
+            if (! $accessToken) {
                 Log::warning('FCM access token unavailable for Firestore read');
+
                 return null;
             }
-
 
             $documentId = (string) $visitId;
             $url = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents/{$collection}/{$documentId}";
@@ -767,45 +965,49 @@ class WhatsAppCloudApiController extends Controller
                 // Extract result_url from Firestore document
                 if (isset($fields['result_url']['stringValue'])) {
                     $resultUrl = $fields['result_url']['stringValue'];
-                    Log::info("Retrieved result URL from Firestore", [
+                    Log::info('Retrieved result URL from Firestore', [
                         'collection' => $collection,
                         'document_id' => $documentId,
-                        'result_url' => $resultUrl
+                        'result_url' => $resultUrl,
                     ]);
+
                     return $resultUrl;
                 } else {
-                    Log::warning("Result URL not found in Firestore document", [
+                    Log::warning('Result URL not found in Firestore document', [
                         'collection' => $collection,
                         'document_id' => $documentId,
-                        'available_fields' => array_keys($fields)
+                        'available_fields' => array_keys($fields),
                     ]);
+
                     return null;
                 }
-            } else if ($response->status() === 404) {
-                Log::warning("Firestore document not found", [
+            } elseif ($response->status() === 404) {
+                Log::warning('Firestore document not found', [
                     'collection' => $collection,
-                    'document_id' => $documentId
+                    'document_id' => $documentId,
                 ]);
+
                 return null;
             } else {
-                Log::warning("Failed to get Firestore document", [
+                Log::warning('Failed to get Firestore document', [
                     'collection' => $collection,
                     'document_id' => $documentId,
                     'status' => $response->status(),
-                    'body' => $response->body()
+                    'body' => $response->body(),
                 ]);
+
                 return null;
             }
         } catch (\Exception $e) {
-            Log::error("Failed to get result URL from Firestore", [
+            Log::error('Failed to get result URL from Firestore', [
                 'visit_id' => $visitId,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
-
 
     /**
      * Fetch all PDF URLs for a shift from Firestore.
@@ -816,14 +1018,16 @@ class WhatsAppCloudApiController extends Controller
     {
         try {
             $projectId = config('firebase.project_id');
-            if (!$projectId) {
+            if (! $projectId) {
                 Log::warning('Firebase project ID not configured');
+
                 return null;
             }
 
             $accessToken = \App\Services\FirebaseService::getAccessToken();
-            if (!$accessToken) {
+            if (! $accessToken) {
                 Log::warning('FCM access token unavailable');
+
                 return null;
             }
 
@@ -832,25 +1036,26 @@ class WhatsAppCloudApiController extends Controller
 
             $response = \Illuminate\Support\Facades\Http::withToken($accessToken)->get($url);
 
-            if (!$response->successful()) {
-                Log::warning("Shift Firestore document not found", ['shift_id' => $shiftId, 'status' => $response->status()]);
+            if (! $response->successful()) {
+                Log::warning('Shift Firestore document not found', ['shift_id' => $shiftId, 'status' => $response->status()]);
+
                 return null;
             }
 
             $fields = $response->json()['fields'] ?? [];
 
             return [
-                'pdf_url'            => $fields['pdf_url']['stringValue'] ?? null,
-                'cost_pdf_url'       => $fields['cost_pdf_url']['stringValue'] ?? null,
+                'pdf_url' => $fields['pdf_url']['stringValue'] ?? null,
+                'cost_pdf_url' => $fields['cost_pdf_url']['stringValue'] ?? null,
                 'sold_items_pdf_url' => $fields['sold_items_pdf_url']['stringValue'] ?? null,
-                'returns_pdf_url'    => $fields['returns_pdf_url']['stringValue'] ?? null,
+                'returns_pdf_url' => $fields['returns_pdf_url']['stringValue'] ?? null,
             ];
         } catch (\Exception $e) {
-            Log::error("Failed to fetch shift PDF URLs from Firestore", ['shift_id' => $shiftId, 'error' => $e->getMessage()]);
+            Log::error('Failed to fetch shift PDF URLs from Firestore', ['shift_id' => $shiftId, 'error' => $e->getMessage()]);
+
             return null;
         }
     }
-
 
     /**
      * Send a document to a user via WhatsApp Cloud API.
@@ -905,7 +1110,7 @@ class WhatsAppCloudApiController extends Controller
     protected function sendTextToUser(string $to, string $text, $phoneNumberId = null): void
     {
         try {
-            $result = $this->whatsappService->sendTextMessagehif($to, $text, null, $phoneNumberId);
+            $result = $this->whatsappService->sendTextMessage($to, $text, null, $phoneNumberId);
 
             if ($result['success']) {
                 Log::info('WhatsApp Cloud API: Text message sent successfully to user.', [
@@ -925,6 +1130,7 @@ class WhatsAppCloudApiController extends Controller
             ]);
         }
     }
+
     /**
      * Fetch PDF URL for an order from Firestore using public REST API.
      * Firestore path: system/alsamar/orders/{orderId}
@@ -940,8 +1146,9 @@ class WhatsAppCloudApiController extends Controller
 
             $response = Http::get($url);
 
-            if (!$response->successful()) {
-                Log::warning("Order Firestore document not found or inaccessible", ['order_id' => $orderId, 'status' => $response->status()]);
+            if (! $response->successful()) {
+                Log::warning('Order Firestore document not found or inaccessible', ['order_id' => $orderId, 'status' => $response->status()]);
+
                 return null;
             }
 
@@ -949,11 +1156,11 @@ class WhatsAppCloudApiController extends Controller
 
             return $fields['pdf_url']['stringValue'] ?? null;
         } catch (\Exception $e) {
-            Log::error("Failed to fetch order PDF URL from Firestore", ['order_id' => $orderId, 'error' => $e->getMessage()]);
+            Log::error('Failed to fetch order PDF URL from Firestore', ['order_id' => $orderId, 'error' => $e->getMessage()]);
+
             return null;
         }
     }
-
 
     /**
      * Handle message status updates.
@@ -980,10 +1187,10 @@ class WhatsAppCloudApiController extends Controller
         try {
             // broadcast(new \App\Events\WhatsAppStatusUpdated($messageId, $currentStatus, $errorInfo));
         } catch (\Throwable $e) {
-            Log::warning('Failed to broadcast WhatsApp status update: ' . $e->getMessage());
+            Log::warning('Failed to broadcast WhatsApp status update: '.$e->getMessage());
         }
     }
-    
+
     /**
      * Handle incoming image messages.
      */
@@ -993,8 +1200,9 @@ class WhatsAppCloudApiController extends Controller
         $caption = $imageData['caption'] ?? '';
         $mimeType = $imageData['mime_type'] ?? 'image/jpeg';
 
-        if (!$mediaId) {
+        if (! $mediaId) {
             Log::warning('WhatsApp Cloud API: Image message missing media ID.');
+
             return;
         }
 
@@ -1004,17 +1212,19 @@ class WhatsAppCloudApiController extends Controller
         ]);
 
         $mediaUrl = $this->whatsappService->getMediaUrl($mediaId);
-        Log::info("whatsapp image url",[$mediaUrl]);
+        Log::info('whatsapp image url', [$mediaUrl]);
 
-        if (!$mediaUrl) {
-            Log::error('WhatsApp Cloud API: Could not retrieve media URL for ID ' . $mediaId);
+        if (! $mediaUrl) {
+            Log::error('WhatsApp Cloud API: Could not retrieve media URL for ID '.$mediaId);
+
             return;
         }
 
         $content = $this->whatsappService->downloadMedia($mediaUrl);
 
-        if (!$content) {
-            Log::error('WhatsApp Cloud API: Could not download media content for URL ' . $mediaUrl);
+        if (! $content) {
+            Log::error('WhatsApp Cloud API: Could not download media content for URL '.$mediaUrl);
+
             return;
         }
 
@@ -1028,7 +1238,7 @@ class WhatsAppCloudApiController extends Controller
             $extension = 'webp';
         }
 
-        $filename = "whatsapp_image_{$messageId}_{$from}." . $extension;
+        $filename = "whatsapp_image_{$messageId}_{$from}.".$extension;
         $path = "whatsapp/images/{$filename}";
 
         try {
@@ -1045,5 +1255,4 @@ class WhatsAppCloudApiController extends Controller
             ]);
         }
     }
-
 }

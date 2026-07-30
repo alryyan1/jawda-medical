@@ -33,6 +33,7 @@ use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\UserDocSelection;
 use App\Services\RequestedServiceHelper;
+use App\Services\WhatsAppCloudApiService;
 use App\Zebra;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -1769,41 +1770,7 @@ class PatientController extends Controller
 
         $this->uploadToFirebase($doctorvisit->patient);
 
-        $settings = Setting::first();
-        $token = $settings?->ultramsg_token ?? '';
-        $instanceId = $settings?->ultramsg_instance_id ?? '';
-        $collection = $settings?->firestore_result_collection ?? '';
-
-        // return $doctorvisit->patient->result_url;
-
-        $response = HttpClient::asForm()->post(
-            'https://intaj-starstechnology.com/whatsapp/alroomy/jawda-medical/public/api/ultramsg/send-document-from-firebase',
-            [
-                'visit_id' => $doctorvisit->id,
-                'phone' => $doctorvisit->patient->phone,
-                'url' => $doctorvisit->patient->result_url,
-                'token' => $token,
-                'instance_id' => $instanceId,
-                'collection' => $collection,
-
-            ]
-        );
-
-        $responseData = $response->json() ?? [];
-
-        // Extract the nested WhatsApp API message if it exists
-        $whatsappMessage = $responseData['data']['message'] ?? null;
-
-        // Use WhatsApp API message as main message if available, otherwise use default
-        $message = $whatsappMessage ?? ($response->successful() ? 'report sent successfully' : 'failed to send report');
-
-        return response()->json([
-            'success' => $response->successful(),
-            'status' => $response->successful(),
-            'status_code' => $response->status(),
-            'data' => $responseData,
-            'message' => $message,
-        ], $response->status());
+        return $this->sendResultUrlViaWhatsApp($doctorvisit);
     }
 
     public function sendWhatsappDirectWithoutUpload(Request $request)
@@ -1814,37 +1781,38 @@ class PatientController extends Controller
             return ['status' => false, 'message' => 'no data found'];
         }
 
-        $settings = Setting::first();
-        $token = $settings?->ultramsg_token ?? '';
-        $instanceId = $settings?->ultramsg_instance_id ?? '';
-        $collection = $settings?->firestore_result_collection ?? '';
-        $response = HttpClient::asForm()->post(
-            'https://intaj-starstechnology.com/whatsapp/alroomy/jawda-medical/public/api/ultramsg/send-document-from-firebase',
-            [
-                'visit_id' => $doctorvisit->id,
-                'phone' => $doctorvisit->patient->phone,
-                'url' => $doctorvisit->patient->result_url,
-                'token' => $token,
-                'instance_id' => $instanceId,
-                'collection' => $collection,
-            ]
+        return $this->sendResultUrlViaWhatsApp($doctorvisit);
+    }
+
+    /**
+     * Sends the patient's already-hosted result PDF URL as a WhatsApp document.
+     */
+    private function sendResultUrlViaWhatsApp(DoctorVisit $doctorvisit): \Illuminate\Http\JsonResponse
+    {
+        $formattedPhone = WhatsAppCloudApiService::formatPhoneNumber($doctorvisit->patient->phone ?? '');
+        if (! $formattedPhone) {
+            return response()->json([
+                'success' => false,
+                'status' => false,
+                'message' => 'Invalid phone number format for WhatsApp.',
+            ], 422);
+        }
+
+        $result = (new WhatsAppCloudApiService)->sendDocument(
+            $formattedPhone,
+            $doctorvisit->patient->result_url,
+            'result.pdf',
+            'Lab Result'
         );
 
-        $responseData = $response->json() ?? [];
-
-        // Extract the nested WhatsApp API message if it exists
-        $whatsappMessage = $responseData['data']['message'] ?? null;
-
-        // Use WhatsApp API message as main message if available, otherwise use default
-        $message = $whatsappMessage ?? ($response->successful() ? 'report sent successfully' : 'failed to send report');
-
         return response()->json([
-            'success' => $response->successful(),
-            'status' => $response->successful(),
-            'status_code' => $response->status(),
-            'data' => $responseData,
-            'message' => $message,
-        ], $response->status());
+            'success' => $result['success'],
+            'status' => $result['success'],
+            'data' => $result['data'] ?? null,
+            'message' => $result['success']
+                ? 'report sent successfully'
+                : ($result['error'] ?? 'failed to send report'),
+        ], $result['success'] ? 200 : 400);
     }
 
     private function calculateNameSimilarity($oldName, $newName)

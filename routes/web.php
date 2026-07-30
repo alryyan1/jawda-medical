@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\CompanyReportController;
 use App\Http\Controllers\Api\ReportController;
-use App\Http\Controllers\WebHookController;
 use App\Http\Controllers\InsuranceReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -41,13 +40,6 @@ Route::get('/visits/{visit}/lab-report/pdf', [ReportController::class, 'result']
 
 // Excel
 Route::get('/excel/reclaim', [\App\Http\Controllers\Api\ExcelController::class, 'reclaim']);
-
-// Webhooks
-Route::get('/webhook', [WebHookController::class, 'webhook']);
-Route::post('/webhook', [WebHookController::class, 'webhook']);
-
-// WhatsApp / Ultramsg
-Route::get('/ultramsg/send-document-from-firebase', [\App\Http\Controllers\UltramsgController::class, 'sendDocumentFromFirebase']);
 
 // Firebase debug
 Route::get('/firebase-check', [\App\Http\Controllers\FirebaseDebugController::class, 'index']);

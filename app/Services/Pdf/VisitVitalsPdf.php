@@ -26,7 +26,7 @@ class VisitVitalsPdf extends TCPDF
 
         $this->setCreator('Jawda Medical');
         $this->setAuthor('Jawda Medical System');
-        $this->setTitle('العلامات الحيوية - زيارة #'.$visit->id);
+        $this->setTitle('Vital Signs - Visit #'.$visit->id);
 
         $this->setMargins(15, 15, 15);
         $this->setHeaderMargin(0);
@@ -45,12 +45,12 @@ class VisitVitalsPdf extends TCPDF
         $this->Ln(2);
         $this->SetFont('arial', 'I', 8);
         $this->SetTextColor(127, 140, 141);
-        $this->Cell(0, 5, 'صفحة '.$this->getAliasNumPage().' من '.$this->getAliasNbPages(), 0, 0, 'C');
+        $this->Cell(0, 5, 'Page '.$this->getAliasNumPage().' of '.$this->getAliasNbPages(), 0, 0, 'C');
     }
 
     public function generate(): string
     {
-        $this->setRTL(true);
+        $this->setRTL(false);
         $this->AddPage();
         $this->renderIdentityBlock();
         $this->renderBaselineSection();
@@ -68,7 +68,7 @@ class VisitVitalsPdf extends TCPDF
 
         $this->SetFont($font, 'B', 16);
         $this->SetTextColor(41, 98, 255);
-        $this->Cell($this->pageUsableWidth, 10, 'العلامات الحيوية', 0, 1, 'C');
+        $this->Cell($this->pageUsableWidth, 10, 'Vital Signs', 0, 1, 'C');
         $this->Ln(2);
 
         $drawCell = function (string $label, string $value) use ($col, $font) {
@@ -77,22 +77,22 @@ class VisitVitalsPdf extends TCPDF
             $this->Rect($x, $y, $col, 12, 'D');
             $this->SetFont($font, '', 7);
             $this->SetTextColor(120, 120, 120);
-            $this->SetXY($x, $y + 1.5);
-            $this->Cell($col - 2, 4, strtoupper($label), 0, 0, 'R');
+            $this->SetXY($x + 2, $y + 1.5);
+            $this->Cell($col - 4, 4, strtoupper($label), 0, 0, 'L');
             $this->SetFont($font, 'B', 9);
             $this->SetTextColor(30, 30, 30);
-            $this->SetXY($x, $y + 6);
-            $this->Cell($col - 2, 5, $value, 0, 0, 'R');
+            $this->SetXY($x + 2, $y + 6);
+            $this->Cell($col - 4, 5, $value, 0, 0, 'L');
             $this->SetXY($x + $col, $y);
         };
 
-        $drawCell('المريض', $patient?->name ?? '—');
-        $drawCell('رقم الزيارة', '#'.$this->visit->id);
-        $drawCell('الطبيب', $doctor?->name ?? '—');
+        $drawCell('Patient', $patient?->name ?? '—');
+        $drawCell('Visit', '#'.$this->visit->id);
+        $drawCell('Doctor', $doctor?->name ?? '—');
         $this->Ln(12);
 
-        $drawCell('العمر/الجنس', ($patient?->full_age ?? '—').' / '.($patient?->gender ?? '—'));
-        $drawCell('تاريخ الزيارة', optional($this->visit->visit_date)->format('Y-m-d') ?? '—');
+        $drawCell('Age/Gender', ($patient?->full_age ?? '—').' / '.($patient?->gender ?? '—'));
+        $drawCell('Visit Date', optional($this->visit->visit_date)->format('Y-m-d') ?? '—');
         $drawCell('', '');
         $this->Ln(16);
     }
@@ -103,13 +103,13 @@ class VisitVitalsPdf extends TCPDF
         $this->SetFillColor(240, 244, 248);
         $this->SetTextColor(44, 62, 80);
         $this->SetDrawColor(189, 195, 199);
-        $this->Cell($this->pageUsableWidth, 8, $title, 1, 1, 'R', true);
+        $this->Cell($this->pageUsableWidth, 8, $title, 1, 1, 'L', true);
         $this->Ln(1);
     }
 
     protected function renderBaselineSection(): void
     {
-        $this->sectionTitle('القيم الأساسية (خط الأساس)');
+        $this->sectionTitle('Baseline Values');
 
         $patient = $this->visit->patient;
         $history = $patient
@@ -119,13 +119,13 @@ class VisitVitalsPdf extends TCPDF
             : null;
 
         $rows = [
-            'ضغط الدم' => $history?->baseline_bp,
-            'معدل ضربات القلب' => $history?->baseline_heart_rate,
-            'درجة الحرارة' => $history?->baseline_temp,
-            'تشبع الأكسجين' => $history?->baseline_spo2,
-            'الوزن' => $history?->baseline_weight,
-            'الطول' => $history?->baseline_height,
-            'سكر الدم العشوائي' => $history?->baseline_rbs,
+            'Blood Pressure' => $history?->baseline_bp,
+            'Heart Rate' => $history?->baseline_heart_rate,
+            'Temperature' => $history?->baseline_temp,
+            'SpO2' => $history?->baseline_spo2,
+            'Weight' => $history?->baseline_weight,
+            'Height' => $history?->baseline_height,
+            'Random Blood Sugar' => $history?->baseline_rbs,
         ];
 
         $hasAny = collect($rows)->filter(fn ($v) => ! empty($v))->isNotEmpty();
@@ -133,7 +133,7 @@ class VisitVitalsPdf extends TCPDF
         if (! $hasAny) {
             $this->SetFont('arial', '', 9);
             $this->SetTextColor(150, 150, 150);
-            $this->Cell($this->pageUsableWidth, 6, 'لا توجد قيم أساسية مسجلة لهذا المريض.', 0, 1, 'R');
+            $this->Cell($this->pageUsableWidth, 6, 'No baseline values recorded for this patient.', 0, 1, 'L');
             $this->Ln(2);
 
             return;
@@ -148,28 +148,28 @@ class VisitVitalsPdf extends TCPDF
             if (empty($value)) {
                 continue;
             }
-            $this->Cell($wLabel, 6, $label, 0, 0, 'R');
-            $this->Cell($wValue, 6, (string) $value, 0, 1, 'R');
+            $this->Cell($wLabel, 6, $label, 0, 0, 'L');
+            $this->Cell($wValue, 6, (string) $value, 0, 1, 'L');
         }
         $this->Ln(2);
     }
 
     protected function renderReadingsSection(): void
     {
-        $this->sectionTitle('قراءات هذه الزيارة');
+        $this->sectionTitle('Readings for This Visit');
 
         $readings = $this->visit->vitals()->orderBy('recorded_at')->get();
 
         if ($readings->isEmpty()) {
             $this->SetFont('arial', '', 9);
             $this->SetTextColor(150, 150, 150);
-            $this->Cell($this->pageUsableWidth, 6, 'لم يتم تسجيل أي قراءات لهذه الزيارة.', 0, 1, 'R');
+            $this->Cell($this->pageUsableWidth, 6, 'No readings recorded for this visit.', 0, 1, 'L');
             $this->Ln(2);
 
             return;
         }
 
-        $headers = ['الوقت', 'ضغط الدم', 'النبض', 'التنفس', 'الحرارة', 'الأكسجين', 'الوزن', 'الطول', 'السكر'];
+        $headers = ['Time', 'BP', 'Pulse', 'Resp.', 'Pain', 'Temp.', 'SpO2', 'Weight', 'Height', 'RBS'];
         $widths = array_fill(0, count($headers), $this->pageUsableWidth / count($headers));
 
         $this->SetFont('arial', 'B', 8);
@@ -192,6 +192,7 @@ class VisitVitalsPdf extends TCPDF
                 $bp,
                 $reading->heart_rate ?? '—',
                 $reading->respiratory_rate ?? '—',
+                $reading->pain_scale ?? '—',
                 $reading->temperature ?? '—',
                 $reading->spo2 ? $reading->spo2.'%' : '—',
                 $reading->weight ?? '—',

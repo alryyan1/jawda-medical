@@ -3,19 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\LabRequestResource;
+use App\Http\Resources\PatientLabQueueItemResource;
+// If needed for generating sample IDs or other settings
 use App\Models\DoctorVisit;
 use App\Models\LabRequest;
-use App\Models\Setting; // If needed for generating sample IDs or other settings
-use Illuminate\Http\Request;
+use App\Models\Patient;
+use App\Models\Shift; // We can reuse this for the queue
+use Illuminate\Http\Request; // For returning updated lab requests
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use App\Http\Resources\PatientLabQueueItemResource; // We can reuse this for the queue
-use App\Http\Resources\LabRequestResource; // For returning updated lab requests
-use App\Services\UltramsgService;
 use Illuminate\Support\Facades\Log;
-use App\Models\Shift;
-use App\Models\Patient;
 
 class SampleCollectionController extends Controller
 {
@@ -39,7 +37,6 @@ class SampleCollectionController extends Controller
             'page' => 'nullable|integer|min:1',
         ]);
 
-
         $query = DoctorVisit::query()
             ->select(
                 'doctorvisits.id as visit_id',
@@ -56,7 +53,7 @@ class SampleCollectionController extends Controller
             )
             ->join('patients', 'doctorvisits.patient_id', '=', 'patients.id')
             ->leftJoin('doctors', 'doctorvisits.doctor_id', '=', 'doctors.id')
-           
+
             // Count of lab requests that need a sample for this visit
             ->withCount(['patientLabRequests as test_count']);
 
@@ -71,12 +68,10 @@ class SampleCollectionController extends Controller
                 $query->where('patients.name', 'LIKE', "%{$searchTerm}%");
             }
         }
-        
+
         $query->having('test_count', '>', 0); // Ensure visit still has samples to be collected
 
         $pendingSampleVisits = $query->orderBy('doctorvisits.id', 'desc')->get();
-        
-      
 
         return PatientLabQueueItemResource::collection($pendingSampleVisits);
     }
@@ -96,7 +91,7 @@ class SampleCollectionController extends Controller
         }
 
         // Generate Sample ID if not present
-        if (!$labrequest->sample_id) {
+        if (! $labrequest->sample_id) {
             $labrequest->sample_id = LabRequest::generateSampleId($labrequest->doctorVisit);
         }
 
@@ -135,7 +130,7 @@ class SampleCollectionController extends Controller
         DB::beginTransaction();
         try {
             foreach ($labRequestsToUpdate as $labrequest) {
-                if (!$labrequest->sample_id) {
+                if (! $labrequest->sample_id) {
                     $labrequest->sample_id = LabRequest::generateSampleId($visit);
                 }
                 $labrequest->sample_collected_at = $now;
@@ -149,7 +144,8 @@ class SampleCollectionController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Error marking all samples collected for visit {$visit->id}: " . $e->getMessage());
+            Log::error("Error marking all samples collected for visit {$visit->id}: ".$e->getMessage());
+
             return response()->json(['message' => 'Failed to mark all samples as collected.'], 500);
         }
 
@@ -187,7 +183,7 @@ class SampleCollectionController extends Controller
     public function markPatientSampleCollectedForVisit(Request $request, DoctorVisit $visit)
     {
         $patient = $visit->patient;
-        if (!$patient) {
+        if (! $patient) {
             return response()->json(['message' => 'Patient not found for this visit'], 404);
         }
 

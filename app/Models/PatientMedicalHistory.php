@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property int $patient_id
  * @property string|null $allergies
@@ -43,11 +43,16 @@ use Illuminate\Database\Eloquent\Model;
  * @property int|null $chronic_lymphadenopathy
  * @property int|null $chronic_peripheral_pulses_issue
  * @property int|null $chronic_feet_ulcer_history
+ * @property bool|null $chronic_hypertension
+ * @property bool|null $chronic_diabetes
+ * @property bool|null $chronic_heart_disease
+ * @property bool|null $chronic_ibs
  * @property string|null $overall_care_plan_summary
  * @property string|null $general_prescription_notes_summary
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \App\Models\Patient $patient
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|PatientMedicalHistory newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|PatientMedicalHistory newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|PatientMedicalHistory query()
@@ -92,6 +97,7 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|PatientMedicalHistory whereSkinSummary($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PatientMedicalHistory whereSocialHistory($value)
  * @method static \Illuminate\Database\Eloquent\Builder|PatientMedicalHistory whereUpdatedAt($value)
+ *
  * @mixin \Eloquent
  */
 class PatientMedicalHistory extends Model
@@ -113,6 +119,7 @@ class PatientMedicalHistory extends Model
         'chronic_juandice', 'chronic_pallor', 'chronic_clubbing', 'chronic_cyanosis',
         'chronic_edema_feet', 'chronic_dehydration_tendency', 'chronic_lymphadenopathy',
         'chronic_peripheral_pulses_issue', 'chronic_feet_ulcer_history',
+        'chronic_hypertension', 'chronic_diabetes', 'chronic_heart_disease', 'chronic_ibs',
         'overall_care_plan_summary', 'general_prescription_notes_summary',
     ];
 
@@ -122,7 +129,17 @@ class PatientMedicalHistory extends Model
         'baseline_height' => 'decimal:2',
         'chronic_juandice' => 'boolean',
         'chronic_pallor' => 'boolean',
-        // ... cast other booleans
+        'chronic_clubbing' => 'boolean',
+        'chronic_cyanosis' => 'boolean',
+        'chronic_edema_feet' => 'boolean',
+        'chronic_dehydration_tendency' => 'boolean',
+        'chronic_lymphadenopathy' => 'boolean',
+        'chronic_peripheral_pulses_issue' => 'boolean',
+        'chronic_feet_ulcer_history' => 'boolean',
+        'chronic_hypertension' => 'boolean',
+        'chronic_diabetes' => 'boolean',
+        'chronic_heart_disease' => 'boolean',
+        'chronic_ibs' => 'boolean',
     ];
 
     public function patient()

@@ -1,10 +1,11 @@
 <?php
+
 namespace App\Http\Resources;
 
 use App\Models\HormoneResult;
 use App\Models\Mindray;
 use App\Models\SysmexResult;
-use App\Services\UltramsgService;
+use App\Services\WhatsAppCloudApiService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,17 +16,17 @@ class PatientLabQueueItemResource extends JsonResource
         // Use eager-loaded data - NO additional queries!
         $patient = $this->patient;
         // Use labRequests (direct relation) if available, fallback to patientLabRequests
-        $labRequests = $this->relationLoaded('labRequests') 
-            ? $this->labRequests 
+        $labRequests = $this->relationLoaded('labRequests')
+            ? $this->labRequests
             : ($this->relationLoaded('patientLabRequests') ? $this->patientLabRequests : collect());
-        
+
         // Calculate from eager-loaded results (no DB queries)
         $totalResultsCount = 0;
         $pendingResultsCount = 0;
         $unpaidCount = 0;
-        
+
         foreach ($labRequests as $lr) {
-            if (!$lr->is_paid) {
+            if (! $lr->is_paid) {
                 $unpaidCount++;
             }
             // Use eager-loaded results relation
@@ -38,15 +39,15 @@ class PatientLabQueueItemResource extends JsonResource
                 }
             }
         }
-        
+
         $isPrinted = $patient->result_print_date != null;
         $areAllPaid = $labRequests->isNotEmpty() && $unpaidCount === 0;
-        
+
         // Check for CBC/Chemistry/Hormone by checking actual database tables
         $hasCbc = SysmexResult::where('doctorvisit_id', '=', $this->id)->exists();
         $hasChemistry = Mindray::where('doctorvisit_id', '=', $this->id)->exists();
         $hasHormone = HormoneResult::where('doctorvisit_id', '=', $this->id)->exists();
-        
+
         return [
             'total_result_count' => $totalResultsCount,
             'pending_result_count' => $pendingResultsCount,
@@ -59,7 +60,7 @@ class PatientLabQueueItemResource extends JsonResource
             'has_cbc' => $hasCbc,
             'has_chemistry' => $hasChemistry,
             'has_hormone' => $hasHormone,
-            'patient_phone_for_whatsapp' => $patient ? UltramsgService::formatPhoneNumber($patient->phone) : null,
+            'patient_phone_for_whatsapp' => $patient ? WhatsAppCloudApiService::formatPhoneNumber($patient->phone) : null,
             'is_result_locked' => (bool) ($patient->result_is_locked ?? false),
             'is_printed' => $isPrinted,
             'print_date' => $patient->result_print_date ?? null,
@@ -76,7 +77,7 @@ class PatientLabQueueItemResource extends JsonResource
             'all_requests_paid' => $areAllPaid,
             'all_requests_paid_for_badge' => $areAllPaid,
             'is_last_result_pending' => ($totalResultsCount > 0 && $pendingResultsCount === 1),
-            'is_ready_for_print' => ($pendingResultsCount == 0 && !$isPrinted),
+            'is_ready_for_print' => ($pendingResultsCount == 0 && ! $isPrinted),
             'sample_collected' => ($patient->sample_collect_time ?? null) != null,
             'sample_collection_time' => $patient->sample_collect_time ?? null,
             'sample_collected_by' => $patient->sampleCollectedBy->name ?? null, // Eager loaded
@@ -90,14 +91,23 @@ class PatientLabQueueItemResource extends JsonResource
 
     protected function formatPatientAge($patient): ?string
     {
-        if (!$patient) return null;
+        if (! $patient) {
+            return null;
+        }
         $y = (int) ($patient->age_year ?? 0);
         $m = (int) ($patient->age_month ?? 0);
         $d = (int) ($patient->age_day ?? 0);
         $parts = [];
-        if ($y > 0) $parts[] = $y . 'Y';
-        if ($m > 0) $parts[] = $m . 'M';
-        if ($d > 0 || empty($parts)) $parts[] = $d . 'D';
+        if ($y > 0) {
+            $parts[] = $y.'Y';
+        }
+        if ($m > 0) {
+            $parts[] = $m.'M';
+        }
+        if ($d > 0 || empty($parts)) {
+            $parts[] = $d.'D';
+        }
+
         return implode(' ', $parts);
     }
 }

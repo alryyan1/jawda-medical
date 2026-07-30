@@ -18,6 +18,7 @@ class VisitVitalResource extends JsonResource
             'temperature' => $this->temperature,
             'heart_rate' => $this->heart_rate,
             'respiratory_rate' => $this->respiratory_rate,
+            'pain_scale' => $this->pain_scale,
             'spo2' => $this->spo2,
             'weight' => $this->weight,
             'height' => $this->height,
