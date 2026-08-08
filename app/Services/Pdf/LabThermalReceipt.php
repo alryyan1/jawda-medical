@@ -10,15 +10,25 @@ use Illuminate\Support\Facades\Auth;
 class LabThermalReceipt extends MyCustomTCPDF
 {
     protected DoctorVisit $visit;
+
     protected array $labRequestsToPrint;
+
     protected Setting $appSettings;
+
     protected bool $isCompanyPatient;
+
     protected string $cashierName;
+
     protected string $fontName;
+
     protected bool $isRTL;
+
     protected string $alignStart;
+
     protected string $alignEnd;
+
     protected string $alignCenter;
+
     protected float $lineHeight;
 
     public function __construct(DoctorVisit $visit, array $labRequestsToPrint = [])
@@ -28,7 +38,7 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->visit = $visit;
         $this->labRequestsToPrint = $labRequestsToPrint ?: $visit->patientLabRequests->toArray();
         $this->appSettings = Setting::instance();
-        $this->isCompanyPatient = !empty($visit->patient->company_id);
+        $this->isCompanyPatient = ! empty($visit->patient->company_id);
         $this->cashierName = Auth::user()?->name ?? $visit->user?->name ?? $this->labRequestsToPrint[0]['deposit_user']?->name ?? 'النظام';
 
         // Set thermal defaults
@@ -55,8 +65,8 @@ class LabThermalReceipt extends MyCustomTCPDF
 
     public function SetFont($family, $style = '', $size = 0, $fontfile = '', $subset = 'default', $out = true)
     {
-        if (!str_contains($style, 'B')) {
-            $style = 'B' . $style;
+        if (! str_contains($style, 'B')) {
+            $style = 'B'.$style;
         }
         parent::SetFont($family, $style, $size, $fontfile, $subset, $out);
     }
@@ -73,7 +83,7 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->generateFooter();
 
         $patientNameSanitized = preg_replace('/[^A-Za-z0-9\-\_\ء-ي]/u', '_', $this->visit->patient->name);
-        $pdfFileName = 'LabReceipt_Visit_' . $this->visit->id . '_' . $patientNameSanitized . '.pdf';
+        $pdfFileName = 'LabReceipt_Visit_'.$this->visit->id.'_'.$patientNameSanitized.'.pdf';
 
         return $this->Output($pdfFileName, 'S');
     }
@@ -82,34 +92,9 @@ class LabThermalReceipt extends MyCustomTCPDF
     {
         // Logo
         $logoData = null;
-        if ($this->appSettings?->header_base64) {
-            try {
-                $originalImageData = null;
-
-                // Check if it's a file path
-                if (file_exists($this->appSettings->header_base64)) {
-                    $originalImageData = file_get_contents($this->appSettings->header_base64);
-                }
-                // Check if it's base64 data with data URI scheme
-                elseif (str_starts_with($this->appSettings->header_base64, 'data:image')) {
-                    $originalImageData = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $this->appSettings->header_base64));
-                }
-                // Check if it's raw base64 encoded string
-                elseif (base64_decode($this->appSettings->header_base64, true) !== false) {
-                    $originalImageData = base64_decode($this->appSettings->header_base64);
-                }
-
-                // Optimize the image for better performance
-                if ($originalImageData) {
-                    $logoData = $this->optimizeImage($originalImageData);
-                }
-            } catch (\Exception $e) {
-                // Logo data invalid, continue without logo
-            }
-        }
 
         if ($logoData) {
-            $this->Image('@' . $logoData, '', 5, 30, 0, '', '', 'T', false, 300, $this->alignCenter, false, false, (float)0, false, false, false);
+            $this->Image('@'.$logoData, '', 5, 30, 0, '', '', 'T', false, 300, $this->alignCenter, false, false, (float) 0, false, false, false);
             $this->Ln($logoData ? 10 : 1);
             $this->Ln(15);
         }
@@ -124,10 +109,10 @@ class LabThermalReceipt extends MyCustomTCPDF
             $this->MultiCell(0, $this->lineHeight - 0.5, $this->appSettings->address, 0, $this->alignCenter, false, 1);
         }
         if ($this->appSettings?->phone) {
-            $this->MultiCell(0, $this->lineHeight - 0.5, "هاتف: " . $this->appSettings->phone, 0, $this->alignCenter, false, 1);
+            $this->MultiCell(0, $this->lineHeight - 0.5, 'هاتف: '.$this->appSettings->phone, 0, $this->alignCenter, false, 1);
         }
         if ($this->appSettings?->vatin) {
-            $this->MultiCell(0, $this->lineHeight - 0.5, "ر.ض: " . $this->appSettings->vatin, 0, $this->alignCenter, false, 1);
+            $this->MultiCell(0, $this->lineHeight - 0.5, 'ر.ض: '.$this->appSettings->vatin, 0, $this->alignCenter, false, 1);
         }
 
         $this->Ln(1);
@@ -140,7 +125,7 @@ class LabThermalReceipt extends MyCustomTCPDF
         $this->SetFont($this->fontName, 'B', 12);
 
         // Patient name (first line, left aligned)
-        $this->Cell(0, $this->lineHeight + 1, 'الاسم / ' . $this->visit->patient->name, 0, 1, $this->alignStart);
+        $this->Cell(0, $this->lineHeight + 1, 'الاسم / '.$this->visit->patient->name, 0, 1, $this->alignStart);
 
         // Doctor name (second line, left aligned)
         // if ($this->visit->doctor) {
@@ -151,8 +136,8 @@ class LabThermalReceipt extends MyCustomTCPDF
 
         // Visit number in the middle and date on the right
         $this->SetFont($this->fontName, 'B', 13);
-        $visitNumber = "ID " . $this->visit->patient->visit_number;
-        $date = Carbon::now()->format('Y/m/d H:i A') . ' التاريخ ';
+        $visitNumber = 'ID '.$this->visit->patient->visit_number;
+        $date = Carbon::now()->format('Y/m/d H:i A').' التاريخ ';
 
         // Calculate positions for center and right alignment
         $pageWidth = $this->getPageWidth() - $this->getMargins()['left'] - $this->getMargins()['right'];
@@ -179,24 +164,24 @@ class LabThermalReceipt extends MyCustomTCPDF
             $this->SetFont($this->fontName, '', 9);
 
             // Company name
-            if (!empty($this->visit->patient->company?->name)) {
-                $this->MultiCell(0, $this->lineHeight, 'اسم الشركة: ' . $this->visit->patient->company->name, 0, $this->alignStart, false, 1);
+            if (! empty($this->visit->patient->company?->name)) {
+                $this->MultiCell(0, $this->lineHeight, 'اسم الشركة: '.$this->visit->patient->company->name, 0, $this->alignStart, false, 1);
             }
             // Subcompany name
-            if (!empty($this->visit->patient->subcompany?->name)) {
-                $this->MultiCell(0, $this->lineHeight, 'اسم الشركة الفرعية: ' . $this->visit->patient->subcompany->name, 0, $this->alignStart, false, 1);
+            if (! empty($this->visit->patient->subcompany?->name)) {
+                $this->MultiCell(0, $this->lineHeight, 'اسم الشركة الفرعية: '.$this->visit->patient->subcompany->name, 0, $this->alignStart, false, 1);
             }
             // Insurance number
-            if (!empty($this->visit->patient->insurance_no)) {
-                $this->MultiCell(0, $this->lineHeight, 'رقم التأمين: ' . $this->visit->patient->insurance_no, 0, $this->alignStart, false, 1);
+            if (! empty($this->visit->patient->insurance_no)) {
+                $this->MultiCell(0, $this->lineHeight, 'رقم التأمين: '.$this->visit->patient->insurance_no, 0, $this->alignStart, false, 1);
             }
             // Guarantor
-            if (!empty($this->visit->patient->guarantor)) {
-                $this->MultiCell(0, $this->lineHeight, 'الضامن: ' . $this->visit->patient->guarantor, 0, $this->alignStart, false, 1);
+            if (! empty($this->visit->patient->guarantor)) {
+                $this->MultiCell(0, $this->lineHeight, 'الضامن: '.$this->visit->patient->guarantor, 0, $this->alignStart, false, 1);
             }
             // Company relation
-            if (!empty($this->visit->patient->company_relation?->name)) {
-                $this->MultiCell(0, $this->lineHeight, 'اسم العلاقة: ' . $this->visit->patient->company_relation->name, 0, $this->alignStart, false, 1);
+            if (! empty($this->visit->patient->company_relation?->name)) {
+                $this->MultiCell(0, $this->lineHeight, 'اسم العلاقة: '.$this->visit->patient->company_relation->name, 0, $this->alignStart, false, 1);
             }
 
             $this->Ln(2);
@@ -235,16 +220,16 @@ class LabThermalReceipt extends MyCustomTCPDF
             'text' => true,
             'font' => $this->fontName,
             'fontsize' => 8,
-            'stretchtext' => 4
+            'stretchtext' => 4,
         ];
 
         // Generate the barcode
-        $this->write1DBarcode($barcodeValue, 'C128B', $barcodeWidth, '', '', (float)15, (float)0.3, $style, 'N');
+        $this->write1DBarcode($barcodeValue, 'C128B', $barcodeWidth, '', '', (float) 15, (float) 0.3, $style, 'N');
 
         // Add visit ID text below barcode
         $this->Ln(2);
         $this->SetFont($this->fontName, '', 8);
-        $visitIdText = "رقم الزيارة: " . $barcodeValue;
+        $visitIdText = 'رقم الزيارة: '.$barcodeValue;
         $textWidth = $this->GetStringWidth($visitIdText);
         $textCenterX = ($pageWidth - $textWidth) / 2;
         $this->SetX($this->getMargins()['left'] + $textCenterX);
@@ -334,7 +319,7 @@ class LabThermalReceipt extends MyCustomTCPDF
             $this->SetFont($this->fontName, 'B', 30);
             $this->SetTextColor(220, 220, 220);
             $this->Rotate(45, $this->GetX() + ($pageUsableWidth / 3), $this->GetY() + 10);
-            $this->Text($this->GetX() + ($pageUsableWidth / 4), $this->GetY(), $this->isCompanyPatient ? $this->visit->patient->company->name : "PAID");
+            $this->Text($this->GetX() + ($pageUsableWidth / 4), $this->GetY(), $this->isCompanyPatient ? $this->visit->patient->company->name : 'PAID');
             $this->Rotate(0);
             $this->SetTextColor(0, 0, 0);
         }
@@ -360,21 +345,21 @@ class LabThermalReceipt extends MyCustomTCPDF
 
     /**
      * Optimize image for PDF embedding using GD library - resize and convert to JPEG
-     * 
-     * @param string $imageData Raw image data
+     *
+     * @param  string  $imageData  Raw image data
      * @return string|null Optimized image data or null on failure
      */
     protected function optimizeImage(string $imageData): ?string
     {
         // Check if GD extension is available
-        if (!extension_loaded('gd')) {
+        if (! extension_loaded('gd')) {
             return $imageData; // Return original if GD is not available
         }
 
         try {
             // Create image from string using GD
             $image = @imagecreatefromstring($imageData);
-            if (!$image) {
+            if (! $image) {
                 return $imageData; // Return original if we can't process it
             }
 
@@ -389,13 +374,14 @@ class LabThermalReceipt extends MyCustomTCPDF
             if ($originalWidth > $maxWidth) {
                 $ratio = $maxWidth / $originalWidth;
                 $newWidth = $maxWidth;
-                $newHeight = (int)($originalHeight * $ratio);
+                $newHeight = (int) ($originalHeight * $ratio);
 
                 // Create new resized image with GD
                 $resizedImage = imagecreatetruecolor($newWidth, $newHeight);
 
-                if (!$resizedImage) {
+                if (! $resizedImage) {
                     imagedestroy($image);
+
                     return $imageData;
                 }
 

@@ -377,7 +377,7 @@ class DoctorVisitController extends Controller
                 fn ($query) => $query->where('file_id', $doctorVisit->file_id),
                 fn ($query) => $query->where('id', $doctorVisit->id)
             )
-            ->with(['doctor:id,name', 'requestedServices.service:id,name', 'patient', 'doctor'])
+            ->with(['doctor:id,name', 'requestedServices.service:id,name', 'patient', 'doctor', 'patientLabRequests'])
             ->orderBy('created_at', 'desc')
             ->get();
 

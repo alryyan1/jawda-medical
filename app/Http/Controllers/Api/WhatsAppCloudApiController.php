@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\VisitDiagnosis;
 use App\Models\VisitMedicalReport;
 use App\Services\FirebaseService;
+use App\Services\Pdf\LabResultReport;
 use App\Services\Pdf\VisitDiagnosisPdf;
 use App\Services\Pdf\VisitMedicalReportPdf;
 use App\Services\Pdf\VisitPrescriptionsPdf;
@@ -796,6 +797,7 @@ class WhatsAppCloudApiController extends Controller
             'medical_report' => $this->buildMedicalReportDocument($visit),
             'diagnosis' => $this->buildDiagnosisDocument($visit),
             'prescription' => $this->buildPrescriptionDocument($visit),
+            'lab_result' => $this->buildLabResultDocument($visit),
             default => [null, null, null],
         };
 
@@ -887,6 +889,16 @@ class WhatsAppCloudApiController extends Controller
         $content = (new VisitPrescriptionsPdf($visit))->generate();
 
         return [$content, 'prescription.pdf', 'الوصفة العلاجية'];
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
+    protected function buildLabResultDocument(DoctorVisit $visit): array
+    {
+        $content = (new LabResultReport)->generate($visit, false, true);
+
+        return [$content, 'lab_result.pdf', 'نتيجة المختبر'];
     }
 
     /**

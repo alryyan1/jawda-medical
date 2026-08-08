@@ -1642,6 +1642,15 @@ class PatientController extends Controller
         $limit = $validated['limit'] ?? null;
         $dateFrom = $validated['date_from'] ?? null;
         $dateTo = $validated['date_to'] ?? null;
+        if ($phone == '0') {
+            return response()->json([
+                'data' => [],
+                'meta' => [
+                    'total_patients' => 0,
+                    'phone_searched' => $phone,
+                ],
+            ]);
+        }
 
         // Find all patients with the same phone number who have lab requests
         // PERFORMANCE: avoid loading every LabRequest and MainTest; we only need the count

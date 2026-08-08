@@ -181,7 +181,7 @@ class LabResultReport
             }
         }
 
-        $pdf->Ln(17);
+        $pdf->Ln(5);
 
         $y = $pdf->GetY();
         $pdf->SetFont('arial', '', 13, '', true);

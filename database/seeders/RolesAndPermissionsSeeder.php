@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Permission;
-use App\Models\User;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
@@ -39,6 +39,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'تعديل علي نتائج المريض',
             'تعديل علي بيانات المريض',
             'اظهار كل اطباء العيادات',
+            'عرض كل مرضي المختبر',
         ];
 
         foreach ($permissions as $name) {
@@ -64,26 +65,26 @@ class RolesAndPermissionsSeeder extends Seeder
                 '/lab-reception',
                 '/lab-sample-collection',
                 '/cash-reconciliation',
-                '/patients'
+                '/patients',
             ],
             'ادخال نتائج' => [
                 '/dashboard',
                 '/lab-workstation',
                 '/lab-sample-collection',
-                '/patients'
+                '/patients',
             ],
             'استقبال عياده' => [
                 '/dashboard',
                 '/clinic',
                 '/cash-reconciliation',
                 '/patients',
-                '/online-booking'
+                '/online-booking',
             ],
             'خزنه موحده' => [
                 '/dashboard',
                 '/clinic',
                 '/cash-reconciliation',
-                '/patients'
+                '/patients',
             ],
             'تامين' => [
                 '/dashboard',
@@ -91,7 +92,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 '/cash-reconciliation',
                 '/lab-reception',
                 '/lab-sample-collection',
-                '/patients'
+                '/patients',
             ],
         ];
 

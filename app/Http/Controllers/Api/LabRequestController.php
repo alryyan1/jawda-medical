@@ -512,9 +512,8 @@ class LabRequestController extends Controller
 
         if ($request->filled('doctor_id')) {
             $query->where('patients.doctor_id', $request->doctor_id);
-        } else {
+        } elseif (! Auth::user()->can('عرض كل مرضي المختبر')) {
             $query->where('patients.user_id', Auth::id());
-
         }
 
         if ($request->filled('specialist_id')) {
@@ -1443,6 +1442,9 @@ class LabRequestController extends Controller
         if (! $labrequest->is_paid) {
             return response()->json(['message' => 'هذا الطلب غير مدفوع.'], 400);
         }
+        if($labrequest->user_deposited !== Auth::id() ) {
+            return response()->json(['message' => 'فقط المستخدم الذي قام بالدفع يمكنه إلغاء الدفع.'], 403);
+        }
 
         $labrequest->is_paid = false;
         $labrequest->amount_paid = 0;
@@ -1470,6 +1472,9 @@ class LabRequestController extends Controller
 
     public function unpay(LabRequest $labrequest)
     {
+        if($labrequest->user_deposited !== Auth::id() ) {
+            return response()->json(['message' => 'فقط المستخدم الذي قام بالدفع يمكنه إلغاء الدفع.'], 403);
+        }
         $labrequest->is_paid = false;
         $labrequest->amount_paid = 0;
         $labrequest->save();

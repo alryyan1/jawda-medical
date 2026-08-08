@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Spatie\Permission\Models\Permission;
 use Illuminate\Support\Facades\DB;
+use Spatie\Permission\Models\Permission;
 
 class CreatePermissions extends Command
 {
@@ -47,7 +47,8 @@ class CreatePermissions extends Command
         'عرض الاعدادات',
         'اضافه خدمه',
         'اضافه فحص',
-        'تعديل نتائج المختبر'
+        'تعديل نتائج المختبر',
+        'عرض كل مرضي المختبر',
     ];
 
     /**
@@ -63,31 +64,32 @@ class CreatePermissions extends Command
         $errors = 0;
 
         DB::beginTransaction();
-        
+
         try {
             // Delete all existing permissions and their relationships
             $this->info('Deleting existing permissions...');
-            
+
             // Delete from pivot tables first to avoid foreign key constraints
             DB::table('model_has_permissions')->delete();
             DB::table('role_has_permissions')->delete();
-            
+
             // Disable foreign key checks temporarily to allow truncate
             DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-            
+
             // Then delete all permissions
             Permission::truncate();
-            
+
             // Re-enable foreign key checks
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
-            
-            $this->line("✓ All permissions deleted.");
+
+            $this->line('✓ All permissions deleted.');
             $this->newLine();
         } catch (\Exception $e) {
             // Make sure to re-enable foreign key checks even if there's an error
             DB::statement('SET FOREIGN_KEY_CHECKS=1;');
             DB::rollBack();
-            $this->error('❌ Error deleting existing permissions: ' . $e->getMessage());
+            $this->error('❌ Error deleting existing permissions: '.$e->getMessage());
+
             return Command::FAILURE;
         }
 
@@ -97,7 +99,7 @@ class CreatePermissions extends Command
                     $permission = Permission::firstOrCreate(
                         [
                             'name' => $permissionName,
-                            'guard_name' => 'web'
+                            'guard_name' => 'web',
                         ]
                     );
 
@@ -109,7 +111,7 @@ class CreatePermissions extends Command
                         $existing++;
                     }
                 } catch (\Exception $e) {
-                    $this->error("✗ Error creating '{$permissionName}': " . $e->getMessage());
+                    $this->error("✗ Error creating '{$permissionName}': ".$e->getMessage());
                     $errors++;
                 }
             }
@@ -123,13 +125,13 @@ class CreatePermissions extends Command
             }
 
             $this->newLine();
-            $this->info("✅ Permissions creation completed!");
+            $this->info('✅ Permissions creation completed!');
             $this->info("   Created: {$created}");
-            
+
             if ($existing > 0) {
                 $this->info("   Already existed: {$existing}");
             }
-            
+
             if ($errors > 0) {
                 $this->warn("   Errors: {$errors}");
             }
@@ -137,7 +139,8 @@ class CreatePermissions extends Command
             return Command::SUCCESS;
         } catch (\Exception $e) {
             DB::rollBack();
-            $this->error('❌ Error creating permissions: ' . $e->getMessage());
+            $this->error('❌ Error creating permissions: '.$e->getMessage());
+
             return Command::FAILURE;
         }
     }
