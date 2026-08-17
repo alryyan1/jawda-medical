@@ -24,7 +24,6 @@ class DoctorsTableSeeder extends Seeder
             'static_wage' => 0,
             'lab_percentage' => 0,
             'specialist_id' => 1,
-            'sub_specialist_id' => null,
             'start' => 1,
             'image' => null,
             'calc_insurance' => 0,
