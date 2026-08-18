@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @property int $id
@@ -90,6 +91,18 @@ class DoctorShift extends Model
         'snap_doctor_fixed_entitlement' => 'decimal:2',
         'snap_total_doctor_entitlement' => 'decimal:2',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (DoctorShift $doctorShift): void {
+            if ($doctorShift->snap_doctor_cash_percentage === null) {
+                $doctorShift->snap_doctor_cash_percentage = $doctorShift->doctor?->cash_percentage ?? 0;
+            }
+            if ($doctorShift->snap_doctor_insurance_percentage === null) {
+                $doctorShift->snap_doctor_insurance_percentage = $doctorShift->doctor?->company_percentage ?? 0;
+            }
+        });
+    }
 
     public function getVisitsCountAttribute()
     {
@@ -459,8 +472,6 @@ class DoctorShift extends Model
             'snap_total_insurance_revenue' => $fin['clinic_endurance'],
             'snap_total_insurance_services' => $this->total_services_insurance(),
             'snap_total_bank' => $fin['total_bank'],
-            'snap_doctor_cash_percentage' => $this->doctor?->cash_percentage ?? 0,
-            'snap_doctor_insurance_percentage' => $this->doctor?->company_percentage ?? 0,
             'snap_doctor_cash_entitlement' => $fin['doctor_credit_cash'],
             'snap_doctor_insurance_entitlement' => $fin['doctor_credit_insurance'],
             'snap_doctor_fixed_entitlement' => $fin['doctor_fixed_share'],
@@ -477,6 +488,7 @@ class DoctorShift extends Model
      */
     public function reportTotals(): array
     {
+        Log::info('this snap_total_paid: '.$this->snap_total_paid);
         if ($this->snap_total_paid === null) {
             $this->saveFinancialSnapshot();
         }
@@ -585,6 +597,18 @@ class DoctorShift extends Model
         ];
     }
 
+    /**
+     * Whether any requested service across this doctor shift's visits is not fully paid.
+     */
+    public function hasUnpaidRequestedServices(): bool
+    {
+        return DB::table('requested_services as rs')
+            ->join('doctorvisits as dv', 'dv.id', '=', 'rs.doctorvisits_id')
+            ->where('dv.doctor_shift_id', $this->id)
+            ->where('rs.is_paid', false)
+            ->exists();
+    }
+
     public function calcServiceCreditInline(RequestedService $service, Doctor $doctor): float
     {
         // 1. Individual doctor-service pivot
@@ -595,7 +619,7 @@ class DoctorShift extends Model
         }
 
         // 2. Default percentage, net of recorded requested_service_costs
-        return $this->netAmountPaidInline($service) * (float) $doctor->cash_percentage / 100;
+        return $this->netAmountPaidInline($service) * (float) ($this->snap_doctor_cash_percentage) / 100;
     }
 
     public function applyPivotRateInline(RequestedService $service, object $pivot, Doctor $doctor): float
@@ -607,7 +631,7 @@ class DoctorShift extends Model
             return (float) $pivot->fixed * $service->count;
         }
 
-        return $this->netAmountPaidInline($service) * (float) $doctor->cash_percentage / 100;
+        return $this->netAmountPaidInline($service) * (float) ($this->snap_doctor_cash_percentage) / 100;
     }
 
     /**

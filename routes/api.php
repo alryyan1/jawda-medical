@@ -112,6 +112,9 @@ Route::get('/reports/doctors-list/pdf', [ReportController::class, 'exportDoctors
 // Public route — doctor names are not sensitive; used for Finance settings mapping
 Route::get('/all-doctors', [DoctorController::class, 'allDoctors']);
 
+// Public route — server-to-server patient search for the inpatient system's admission dialog
+Route::get('/public/patients-search', [PatientController::class, 'publicSearch']);
+
 Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
 Route::apiResource('main-tests', MainTestController::class);
 Route::get('/visits/{visit}/lab-requests', [LabRequestController::class, 'indexForVisit']);

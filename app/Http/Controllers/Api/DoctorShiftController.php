@@ -417,6 +417,7 @@ class DoctorShiftController extends Controller
             'total_doctor_share' => $fin['total_doctor_share'],
             'doctor_insurance_share_total' => $fin['doctor_credit_insurance'],
             'total_insurance_services' => $doctorShift->total_services_insurance(),
+            'has_unpaid_services' => $doctorShift->hasUnpaidRequestedServices(),
             'patients_breakdown' => [],
         ];
 
@@ -507,6 +508,12 @@ class DoctorShiftController extends Controller
     // app/Http/Controllers/Api/DoctorShiftController.php
     public function updateProofingFlags(Request $request, DoctorShift $doctorShift)
     {
+        if ($doctorShift->hasUnpaidRequestedServices()) {
+            return response()->json([
+                'message' => 'لا يمكن اثبات الاستحقاق لوجود خدمات مطلوبة غير مسددة بالكامل في هذه المناوبة.',
+            ], 422);
+        }
+
         $doctorShift->update([
             'status' => false,
             'end_time' => Carbon::now(),

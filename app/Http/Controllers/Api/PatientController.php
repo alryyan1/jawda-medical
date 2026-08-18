@@ -36,6 +36,7 @@ use App\Services\RequestedServiceHelper;
 use App\Services\WhatsAppCloudApiService;
 use App\Zebra;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +78,31 @@ class PatientController extends Controller
 
         // return new PatientCollection($patients);
         return PatientResource::collection($patients);
+    }
+
+    /**
+     * Public, unauthenticated patient search used by the inpatient system's
+     * admission dialog to look up and import existing Jawda Medical patients
+     * without a server-to-server login/token exchange.
+     */
+    public function publicSearch(Request $request): JsonResponse
+    {
+        $searchTerm = (string) $request->query('search', '');
+
+        $patients = Patient::query()
+            ->when($searchTerm !== '', function ($query) use ($searchTerm) {
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('name', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('phone', 'LIKE', "%{$searchTerm}%");
+                });
+            })
+            ->orderByDesc('id')
+            ->limit((int) $request->query('per_page', 15))
+            ->get(['id', 'name', 'phone', 'gender', 'age_year', 'age_month', 'age_day', 'address']);
+
+        return response()->json([
+            'data' => $patients,
+        ]);
     }
 
     /**

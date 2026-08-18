@@ -155,12 +155,10 @@ class ClinicShiftReport extends TCPDF
      */
     protected function renderFinancialSummary(): void
     {
-        $totals = $this->doctorShift->reportTotals();
-
         $visitsCount = $this->doctorShift->snap_patients_count;
-        $cashCredit = $totals['doctor_cash'];
-        $companyCredit = $totals['doctor_insurance'];
-        $netCenter = $totals['hospital_share'];
+        $cashCredit = $this->doctorShift->doctor_credit_cash();
+        $companyCredit = $this->doctorShift->doctor_credit_company();
+        $netCenter = $this->doctorShift->total_paid_services() - $cashCredit - $companyCredit;
         $cashPercentage = $this->doctorShift->snap_doctor_cash_percentage;
         $insurancePercentage = $this->doctorShift->snap_doctor_insurance_percentage;
 
