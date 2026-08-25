@@ -8,6 +8,7 @@ use App\Http\Resources\DoctorVisitResource;
 use App\Models\Doctor; // General clinic shift
 use App\Models\DoctorShift;
 use App\Models\DoctorVisit;
+use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\User;
 use Carbon\Carbon;
@@ -417,7 +418,8 @@ class DoctorShiftController extends Controller
             'total_doctor_share' => $fin['total_doctor_share'],
             'doctor_insurance_share_total' => $fin['doctor_credit_insurance'],
             'total_insurance_services' => $doctorShift->total_services_insurance(),
-            'has_unpaid_services' => $doctorShift->hasUnpaidRequestedServices(),
+            'has_unpaid_services' => (bool) optional(Setting::first())->enforce_unpaid_services_guard
+                && $doctorShift->hasUnpaidRequestedServices(),
             'patients_breakdown' => [],
         ];
 
@@ -508,7 +510,8 @@ class DoctorShiftController extends Controller
     // app/Http/Controllers/Api/DoctorShiftController.php
     public function updateProofingFlags(Request $request, DoctorShift $doctorShift)
     {
-        if ($doctorShift->hasUnpaidRequestedServices()) {
+        $enforceUnpaidServicesGuard = (bool) optional(Setting::first())->enforce_unpaid_services_guard;
+        if ($enforceUnpaidServicesGuard && $doctorShift->hasUnpaidRequestedServices()) {
             return response()->json([
                 'message' => 'لا يمكن اثبات الاستحقاق لوجود خدمات مطلوبة غير مسددة بالكامل في هذه المناوبة.',
             ], 422);

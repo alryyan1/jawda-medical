@@ -129,6 +129,7 @@ class SettingsController extends Controller
             'settings_enable_Sms_front' => 'sometimes|boolean',
             'prevent_backdated_entry' => 'sometimes|boolean',
             'enforce_shift_hours' => 'sometimes|boolean',
+            'enforce_unpaid_services_guard' => 'sometimes|boolean',
             'require_patient_phone' => 'sometimes|boolean',
             'show_patient_address_field' => 'sometimes|boolean',
             'whatsapp_number' => 'nullable|string|max:20',

@@ -619,7 +619,7 @@ class DoctorShift extends Model
         }
 
         // 2. Default percentage, net of recorded requested_service_costs
-        return $this->netAmountPaidInline($service) * (float) ($this->snap_doctor_cash_percentage) / 100;
+        return $this->netAmountPaidInline($service) * (float) ($this?->snap_doctor_cash_percentage ?? $doctor->cash_percentage) / 100;
     }
 
     public function applyPivotRateInline(RequestedService $service, object $pivot, Doctor $doctor): float

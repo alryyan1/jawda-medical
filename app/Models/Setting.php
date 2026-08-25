@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property \Illuminate\Support\Carbon|null $financial_year_end
  * @property string|null $welcome_message
  * @property bool $send_welcome_message
+ * @property bool $enforce_unpaid_services_guard
  *
  * @method static \Illuminate\Database\Eloquent\Builder|Setting newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|Setting newQuery()
@@ -153,6 +154,7 @@ class Setting extends Model
         'lab_welcome_sms_message',
         'discount_request_phone',
         'enforce_shift_hours',
+        'enforce_unpaid_services_guard',
         'require_patient_phone',
         'show_patient_address_field',
         'whatsapp_result_template_name',
@@ -204,6 +206,7 @@ class Setting extends Model
         'show_title_in_lab_result' => 'boolean',
         'prevent_backdated_entry' => 'boolean',
         'enforce_shift_hours' => 'boolean',
+        'enforce_unpaid_services_guard' => 'boolean',
         'require_patient_phone' => 'boolean',
         'show_patient_address_field' => 'boolean',
         'whatsapp_result_template_name' => 'string',

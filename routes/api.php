@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\HL7MessageInsertController;
 use App\Http\Controllers\Api\ImageProxyController;
 use App\Http\Controllers\Api\Lab2LabController;
 use App\Http\Controllers\Api\LabRequestController;
+use App\Http\Controllers\Api\LabRequestDiscountReportController;
 use App\Http\Controllers\Api\MainTestController;
 use App\Http\Controllers\Api\MedicalAttachmentController;
 use App\Http\Controllers\Api\OfferController;
@@ -292,6 +293,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/requested-service-costs/{requestedServiceCost}', [RequestedServiceCostController::class, 'destroy']);
     Route::get('/reports/patient-service-costs', [RequestedServiceCostController::class, 'report']);
     Route::get('/reports/patient-service-costs/pdf', [RequestedServiceCostController::class, 'reportPdf']);
+    Route::get('/reports/lab-request-discounts', [LabRequestDiscountReportController::class, 'report']);
+    Route::get('/reports/lab-request-discounts/pdf', [LabRequestDiscountReportController::class, 'reportPdf']);
+    Route::get('/reports/lab-request-discounts/excel', [LabRequestDiscountReportController::class, 'reportExcel']);
 
     /*
       |--------------------------------------------------------------------------

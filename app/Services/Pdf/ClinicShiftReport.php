@@ -155,12 +155,12 @@ class ClinicShiftReport extends TCPDF
      */
     protected function renderFinancialSummary(): void
     {
-        $visitsCount = $this->doctorShift->snap_patients_count;
+        $visitsCount = $this->doctorShift->visits->where('only_lab', 0)->count();
         $cashCredit = $this->doctorShift->doctor_credit_cash();
         $companyCredit = $this->doctorShift->doctor_credit_company();
         $netCenter = $this->doctorShift->total_paid_services() - $cashCredit - $companyCredit;
-        $cashPercentage = $this->doctorShift->snap_doctor_cash_percentage;
-        $insurancePercentage = $this->doctorShift->snap_doctor_insurance_percentage;
+        $cashPercentage = $this->doctorShift->snap_doctor_cash_percentage ?? $this->doctorShift->doctor->cash_percentage;
+        $insurancePercentage = $this->doctorShift->snap_doctor_insurance_percentage ?? $this->doctorShift->doctor->company_percentage;
 
         $labels = ['إجمالي المرضى', 'نسبة النقدي', 'نسبة التأمين', 'استحقاق نقدي', 'استحقاق تأمين', 'صافي المركز'];
         $values = [
@@ -312,13 +312,13 @@ class ClinicShiftReport extends TCPDF
 
                 if ($i === 7) {
                     // Cell() has a built-in $link param — simpler and RTL-safe
-                    $this->SetTextColorArray(self::COLOR_LINK);
-                    $this->setFont('arial', 'BU', 9);
+                    // $this->SetTextColorArray(self::COLOR_LINK);
+                    // $this->setFont('arial', 'BU', 9);
                     $this->Cell($cols[$i]['w'], $rowHeight, $val, 'B', 0, 'C', true, $visitBreakdownUrl);
                     $this->setFont('arial', '', 9);
-                    $this->SetTextColorArray(self::COLOR_TEXT);
+                    // $this->SetTextColorArray(self::COLOR_TEXT);
                 } elseif ($i === 2 && $isInsurance) {
-                    $this->setFont('arial', 'I', 8.5);
+                    // $this->setFont('arial', 'I', 8.5);
                     $this->MultiCell($cols[$i]['w'], $rowHeight, $val, 'B', $align, true, 0, null, null, true, 0, false, true, $rowHeight, 'M');
                     $this->setFont('arial', '', 9);
                 } else {

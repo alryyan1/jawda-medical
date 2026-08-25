@@ -70,6 +70,7 @@ class SettingResource extends JsonResource
             'settings_enable_Sms_front' => (bool) $this->settings_enable_Sms_front,
             'prevent_backdated_entry' => (bool) $this->prevent_backdated_entry,
             'enforce_shift_hours' => (bool) $this->enforce_shift_hours,
+            'enforce_unpaid_services_guard' => (bool) $this->enforce_unpaid_services_guard,
             'require_patient_phone' => (bool) $this->require_patient_phone,
             'show_patient_address_field' => (bool) $this->show_patient_address_field,
             'whatsapp_number' => $this->whatsapp_number,
