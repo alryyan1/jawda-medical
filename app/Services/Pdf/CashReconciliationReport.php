@@ -2,22 +2,23 @@
 
 namespace App\Services\Pdf;
 
-use TCPDF;
-use App\Models\Shift;
+use App\Http\Controllers\Api\UserController;
 use App\Models\Cost;
 use App\Models\Deno;
 use App\Models\DenoUser;
-use App\Http\Controllers\Api\UserController;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use TCPDF;
 
 class CashReconciliationReport
 {
     private TCPDF $pdf;
+
     private array $data;
+
     public function __construct(array $data)
     {
         $this->data = $data;
@@ -29,7 +30,7 @@ class CashReconciliationReport
         $this->pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
         $this->pdf->setFontSubsetting(true);
         $this->pdf->SetFont('arial', 'B', 10);
-        
+
         // Set document information
         $this->pdf->SetCreator('Jawda Medical System');
         $this->pdf->SetAuthor('Jawda Medical System');
@@ -42,7 +43,7 @@ class CashReconciliationReport
         $this->pdf->SetFooterMargin(10);
 
         // Set auto page breaks
-        $this->pdf->SetAutoPageBreak(TRUE, 25);
+        $this->pdf->SetAutoPageBreak(true, 25);
 
         // Set RTL direction for Arabic text
         $this->pdf->setRTL(true);
@@ -80,11 +81,10 @@ class CashReconciliationReport
         $this->pdf->SetFont('arial', 'B', 16);
         $this->pdf->SetTextColor(45, 55, 72);
         // Parse the shift date - handle both formats
-       
-        
+
         $this->pdf->Ln(4);
         $this->pdf->Cell(0, 10, $this->data['title'], 0, 1, 'C');
-        
+
         // Decorative line under title
         $this->pdf->SetDrawColor(45, 55, 72);
         $this->pdf->SetLineWidth(0.5);
@@ -99,14 +99,14 @@ class CashReconciliationReport
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->SetDrawColor(230, 230, 230);
         $this->pdf->SetLineWidth(0.3);
-        
+
         // Row: user + shift date with modern card design
         $this->pdf->SetFillColor(248, 249, 250);
         // $this->pdf->Cell($labelWidth, 9, 'اسم المستخدم', 1, 0, 'R', true);
         // $this->pdf->SetFillColor(255, 255, 255);
         // $this->pdf->SetFont('arial', 'B', 10);
         // $this->pdf->Cell($valueWidth, 9, $this->data['user'], 1, 0, 'R', true);
-        
+
         // $this->pdf->SetFont('arial', '', 10);
         // $this->pdf->SetFillColor(248, 249, 250);
         // $this->pdf->Cell($labelWidth, 9, 'تاريخ الوردية', 1, 0, 'R', true);
@@ -129,7 +129,7 @@ class CashReconciliationReport
         $this->pdf->Ln(1);
         $titleText = 'بيانات الوردية';
         $this->pdf->Cell($usableWidth, 8, $titleText, 0, 1, 'R');
-        
+
         // Accent line - width matches title length
         $this->pdf->SetDrawColor(45, 55, 72);
         $this->pdf->SetLineWidth(1);
@@ -154,7 +154,7 @@ class CashReconciliationReport
         $this->pdf->SetFillColor(255, 255, 255);
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->Cell($valueWidth, 9, $this->data['shiftType'], 1, 0, 'R', true);
-        
+
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->SetFillColor(248, 249, 250);
         $this->pdf->Cell($labelWidth, 9, 'رقم الوردية', 1, 0, 'R', true);
@@ -169,7 +169,7 @@ class CashReconciliationReport
         $this->pdf->SetFillColor(255, 255, 255);
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->Cell($valueWidth, 9, $this->data['user'], 1, 0, 'R', true);
-        
+
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->SetFillColor(248, 249, 250);
         $this->pdf->Cell($labelWidth, 9, 'تاريخ الورديه', 1, 0, 'R', true);
@@ -186,14 +186,14 @@ class CashReconciliationReport
         $pageWidth = $this->pdf->getPageWidth();
         $margin = 15;
         $usableWidth = $pageWidth - (2 * $margin);
-        
+
         // Modern section header
         $this->pdf->SetFont('arial', 'B', 13);
         $this->pdf->SetTextColor(45, 55, 72);
         $this->pdf->Ln(1);
         $titleText = 'الملخص المالي';
         $this->pdf->Cell($usableWidth, 8, $titleText, 0, 1, 'R');
-        
+
         // Accent line - width matches title length
         $this->pdf->SetDrawColor(45, 55, 72);
         $this->pdf->SetLineWidth(1);
@@ -204,7 +204,7 @@ class CashReconciliationReport
         $this->pdf->Ln(4);
 
         $incomeData = $this->data['incomeData'];
-        
+
         // Modern table header with lighter gray background
         $this->pdf->SetDrawColor(220, 223, 230);
         $this->pdf->SetLineWidth(0.3);
@@ -229,7 +229,7 @@ class CashReconciliationReport
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_cash, 0), 1, 0, 'C', $rowFill);
         $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_bank, 0), 1, 1, 'C', $rowFill);
-        $rowFill = !$rowFill;
+        $rowFill = ! $rowFill;
 
         // Expenses row
         $this->pdf->SetFont('arial', 'B', 10);
@@ -242,11 +242,11 @@ class CashReconciliationReport
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_cash_expenses, 0), 1, 0, 'C', $rowFill);
         $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->total_bank_expenses, 0), 1, 1, 'C', $rowFill);
-        $rowFill = !$rowFill;
+        $rowFill = ! $rowFill;
 
         // Net balance row - emphasized
-        $netCash = ($incomeData->net_cash ?? 0) ;
-        $netBank = ($incomeData->net_bank ?? 0) ;
+        $netCash = ($incomeData->net_cash ?? 0);
+        $netBank = ($incomeData->net_bank ?? 0);
         $this->pdf->SetFont('arial', 'B', 11);
         $this->pdf->SetFillColor(240, 245, 250);
         $this->pdf->SetTextColor(45, 55, 72);
@@ -283,7 +283,7 @@ class CashReconciliationReport
         $this->pdf->Cell($usableWidth * 0.3, 8, number_format($cashDifference, 0), 1, 0, 'C', true);
         $this->pdf->Cell($usableWidth * 0.3, 8, '-', 1, 1, 'C', true);
         $this->pdf->SetTextColor(0, 0, 0);
-        
+
         $this->pdf->Ln(8);
     }
 
@@ -292,7 +292,7 @@ class CashReconciliationReport
         $pageWidth = $this->pdf->getPageWidth();
         $margin = 20;
         $usableWidth = $pageWidth - (2 * $margin);
-        
+
         // Section header (monochrome)
         $this->pdf->SetFont('arial', 'B', 12);
         $this->pdf->SetTextColor(0, 0, 0);
@@ -312,7 +312,7 @@ class CashReconciliationReport
 
         $this->pdf->SetFont('arial', 'B', 11);
         $hasDenominations = false;
-        
+
         foreach ($this->data['denominations'] as $denomination) {
             if ($denomination['count'] > 0) {
                 $hasDenominations = true;
@@ -322,7 +322,7 @@ class CashReconciliationReport
             }
         }
 
-        if (!$hasDenominations) {
+        if (! $hasDenominations) {
             $this->pdf->SetFont('arial', 'B', 11);
             $this->pdf->Cell($usableWidth, 9, 'لا توجد فئات نقدية مسجلة', 1, 1, 'C', false);
         }
@@ -331,7 +331,7 @@ class CashReconciliationReport
         $this->pdf->SetFont('arial', 'B', 11);
         $this->pdf->Cell($usableWidth * 0.66, 9, 'الإجمالي', 1, 0, 'R', false);
         $this->pdf->Cell($usableWidth * 0.34, 9, number_format($this->data['totalDenominations'], 0), 1, 1, 'C', false);
-        
+
         $this->pdf->Ln(12);
     }
 
@@ -340,14 +340,14 @@ class CashReconciliationReport
         $pageWidth = $this->pdf->getPageWidth();
         $margin = 15;
         $usableWidth = $pageWidth - (2 * $margin);
-        
+
         // Modern section header
         $this->pdf->SetFont('arial', 'B', 13);
         $this->pdf->SetTextColor(45, 55, 72);
         $this->pdf->Ln(1);
         $titleText = 'تفاصيل المصروفات';
         $this->pdf->Cell($usableWidth, 8, $titleText, 0, 1, 'R');
-        
+
         // Accent line - width matches title length
         $this->pdf->SetDrawColor(45, 55, 72);
         $this->pdf->SetLineWidth(1);
@@ -357,7 +357,7 @@ class CashReconciliationReport
         $this->pdf->Line($lineStartX, $lineY, $pageWidth - $margin, $lineY);
         $this->pdf->Ln(4);
 
-        if (!empty($this->data['costs'])) {
+        if (! empty($this->data['costs'])) {
             // Modern table header with lighter gray background
             $this->pdf->SetDrawColor(220, 223, 230);
             $this->pdf->SetLineWidth(0.3);
@@ -365,7 +365,7 @@ class CashReconciliationReport
             $this->pdf->SetFillColor(240, 240, 240);
             $this->pdf->SetTextColor(0, 0, 0);
             $this->pdf->Cell($usableWidth * 0.35, 8, 'الوصف', 1, 0, 'C', true);
-            $this->pdf->Cell($usableWidth * 0.2, 8, 'القسم', 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.2, 8, 'التصنيف', 1, 0, 'C', true);
             $this->pdf->Cell($usableWidth * 0.15, 8, 'النقدي', 1, 0, 'C', true);
             $this->pdf->Cell($usableWidth * 0.15, 8, 'البنكي', 1, 0, 'C', true);
             $this->pdf->Cell($usableWidth * 0.15, 8, 'المجموع', 1, 1, 'C', true);
@@ -376,13 +376,13 @@ class CashReconciliationReport
             $sumBank = 0;
             $sumTotal = 0;
             $rowFill = false;
-            
+
             foreach ($this->data['costs'] as $cost) {
                 $total = $cost['amount'] + $cost['amount_bankak'];
                 $sumCash += $cost['amount'];
                 $sumBank += $cost['amount_bankak'];
                 $sumTotal += $total;
-                
+
                 // Alternating row colors for better readability
                 if ($rowFill) {
                     $this->pdf->SetFillColor(252, 252, 253);
@@ -390,16 +390,16 @@ class CashReconciliationReport
                     $this->pdf->SetFillColor(255, 255, 255);
                 }
                 $this->pdf->Cell($usableWidth * 0.35, 7, $cost['description'], 1, 0, 'C', $rowFill);
-                
+
                 $this->pdf->SetFont('arial', '', 9);
-                $this->pdf->Cell($usableWidth * 0.2, 7, $cost['employee']['department']['name'] ?? '-', 1, 0, 'C', $rowFill);
-                
+                $this->pdf->Cell($usableWidth * 0.2, 7, $cost['cost_category']['name'] ?? '-', 1, 0, 'C', $rowFill);
+
                 $this->pdf->SetFont('arial', 'B', 10);
                 $this->pdf->Cell($usableWidth * 0.15, 7, $cost['amount'] > 0 ? number_format($cost['amount']) : '-', 1, 0, 'C', $rowFill);
                 $this->pdf->Cell($usableWidth * 0.15, 7, $cost['amount_bankak'] > 0 ? number_format($cost['amount_bankak']) : '-', 1, 0, 'C', $rowFill);
                 $this->pdf->SetFont('arial', 'B', 10);
                 $this->pdf->Cell($usableWidth * 0.15, 7, number_format($total), 1, 1, 'C', $rowFill);
-                $rowFill = !$rowFill;
+                $rowFill = ! $rowFill;
             }
 
             // Totals row - emphasized
@@ -421,7 +421,7 @@ class CashReconciliationReport
             $this->pdf->Cell($usableWidth, 10, 'لا توجد مصروفات مسجلة', 1, 1, 'C', true);
             $this->pdf->SetTextColor(0, 0, 0);
         }
-        
+
         $this->pdf->Ln(8);
     }
 
@@ -429,16 +429,16 @@ class CashReconciliationReport
     {
         $pageWidth = $this->pdf->getPageWidth();
         $this->pdf->SetY(-18);
-        
+
         // Modern footer line
         $this->pdf->SetDrawColor(220, 223, 230);
         $this->pdf->SetLineWidth(0.3);
         $this->pdf->Line(15, $this->pdf->GetY() - 3, $pageWidth - 15, $this->pdf->GetY() - 3);
-        
+
         // Footer text with better styling
         $this->pdf->SetFont('arial', 'B', 8);
         $this->pdf->SetTextColor(107, 114, 128);
-        $footerText = 'صفحة ' . $this->pdf->getAliasNumPage() . ' من ' . $this->pdf->getAliasNbPages() . '  |  تم الإنشاء بواسطة نظام جوادة الطبي';
+        $footerText = 'صفحة '.$this->pdf->getAliasNumPage().' من '.$this->pdf->getAliasNbPages().'  |  تم الإنشاء بواسطة نظام جوادة الطبي';
         $this->pdf->Cell(0, 6, $footerText, 0, 0, 'C');
         $this->pdf->SetTextColor(0, 0, 0);
     }
@@ -446,7 +446,7 @@ class CashReconciliationReport
     public static function generateFromRequest(Request $request): array
     {
         try {
-      
+
             $validated = $request->validate([
                 'shift_id' => 'required|string',
                 'title' => 'nullable|string|max:255',
@@ -456,30 +456,31 @@ class CashReconciliationReport
 
             $shiftId = $validated['shift_id'];
             $shift = Shift::find($shiftId);
-            $title =  'تقرير ملخص دخل المستخدم';
+            $title = 'تقرير ملخص دخل المستخدم';
             $date = $validated['date'] ?? date('Y-m-d');
             $userId = $validated['user_id'];
             $user = User::find($userId);
             Log::info('Cash Reconciliation PDF - Validated params', [
                 'shiftId' => $shiftId,
                 'title' => $title,
-                'date' => $date
+                'date' => $date,
             ]);
 
             // Get shift information
             $shift = Shift::with('userOpened')->find($shiftId);
-            if (!$shift) {
+            if (! $shift) {
                 Log::error("Shift not found: {$shiftId}");
+
                 return ['error' => 'الوردية غير موجودة', 'status' => 404];
             }
 
             $shiftName = $shift->name ?? "وردية #{$shiftId}";
-            
+
             // Get user name
-            
+
             // Get English date
             $englishDate = $shift->created_at ? $shift->created_at->format('Y-m-d H:i:s') : date('Y-m-d H:i:s');
-            
+
             // Determine shift type based on creation time
             $shiftType = 'الوردية المسائيه'; // Default to evening
             if ($shift->created_at) {
@@ -494,7 +495,7 @@ class CashReconciliationReport
                 $incomeResponse = app(UserController::class)->getCurrentUserShiftIncomeSummary(new Request(['shift_id' => $shiftId, 'user_id' => $userId]));
                 $incomeData = $incomeResponse->getData()->data;
             } catch (\Exception $e) {
-                Log::error("Error fetching income data: " . $e->getMessage());
+                Log::error('Error fetching income data: '.$e->getMessage());
                 $incomeData = (object) [
                     'total_cash' => 0,
                     'total_bank' => 0,
@@ -510,32 +511,33 @@ class CashReconciliationReport
                 $denos = Deno::orderBy('display_order')
                     ->whereNotIn('name', [10, 20, 50])
                     ->get();
-                
+
                 $denoUsers = DenoUser::where('shift_id', $shiftId)->where('user_id', $userId)->get();
-                
+
                 $denominations = $denos->map(function ($deno) use ($denoUsers) {
                     $denoUser = $denoUsers->where('deno_id', $deno->id)->first();
+
                     return [
                         'id' => $deno->id,
                         'name' => $deno->name,
                         'count' => $denoUser ? $denoUser->count : 0,
                     ];
                 });
-                
-                $totalDenominations = $denominations->sum(function($deno) {
+
+                $totalDenominations = $denominations->sum(function ($deno) {
                     return $deno['name'] * $deno['count'];
                 });
             } catch (\Exception $e) {
-                Log::error("Error fetching denominations data: " . $e->getMessage());
+                Log::error('Error fetching denominations data: '.$e->getMessage());
                 $denominations = collect([]);
                 $totalDenominations = 0;
             }
 
             // Fetch costs data
             try {
-                $costs = Cost::with('employee.department')->where('shift_id', $shiftId )->where('user_cost', $userId)->get();
+                $costs = Cost::with(['costCategory', 'userCost'])->where('shift_id', $shiftId)->where('user_cost', $userId)->get();
             } catch (\Exception $e) {
-                Log::error("Error fetching costs data: " . $e->getMessage());
+                Log::error('Error fetching costs data: '.$e->getMessage());
                 $costs = collect([]);
             }
 
@@ -552,25 +554,25 @@ class CashReconciliationReport
                 'denominations' => $denominations->toArray(),
                 'totalDenominations' => $totalDenominations,
                 'costs' => $costs->toArray(),
-                'incomeData' => $incomeData
+                'incomeData' => $incomeData,
             ];
 
             // Generate PDF
             $report = new self($pdfData);
             $pdfContent = $report->generate();
-            
-            $pdfFileName = 'cash-reconciliation-' . $shiftId . '-' . date('Y-m-d') . '.pdf';
+
+            $pdfFileName = 'cash-reconciliation-'.$shiftId.'-'.date('Y-m-d').'.pdf';
 
             return [
                 'content' => $pdfContent,
                 'filename' => $pdfFileName,
-                'status' => 200
+                'status' => 200,
             ];
 
         } catch (\Exception $e) {
-            Log::error('Cash Reconciliation PDF Generation Error: ' . $e->getMessage());
+            Log::error('Cash Reconciliation PDF Generation Error: '.$e->getMessage());
+
             return ['error' => $e->getMessage(), 'status' => 500];
         }
     }
 }
-

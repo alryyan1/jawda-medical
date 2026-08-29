@@ -1,17 +1,19 @@
 <?php
+
 // app/Http/Controllers/Api/CostController.php
 // php artisan make:controller Api/CostController --api --model=Cost
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Cost;
-use App\Models\CostCategory; // For dropdown
-use App\Models\Shift;      // To ensure shift is open
+use App\Http\Resources\CostResource;
+use App\Models\Cost; // For dropdown
+use App\Models\CostCategory;      // To ensure shift is open
+use App\Models\Shift;
+use Carbon\Carbon; // Create this
 use Illuminate\Http\Request;
-use App\Http\Resources\CostResource; // Create this
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
-use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class CostController extends Controller
@@ -41,12 +43,35 @@ class CostController extends Controller
             'amount_cash_input' => 'required_without:amount_bank|nullable|numeric|min:0', // Amount from cash
             'amount_bank_input' => 'required_without:amount_cash|nullable|numeric|min:0', // Amount from bank
         ]);
-    
+
         // Ensure at least one amount is provided and not both zero if one is required
         if (($validated['amount_cash_input'] ?? 0) <= 0 && ($validated['amount_bank_input'] ?? 0) <= 0) {
             throw ValidationException::withMessages(['amount_cash_input' => 'At least one amount (cash or bank) must be greater than zero.']);
         }
-    
+
+        $cashInput = (float) ($validated['amount_cash_input'] ?? 0);
+        $bankInput = (float) ($validated['amount_bank_input'] ?? 0);
+
+        // Prevent spending more than the user actually holds for this shift
+        $shift = Shift::findOrFail($validated['shift_id']);
+        $totals = $shift->userIncomeTotals(Auth::id());
+        $availableCash = ($totals['total_paid_service'] - $totals['total_bank_service'])
+            + ($totals['total_lab'] - $totals['total_lab_bank'])
+            - ($totals['total_cost'] - $totals['total_cost_bank']);
+        $availableBank = $totals['total_bank_service'] + $totals['total_lab_bank'] - $totals['total_cost_bank'];
+
+        if ($cashInput > $availableCash + 0.01) {
+            throw ValidationException::withMessages([
+                'amount_cash_input' => 'المبلغ النقدي يتجاوز الرصيد النقدي المتاح ('.number_format($availableCash, 2).').',
+            ]);
+        }
+
+        if ($bankInput > $availableBank + 0.01) {
+            throw ValidationException::withMessages([
+                'amount_bank_input' => 'المبلغ البنكي يتجاوز الرصيد البنكي المتاح ('.number_format($availableBank, 2).').',
+            ]);
+        }
+
         $cost = Cost::create([
             'shift_id' => $validated['shift_id'],
             'user_cost' => Auth::id(),
@@ -54,11 +79,13 @@ class CostController extends Controller
             'doctor_shift_id' => $validated['doctor_shift_id'] ?? null,
             'description' => $validated['description'],
             'comment' => $validated['comment'] ?? null,
-            'amount' => $validated['amount_cash_input'] ?? 0,       // Store cash portion
-            'amount_bankak' => $validated['amount_bank_input'] ?? 0, // Store bank portion
+            'amount' => $cashInput,       // Store cash portion
+            'amount_bankak' => $bankInput, // Store bank portion
         ]);
+
         return new CostResource($cost->load(['costCategory', 'userCost:id,name']));
     }
+
     public function index(Request $request)
     {
         // Permission check: e.g., can('list costs') or can('view cost_report')
@@ -81,24 +108,40 @@ class CostController extends Controller
             'costCategory:id,name',
             'userCost:id,name',
             'shift:id',
-            'doctorShift.doctor:id,name'
+            'doctorShift.doctor:id,name',
         ]); // Eager load
 
         // Apply all filters to the main query
-        if ($request->filled('date_from')) { $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay()); }
-        if ($request->filled('date_to')) { $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay()); }
-        if ($request->filled('cost_category_id')) { $query->where('cost_category_id', $request->cost_category_id); }
-        if ($request->filled('user_cost_id')) { $query->where('user_cost', $request->user_cost_id); }
-        if ($request->filled('shift_id')) { $query->where('shift_id', $request->shift_id); }
-        if ($request->filled('payment_method') && $request->payment_method !== 'all') {
-            if ($request->payment_method === 'cash') { $query->where('amount', '>', 0)->where('amount_bankak', '=', 0); }
-            elseif ($request->payment_method === 'bank') { $query->where('amount_bankak', '>', 0)->where('amount', '=', 0); }
-            elseif ($request->payment_method === 'mixed') { $query->where('amount', '>', 0)->where('amount_bankak', '>', 0); }
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', Carbon::parse($request->date_from)->startOfDay());
         }
-        if ($request->filled('search_description')) { $query->where('description', 'LIKE', '%' . $request->search_description . '%'); }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', Carbon::parse($request->date_to)->endOfDay());
+        }
+        if ($request->filled('cost_category_id')) {
+            $query->where('cost_category_id', $request->cost_category_id);
+        }
+        if ($request->filled('user_cost_id')) {
+            $query->where('user_cost', $request->user_cost_id);
+        }
+        if ($request->filled('shift_id')) {
+            $query->where('shift_id', $request->shift_id);
+        }
+        if ($request->filled('payment_method') && $request->payment_method !== 'all') {
+            if ($request->payment_method === 'cash') {
+                $query->where('amount', '>', 0)->where('amount_bankak', '=', 0);
+            } elseif ($request->payment_method === 'bank') {
+                $query->where('amount_bankak', '>', 0)->where('amount', '=', 0);
+            } elseif ($request->payment_method === 'mixed') {
+                $query->where('amount', '>', 0)->where('amount_bankak', '>', 0);
+            }
+        }
+        if ($request->filled('search_description')) {
+            $query->where('description', 'LIKE', '%'.$request->search_description.'%');
+        }
 
         if ($request->input('sort_by') === 'total_cost') {
-            $query->orderByRaw('(amount + amount_bankak) ' . ($request->input('sort_direction', 'desc')));
+            $query->orderByRaw('(amount + amount_bankak) '.($request->input('sort_direction', 'desc')));
         } else {
             $query->orderBy($request->input('sort_by', 'created_at'), $request->input('sort_direction', 'desc'));
         }
@@ -110,37 +153,37 @@ class CostController extends Controller
         $summaryQuery = clone $query;
         $summaryQuery->getQuery()->orders = null; // Remove ordering for summary calculation
 
-
         $summaryTotals = $summaryQuery->selectRaw('SUM(amount) as total_cash_paid, SUM(amount_bankak) as total_bank_paid, SUM(amount + amount_bankak) as grand_total_paid')
-                                 ->first();
+            ->first();
 
         return CostResource::collection($costs)->additional(['meta' => [
             'summary' => [
-                'total_cash_paid' => (float)($summaryTotals->total_cash_paid ?? 0),
-                'total_bank_paid' => (float)($summaryTotals->total_bank_paid ?? 0),
-                'grand_total_paid' => (float)($summaryTotals->grand_total_paid ?? 0),
-            ]
+                'total_cash_paid' => (float) ($summaryTotals->total_cash_paid ?? 0),
+                'total_bank_paid' => (float) ($summaryTotals->total_bank_paid ?? 0),
+                'grand_total_paid' => (float) ($summaryTotals->grand_total_paid ?? 0),
+            ],
         ]]);
     }
-    
+
     public function update(Request $request, Cost $cost)
     {
         $validated = $request->validate([
             'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
         ]);
         $cost->update(['doctor_shift_id' => $validated['doctor_shift_id']]);
+
         return new CostResource($cost->load(['costCategory', 'userCost:id,name', 'doctorShift.doctor']));
     }
 
     public function destroy($id)
     {
         $cost = Cost::findOrFail($id);
-        
+
         // Check if user can delete this cost (optional authorization)
         // $this->authorize('delete', $cost);
-        
+
         $cost->delete();
-        
+
         return response()->json(['message' => 'Cost deleted successfully'], 200);
     }
 
@@ -150,6 +193,7 @@ class CostController extends Controller
     public function costsByDay(Request $request)
     {
         $data = $this->getCostsByDayData($request);
+
         return response()->json($data);
     }
 
@@ -209,7 +253,7 @@ class CostController extends Controller
     public function costsByDayPdf(Request $request)
     {
         $data = $this->getCostsByDayData($request);
-        
+
         $arabicMonths = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
         $monthName = $arabicMonths[$data['report_period']['month'] - 1];
         $year = $data['report_period']['year'];
@@ -224,7 +268,7 @@ class CostController extends Controller
 
         // Title
         $pdf->SetFont('dejavusans', 'B', 16);
-        $pdf->Cell(0, 10, "تقرير المصروفات اليومية", 0, 1, 'C');
+        $pdf->Cell(0, 10, 'تقرير المصروفات اليومية', 0, 1, 'C');
         $pdf->SetFont('dejavusans', '', 12);
         $pdf->Cell(0, 8, "{$monthName} {$year}", 0, 1, 'C');
         $pdf->Ln(5);
@@ -233,10 +277,10 @@ class CostController extends Controller
         $pdf->SetFont('dejavusans', 'B', 10);
         $pdf->SetFillColor(41, 128, 185);
         $pdf->SetTextColor(255, 255, 255);
-        
+
         $colWidths = [25, 50, 35, 35, 35];
         $headers = ['اليوم', 'التاريخ', 'إجمالي المصروفات', 'كاش', 'بنك'];
-        
+
         foreach ($headers as $i => $header) {
             $pdf->Cell($colWidths[$i], 8, $header, 1, 0, 'C', true);
         }
@@ -246,19 +290,19 @@ class CostController extends Controller
         $pdf->SetFont('dejavusans', '', 9);
         $pdf->SetTextColor(0, 0, 0);
         $fill = false;
-        
+
         foreach ($data['data'] as $row) {
             $pdf->SetFillColor($fill ? 245 : 255, $fill ? 245 : 255, $fill ? 245 : 255);
             $dayNum = Carbon::parse($row->date)->day;
             $dateFormatted = Carbon::parse($row->date)->format('Y-m-d');
-            
+
             $pdf->Cell($colWidths[0], 7, $dayNum, 1, 0, 'C', true);
             $pdf->Cell($colWidths[1], 7, $dateFormatted, 1, 0, 'C', true);
             $pdf->Cell($colWidths[2], 7, number_format($row->total_cost, 2), 1, 0, 'C', true);
             $pdf->Cell($colWidths[3], 7, number_format($row->total_cash, 2), 1, 0, 'C', true);
             $pdf->Cell($colWidths[4], 7, number_format($row->total_bank, 2), 1, 0, 'C', true);
             $pdf->Ln();
-            $fill = !$fill;
+            $fill = ! $fill;
         }
 
         // Table footer (totals)
@@ -280,13 +324,13 @@ class CostController extends Controller
     public function costsByDayExcel(Request $request)
     {
         $data = $this->getCostsByDayData($request);
-        
+
         $arabicMonths = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
         $monthName = $arabicMonths[$data['report_period']['month'] - 1];
         $year = $data['report_period']['year'];
         $month = $data['report_period']['month'];
 
-        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setRightToLeft(true);
 
@@ -300,13 +344,13 @@ class CostController extends Controller
         $headers = ['اليوم', 'التاريخ', 'إجمالي المصروفات', 'كاش', 'بنك'];
         $col = 'A';
         foreach ($headers as $header) {
-            $sheet->setCellValue($col . '3', $header);
-            $sheet->getStyle($col . '3')->getFont()->setBold(true);
-            $sheet->getStyle($col . '3')->getFill()
+            $sheet->setCellValue($col.'3', $header);
+            $sheet->getStyle($col.'3')->getFont()->setBold(true);
+            $sheet->getStyle($col.'3')->getFill()
                 ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
                 ->getStartColor()->setARGB('FF2980B9');
-            $sheet->getStyle($col . '3')->getFont()->getColor()->setARGB('FFFFFFFF');
-            $sheet->getStyle($col . '3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle($col.'3')->getFont()->getColor()->setARGB('FFFFFFFF');
+            $sheet->getStyle($col.'3')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
             $col++;
         }
 
@@ -315,24 +359,24 @@ class CostController extends Controller
         foreach ($data['data'] as $item) {
             $dayNum = Carbon::parse($item->date)->day;
             $dateFormatted = Carbon::parse($item->date)->format('Y-m-d');
-            
-            $sheet->setCellValue('A' . $row, $dayNum);
-            $sheet->setCellValue('B' . $row, $dateFormatted);
-            $sheet->setCellValue('C' . $row, $item->total_cost);
-            $sheet->setCellValue('D' . $row, $item->total_cash);
-            $sheet->setCellValue('E' . $row, $item->total_bank);
-            
+
+            $sheet->setCellValue('A'.$row, $dayNum);
+            $sheet->setCellValue('B'.$row, $dateFormatted);
+            $sheet->setCellValue('C'.$row, $item->total_cost);
+            $sheet->setCellValue('D'.$row, $item->total_cash);
+            $sheet->setCellValue('E'.$row, $item->total_bank);
+
             // Center align all cells
             $sheet->getStyle("A{$row}:E{$row}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
             $row++;
         }
 
         // Totals row
-        $sheet->setCellValue('A' . $row, 'الإجمالي');
+        $sheet->setCellValue('A'.$row, 'الإجمالي');
         $sheet->mergeCells("A{$row}:B{$row}");
-        $sheet->setCellValue('C' . $row, $data['summary']['total_cost']);
-        $sheet->setCellValue('D' . $row, $data['summary']['total_cash']);
-        $sheet->setCellValue('E' . $row, $data['summary']['total_bank']);
+        $sheet->setCellValue('C'.$row, $data['summary']['total_cost']);
+        $sheet->setCellValue('D'.$row, $data['summary']['total_cash']);
+        $sheet->setCellValue('E'.$row, $data['summary']['total_bank']);
         $sheet->getStyle("A{$row}:E{$row}")->getFont()->setBold(true);
         $sheet->getStyle("A{$row}:E{$row}")->getFill()
             ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
@@ -364,5 +408,4 @@ class CostController extends Controller
             ->header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->header('Content-Disposition', "attachment; filename=\"{$filename}\"");
     }
-
 }
