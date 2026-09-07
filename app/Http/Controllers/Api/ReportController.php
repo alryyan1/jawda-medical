@@ -4799,45 +4799,48 @@ class ReportController extends Controller
         $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
         $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth();
         $period = CarbonPeriod::create($startDate, '1 day', $endDate);
+        $showEmptyDays = $request->boolean('show_empty_days', false);
 
         $dailyData = [];
         $grandTotals = [
-            'total_lab_income_paid' => 0,
-            'total_lab_cash_paid' => 0,
-            'total_lab_bank_paid' => 0,
+            'total_lab_income_paid' => 0.0,
+            'total_lab_cash_paid' => 0.0,
+            'total_lab_bank_paid' => 0.0,
         ];
 
-        // Fetch all relevant lab requests for the month once for efficiency.
-        // We need to consider when the income is recognized:
-        // Option 1: When the LabRequest is created (service rendered date)
-        // Option 2: When the payment is actually recorded (payment date)
-        // Let's assume for now it's based on LabRequest's `updated_at` when `is_paid` becomes true,
-        // or more simply, `created_at` if payments usually happen on the same day.
-        // For simplicity, we'll use `created_at` of LabRequest and filter by `is_paid = true`.
-        // A more accurate system would have a dedicated `payment_date` on the LabRequest or a separate payments table.
-
-        $paidLabRequestsForMonth = LabRequest::query()
-            ->where('is_paid', true) // Only consider paid requests for "income"
-            ->whereBetween('created_at', [$startDate, $endDate]) // Filter by request creation date
+        // Income is recognized on the LabRequest `created_at` date and only for paid
+        // requests. Aggregate everything in a single grouped SQL query keyed by day
+        // instead of hydrating every row and looping in PHP (that scaled as
+        // days x rows and timed out for busy months). A NULL `is_bankak` counts as
+        // cash, matching the previous loose-comparison behaviour.
+        // FORCE INDEX: the optimizer otherwise picks the single-column
+        // `labrequests_is_paid_index` (is_paid matches most rows) and filesorts
+        // ~230k rows; the composite (is_paid, created_at) index keeps it to the
+        // month's slice (~5x faster here).
+        $aggregatedByDay = DB::query()
+            ->fromRaw('`labrequests` FORCE INDEX (`labrequests_is_paid_created_at_index`)')
+            ->where('is_paid', true)
+            ->whereBetween('created_at', [$startDate, $endDate])
             // ->when($request->filled('user_id_deposited'), fn($q) => $q->where('user_deposited', $request->user_id_deposited))
-            ->get();
+            ->groupByRaw('DATE(created_at)')
+            ->orderByRaw('DATE(created_at)')
+            ->get([
+                DB::raw('DATE(created_at) as day'),
+                DB::raw('COALESCE(SUM(amount_paid), 0) as total_paid'),
+                DB::raw('COALESCE(SUM(CASE WHEN is_bankak = 1 THEN amount_paid ELSE 0 END), 0) as bank_paid'),
+                DB::raw('COALESCE(SUM(CASE WHEN is_bankak = 1 THEN 0 ELSE amount_paid END), 0) as cash_paid'),
+            ])
+            ->keyBy('day');
 
         foreach ($period as $date) {
             $currentDateStr = $date->format('Y-m-d');
+            $row = $aggregatedByDay->get($currentDateStr);
 
-            $requestsOnThisDay = $paidLabRequestsForMonth->filter(function ($lr) use ($date) {
-                return Carbon::parse($lr->created_at)->isSameDay($date);
-            });
+            $dailyTotalPaid = (float) ($row->total_paid ?? 0);
+            $dailyCashPaid = (float) ($row->cash_paid ?? 0);
+            $dailyBankPaid = (float) ($row->bank_paid ?? 0);
 
-            $dailyTotalPaid = $requestsOnThisDay->sum(function ($lr) {
-                // Net amount paid for this request (price * count - discount - endurance)
-                // For simplicity, let's assume amount_paid already reflects this net amount
-                return (float) $lr->amount_paid;
-            });
-            $dailyCashPaid = $requestsOnThisDay->where('is_bankak', false)->sum(fn ($lr) => (float) $lr->amount_paid);
-            $dailyBankPaid = $requestsOnThisDay->where('is_bankak', true)->sum(fn ($lr) => (float) $lr->amount_paid);
-
-            if ($dailyTotalPaid > 0 || $request->boolean('show_empty_days', false)) {
+            if ($dailyTotalPaid > 0 || $showEmptyDays) {
                 $dailyData[] = [
                     'date' => $currentDateStr,
                     'total_lab_income_paid' => $dailyTotalPaid,
@@ -4897,7 +4900,8 @@ class ReportController extends Controller
         $reportTitle = 'تقرير إيرادات المختبر الشهرية (المدفوع)';
         $filterCriteria = "لشهر: {$reportPeriod['month_name']}";
 
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'P', 'mm', 'A4'); // Portrait
+        // 2nd arg is $visitContext (must be null here); $filterCriteria is the 10th arg.
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteria); // Portrait
         $pdf->AddPage();
         $pdf->SetLineWidth(0.1);
         $isRTL = $pdf->getRTL();
