@@ -72,6 +72,7 @@ class CompanyMainTestContractImportExportTest extends TestCase
 
         $response->assertOk();
         $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $this->assertStringContainsString('Acme Insurance.xlsx', $response->headers->get('content-disposition'));
     }
 
     public function test_import_updates_pivot_price_and_endurance(): void

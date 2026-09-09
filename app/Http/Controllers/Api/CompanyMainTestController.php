@@ -306,7 +306,7 @@ class CompanyMainTestController extends Controller
         $sheet->getColumnDimension('D')->setWidth(15);
         $sheet->getColumnDimension('E')->setWidth(15);
 
-        $fileName = 'company-'.$company->id.'-test-contracts-'.date('Y-m-d').'.xlsx';
+        $fileName = trim($company->name).'.xlsx';
         $writer = new Xlsx($spreadsheet);
         $tempFile = tempnam(sys_get_temp_dir(), 'cmt_contract_');
         $writer->save($tempFile);
@@ -319,7 +319,6 @@ class CompanyMainTestController extends Controller
             }
         }, $fileName, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
         ]);
     }
 
