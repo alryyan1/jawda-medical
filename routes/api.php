@@ -117,6 +117,11 @@ Route::get('/all-doctors', [DoctorController::class, 'allDoctors']);
 Route::get('/public/patients-search', [PatientController::class, 'publicSearch']);
 
 Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
+// Registered before the apiResource so the literal path is not captured by main-tests/{main_test}
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/main-tests/export-prices-excel', [MainTestController::class, 'exportPricesExcel']);
+    Route::post('/main-tests/import-prices-excel', [MainTestController::class, 'importPricesExcel']);
+});
 Route::apiResource('main-tests', MainTestController::class);
 Route::get('/visits/{visit}/lab-requests', [LabRequestController::class, 'indexForVisit']);
 
@@ -334,6 +339,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('services-list', [ServiceController::class, 'indexList']);
     Route::get('services/trashed', [ServiceController::class, 'trashed']);
     Route::post('services/{id}/restore', [ServiceController::class, 'restore']);
+    Route::get('services/export-prices-excel', [ServiceController::class, 'exportPricesExcel']);
+    Route::post('services/import-prices-excel', [ServiceController::class, 'importPricesExcel']);
     Route::apiResource('services', ServiceController::class);
 
     /*
@@ -393,6 +400,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('companies/{company}/available-main-tests', [CompanyMainTestController::class, 'availableMainTests']);
     Route::post('companies/{company}/contracted-main-tests', [CompanyMainTestController::class, 'store']);
     Route::post('companies/{company}/contracted-main-tests/import-all', [CompanyMainTestController::class, 'importAllMainTests']);
+    Route::get('companies/{company}/contracted-main-tests/export-excel', [CompanyMainTestController::class, 'exportContractsExcel']);
+    Route::post('companies/{company}/contracted-main-tests/import-excel', [CompanyMainTestController::class, 'importContractsExcel']);
     Route::post('companies/{targetCompany}/copy-main-test-contracts-from/{sourceCompany}', [CompanyMainTestController::class, 'copyContractsFrom']);
     // Note: For update and destroy, Laravel's route model binding will bind {main_test} to a MainTest instance
     Route::put('companies/{company}/contracted-main-tests/{main_test}', [CompanyMainTestController::class, 'update']);
