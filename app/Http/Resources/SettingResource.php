@@ -67,6 +67,7 @@ class SettingResource extends JsonResource
             'show_logo_only_whatsapp' => (bool) $this->show_logo_only_whatsapp,
             'show_title_in_lab_result' => (bool) $this->show_title_in_lab_result,
             'storage_name' => $this->storage_name,
+            'firestore_facility_id' => $this->firestore_facility_id,
             'settings_enable_Sms_front' => (bool) $this->settings_enable_Sms_front,
             'prevent_backdated_entry' => (bool) $this->prevent_backdated_entry,
             'enforce_shift_hours' => (bool) $this->enforce_shift_hours,

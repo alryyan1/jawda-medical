@@ -146,6 +146,7 @@ class Setting extends Model
         'show_logo_only_whatsapp',
         'show_title_in_lab_result',
         'storage_name',
+        'firestore_facility_id',
         'settings_enable_Sms_front',
         'prevent_backdated_entry',
         'whatsapp_number',

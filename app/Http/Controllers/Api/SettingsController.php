@@ -133,6 +133,7 @@ class SettingsController extends Controller
             'require_patient_phone' => 'sometimes|boolean',
             'show_patient_address_field' => 'sometimes|boolean',
             'whatsapp_number' => 'nullable|string|max:20',
+            'firestore_facility_id' => 'sometimes|nullable|string|max:255',
             'firebase_upload_target' => 'sometimes|string|in:sales,hospital,both',
             'lab_to_lab_firebase_source' => 'sometimes|string|in:sales,hospital',
             'pdf_header_type' => 'nullable|string|in:logo,full_width,none',
