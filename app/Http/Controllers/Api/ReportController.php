@@ -24,6 +24,7 @@ use App\Models\RequestedResult;
 use App\Models\RequestedService;
 use App\Models\RequestedServiceDeposit;
 use App\Models\Service;
+use App\Models\ServiceGroup;
 use App\Models\Setting;
 use App\Models\Shift;
 use App\Models\User;
@@ -2437,6 +2438,7 @@ class ReportController extends Controller
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
             'year' => 'required|integer|min:2000|max:'.(date('Y') + 5),
+            'service_group_id' => 'nullable|integer|exists:service_groups,id',
             // Add other filters if needed, e.g., specific user who processed deposits
             // 'user_id' => 'nullable|integer|exists:users,id',
         ]);
@@ -2462,6 +2464,13 @@ class ReportController extends Controller
         // Fetch all relevant deposits and costs for the month once for efficiency
         $allDepositsForMonth = RequestedServiceDeposit::with('shift') // Eager load shift if needed for context
             ->whereBetween('created_at', [$startDate, $endDate])
+            ->when(
+                ! empty($validated['service_group_id']),
+                fn ($q) => $q->whereHas(
+                    'requestedService.service',
+                    fn ($sq) => $sq->where('service_group_id', $validated['service_group_id'])
+                )
+            )
             // ->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->user_id))
             ->get();
 
@@ -2542,6 +2551,7 @@ class ReportController extends Controller
         $validated = $request->validate([
             'month' => 'required|integer|min:1|max:12',
             'year' => 'required|integer|min:2000|max:'.(date('Y') + 5),
+            'service_group_id' => 'nullable|integer|exists:service_groups,id',
             // 'user_id' => 'nullable|integer|exists:users,id', // Optional filter
             'show_empty_days' => 'nullable|boolean', // For PDF/Excel, you might always want to show all days
         ]);
@@ -2563,6 +2573,13 @@ class ReportController extends Controller
         ];
 
         $allDepositsForMonth = RequestedServiceDeposit::whereBetween('created_at', [$startDate, $endDate])
+            ->when(
+                ! empty($validated['service_group_id']),
+                fn ($q) => $q->whereHas(
+                    'requestedService.service',
+                    fn ($sq) => $sq->where('service_group_id', $validated['service_group_id'])
+                )
+            )
             // ->when($request->filled('user_id'), fn($q) => $q->where('user_id', $request->user_id))
             ->get();
 
@@ -2640,8 +2657,14 @@ class ReportController extends Controller
 
         $reportTitle = 'تقرير الإيرادات الشهرية من الخدمات';
         $filterCriteria = "لشهر: {$reportPeriod['month_name']}";
+        if ($request->filled('service_group_id')) {
+            $serviceGroup = ServiceGroup::find($request->service_group_id);
+            if ($serviceGroup) {
+                $filterCriteria .= ' | مجموعة الخدمة: '.$serviceGroup->name;
+            }
+        }
 
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'L', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteria); // Landscape
         $pdf->AddPage();
         $pdf->SetLineWidth(0.1);
         // rtl
@@ -2969,7 +2992,7 @@ class ReportController extends Controller
         $filterCriteria = 'الفترة من: '.$reportPeriod['from'].' إلى: '.$reportPeriod['to'];
         // Append other applied filters to filterCriteria string
 
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4'); // Landscape
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'L', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteria); // Landscape
         $pdf->AddPage();
         $fontname = 'helvetica';
 
@@ -3166,7 +3189,7 @@ class ReportController extends Controller
             }
         }
 
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'L', 'mm', 'A4');
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'L', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteria);
         $pdf->AddPage();
         $fontname = 'helvetica';
 
@@ -3340,7 +3363,7 @@ class ReportController extends Controller
         $reportTitle = 'تقرير مستحقات الطبيب من شركات التأمين';
         $filterCriteria = "الطبيب: {$doctorName} | الفترة من: {$reportPeriod['from']} إلى: {$reportPeriod['to']}";
 
-        $pdf = new MyCustomTCPDF($reportTitle, $filterCriteria, 'P', 'mm', 'A4');
+        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteria);
         $pdf->AddPage();
         $fontname = 'helvetica';
 

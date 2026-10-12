@@ -97,6 +97,7 @@ class CostController extends Controller
             'cost_category_id' => 'nullable|integer|exists:cost_categories,id',
             'user_cost_id' => 'nullable|integer|exists:users,id', // User who recorded
             'shift_id' => 'nullable|integer|exists:shifts,id',
+            'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
             'payment_method' => 'nullable|string|in:cash,bank', // 'cash' or 'bank'
             'search_description' => 'nullable|string|max:255',
             'sort_by' => 'nullable|string|in:created_at,amount,description',
@@ -126,6 +127,9 @@ class CostController extends Controller
         }
         if ($request->filled('shift_id')) {
             $query->where('shift_id', $request->shift_id);
+        }
+        if ($request->filled('doctor_shift_id')) {
+            $query->where('doctor_shift_id', $request->doctor_shift_id);
         }
         if ($request->filled('payment_method') && $request->payment_method !== 'all') {
             if ($request->payment_method === 'cash') {
@@ -167,10 +171,27 @@ class CostController extends Controller
 
     public function update(Request $request, Cost $cost)
     {
+        // $this->authorize('update', $cost);
+
         $validated = $request->validate([
-            'doctor_shift_id' => 'nullable|integer|exists:doctor_shifts,id',
+            'description' => 'sometimes|required|string|max:255',
+            'comment' => 'sometimes|nullable|string|max:255',
+            'cost_category_id' => 'sometimes|nullable|integer|exists:cost_categories,id',
+            'amount' => 'sometimes|required|numeric|min:0', // Cash portion
+            'amount_bankak' => 'sometimes|required|numeric|min:0', // Bank portion
+            'doctor_shift_id' => 'sometimes|nullable|integer|exists:doctor_shifts,id',
         ]);
-        $cost->update(['doctor_shift_id' => $validated['doctor_shift_id']]);
+
+        $cashAmount = $validated['amount'] ?? $cost->amount;
+        $bankAmount = $validated['amount_bankak'] ?? $cost->amount_bankak;
+        if ((array_key_exists('amount', $validated) || array_key_exists('amount_bankak', $validated))
+            && $cashAmount <= 0 && $bankAmount <= 0) {
+            throw ValidationException::withMessages([
+                'amount' => 'At least one amount (cash or bank) must be greater than zero.',
+            ]);
+        }
+
+        $cost->update($validated);
 
         return new CostResource($cost->load(['costCategory', 'userCost:id,name', 'doctorShift.doctor']));
     }
@@ -313,9 +334,11 @@ class CostController extends Controller
         $pdf->Cell($colWidths[3], 8, number_format($data['summary']['total_cash'], 2), 1, 0, 'C', true);
         $pdf->Cell($colWidths[4], 8, number_format($data['summary']['total_bank'], 2), 1, 0, 'C', true);
 
-        return response($pdf->Output('S'), 200)
+        $pdfFileName = "Daily_Costs_{$year}_{$data['report_period']['month']}.pdf";
+
+        return response($pdf->Output($pdfFileName, 'S'), 200)
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', "inline; filename=\"Daily_Costs_{$year}_{$data['report_period']['month']}.pdf\"");
+            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
     }
 
     /**

@@ -614,7 +614,7 @@ class LabRequestController extends Controller
 
             $filename = 'container_barcode_'.$visit->id.'_'.$containerId.'.pdf';
 
-            return response($pdf->Output('S'), 200, [
+            return response($pdf->Output($filename, 'S'), 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="'.$filename.'"',
             ]);
@@ -1442,7 +1442,7 @@ class LabRequestController extends Controller
         if (! $labrequest->is_paid) {
             return response()->json(['message' => 'هذا الطلب غير مدفوع.'], 400);
         }
-        if($labrequest->user_deposited !== Auth::id() ) {
+        if ($labrequest->user_deposited !== Auth::id()) {
             return response()->json(['message' => 'فقط المستخدم الذي قام بالدفع يمكنه إلغاء الدفع.'], 403);
         }
 
@@ -1472,7 +1472,7 @@ class LabRequestController extends Controller
 
     public function unpay(LabRequest $labrequest)
     {
-        if($labrequest->user_deposited !== Auth::id() ) {
+        if ($labrequest->user_deposited !== Auth::id()) {
             return response()->json(['message' => 'فقط المستخدم الذي قام بالدفع يمكنه إلغاء الدفع.'], 403);
         }
         $labrequest->is_paid = false;

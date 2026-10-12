@@ -8,9 +8,68 @@ use App\Models\SysmexResult;
 use App\Services\WhatsAppCloudApiService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Collection as SupportCollection;
 
 class PatientLabQueueItemResource extends JsonResource
 {
+    /**
+     * Per-request cache of visit ids that have a CBC/chemistry/hormone record,
+     * keyed by visit id. Populated once per collection() call to avoid running
+     * three exists() queries for every row (these tables have no index on
+     * doctorvisit_id, so per-row queries do a full table scan each).
+     */
+    protected static array $cbcVisitIds = [];
+
+    protected static array $chemistryVisitIds = [];
+
+    protected static array $hormoneVisitIds = [];
+
+    /**
+     * @param  \Illuminate\Support\Collection|array<int, mixed>|\Illuminate\Database\Eloquent\Collection  $resource
+     */
+    public static function collection($resource): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+    {
+        static::preloadDiagnosticFlags(SupportCollection::wrap($resource)->pluck('id')->filter()->unique()->values());
+
+        return parent::collection($resource);
+    }
+
+    /**
+     * Batch-fetch which of the given visit ids have CBC/chemistry/hormone
+     * records, replacing N per-row exists() queries with 3 whereIn() queries.
+     */
+    protected static function preloadDiagnosticFlags(SupportCollection $visitIds): void
+    {
+        if ($visitIds->isEmpty()) {
+            static::$cbcVisitIds = [];
+            static::$chemistryVisitIds = [];
+            static::$hormoneVisitIds = [];
+
+            return;
+        }
+
+        static::$cbcVisitIds = SysmexResult::query()
+            ->whereIn('doctorvisit_id', $visitIds)
+            ->distinct()
+            ->pluck('doctorvisit_id')
+            ->flip()
+            ->all();
+
+        static::$chemistryVisitIds = Mindray::query()
+            ->whereIn('doctorvisit_id', $visitIds)
+            ->distinct()
+            ->pluck('doctorvisit_id')
+            ->flip()
+            ->all();
+
+        static::$hormoneVisitIds = HormoneResult::query()
+            ->whereIn('doctorvisit_id', $visitIds)
+            ->distinct()
+            ->pluck('doctorvisit_id')
+            ->flip()
+            ->all();
+    }
+
     public function toArray(Request $request): array
     {
         // Use eager-loaded data - NO additional queries!
@@ -43,10 +102,18 @@ class PatientLabQueueItemResource extends JsonResource
         $isPrinted = $patient->result_print_date != null;
         $areAllPaid = $labRequests->isNotEmpty() && $unpaidCount === 0;
 
-        // Check for CBC/Chemistry/Hormone by checking actual database tables
-        $hasCbc = SysmexResult::where('doctorvisit_id', '=', $this->id)->exists();
-        $hasChemistry = Mindray::where('doctorvisit_id', '=', $this->id)->exists();
-        $hasHormone = HormoneResult::where('doctorvisit_id', '=', $this->id)->exists();
+        // Check for CBC/Chemistry/Hormone, preferring the batch-preloaded flags
+        // (see preloadDiagnosticFlags()) and falling back to a single-row
+        // query when the resource is used standalone via `new static(...)`.
+        $hasCbc = array_key_exists($this->id, static::$cbcVisitIds)
+            ? true
+            : SysmexResult::where('doctorvisit_id', '=', $this->id)->exists();
+        $hasChemistry = array_key_exists($this->id, static::$chemistryVisitIds)
+            ? true
+            : Mindray::where('doctorvisit_id', '=', $this->id)->exists();
+        $hasHormone = array_key_exists($this->id, static::$hormoneVisitIds)
+            ? true
+            : HormoneResult::where('doctorvisit_id', '=', $this->id)->exists();
 
         return [
             'total_result_count' => $totalResultsCount,

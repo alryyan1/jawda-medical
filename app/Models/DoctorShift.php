@@ -598,14 +598,20 @@ class DoctorShift extends Model
     }
 
     /**
-     * Whether any requested service across this doctor shift's visits is not fully paid.
+     * Whether any requested service across this doctor shift's visits is not
+     * fully paid. Company (insurance) patients are excluded — their services
+     * are settled through the company's contract rather than paid by the
+     * patient directly, so an unpaid service there isn't an outstanding debt
+     * in the same sense it is for a cash patient.
      */
     public function hasUnpaidRequestedServices(): bool
     {
         return DB::table('requested_services as rs')
             ->join('doctorvisits as dv', 'dv.id', '=', 'rs.doctorvisits_id')
+            ->join('patients as p', 'p.id', '=', 'dv.patient_id')
             ->where('dv.doctor_shift_id', $this->id)
             ->where('rs.is_paid', false)
+            ->whereNull('p.company_id')
             ->exists();
     }
 

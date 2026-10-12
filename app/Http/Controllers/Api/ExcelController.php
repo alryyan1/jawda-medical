@@ -396,7 +396,14 @@ class ExcelController extends Controller
         $sheet->mergeCells('A1:H1');
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
         $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->setCellValue('A2', "لشهر: {$reportPeriod['month_name']}");
+        $subtitle = "لشهر: {$reportPeriod['month_name']}";
+        if ($request->filled('service_group_id')) {
+            $serviceGroup = ServiceGroup::find($request->service_group_id);
+            if ($serviceGroup) {
+                $subtitle .= ' | مجموعة الخدمة: '.$serviceGroup->name;
+            }
+        }
+        $sheet->setCellValue('A2', $subtitle);
         $sheet->mergeCells('A2:H2');
         $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
