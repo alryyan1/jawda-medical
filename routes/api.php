@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\PartyServiceCostController;
 use App\Http\Controllers\Api\PatientAppointmentController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PatientMedicalHistoryController;
+use App\Http\Controllers\Api\PatientPhoneReportController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RequestedServiceCostController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
@@ -301,6 +302,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/lab-request-discounts', [LabRequestDiscountReportController::class, 'report']);
     Route::get('/reports/lab-request-discounts/pdf', [LabRequestDiscountReportController::class, 'reportPdf']);
     Route::get('/reports/lab-request-discounts/excel', [LabRequestDiscountReportController::class, 'reportExcel']);
+    Route::get('/reports/patient-phones', [PatientPhoneReportController::class, 'report']);
+    Route::get('/reports/patient-phones/excel', [PatientPhoneReportController::class, 'reportExcel']);
 
     /*
       |--------------------------------------------------------------------------
