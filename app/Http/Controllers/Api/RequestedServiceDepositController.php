@@ -3,12 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\RequestedService;
-use App\Models\RequestedServiceDeposit;
-use App\Models\Shift; // To get current shift
-use Illuminate\Http\Request;
 use App\Http\Resources\RequestedServiceDepositResource;
 use App\Http\Resources\RequestedServiceResource;
+use App\Models\PaymentMethod;
+use App\Models\RequestedService; // To get current shift
+use App\Models\RequestedServiceDeposit;
+use App\Models\Shift;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log; // Added for logging
@@ -30,7 +31,7 @@ class RequestedServiceDepositController extends Controller
     public function indexForRequestedService(RequestedService $requestedService) // Route model binding
     {
         // Add authorization if needed: e.g., can user view deposits for this service/visit?
-        // $this->authorize('view', $requestedService); 
+        // $this->authorize('view', $requestedService);
 
         $deposits = $requestedService->deposits() // Assuming 'deposits' is the relationship name
             ->with(['user:id,name', 'requestedService']) // Eager load user who made the deposit
@@ -49,22 +50,23 @@ class RequestedServiceDepositController extends Controller
 
         $validated = $request->validate([
             'amount' => 'required|numeric|min:0.01',
-            'is_bank' => 'required|boolean',
+            'payment_method_id' => 'required|exists:payment_methods,id',
             // 'shift_id' might be taken from AuthContext on frontend and passed, or determined here
             // For now, assuming frontend might pass it or we take current open shift
         ]);
-        //block the creation if the doctorshift is closed 
-        if($requestedService->doctorVisit->doctorShift->status == 0){
+        // block the creation if the doctorshift is closed
+        if ($requestedService->doctorVisit->doctorShift->status == 0) {
             return response()->json(['message' => 'لا يمكن تسجيل دفعة لأن ورديه الطبيب غير مفتوحة.'], 403);
         }
-        
-        if($requestedService->doctorVisit->shift_id != Shift::max('id')) {
-            Log::error("Requested service {$requestedService->id} is in a previous shift.",);
+
+        if ($requestedService->doctorVisit->shift_id != Shift::max('id')) {
+            Log::error("Requested service {$requestedService->id} is in a previous shift.");
+
             return response()->json(['message' => 'لا يمكن تسجيل دفعة لخدمة في ورديه سابقه  .'], 403);
         }
 
         $currentClinicShift = Shift::open()->latest('created_at')->first();
-        if (!$currentClinicShift) {
+        if (! $currentClinicShift) {
             return response()->json(['message' => 'لا توجد وردية عيادة مفتوحة حالياً لتسجيل الدفعة.'], 400);
         }
 
@@ -77,14 +79,13 @@ class RequestedServiceDepositController extends Controller
         $fixedDiscount = intval($requestedService->discount) || 0;
         $totalDiscount = $discountFromPercentage + $fixedDiscount;
 
-        if($requestedService->doctorVisit->patient->company_id){
+        if ($requestedService->doctorVisit->patient->company_id) {
             $netPayable = $requestedService->endurance * $count;
-        }
-        else{
+        } else {
             $netPayable = $subTotal - $totalDiscount;
         }
 
-        log::info('netPayable   ',['netPayable' => $netPayable]);
+        log::info('netPayable   ', ['netPayable' => $netPayable]);
         // If company patient, subtract endurance that company covers
         $patient = $requestedService->doctorVisit->patient; // Need to load this relationship if not always available
         // if ($patient->company_id) {
@@ -93,7 +94,7 @@ class RequestedServiceDepositController extends Controller
 
         $currentBalance = $netPayable - (float) $requestedService->amount_paid;
         $paymentAmount = (float) $validated['amount'];
-        log::info('currentBalance   ',['currentBalance' => $currentBalance,'paymentAmount' => $paymentAmount]);
+        log::info('currentBalance   ', ['currentBalance' => $currentBalance, 'paymentAmount' => $paymentAmount]);
         if ($paymentAmount > ($currentBalance + 0.009)) { // Allow for small float inaccuracies
             return response()->json(['message' => 'مبلغ الدفعة يتجاوز الرصيد المستحق للخدمة.', 'balance' => round($currentBalance, 2)], 422);
         }
@@ -102,7 +103,8 @@ class RequestedServiceDepositController extends Controller
         try {
             $deposit = $requestedService->deposits()->create([ // Use the relationship to create
                 'amount' => $paymentAmount,
-                'is_bank' => $validated['is_bank'],
+                'is_bank' => PaymentMethod::isBankLike((int) $validated['payment_method_id']),
+                'payment_method_id' => $validated['payment_method_id'],
                 'user_id' => Auth::id(),
                 'shift_id' => $currentClinicShift->id,
                 'is_claimed' => false,
@@ -131,12 +133,13 @@ class RequestedServiceDepositController extends Controller
 
             return response()->json([
                 'message' => 'تم تسجيل الدفعة بنجاح.', // Added success message
-                'deposit' => new RequestedServiceDepositResource($deposit->load('user')),
-                'requested_service' => new RequestedServiceResource($requestedService->load(['service.serviceGroup', 'requestingUser', 'performingDoctor', 'depositUser', 'deposits']))
+                'deposit' => new RequestedServiceDepositResource($deposit->load(['user', 'paymentMethod'])),
+                'requested_service' => new RequestedServiceResource($requestedService->load(['service.serviceGroup', 'requestingUser', 'performingDoctor', 'depositUser', 'deposits', 'paymentMethod'])),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to record service deposit for RequestedService ID {$requestedService->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Failed to record service deposit for RequestedService ID {$requestedService->id}: ".$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'فشل تسجيل الدفعة.', 'error' => $e->getMessage()], 500);
         }
     }
@@ -154,17 +157,21 @@ class RequestedServiceDepositController extends Controller
         //     return response()->json(['message' => 'لا يمكنك تحديث دفعة للخدمة لأنك ليس لديك صلاحية للقيام بذلك.'], 403);
         // }
 
-        //block the update if the doctorshift is closed 
+        // block the update if the doctorshift is closed
         $requestedService = $requestedServiceDeposit->requestedService;
-        if($requestedService->doctorVisit->doctorShift->status == 0){
+        if ($requestedService->doctorVisit->doctorShift->status == 0) {
             return response()->json(['message' => 'لا يمكن التعديل  لأن ورديه الطبيب غير مفتوحة.'], 403);
         }
-        
+
         $validated = $request->validate([
             'amount' => 'sometimes|required|numeric|min:0.01',
-            'is_bank' => 'sometimes|required|boolean',
+            'payment_method_id' => 'sometimes|required|exists:payment_methods,id',
             // 'is_claimed' => 'sometimes|required|boolean', // If you want to update this
         ]);
+
+        if (array_key_exists('payment_method_id', $validated)) {
+            $validated['is_bank'] = PaymentMethod::isBankLike((int) $validated['payment_method_id']);
+        }
 
         $requestedService = $requestedServiceDeposit->requestedService;
         $oldDepositAmount = (float) $requestedServiceDeposit->amount;
@@ -204,17 +211,21 @@ class RequestedServiceDepositController extends Controller
             $newBalance = $netPayable - $newTotalPaidOnService;
             if ($newBalance <= 0.009) {
                 $requestedService->is_paid = true;
-                if (abs($newBalance) < 0.01) $requestedService->amount_paid = $netPayable;
+                if (abs($newBalance) < 0.01) {
+                    $requestedService->amount_paid = $netPayable;
+                }
             } else {
                 $requestedService->is_paid = false;
             }
             $requestedService->save();
 
             DB::commit();
-            return new RequestedServiceDepositResource($requestedServiceDeposit->load('user'));
+
+            return new RequestedServiceDepositResource($requestedServiceDeposit->load(['user', 'paymentMethod']));
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to update service deposit ID {$requestedServiceDeposit->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Failed to update service deposit ID {$requestedServiceDeposit->id}: ".$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'فشل تحديث الدفعة.', 'error' => $e->getMessage()], 500);
         }
     }
@@ -226,18 +237,15 @@ class RequestedServiceDepositController extends Controller
     public function destroy(RequestedServiceDeposit $requestedServiceDeposit)
     {
         // $this->authorize('delete', $requestedServiceDeposit);
-        
 
         // IMPORTANT: Adjusting the parent RequestedService's amount_paid is critical.
         $requestedService = $requestedServiceDeposit->requestedService;
         $amountBeingReversed = (float) $requestedServiceDeposit->amount;
-        
 
-        //block the deletion if the doctorshift is closed 
-        if($requestedService->doctorVisit->doctorShift->status == 0){
+        // block the deletion if the doctorshift is closed
+        if ($requestedService->doctorVisit->doctorShift->status == 0) {
             return response()->json(['message' => 'لا يمكن حذف  لأن ورديه الطبيب غير مفتوحة.'], 403);
         }
-        
 
         DB::beginTransaction();
         try {
@@ -262,17 +270,21 @@ class RequestedServiceDepositController extends Controller
             }
             // If amount_paid becomes negative due to reversal, it implies an issue, but we'll allow it for now.
             // Ensure it doesn't go below zero if that's a hard rule.
-            if ($requestedService->amount_paid < 0) $requestedService->amount_paid = 0;
+            if ($requestedService->amount_paid < 0) {
+                $requestedService->amount_paid = 0;
+            }
 
             $requestedService->save();
             $requestedServiceDeposit->delete();
-            $requestedService->update(['is_paid'=>0]);
+            $requestedService->update(['is_paid' => 0]);
 
             DB::commit();
+
             return response()->json(null, 204);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Failed to delete service deposit ID {$requestedServiceDeposit->id}: " . $e->getMessage(), ['exception' => $e]);
+            Log::error("Failed to delete service deposit ID {$requestedServiceDeposit->id}: ".$e->getMessage(), ['exception' => $e]);
+
             return response()->json(['message' => 'فشل حذف الدفعة.', 'error' => $e->getMessage()], 500);
         }
     }

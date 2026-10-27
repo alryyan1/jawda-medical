@@ -28,6 +28,8 @@ class RequestedServiceResource extends JsonResource
             'discount' => (float) $this->discount, // Fixed discount amount
             'discount_per' => (int) $this->discount_per, // Percentage discount
             'bank' => (bool) $this->bank,
+            'payment_method_id' => $this->payment_method_id,
+            'payment_method' => new PaymentMethodResource($this->whenLoaded('paymentMethod')),
             'count' => (int) $this->count,
             'doctor_note' => $this->doctor_note,
             'nurse_note' => $this->nurse_note,

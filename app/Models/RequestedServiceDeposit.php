@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Models;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * 
- *
  * @property int $id
  * @property int $requested_service_id
  * @property string $amount
@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property-read \App\Models\RequestedService|null $requestedService
  * @property-read \App\Models\Shift|null $shift
  * @property-read \App\Models\User|null $user
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedServiceDeposit newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedServiceDeposit newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedServiceDeposit query()
@@ -30,19 +31,23 @@ use Illuminate\Database\Eloquent\Model;
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedServiceDeposit whereShiftId($value)
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedServiceDeposit whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder|RequestedServiceDeposit whereUserId($value)
+ *
  * @mixin \Eloquent
  */
 class RequestedServiceDeposit extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'requested_service_id',
         'amount',
         'user_id',
         'is_bank',
+        'payment_method_id',
         'is_claimed',
-        'shift_id'
+        'shift_id',
     ];
+
     protected $casts = [
         'amount' => 'decimal:2',
         'is_bank' => 'boolean',
@@ -53,10 +58,18 @@ class RequestedServiceDeposit extends Model
     {
         return $this->belongsTo(RequestedService::class, 'requested_service_id', 'id');
     }
+
+    public function paymentMethod()
+    {
+        return $this->belongsTo(PaymentMethod::class);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
-    } // User who processed payment
+    }
+
+    // User who processed payment
     public function shift()
     {
         return $this->belongsTo(Shift::class);

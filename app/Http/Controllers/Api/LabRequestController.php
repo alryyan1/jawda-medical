@@ -15,6 +15,7 @@ use App\Models\DoctorVisit;
 use App\Models\LabRequest;
 use App\Models\MainTest;
 use App\Models\Patient;
+use App\Models\PaymentMethod;
 use App\Models\RequestedOrganism;
 use App\Models\RequestedResult;
 use App\Models\Shift;
@@ -676,13 +677,14 @@ class LabRequestController extends Controller
         // $this->authorize('record_batch_lab_payment', $visit);
         $validated = $request->validate([
             'total_payment_amount' => 'required|numeric|min:0.01',
-            'is_bankak' => 'required|boolean',
+            'payment_method_id' => 'required|exists:payment_methods,id',
             'shift_id' => ['required', 'integer', 'exists:shifts,id', Rule::exists('shifts', 'id')->where('is_closed', false)],
             'payment_notes' => 'nullable|string|max:255', // Optional overall payment note
         ]);
 
         $totalPaymentAmount = (float) $validated['total_payment_amount'];
-        $isBankak = (bool) $validated['is_bankak'];
+        $paymentMethodId = (int) $validated['payment_method_id'];
+        $isBankak = PaymentMethod::isBankLike($paymentMethodId);
         $currentShiftId = $validated['shift_id'];
         $userId = Auth::id();
 
@@ -734,6 +736,7 @@ class LabRequestController extends Controller
 
                 $labrequest->amount_paid += 0;
                 $labrequest->is_bankak = $isBankak; // Set payment method for the latest payment part
+                $labrequest->payment_method_id = $paymentMethodId;
                 $labrequest->user_deposited = $userId;
                 $labrequest->is_paid = true;
 
@@ -749,6 +752,7 @@ class LabRequestController extends Controller
                 'patientLabRequests.mainTest',
                 'patientLabRequests.requestingUser:id,name',
                 'patientLabRequests.depositUser:id,name',
+                'patientLabRequests.paymentMethod',
                 'patient.doctor',
             ]));
 
@@ -1335,7 +1339,7 @@ class LabRequestController extends Controller
             'approve' => 'sometimes|boolean', // For insurance/admin approval of the request itself
             'discount_per' => 'sometimes|integer|min:0|max:100',
             'endurance' => 'sometimes|numeric|min:0',
-            'is_bankak' => 'sometimes|boolean', // If payment method choice is saved before actual payment
+            'payment_method_id' => 'sometimes|exists:payment_methods,id', // If payment method choice is saved before actual payment
         ]);
 
         // Prevent updating financial fields if already paid or processed, unless specific permission
@@ -1343,9 +1347,13 @@ class LabRequestController extends Controller
         //     return response()->json(['message' => 'لا يمكن تعديل البيانات المالية لطلب مدفوع أو مكتمل.'], 403);
         // }
 
+        if (array_key_exists('payment_method_id', $validatedData)) {
+            $validatedData['is_bankak'] = PaymentMethod::isBankLike((int) $validatedData['payment_method_id']);
+        }
+
         $labrequest->update($validatedData);
 
-        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
+        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'paymentMethod']));
     }
 
     /**
@@ -1402,6 +1410,8 @@ class LabRequestController extends Controller
             return response()->json(['message' => 'جميع طلبات المختبر لهذه الزيارة مدفوعة بالفعل.'], 400);
         }
 
+        $cashPaymentMethodId = PaymentMethod::defaultCashId();
+
         DB::beginTransaction();
         try {
             foreach ($unpaidRequests as $labrequest) {
@@ -1414,6 +1424,7 @@ class LabRequestController extends Controller
                 $labrequest->amount_paid = $netPayableByPatient;
                 $labrequest->is_paid = true;
                 $labrequest->is_bankak = false; // Default to cash payment
+                $labrequest->payment_method_id = $cashPaymentMethodId;
                 $labrequest->user_deposited = Auth::id();
                 $labrequest->save();
             }
@@ -1424,6 +1435,7 @@ class LabRequestController extends Controller
                 'patientLabRequests.mainTest',
                 'patientLabRequests.requestingUser:id,name',
                 'patientLabRequests.depositUser:id,name',
+                'patientLabRequests.paymentMethod',
             ]));
 
         } catch (\Exception $e) {
@@ -1460,14 +1472,15 @@ class LabRequestController extends Controller
     public function toggleBankak(Request $request, LabRequest $labrequest)
     {
         $validated = $request->validate([
-            'is_bankak' => 'required|boolean',
+            'payment_method_id' => 'required|exists:payment_methods,id',
         ]);
 
         $labrequest->update([
-            'is_bankak' => $validated['is_bankak'],
+            'payment_method_id' => $validated['payment_method_id'],
+            'is_bankak' => PaymentMethod::isBankLike((int) $validated['payment_method_id']),
         ]);
 
-        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser']));
+        return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'paymentMethod']));
     }
 
     public function unpay(LabRequest $labrequest)
@@ -1497,7 +1510,7 @@ class LabRequestController extends Controller
         }
 
         $validated = $request->validate([
-            'is_bankak' => 'required|boolean', // Or 'is_bank' if that's your field name
+            'payment_method_id' => 'required|exists:payment_methods,id',
 
             // 'payment_datetime' => 'nullable|date_format:Y-m-d H:i:s', // Optional: if payment time can be backdated
         ]);
@@ -1540,7 +1553,8 @@ class LabRequestController extends Controller
             // Update LabRequest directly
             $labrequest->amount_paid = $netPayableByPatient; // Mark as fully paid up to net patient payable
             $labrequest->is_paid = true;
-            $labrequest->is_bankak = $validated['is_bankak']; // Store the method of this payment
+            $labrequest->payment_method_id = $validated['payment_method_id']; // Store the method of this payment
+            $labrequest->is_bankak = PaymentMethod::isBankLike((int) $validated['payment_method_id']);
             $labrequest->user_deposited = Auth::id();       // User who processed this payment
             // $labrequest->payment_at = $request->input('payment_datetime', Carbon::now()); // If you add a payment_at timestamp
             // $labrequest->payment_shift_id = $validated['shift_id']; // If you want to store the specific shift of payment
@@ -1551,7 +1565,7 @@ class LabRequestController extends Controller
 
             DB::commit();
 
-            return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser']));
+            return new LabRequestResource($labrequest->load(['mainTest', 'requestingUser', 'depositUser', 'paymentMethod']));
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1572,16 +1586,17 @@ class LabRequestController extends Controller
         // }
 
         $validated = $request->validate([
-            'is_bankak' => 'required|boolean',
+            'payment_method_id' => 'required|exists:payment_methods,id',
         ]);
 
-        $isBankak = (bool) $validated['is_bankak'];
+        $paymentMethodId = (int) $validated['payment_method_id'];
+        $isBankak = PaymentMethod::isBankLike($paymentMethodId);
 
         DB::beginTransaction();
         try {
             // Update all lab requests for this visit
             $updatedCount = $visit->patientLabRequests()
-                ->update(['is_bankak' => $isBankak]);
+                ->update(['is_bankak' => $isBankak, 'payment_method_id' => $paymentMethodId]);
 
             DB::commit();
 
@@ -1590,6 +1605,7 @@ class LabRequestController extends Controller
                 'patientLabRequests.mainTest',
                 'patientLabRequests.requestingUser:id,name',
                 'patientLabRequests.depositUser:id,name',
+                'patientLabRequests.paymentMethod',
             ]));
 
         } catch (\Exception $e) {

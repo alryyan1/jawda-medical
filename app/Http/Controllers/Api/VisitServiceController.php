@@ -7,6 +7,7 @@ use App\Http\Resources\RequestedServiceResource;
 use App\Http\Resources\ServiceResource;
 use App\Models\Company;
 use App\Models\DoctorVisit;
+use App\Models\PaymentMethod;
 use App\Models\RequestedService;
 use App\Models\Service;
 use App\Models\Shift;
@@ -223,6 +224,7 @@ class VisitServiceController extends Controller
                     'discount' => 0,
                     'discount_per' => 0,
                     'bank' => false,
+                    'payment_method_id' => PaymentMethod::defaultCashId(),
                     'count' => $count,
                     'approval' => $contractApproval,
                     'done' => false,

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\RoleResource;
 use App\Http\Resources\UserResource;
 use App\Models\LabRequest;
+use App\Models\PaymentMethod;
 use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -325,6 +326,22 @@ class UserController extends Controller
         $totalBank = (float) (clone $query)->where('is_bankak', true)->sum('amount_paid');
         $totalCash = $totalIncome - $totalBank;
 
+        $byMethod = (clone $query)
+            ->selectRaw('payment_method_id, SUM(amount_paid) as total')
+            ->groupBy('payment_method_id')
+            ->pluck('total', 'payment_method_id');
+
+        $paymentMethods = PaymentMethod::active()->orderBy('sort_order')->get()
+            ->map(function (PaymentMethod $method) use ($byMethod) {
+                return [
+                    'id' => $method->id,
+                    'code' => $method->code,
+                    'name' => $method->name,
+                    'total' => (float) ($byMethod[$method->id] ?? 0),
+                ];
+            })
+            ->values();
+
         return response()->json([
             'data' => [
                 'user_id' => $user->id,
@@ -333,6 +350,7 @@ class UserController extends Controller
                 'total_lab_income' => $totalIncome,
                 'total_cash' => $totalCash,
                 'total_bank' => $totalBank,
+                'payment_methods' => $paymentMethods,
             ],
         ]);
     }

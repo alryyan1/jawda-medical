@@ -107,7 +107,6 @@ class DoctorVisitResource extends JsonResource
         $totalAmount = 0;
         $totalPaid = 0;
         $totalDiscount = 0;
-        $totalEndurance = 0;
         $totalServicesAmount = 0;
         $totalLabAmount = 0;
         $totalLabPaid = 0;
@@ -155,7 +154,11 @@ class DoctorVisitResource extends JsonResource
             'total_lab_amount' => round($totalLabAmount, 2),
             'total_paid' => round($totalPaid, 2),
             'total_discount' => round($totalDiscount, 2),
-            'balance_due' => round($isCompanyPatient ? $totalEndurance - $totalPaid : ($totalAmount - $totalDiscount) - $totalPaid, 2),
+            // $totalAmount is the sum of each service's net_payable, which is
+            // already subtotal minus discount minus endurance — subtracting
+            // $totalDiscount again here previously double-counted it (and,
+            // for company patients, used an always-zero $totalEndurance).
+            'balance_due' => round($totalAmount - $totalPaid, 2),
             'total_lab_paid' => round($totalLabPaid, 2),
             'total_lab_discount' => round($totalLabDiscount, 2),
             'total_lab_endurance' => round($totalLabEndurance, 2),

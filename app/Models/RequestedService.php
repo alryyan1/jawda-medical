@@ -86,6 +86,7 @@ class RequestedService extends Model
         'discount',
         'discount_per',
         'bank', // This 'bank' field indicates if the *last or primary* payment was bank. Individual deposits have their own is_bank.
+        'payment_method_id',
         'count',
         'doctor_note',
         'nurse_note',
@@ -151,6 +152,11 @@ class RequestedService extends Model
     public function deposits() // <-- THE MISSING RELATIONSHIP
     {
         return $this->hasMany(RequestedServiceDeposit::class, 'requested_service_id');
+    }
+
+    public function paymentMethod()
+    {
+        return $this->belongsTo(PaymentMethod::class);
     }
 
     public function diagnosis()

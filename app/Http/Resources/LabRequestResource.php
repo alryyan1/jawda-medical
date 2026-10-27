@@ -1,10 +1,14 @@
 <?php
+
 // app/Http/Resources/LabRequestResource.php
+
 namespace App\Http\Resources;
-use Illuminate\Http\Request; 
+
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+
 // Import RequestedResultResource if you create one, or inline the structure
-// use App\Http\Resources\RequestedResultResource; 
+// use App\Http\Resources\RequestedResultResource;
 
 class LabRequestResource extends JsonResource
 {
@@ -14,7 +18,7 @@ class LabRequestResource extends JsonResource
             'id' => $this->id,
             'main_test_id' => $this->main_test_id,
             // Load full MainTest with its childTests for result entry context
-            'main_test' => new MainTestResource($this->whenLoaded('mainTest')), 
+            'main_test' => new MainTestResource($this->whenLoaded('mainTest')),
             'pid' => $this->pid,
             'patient_name' => $this->whenLoaded('patient', optional($this->patient)->name),
             'doctor_visit_id' => $this->doctor_visit_id,
@@ -26,8 +30,10 @@ class LabRequestResource extends JsonResource
             'amount_paid' => (float) $this->amount_paid,
             'discount_per' => (int) $this->discount_per,
             'is_bankak' => (bool) $this->is_bankak,
+            'payment_method_id' => $this->payment_method_id,
+            'payment_method' => new PaymentMethodResource($this->whenLoaded('paymentMethod')),
             'comment' => $this->comment, // Comment for the LabRequest itself
-            'image_url' => $this->image_path ? asset('storage/' . $this->image_path) : null,
+            'image_url' => $this->image_path ? asset('storage/'.$this->image_path) : null,
             'user_requested' => $this->user_requested,
             'requesting_user_name' => $this->whenLoaded('requestingUser', optional($this->requestingUser)->name),
             'user_deposited' => $this->user_deposited,
@@ -41,7 +47,7 @@ class LabRequestResource extends JsonResource
 
             // --- ADD/ENSURE THIS ---
             // Eager load 'results.childTest.unit' if needed for display consistency
-            'results' => RequestedResultResource::collection($this->whenLoaded('results')), 
+            'results' => RequestedResultResource::collection($this->whenLoaded('results')),
             // If you don't have RequestedResultResource yet, you can inline:
             // 'results' => $this->whenLoaded('results', function() {
             //     return $this->results->map(function ($result) {

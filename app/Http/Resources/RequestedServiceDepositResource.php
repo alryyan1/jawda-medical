@@ -1,12 +1,21 @@
-<?php namespace App\Http\Resources;
-use Illuminate\Http\Request; use Illuminate\Http\Resources\Json\JsonResource;
-class RequestedServiceDepositResource extends JsonResource {
-    public function toArray(Request $request): array {
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class RequestedServiceDepositResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
         return [
             'id' => $this->id,
             'requested_service_id' => $this->requested_service_id,
             'amount' => (float) $this->amount,
             'is_bank' => (bool) $this->is_bank,
+            'payment_method_id' => $this->payment_method_id,
+            'payment_method' => new PaymentMethodResource($this->whenLoaded('paymentMethod')),
             'is_claimed' => (bool) $this->is_claimed,
             'shift_id' => $this->shift_id,
             'user_id' => $this->user_id,

@@ -22,7 +22,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $count Default 1
  * @property string|null $amount_paid
  * @property int $discount_per
- * @property bool $is_bankak Payment method for this request
+ * @property bool $is_bankak Legacy payment method flag (true = non-cash), kept in sync with payment_method_id
+ * @property int|null $payment_method_id
  * @property string|null $comment Main comment for the lab request
  * @property int|null $user_requested User who made the request
  * @property int|null $user_deposited User who handled payment
@@ -47,14 +48,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read int|null $results_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\RequestedOrganism> $requestedOrganisms
  * @property-read int|null $requested_organisms_count
+ *
  * @method static \Illuminate\Database\Eloquent\Builder|LabRequest newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|LabRequest newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder|LabRequest query()
+ *
  * @mixin \Eloquent
  */
 class LabRequest extends Model
 {
     use HasFactory;
+
     protected $table = 'labrequests';
 
     protected $fillable = [
@@ -70,6 +74,7 @@ class LabRequest extends Model
         'amount_paid',
         'discount_per',
         'is_bankak',
+        'payment_method_id',
         'comment',
         'image_path',
         'user_requested',
@@ -116,8 +121,6 @@ class LabRequest extends Model
         return $this->belongsTo(Patient::class, 'pid');
     }
 
-
-
     public function requestingUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_requested');
@@ -126,6 +129,11 @@ class LabRequest extends Model
     public function depositUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_deposited');
+    }
+
+    public function paymentMethod(): BelongsTo
+    {
+        return $this->belongsTo(PaymentMethod::class);
     }
 
     public function results(): HasMany
@@ -137,6 +145,7 @@ class LabRequest extends Model
     {
         return $this->hasMany(RequestedOrganism::class);
     }
+
     public function sampleCollectedBy(): BelongsTo // NEW
     {
         return $this->belongsTo(User::class, 'sample_collected_by_user_id');
@@ -163,8 +172,6 @@ class LabRequest extends Model
      *
      * This is a conceptual implementation. The exact logic depends on your business rules
      * for what constitutes "fully authorized".
-     *
-     * @return bool
      */
     public function isFullyAuthorized(): bool
     {
@@ -173,11 +180,14 @@ class LabRequest extends Model
             // Additionally, you might want to ensure all results are entered if it's a divided test
             if ($this->mainTest && $this->mainTest->divided) {
                 $expectedChildTestsCount = $this->mainTest->childTests()->count();
-                $enteredResultsCount = $this->results()->where(fn($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
+                $enteredResultsCount = $this->results()->where(fn ($q) => $q->whereNotNull('result')->where('result', '!=', ''))->count();
+
                 return $enteredResultsCount >= $expectedChildTestsCount;
             }
+
             return true; // Approved and not divided, or divided and all results seem entered
         }
+
         return false;
 
         // Option 2: More granular check (if you re-introduce authorization per RequestedResult)
@@ -204,23 +214,26 @@ class LabRequest extends Model
     /**
      * Generates a unique sample ID.
      * This is a basic example. You might want a more robust, centralized sequence.
-     * @return string
      */
-    public static function generateSampleId(DoctorVisit $visit = null): string
+    public static function generateSampleId(?DoctorVisit $visit = null): string
     {
-        $prefix = $visit ? "V{$visit->id}-" : "S-";
-        return $prefix . strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 6));
+        $prefix = $visit ? "V{$visit->id}-" : 'S-';
+
+        return $prefix.strtoupper(substr(md5(uniqid((string) mt_rand(), true)), 0, 6));
     }
-    public function getNameAttribute(){
+
+    public function getNameAttribute()
+    {
         return $this->mainTest->main_test_name;
     }
+
     // In app/Models/LabRequest.php
     public function scopeLoadDefaultRelations($query)
     {
         return $query->with([
             'mainTest.childTests.unit',
             'results.childTest.unit',
-            'results.enteredBy:id,name' // If you have this
+            'results.enteredBy:id,name', // If you have this
         ]);
     }
 }

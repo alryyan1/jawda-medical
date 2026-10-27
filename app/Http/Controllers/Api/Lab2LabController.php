@@ -9,6 +9,7 @@ use App\Models\DoctorVisit;
 use App\Models\File;
 use App\Models\LabRequest;
 use App\Models\Patient;
+use App\Models\PaymentMethod;
 use App\Models\RequestedResult;
 use App\Models\Setting;
 use App\Models\Shift;
@@ -58,12 +59,12 @@ class Lab2LabController extends Controller
         ]);
 
         $currentGeneralShift = Shift::open()->latest('created_at')->first();
-        if (!$currentGeneralShift) {
+        if (! $currentGeneralShift) {
             return response()->json(['message' => 'لا توجد وردية مفتوحة حالياً.'], 400);
         }
 
         $company = Company::where('lab2lab_firestore_id', $validated['labId'])->first();
-        if (!$company) {
+        if (! $company) {
             return response()->json(['message' => 'العقد غير مرتبط مع الشركات يجب ربط العقد مع الشركه'], 400);
         }
 
@@ -95,7 +96,7 @@ class Lab2LabController extends Controller
             ];
             $notifications = array_merge(
                 $notifications,
-                $this->sendSampleReceivedWhatsAppConfirmations($validated,$patient)
+                $this->sendSampleReceivedWhatsAppConfirmations($validated, $patient)
             );
 
             return response()->json([
@@ -105,7 +106,8 @@ class Lab2LabController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Failed to save online lab patient: ' . $e->getMessage(), ['exception' => $e]);
+            Log::error('Failed to save online lab patient: '.$e->getMessage(), ['exception' => $e]);
+
             return response()->json([
                 'message' => 'فشل في حفظ بيانات المريض',
                 'error' => $e->getMessage(),
@@ -132,7 +134,7 @@ class Lab2LabController extends Controller
             'result_auth' => false,
             'referred' => 'من مختبر خارجي',
             'labId' => $validated['labId'],
-            'discount_comment' => 'مختبر خارجي: ' . ' - مريض: ' . $validated['lab2lab_id'],
+            'discount_comment' => 'مختبر خارجي: '.' - مريض: '.$validated['lab2lab_id'],
             'lab_to_lab_object_id' => $validated['external_patient_id'], // Store the Firestore document ID
         ]);
     }
@@ -170,7 +172,8 @@ class Lab2LabController extends Controller
                 'amount_paid' => 0,
                 'discount_per' => 0,
                 'is_bankak' => false,
-                'comment' => 'لاب تو' . $labRequestData['testId'],
+                'payment_method_id' => PaymentMethod::defaultCashId(),
+                'comment' => 'لاب تو'.$labRequestData['testId'],
                 'user_requested' => Auth::id(),
                 'approve' => 0,
                 'endurance' => 0,
@@ -194,7 +197,7 @@ class Lab2LabController extends Controller
                 'child_test_id' => $childTest->id,
                 'result' => '', // Initial empty result
                 // Capture normal range and unit AT THE TIME OF REQUEST
-                'normal_range' => $childTest->normalRange ?? ($childTest->low !== null && $childTest->upper !== null ? $childTest->low . ' - ' . $childTest->upper : null),
+                'normal_range' => $childTest->normalRange ?? ($childTest->low !== null && $childTest->upper !== null ? $childTest->low.' - '.$childTest->upper : null),
                 'unit_id' => $childTest->unit?->id, // From eager loaded unit
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -209,7 +212,7 @@ class Lab2LabController extends Controller
      */
     private function markSampleDeliveredInFirestore(?string $externalPatientId): void
     {
-        if (!$externalPatientId) {
+        if (! $externalPatientId) {
             return;
         }
 
@@ -244,11 +247,11 @@ class Lab2LabController extends Controller
             $testsNames = collect($validated['lab_requests'] ?? [])->pluck('name')->filter()->values()->all();
             $testsList = implode(' و ', $testsNames);
             $title = 'تم توصيل العينات الي المختبر';
-            $body = 'تم توصيل العينات للمريض ' . $validated['name'] . ' صاحب التحاليل التاليه ' . $testsList;
+            $body = 'تم توصيل العينات للمريض '.$validated['name'].' صاحب التحاليل التاليه '.$testsList;
 
             $notification['attempted'] = true;
             $notification['success'] = FirebaseService::sendTopicMessage($safeTopic, $title, $body);
-            if (!$notification['success']) {
+            if (! $notification['success']) {
                 $notification['error'] = 'Failed to send FCM topic notification';
             }
         } catch (\Throwable $e) {
@@ -290,7 +293,7 @@ class Lab2LabController extends Controller
                 ],
             ];
 
-            $whatsappService = new WhatsAppCloudApiService();
+            $whatsappService = new WhatsAppCloudApiService;
 
             // 1. Lab2lab contracted phone (submitted with the request)
             $lab2labPhone = WhatsAppCloudApiService::formatPhoneNumber($validated['lab_phone'] ?? '');
@@ -298,7 +301,7 @@ class Lab2LabController extends Controller
                 $notifications['whatsapp_lab2lab']['attempted'] = true;
                 $result = $whatsappService->sendTemplateMessage($lab2labPhone, 'sample_received_confirmation', 'ar', $components);
                 $notifications['whatsapp_lab2lab']['success'] = $result['success'] ?? false;
-                if (!$notifications['whatsapp_lab2lab']['success']) {
+                if (! $notifications['whatsapp_lab2lab']['success']) {
                     $notifications['whatsapp_lab2lab']['error'] = $result['error'] ?? 'Unknown error';
                     Log::warning('Failed to send sample_received_confirmation WhatsApp template to lab2lab phone', [
                         'error' => $notifications['whatsapp_lab2lab']['error'],
@@ -315,7 +318,7 @@ class Lab2LabController extends Controller
                 $notifications['whatsapp_owner']['attempted'] = true;
                 $result = $whatsappService->sendTemplateMessage($ownerPhone, 'sample_received_confirmation', 'ar', $components);
                 $notifications['whatsapp_owner']['success'] = $result['success'] ?? false;
-                if (!$notifications['whatsapp_owner']['success']) {
+                if (! $notifications['whatsapp_owner']['success']) {
                     $notifications['whatsapp_owner']['error'] = $result['error'] ?? 'Unknown error';
                     Log::warning('Failed to send sample_received_confirmation WhatsApp template to settings phone', [
                         'error' => $notifications['whatsapp_owner']['error'],

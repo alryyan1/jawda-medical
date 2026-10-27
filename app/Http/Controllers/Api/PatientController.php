@@ -26,6 +26,7 @@ use App\Models\LabRequest;
 use App\Models\MainTest;
 use App\Models\Mindray;
 use App\Models\Patient;
+use App\Models\PaymentMethod;
 use App\Models\RequestedResult;
 use App\Models\RequestedService;
 use App\Models\Service;
@@ -1625,6 +1626,7 @@ class PatientController extends Controller
                         'discount' => 0,
                         'discount_per' => 0,
                         'bank' => false,
+                        'payment_method_id' => PaymentMethod::defaultCashId(),
                         'count' => 1,
                         'approval' => $contractApproval,
                         'done' => false,

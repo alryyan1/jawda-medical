@@ -2,22 +2,23 @@
 
 namespace App\Services;
 
-use App\Models\Service;
 use App\Models\Company;
-use App\Models\Patient;
 use App\Models\DoctorVisit;
+use App\Models\Patient;
+use App\Models\PaymentMethod;
 use App\Models\RequestedService;
+use App\Models\Service;
 
 class RequestedServiceHelper
 {
     /**
      * Create a requested service from a favorite service with company contract handling.
      *
-     * @param Service $service The service to create a request for
-     * @param DoctorVisit $doctorVisit The doctor visit to attach the service to
-     * @param Patient $patient The patient for company contract calculations
-     * @param int $userId The user ID creating the request
-     * @param int $count The count/quantity of the service (default: 1)
+     * @param  Service  $service  The service to create a request for
+     * @param  DoctorVisit  $doctorVisit  The doctor visit to attach the service to
+     * @param  Patient  $patient  The patient for company contract calculations
+     * @param  int  $userId  The user ID creating the request
+     * @param  int  $count  The count/quantity of the service (default: 1)
      * @return RequestedService|null The created RequestedService or null on failure
      */
     public static function createFromFavoriteService(
@@ -74,6 +75,7 @@ class RequestedServiceHelper
             'discount' => 0,
             'discount_per' => 0,
             'bank' => false,
+            'payment_method_id' => PaymentMethod::defaultCashId(),
             'count' => $count,
             'approval' => $contractApproval,
             'done' => false,
@@ -82,4 +84,3 @@ class RequestedServiceHelper
         return $requestedService;
     }
 }
-

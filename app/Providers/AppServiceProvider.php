@@ -2,11 +2,11 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use App\Services\Contracts\SmsClient;
-use App\Services\AirtelSmsClient;
 use App\Models\SysmexResult;
 use App\Observers\SysmexResultObserver;
+use App\Services\AirtelSmsClient;
+use App\Services\Contracts\SmsClient;
+use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
@@ -17,7 +17,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(SmsClient::class, function () {
-            return new AirtelSmsClient();
+            return new AirtelSmsClient;
         });
 
         // Sanctum::ignoreMigrations();
@@ -35,5 +35,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Register model observers
         SysmexResult::observe(SysmexResultObserver::class);
+
+        // The base schema migrations live under a subdirectory, which
+        // `php artisan migrate` does not scan by default.
+        $this->loadMigrationsFrom(database_path('migrations/system_setup'));
     }
 }

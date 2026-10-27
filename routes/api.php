@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\PatientAppointmentController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PatientMedicalHistoryController;
 use App\Http\Controllers\Api\PatientPhoneReportController;
+use App\Http\Controllers\Api\PaymentMethodController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\RequestedServiceCostController;
 use App\Http\Controllers\Api\RequestedServiceDepositController;
@@ -58,6 +59,7 @@ use App\Http\Controllers\Api\SubcompanyController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\UserDocSelectionController;
+use App\Http\Controllers\Api\UserPatientActivityReportController;
 use App\Http\Controllers\Api\VisitDiagnosisController;
 use App\Http\Controllers\Api\VisitDocumentsWhatsAppController;
 use App\Http\Controllers\Api\VisitMedicalReportController;
@@ -304,6 +306,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/reports/lab-request-discounts/excel', [LabRequestDiscountReportController::class, 'reportExcel']);
     Route::get('/reports/patient-phones', [PatientPhoneReportController::class, 'report']);
     Route::get('/reports/patient-phones/excel', [PatientPhoneReportController::class, 'reportExcel']);
+    Route::get('/reports/user-patient-activity', [UserPatientActivityReportController::class, 'report']);
+    Route::get('/reports/user-patient-activity/pdf', [UserPatientActivityReportController::class, 'reportPdf']);
 
     /*
       |--------------------------------------------------------------------------
@@ -357,6 +361,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Settings
     Route::get('/settings', [SettingsController::class, 'show']);
     Route::post('/settings', [SettingsController::class, 'update']);
+
+    // Payment Methods
+    Route::get('/payment-methods', [PaymentMethodController::class, 'index']);
+    Route::post('/payment-methods', [PaymentMethodController::class, 'store']);
+    Route::put('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'update']);
+    Route::delete('/payment-methods/{paymentMethod}', [PaymentMethodController::class, 'destroy']);
 
     // Bindings Management (CBC, Chemistry, Hormone)
     Route::get('/bindings', [BindingController::class, 'index']);
