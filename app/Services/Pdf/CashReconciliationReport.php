@@ -57,6 +57,7 @@ class CashReconciliationReport
         $this->renderHeader();
         $this->renderTitle();
         $this->renderShiftInfo();
+        $this->renderIncomeBreakdown();
         $this->renderFinancialSummary();
         // $this->renderDenominations();
         $this->renderCosts();
@@ -176,6 +177,66 @@ class CashReconciliationReport
         $this->pdf->SetFillColor(255, 255, 255);
         $this->pdf->SetFont('arial', 'B', 10);
         $this->pdf->Cell($valueWidth, 9, $this->data['shiftDate'], 1, 1, 'R', true);
+
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->Ln(8);
+    }
+
+    private function renderIncomeBreakdown(): void
+    {
+        $pageWidth = $this->pdf->getPageWidth();
+        $margin = 15;
+        $usableWidth = $pageWidth - (2 * $margin);
+
+        // Modern section header
+        $this->pdf->SetFont('arial', 'B', 13);
+        $this->pdf->SetTextColor(45, 55, 72);
+        $this->pdf->Ln(1);
+        $titleText = 'تفاصيل الإيراد المدفوع';
+        $this->pdf->Cell($usableWidth, 8, $titleText, 0, 1, 'R');
+
+        // Accent line - width matches title length
+        $this->pdf->SetDrawColor(45, 55, 72);
+        $this->pdf->SetLineWidth(1);
+        $lineY = $this->pdf->GetY();
+        $titleWidth = $this->pdf->GetStringWidth($titleText);
+        $lineStartX = $pageWidth - $margin - $titleWidth;
+        $this->pdf->Line($lineStartX, $lineY, $pageWidth - $margin, $lineY);
+        $this->pdf->Ln(4);
+
+        $incomeData = $this->data['incomeData'];
+
+        // Modern table header with lighter gray background
+        $this->pdf->SetDrawColor(220, 223, 230);
+        $this->pdf->SetLineWidth(0.3);
+        $this->pdf->SetFont('arial', 'B', 11);
+        $this->pdf->SetFillColor(240, 240, 240);
+        $this->pdf->SetTextColor(0, 0, 0);
+        $this->pdf->Cell($usableWidth * 0.4, 8, 'البند', 1, 0, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, 'النقدي', 1, 0, 'C', true);
+        $this->pdf->Cell($usableWidth * 0.3, 8, 'البنك', 1, 1, 'C', true);
+
+        $this->pdf->SetTextColor(0, 0, 0);
+        $rowFill = false;
+
+        // Lab income row (إجمالي الإيراد المدفوع للمختبر)
+        $this->pdf->SetFont('arial', 'B', 10);
+        $this->pdf->SetFillColor(255, 255, 255);
+        $this->pdf->Cell($usableWidth * 0.4, 7, 'إيراد المختبر المدفوع', 1, 0, 'C', $rowFill);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->lab_income->cash ?? 0, 0), 1, 0, 'C', $rowFill);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->lab_income->bank ?? 0, 0), 1, 1, 'C', $rowFill);
+        $rowFill = ! $rowFill;
+
+        // Clinic/services income row (إجمالي إيراد العيادات (الخدمات) المدفوع)
+        $this->pdf->SetFont('arial', 'B', 10);
+        if ($rowFill) {
+            $this->pdf->SetFillColor(252, 252, 253);
+        } else {
+            $this->pdf->SetFillColor(255, 255, 255);
+        }
+        $this->pdf->Cell($usableWidth * 0.4, 7, 'إيراد العيادات (الخدمات) المدفوع', 1, 0, 'C', $rowFill);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->service_income->cash ?? 0, 0), 1, 0, 'C', $rowFill);
+        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($incomeData->service_income->bank ?? 0, 0), 1, 1, 'C', $rowFill);
 
         $this->pdf->SetTextColor(0, 0, 0);
         $this->pdf->Ln(8);
@@ -503,6 +564,8 @@ class CashReconciliationReport
                     'total_bank_expenses' => 0,
                     'net_cash' => 0,
                     'net_bank' => 0,
+                    'lab_income' => (object) ['total' => 0, 'cash' => 0, 'bank' => 0],
+                    'service_income' => (object) ['total' => 0, 'cash' => 0, 'bank' => 0],
                 ];
             }
 

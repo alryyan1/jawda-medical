@@ -65,9 +65,10 @@ class LabResultReport
         $footer_name = $settings?->footer_base64;
         $logo_path = public_path();
 
-        // Set up header function
-        $pdf->head = function ($pdf) use ($patient, $page_width, $settings, $doctorvisit) {
+        // Set up header function (runs on every page, including the logo so it repeats too)
+        $pdf->head = function ($pdf) use ($patient, $page_width, $settings, $doctorvisit, $logo_name, $logo_path, $base64, $isWhatsappContext) {
             $this->renderHeader($pdf, $patient, $page_width, $settings, $doctorvisit);
+            $this->addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64, $isWhatsappContext);
         };
 
         // Set up footer function
@@ -121,9 +122,6 @@ class LabResultReport
             );
             $pdf->SetAlpha(1);
         }
-
-        // Add logo
-        $this->addLogo($pdf, $settings, $logo_name, $logo_path, $page_width, $base64, $isWhatsappContext);
 
         if (! $isWhatsappContext) {
             $patient->update(['result_print_date' => now()]);
@@ -181,7 +179,7 @@ class LabResultReport
             }
         }
 
-        $pdf->Ln(5);
+        $pdf->Ln(18);
 
         $y = $pdf->GetY();
         $pdf->SetFont('arial', '', 13, '', true);
@@ -1342,21 +1340,11 @@ class LabResultReport
      */
     private function renderComments($pdf, $m_test, $page_width): void
     {
-        // Collect comment lines: per-request comment first, then default_comment from MainTest
-        $lines = [];
-        if (str_word_count((string) $m_test->comment) > 0) {
-            $lines[] = $m_test->comment;
-        }
-        $defaultComment = trim((string) ($m_test->mainTest->default_comment ?? ''));
-        if ($defaultComment !== '') {
-            $lines[] = $defaultComment;
-        }
-
-        if (empty($lines)) {
+        if (str_word_count((string) $m_test->comment) === 0) {
             return;
         }
 
-        $combined = implode("\n", $lines);
+        $combined = (string) $m_test->comment;
         $estimated = $this->measureTextHeight($pdf, $page_width, $combined, $this->baseLineHeight) + $this->headerSpacing + $this->smallSpacing;
         $this->ensureSpaceFor($pdf, $estimated);
         $pdf->SetFont('arial', 'u', 14, '', true);

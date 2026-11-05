@@ -471,6 +471,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/main-tests/{main_test}/child-tests/batch-update-order', [ChildTestController::class, 'batchUpdateOrder'])->middleware('auth:sanctum');
     Route::apiResource('child-tests.options', ChildTestOptionController::class)->shallow()->except(['show']);
     Route::get('/cost-categories-list', [CostController::class, 'getCostCategories']);
+    Route::post('/cost-categories', [CostController::class, 'storeCostCategory']);
     // api/main-tests/find/123
     Route::get('/main-tests/find/{identifier}', [MainTestController::class, 'findByIdOrCode']);
     Route::delete('/visits/{visit}/lab-requests/clear-pending', [LabRequestController::class, 'clearPendingRequests'])->middleware('auth:sanctum');

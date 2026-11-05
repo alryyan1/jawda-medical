@@ -31,6 +31,17 @@ class CostController extends Controller
         return \App\Http\Resources\CostCategoryResource::collection(CostCategory::orderBy('name')->get());
     }
 
+    public function storeCostCategory(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', Rule::unique('cost_categories', 'name')],
+        ]);
+
+        $costCategory = CostCategory::create($validated);
+
+        return new \App\Http\Resources\CostCategoryResource($costCategory);
+    }
+
     public function store(Request $request)
     {
         // $this->authorize('create', Cost::class);
