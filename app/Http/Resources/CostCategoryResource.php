@@ -10,7 +10,6 @@ class CostCategoryResource extends JsonResource
     /**
      * Transform the resource into an array.
      *
-     * @param  Request  $request
      * @return array<string, mixed>
      */
     public function toArray(Request $request): array
@@ -23,8 +22,11 @@ class CostCategoryResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            // Add other fields if your CostCategory model has them and they are needed
-            // e.g., 'description' => $this->description,
+            'service_group_id' => $this->service_group_id,
+            'service_group' => $this->whenLoaded('serviceGroup', fn () => $this->serviceGroup ? [
+                'id' => $this->serviceGroup->id,
+                'name' => $this->serviceGroup->name,
+            ] : null),
         ];
     }
 }

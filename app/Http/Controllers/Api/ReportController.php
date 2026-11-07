@@ -4889,6 +4889,131 @@ class ReportController extends Controller
     }
 
     /**
+     * Department (ServiceGroup) revenue vs linked cost-category expenses, net per department.
+     * Lab is included as a virtual department via ServiceGroup.is_lab.
+     */
+    public function departmentRevenueExpenses(Request $request)
+    {
+        $validated = $request->validate([
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+        ]);
+
+        $startDate = Carbon::parse($validated['date_from'])->startOfDay();
+        $endDate = Carbon::parse($validated['date_to'])->endOfDay();
+
+        // Revenue per non-lab ServiceGroup: grouped SQL join from the actual
+        // payment ledger (requested_service_deposits) down to the service's group.
+        $revenueByGroup = DB::table('requested_service_deposits')
+            ->join('requested_services', 'requested_services.id', '=', 'requested_service_deposits.requested_service_id')
+            ->join('services', 'services.id', '=', 'requested_services.service_id')
+            ->whereBetween('requested_service_deposits.created_at', [$startDate, $endDate])
+            ->groupBy('services.service_group_id')
+            ->get([
+                'services.service_group_id',
+                DB::raw('COALESCE(SUM(requested_service_deposits.amount), 0) as total'),
+                DB::raw('COALESCE(SUM(CASE WHEN requested_service_deposits.is_bank = 1 THEN requested_service_deposits.amount ELSE 0 END), 0) as bank'),
+                DB::raw('COALESCE(SUM(CASE WHEN requested_service_deposits.is_bank = 1 THEN 0 ELSE requested_service_deposits.amount END), 0) as cash'),
+            ])
+            ->keyBy('service_group_id');
+
+        // Lab revenue (virtual department), same aggregation shape as monthlyLabIncome().
+        $labRevenue = DB::query()
+            ->fromRaw('`labrequests` FORCE INDEX (`labrequests_is_paid_created_at_index`)')
+            ->where('is_paid', true)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->first([
+                DB::raw('COALESCE(SUM(amount_paid), 0) as total'),
+                DB::raw('COALESCE(SUM(CASE WHEN is_bankak = 1 THEN amount_paid ELSE 0 END), 0) as bank'),
+                DB::raw('COALESCE(SUM(CASE WHEN is_bankak = 1 THEN 0 ELSE amount_paid END), 0) as cash'),
+            ]);
+
+        // Expenses grouped by cost_category_id first (categories:groups is many:one),
+        // then rolled up to department level in PHP.
+        $expenseByCategory = DB::table('costs')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->groupBy('cost_category_id')
+            ->get([
+                'cost_category_id',
+                DB::raw('COALESCE(SUM(amount), 0) as cash'),
+                DB::raw('COALESCE(SUM(amount_bankak), 0) as bank'),
+                DB::raw('COALESCE(SUM(amount + amount_bankak), 0) as total'),
+            ]);
+
+        $categoryGroupMap = CostCategory::query()->pluck('service_group_id', 'id');
+
+        $expenseByGroup = [];
+        $unassignedExpense = ['cash' => 0.0, 'bank' => 0.0, 'total' => 0.0];
+
+        foreach ($expenseByCategory as $row) {
+            $groupId = $row->cost_category_id ? $categoryGroupMap->get($row->cost_category_id) : null;
+
+            if ($groupId === null) {
+                $unassignedExpense['cash'] += (float) $row->cash;
+                $unassignedExpense['bank'] += (float) $row->bank;
+                $unassignedExpense['total'] += (float) $row->total;
+
+                continue;
+            }
+
+            $expenseByGroup[$groupId]['cash'] = ($expenseByGroup[$groupId]['cash'] ?? 0) + (float) $row->cash;
+            $expenseByGroup[$groupId]['bank'] = ($expenseByGroup[$groupId]['bank'] ?? 0) + (float) $row->bank;
+            $expenseByGroup[$groupId]['total'] = ($expenseByGroup[$groupId]['total'] ?? 0) + (float) $row->total;
+        }
+
+        $serviceGroups = ServiceGroup::orderBy('id')->get();
+        $rows = [];
+        $grand = [
+            'revenue_cash' => 0.0, 'revenue_bank' => 0.0, 'revenue_total' => 0.0,
+            'expense_cash' => 0.0, 'expense_bank' => 0.0, 'expense_total' => 0.0,
+            'net' => 0.0,
+        ];
+
+        foreach ($serviceGroups as $group) {
+            if ($group->is_lab) {
+                $revCash = (float) ($labRevenue->cash ?? 0);
+                $revBank = (float) ($labRevenue->bank ?? 0);
+                $revTotal = (float) ($labRevenue->total ?? 0);
+            } else {
+                $r = $revenueByGroup->get($group->id);
+                $revCash = (float) ($r->cash ?? 0);
+                $revBank = (float) ($r->bank ?? 0);
+                $revTotal = (float) ($r->total ?? 0);
+            }
+
+            $exp = $expenseByGroup[$group->id] ?? ['cash' => 0.0, 'bank' => 0.0, 'total' => 0.0];
+            $net = $revTotal - $exp['total'];
+
+            $rows[] = [
+                'id' => $group->id,
+                'name' => $group->name,
+                'is_lab' => (bool) $group->is_lab,
+                'revenue' => ['cash' => $revCash, 'bank' => $revBank, 'total' => $revTotal],
+                'expense' => ['cash' => (float) $exp['cash'], 'bank' => (float) $exp['bank'], 'total' => (float) $exp['total']],
+                'net' => $net,
+            ];
+
+            $grand['revenue_cash'] += $revCash;
+            $grand['revenue_bank'] += $revBank;
+            $grand['revenue_total'] += $revTotal;
+            $grand['expense_cash'] += $exp['cash'];
+            $grand['expense_bank'] += $exp['bank'];
+            $grand['expense_total'] += $exp['total'];
+            $grand['net'] += $net;
+        }
+
+        return response()->json([
+            'data' => $rows,
+            'unassigned_expense' => $unassignedExpense,
+            'summary' => $grand,
+            'report_period' => [
+                'from' => $startDate->toDateString(),
+                'to' => $endDate->toDateString(),
+            ],
+        ]);
+    }
+
+    /**
      * Generate PDF for Monthly Lab Income Report.
      * This was provided in a previous response, make sure it's in this controller.
      * This method is distinct from the JSON data endpoint.

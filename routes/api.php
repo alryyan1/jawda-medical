@@ -472,6 +472,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('child-tests.options', ChildTestOptionController::class)->shallow()->except(['show']);
     Route::get('/cost-categories-list', [CostController::class, 'getCostCategories']);
     Route::post('/cost-categories', [CostController::class, 'storeCostCategory']);
+    Route::put('/cost-categories/{costCategory}', [CostController::class, 'updateCostCategory']);
     // api/main-tests/find/123
     Route::get('/main-tests/find/{identifier}', [MainTestController::class, 'findByIdOrCode']);
     Route::delete('/visits/{visit}/lab-requests/clear-pending', [LabRequestController::class, 'clearPendingRequests'])->middleware('auth:sanctum');
@@ -502,6 +503,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // "The route api/reports/monthly-lab-income could not be found."
     Route::get('/reports/monthly-lab-income', [ReportController::class, 'monthlyLabIncome']);
+    Route::get('/reports/department-revenue-expenses', [ReportController::class, 'departmentRevenueExpenses']);
     Route::get('/reports/monthly-shifts-summary', [ReportController::class, 'monthlyShiftsSummary']);
     // api/reports/clinic-report/1/financial-summary/pdf
     Route::get('/reports/doctor-shifts/{doctorShift}/financial-summary/pdf', [ReportController::class, 'clinicReport']);

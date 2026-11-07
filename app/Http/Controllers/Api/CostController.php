@@ -28,7 +28,7 @@ class CostController extends Controller
     public function getCostCategories()
     {
         // $this->authorize('view cost_categories');
-        return \App\Http\Resources\CostCategoryResource::collection(CostCategory::orderBy('name')->get());
+        return \App\Http\Resources\CostCategoryResource::collection(CostCategory::with('serviceGroup')->orderBy('name')->get());
     }
 
     public function storeCostCategory(Request $request)
@@ -40,6 +40,18 @@ class CostController extends Controller
         $costCategory = CostCategory::create($validated);
 
         return new \App\Http\Resources\CostCategoryResource($costCategory);
+    }
+
+    public function updateCostCategory(Request $request, CostCategory $costCategory)
+    {
+        $validated = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('cost_categories', 'name')->ignore($costCategory->id)],
+            'service_group_id' => ['sometimes', 'nullable', 'integer', 'exists:service_groups,id'],
+        ]);
+
+        $costCategory->update($validated);
+
+        return new \App\Http\Resources\CostCategoryResource($costCategory->load('serviceGroup'));
     }
 
     public function store(Request $request)
@@ -171,12 +183,33 @@ class CostController extends Controller
         $summaryTotals = $summaryQuery->selectRaw('SUM(amount) as total_cash_paid, SUM(amount_bankak) as total_bank_paid, SUM(amount + amount_bankak) as grand_total_paid')
             ->first();
 
+        // Breakdown by cost category - same filters, grouped instead of paginated
+        $categoryBreakdownQuery = clone $query;
+        $categoryBreakdownQuery->getQuery()->orders = null;
+        $categoryBreakdownQuery->setEagerLoads([]);
+
+        $categoryBreakdown = $categoryBreakdownQuery
+            ->leftJoin('cost_categories', 'costs.cost_category_id', '=', 'cost_categories.id')
+            ->selectRaw('costs.cost_category_id, cost_categories.name as cost_category_name, COUNT(*) as items_count, SUM(costs.amount) as total_cash, SUM(costs.amount_bankak) as total_bank, SUM(costs.amount + costs.amount_bankak) as total')
+            ->groupBy('costs.cost_category_id', 'cost_categories.name')
+            ->orderByDesc('total')
+            ->get()
+            ->map(fn ($row) => [
+                'cost_category_id' => $row->cost_category_id,
+                'cost_category_name' => $row->cost_category_name ?? 'بدون جهة',
+                'items_count' => (int) $row->items_count,
+                'total_cash' => (float) $row->total_cash,
+                'total_bank' => (float) $row->total_bank,
+                'total' => (float) $row->total,
+            ]);
+
         return CostResource::collection($costs)->additional(['meta' => [
             'summary' => [
                 'total_cash_paid' => (float) ($summaryTotals->total_cash_paid ?? 0),
                 'total_bank_paid' => (float) ($summaryTotals->total_bank_paid ?? 0),
                 'grand_total_paid' => (float) ($summaryTotals->grand_total_paid ?? 0),
             ],
+            'by_category' => $categoryBreakdown,
         ]]);
     }
 
