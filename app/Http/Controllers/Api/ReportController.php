@@ -5018,87 +5018,15 @@ class ReportController extends Controller
      */
     public function generateDepartmentRevenueExpensesPdf(Request $request)
     {
-        $validated = $request->validate([
-            'date_from' => 'required|date_format:Y-m-d',
-            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
-        ]);
+        $result = \App\Services\Pdf\DepartmentRevenueExpensesReport::generateFromRequest($request);
 
-        // Use the same data fetching logic as the JSON endpoint by calling it internally
-        $dataResponse = $this->departmentRevenueExpenses($request);
-        $jsonData = json_decode($dataResponse->getContent(), true);
-
-        $rows = $jsonData['data'] ?? [];
-        $summary = $jsonData['summary'] ?? [
-            'revenue_cash' => 0, 'revenue_bank' => 0, 'revenue_total' => 0,
-            'expense_cash' => 0, 'expense_bank' => 0, 'expense_total' => 0,
-            'net' => 0,
-        ];
-        $unassigned = $jsonData['unassigned_expense'] ?? ['cash' => 0, 'bank' => 0, 'total' => 0];
-        $reportPeriod = $jsonData['report_period'] ?? ['from' => $validated['date_from'], 'to' => $validated['date_to']];
-
-        // --- PDF Generation ---
-        $reportTitle = 'تقرير إيرادات ومصروفات الأقسام';
-        $filterCriteria = "من {$reportPeriod['from']} إلى {$reportPeriod['to']}";
-
-        $pdf = new MyCustomTCPDF($reportTitle, null, 'P', 'mm', 'A4', true, 'UTF-8', false, false, $filterCriteria); // Portrait
-        $pdf->AddPage();
-        $pdf->SetLineWidth(0.1);
-
-        // Table Header
-        $headers = ['القسم', 'إيراد نقدي', 'إيراد بنكي', 'إجمالي الإيراد', 'المصروفات', 'صافي الإيراد'];
-        $pageWidth = $pdf->getPageWidth() - $pdf->getMargins()['left'] - $pdf->getMargins()['right'];
-        $colWidths = [$pageWidth * 0.28, $pageWidth * 0.14, $pageWidth * 0.14, $pageWidth * 0.15, $pageWidth * 0.15, 0];
-        $colWidths[count($colWidths) - 1] = $pageWidth - array_sum(array_slice($colWidths, 0, -1));
-        $alignments = ['R', 'C', 'C', 'C', 'C', 'C'];
-
-        $pdf->DrawTableHeader($headers, $colWidths, $alignments);
-
-        // Table Body
-        $pdf->SetFont('helvetica', '', 8);
-        $fill = false;
-        if (empty($rows)) {
-            $pdf->Cell(array_sum($colWidths), 10, 'لا توجد بيانات لهذه الفترة.', 1, 1, 'C', $fill);
-        } else {
-            foreach ($rows as $row) {
-                $name = $row['name'].($row['is_lab'] ? ' (معمل)' : '');
-                $rowData = [
-                    $name,
-                    number_format((float) $row['revenue']['cash'], 2),
-                    number_format((float) $row['revenue']['bank'], 2),
-                    number_format((float) $row['revenue']['total'], 2),
-                    number_format((float) $row['expense']['total'], 2),
-                    number_format((float) $row['net'], 2),
-                ];
-                $pdf->DrawTableRow($rowData, $colWidths, $alignments, $fill);
-                $fill = ! $fill;
-            }
-        }
-        $pdf->Line($pdf->getMargins()['left'], $pdf->GetY(), $pdf->getPageWidth() - $pdf->getMargins()['right'], $pdf->GetY());
-
-        // Summary Footer for Table
-        $pdf->SetFont('helvetica', 'B', 8.5);
-        $summaryRow = [
-            'الإجمالي',
-            number_format((float) $summary['revenue_cash'], 2),
-            number_format((float) $summary['revenue_bank'], 2),
-            number_format((float) $summary['revenue_total'], 2),
-            number_format((float) $summary['expense_total'], 2),
-            number_format((float) $summary['net'], 2),
-        ];
-        $pdf->DrawSummaryRow($summaryRow, $colWidths, $alignments, 8, [220, 220, 220]);
-
-        if (($unassigned['total'] ?? 0) > 0) {
-            $pdf->Ln(4);
-            $pdf->SetFont('helvetica', 'B', 8.5);
-            $pdf->Cell(0, 6, 'مصروفات غير مرتبطة بقسم: '.number_format((float) $unassigned['total'], 2), 0, 1, 'C');
+        if (isset($result['error'])) {
+            return response()->json(['message' => $result['error']], $result['status']);
         }
 
-        $pdfFileName = 'department_revenue_expenses_'.$reportPeriod['from'].'_'.$reportPeriod['to'].'.pdf';
-        $pdfContent = $pdf->Output($pdfFileName, 'S');
-
-        return response($pdfContent, 200)
+        return response($result['content'], 200)
             ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', "inline; filename=\"{$pdfFileName}\"");
+            ->header('Content-Disposition', "inline; filename=\"{$result['filename']}\"");
     }
 
     /**
