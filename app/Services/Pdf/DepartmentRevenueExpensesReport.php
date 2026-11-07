@@ -236,6 +236,9 @@ class DepartmentRevenueExpensesReport
     private function renderFooter(): void
     {
         $pageWidth = $this->pdf->getPageWidth();
+        // Drawing 18mm from the bottom is inside the 25mm auto-page-break
+        // margin, which would otherwise push the footer onto a blank new page.
+        $this->pdf->SetAutoPageBreak(false, 0);
         $this->pdf->SetY(-18);
 
         $this->pdf->SetDrawColor(220, 223, 230);
