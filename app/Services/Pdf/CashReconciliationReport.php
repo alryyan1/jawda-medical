@@ -317,33 +317,36 @@ class CashReconciliationReport
         $this->pdf->Cell($usableWidth * 0.3, 8, number_format($netBank, 0), 1, 1, 'C', true);
         $this->pdf->SetTextColor(0, 0, 0);
 
-        // Total denominations row
-        $this->pdf->SetFont('arial', 'B', 10);
-        if ($rowFill) {
-            $this->pdf->SetFillColor(252, 252, 253);
-        } else {
-            $this->pdf->SetFillColor(255, 255, 255);
-        }
-        $this->pdf->Cell($usableWidth * 0.4, 7, 'إجمالي الفئات', 1, 0, 'C', $rowFill);
-        $this->pdf->SetFont('arial', 'B', 10);
-        $this->pdf->Cell($usableWidth * 0.3, 7, number_format($this->data['totalDenominations'], 0), 1, 0, 'C', $rowFill);
-        $this->pdf->Cell($usableWidth * 0.3, 7, '-', 1, 1, 'C', $rowFill);
+        // Denomination/difference rows - only meaningful when denominations were actually counted
+        if ($this->data['hasDenominations'] ?? false) {
+            // Total denominations row
+            $this->pdf->SetFont('arial', 'B', 10);
+            if ($rowFill) {
+                $this->pdf->SetFillColor(252, 252, 253);
+            } else {
+                $this->pdf->SetFillColor(255, 255, 255);
+            }
+            $this->pdf->Cell($usableWidth * 0.4, 7, 'إجمالي الفئات', 1, 0, 'C', $rowFill);
+            $this->pdf->SetFont('arial', 'B', 10);
+            $this->pdf->Cell($usableWidth * 0.3, 7, number_format($this->data['totalDenominations'], 0), 1, 0, 'C', $rowFill);
+            $this->pdf->Cell($usableWidth * 0.3, 7, '-', 1, 1, 'C', $rowFill);
 
-        // Difference row - with conditional styling
-        $cashDifference = $netCash - $this->data['totalDenominations'];
-        $this->pdf->SetFont('arial', 'B', 11);
-        if ($cashDifference == 0) {
-            $this->pdf->SetFillColor(236, 253, 245);
-            $this->pdf->SetTextColor(16, 185, 129);
-        } else {
-            $this->pdf->SetFillColor(254, 242, 242);
-            $this->pdf->SetTextColor(220, 38, 38);
+            // Difference row - with conditional styling
+            $cashDifference = $netCash - $this->data['totalDenominations'];
+            $this->pdf->SetFont('arial', 'B', 11);
+            if ($cashDifference == 0) {
+                $this->pdf->SetFillColor(236, 253, 245);
+                $this->pdf->SetTextColor(16, 185, 129);
+            } else {
+                $this->pdf->SetFillColor(254, 242, 242);
+                $this->pdf->SetTextColor(220, 38, 38);
+            }
+            $this->pdf->Cell($usableWidth * 0.4, 8, 'الفرق', 1, 0, 'C', true);
+            $this->pdf->SetFont('arial', 'B', 11);
+            $this->pdf->Cell($usableWidth * 0.3, 8, number_format($cashDifference, 0), 1, 0, 'C', true);
+            $this->pdf->Cell($usableWidth * 0.3, 8, '-', 1, 1, 'C', true);
+            $this->pdf->SetTextColor(0, 0, 0);
         }
-        $this->pdf->Cell($usableWidth * 0.4, 8, 'الفرق', 1, 0, 'C', true);
-        $this->pdf->SetFont('arial', 'B', 11);
-        $this->pdf->Cell($usableWidth * 0.3, 8, number_format($cashDifference, 0), 1, 0, 'C', true);
-        $this->pdf->Cell($usableWidth * 0.3, 8, '-', 1, 1, 'C', true);
-        $this->pdf->SetTextColor(0, 0, 0);
 
         $this->pdf->Ln(8);
     }
@@ -590,10 +593,13 @@ class CashReconciliationReport
                 $totalDenominations = $denominations->sum(function ($deno) {
                     return $deno['name'] * $deno['count'];
                 });
+
+                $hasDenominations = $denoUsers->isNotEmpty();
             } catch (\Exception $e) {
                 Log::error('Error fetching denominations data: '.$e->getMessage());
                 $denominations = collect([]);
                 $totalDenominations = 0;
+                $hasDenominations = false;
             }
 
             // Fetch costs data
@@ -616,6 +622,7 @@ class CashReconciliationReport
                 'shiftType' => $shiftType,
                 'denominations' => $denominations->toArray(),
                 'totalDenominations' => $totalDenominations,
+                'hasDenominations' => $hasDenominations,
                 'costs' => $costs->toArray(),
                 'incomeData' => $incomeData,
             ];
