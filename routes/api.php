@@ -504,6 +504,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // "The route api/reports/monthly-lab-income could not be found."
     Route::get('/reports/monthly-lab-income', [ReportController::class, 'monthlyLabIncome']);
     Route::get('/reports/department-revenue-expenses', [ReportController::class, 'departmentRevenueExpenses']);
+    Route::get('/reports/department-revenue-expenses/pdf', [ReportController::class, 'generateDepartmentRevenueExpensesPdf']);
     Route::get('/reports/monthly-shifts-summary', [ReportController::class, 'monthlyShiftsSummary']);
     // api/reports/clinic-report/1/financial-summary/pdf
     Route::get('/reports/doctor-shifts/{doctorShift}/financial-summary/pdf', [ReportController::class, 'clinicReport']);
