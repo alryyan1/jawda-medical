@@ -38,6 +38,6 @@ class AppServiceProvider extends ServiceProvider
 
         // The base schema migrations live under a subdirectory, which
         // `php artisan migrate` does not scan by default.
-        $this->loadMigrationsFrom(database_path('migrations/system_setup'));
+        // $this->loadMigrationsFrom(database_path('migrations/system_setup'));
     }
 }
