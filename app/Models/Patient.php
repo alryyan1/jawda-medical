@@ -160,6 +160,7 @@ class Patient extends Model
         'lab_to_lab_id',
         'social_status',
         'income_source',
+        'from_admission',
     ];
 
     /**
@@ -193,6 +194,7 @@ class Patient extends Model
         'doctor_finish' => 'boolean',
         'doctor_lab_request_confirm' => 'boolean',
         'doctor_lab_urgent_confirm' => 'boolean',
+        'from_admission' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'lab_to_lab_id' => 'string',

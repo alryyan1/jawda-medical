@@ -34,7 +34,9 @@
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const i=JSON.parse\\(d\\); console.log\\('nights:',i.nights_stayed,'bed_charges:',i.bed_charges,'services_total:',i.services_total,'total:',i.total,'deposits_total:',i.deposits_total,'balance_due:',i.balance_due\\)}\\)\")",
       "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\); console.log\\(j.message\\)}\\)\")",
       "mcp__claude-in-chrome__tabs_context_mcp",
-      "ClaudeInChromeDomain(localhost:5174)"
+      "ClaudeInChromeDomain(localhost:5174)",
+      "mcp__claude-in-chrome__tabs_create_mcp",
+      "ClaudeInChromeDomain(localhost:5173)"
     ],
     "additionalDirectories": [
       "C:\\xampp\\htdocs\\jawda-inpatient",

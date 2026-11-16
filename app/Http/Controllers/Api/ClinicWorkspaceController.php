@@ -18,6 +18,11 @@ class ClinicWorkspaceController extends Controller
             'doctor_id' => 'nullable|integer|exists:doctors,id',
             'date' => 'nullable|date_format:Y-m-d',
             'search' => 'nullable|string|max:100',
+            // Laravel's `boolean` rule only accepts 1/0/"1"/"0"/true/false — not the
+            // string "true"/"false" that a query string (?from_admission=true) or
+            // axios's param serializer actually sends, so it's whitelisted explicitly
+            // here instead; $request->boolean() below coerces it correctly either way.
+            'from_admission' => ['nullable', 'in:0,1,true,false'],
         ]);
 
         $query = DoctorVisit::with([
@@ -58,6 +63,11 @@ class ClinicWorkspaceController extends Controller
                 $q->where('doctor_id', $request->doctor_id);
             })
                 ->whereDate('created_at', $date);
+        } elseif ($request->boolean('from_admission')) {
+            // All admission-origin patients system-wide, regardless of doctor or
+            // date — used by the "open in doctor portal" deep link from the
+            // inpatient admission system to focus a specific admission patient.
+            $query->whereHas('patient', fn ($q) => $q->where('from_admission', true));
         } else {
             // Neither scope given — never fall through to an unbounded system-wide
             // query; the caller must identify a shift or a doctor.

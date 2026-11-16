@@ -124,6 +124,7 @@ class PatientLabQueueItemResource extends JsonResource
             'company' => $patient->company ?? null, // Eager loaded
             'shift_id' => $patient->shift_id ?? null,
             'lab_to_lab_object_id' => $patient->lab_to_lab_object_id ?? null,
+            'from_admission' => (bool) ($patient->from_admission ?? false),
             'has_cbc' => $hasCbc,
             'has_chemistry' => $hasChemistry,
             'has_hormone' => $hasHormone,

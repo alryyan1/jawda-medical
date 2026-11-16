@@ -46,6 +46,21 @@ class LabRequestController extends Controller
         // 'assign roles' permission is typically checked within store/update methods if request has roles
     }
 
+    /**
+     * Lab-request actions (add, discount, payment, delete, bankak) are only
+     * allowed while the visit's general shift is both the most recent shift
+     * and still open. Returns an error response when locked, null otherwise.
+     */
+    private function shiftLockResponse(?Shift $shift): ?\Illuminate\Http\JsonResponse
+    {
+        $isLatestOpenShift = $shift && ! $shift->is_closed && $shift->id === (int) Shift::max('id');
+        if ($isLatestOpenShift) {
+            return null;
+        }
+
+        return response()->json(['message' => 'لا يمكن تعديل طلبات المختبر — الوردية ليست الحالية أو مغلقة.'], 400);
+    }
+
     // Example in LabRequestController or VisitServiceController
     // app/Http/Controllers/Api/LabRequestController.php
     public function clearPendingRequests(Request $request, DoctorVisit $visit)
@@ -188,7 +203,7 @@ class LabRequestController extends Controller
 
         // Optimized eager loading - use labRequests (direct) instead of patientLabRequests (hasManyThrough)
         $query->with([
-            'patient:id,name,phone,company_id,shift_id,visit_number,result_is_locked,result_print_date,sample_collect_time,result_url,auth_date,result_auth,age_year,age_month,age_day,doctor_id,user_id,lab_to_lab_object_id',
+            'patient:id,name,phone,company_id,shift_id,visit_number,result_is_locked,result_print_date,sample_collect_time,result_url,auth_date,result_auth,age_year,age_month,age_day,doctor_id,user_id,lab_to_lab_object_id,from_admission',
             'patient.company:id,name',
             'patient.doctor:id,name',
             'patient.user:id,name',
@@ -861,6 +876,11 @@ class LabRequestController extends Controller
         if ($patient->result_auth) {
             return response()->json(['message' => 'لا يمكن اضافه فحص بعد التحقيق.'], 400);
         }
+
+        if ($resp = $this->shiftLockResponse($visit->generalShift)) {
+            return $resp;
+        }
+
         $company = $patient->company_id ? Company::find($patient->company_id) : null;
 
         $createdLabRequests = []; // To hold the LabRequest models created
@@ -1361,6 +1381,10 @@ class LabRequestController extends Controller
      */
     public function destroy(LabRequest $labrequest)
     {
+        if ($resp = $this->shiftLockResponse($labrequest->doctorVisit?->generalShift)) {
+            return $resp;
+        }
+
         // ... (logic for cancellation/deletion with checks) ...
         // start transaction
         DB::beginTransaction();
@@ -1385,6 +1409,10 @@ class LabRequestController extends Controller
      */
     public function updateDiscount(Request $request, LabRequest $labrequest)
     {
+        if ($resp = $this->shiftLockResponse($labrequest->doctorVisit?->generalShift)) {
+            return $resp;
+        }
+
         $validated = $request->validate([
             'discount_per' => 'required|integer|min:0|max:100',
         ]);
@@ -1401,6 +1429,10 @@ class LabRequestController extends Controller
      */
     public function payAllLabRequests(Request $request, DoctorVisit $visit)
     {
+        if ($resp = $this->shiftLockResponse($visit->generalShift)) {
+            return $resp;
+        }
+
         // Get all unpaid lab requests for this visit
         $unpaidRequests = $visit->patientLabRequests()
             ->where('is_paid', false)
@@ -1451,6 +1483,9 @@ class LabRequestController extends Controller
      */
     public function cancelPayment(Request $request, LabRequest $labrequest)
     {
+        if ($resp = $this->shiftLockResponse($labrequest->doctorVisit?->generalShift)) {
+            return $resp;
+        }
         if (! $labrequest->is_paid) {
             return response()->json(['message' => 'هذا الطلب غير مدفوع.'], 400);
         }
@@ -1471,6 +1506,10 @@ class LabRequestController extends Controller
      */
     public function toggleBankak(Request $request, LabRequest $labrequest)
     {
+        if ($resp = $this->shiftLockResponse($labrequest->doctorVisit?->generalShift)) {
+            return $resp;
+        }
+
         $validated = $request->validate([
             'payment_method_id' => 'required|exists:payment_methods,id',
         ]);
@@ -1485,6 +1524,9 @@ class LabRequestController extends Controller
 
     public function unpay(LabRequest $labrequest)
     {
+        if ($resp = $this->shiftLockResponse($labrequest->doctorVisit?->generalShift)) {
+            return $resp;
+        }
         if ($labrequest->user_deposited !== Auth::id()) {
             return response()->json(['message' => 'فقط المستخدم الذي قام بالدفع يمكنه إلغاء الدفع.'], 403);
         }
@@ -1504,6 +1546,10 @@ class LabRequestController extends Controller
         // if (!Auth::user()->can('record lab_payment')) {
         //     return response()->json(['message' => 'Unauthorized'], 403);
         // }
+
+        if ($resp = $this->shiftLockResponse($labrequest->doctorVisit?->generalShift)) {
+            return $resp;
+        }
 
         if ($labrequest->is_paid) {
             return response()->json(['message' => 'هذا الطلب مدفوع بالفعل.'], 400);
@@ -1584,6 +1630,10 @@ class LabRequestController extends Controller
         // if (!Auth::user()->can('update lab_request_payment_methods', $visit)) {
         //     return response()->json(['message' => 'Unauthorized to update payment methods.'], 403);
         // }
+
+        if ($resp = $this->shiftLockResponse($visit->generalShift)) {
+            return $resp;
+        }
 
         $validated = $request->validate([
             'payment_method_id' => 'required|exists:payment_methods,id',

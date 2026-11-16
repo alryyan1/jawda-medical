@@ -35,6 +35,23 @@ require __DIR__.'/../vendor/autoload.php';
 
 /*
 |--------------------------------------------------------------------------
+| Disable putenv() For Environment Variables
+|--------------------------------------------------------------------------
+|
+| This server (XAMPP/Apache with mod_php) hosts multiple Laravel apps that
+| share the same worker process. phpdotenv's default putenv() adapter sets
+| environment variables at the OS-process level, which is NOT reset between
+| requests the way $_ENV/$_SERVER are — so when another app on this server
+| (e.g. a request to/from jawda-inpatient) runs in the same worker, its env
+| values (like DB_DATABASE) can leak into this app's next request. Disabling
+| putenv() forces env() to read only from the request-scoped $_ENV/$_SERVER.
+|
+*/
+
+\Illuminate\Support\Env::disablePutenv();
+
+/*
+|--------------------------------------------------------------------------
 | Run The Application
 |--------------------------------------------------------------------------
 |

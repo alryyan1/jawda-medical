@@ -2,9 +2,9 @@
 
 namespace App\Http\Resources;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Carbon\Carbon;
 
 class PatientResource extends JsonResource
 {
@@ -26,7 +26,7 @@ class PatientResource extends JsonResource
             'dob' => $this->dob ? Carbon::parse($this->dob)->toDateString() : null,
             // 'user_name' => $this->user?->username,
             'full_age' => $this->getFullAgeAttribute(), // Accessor for display
-            'doctor'=> new DoctorStrippedResource($this->whenLoaded('doctor')),
+            'doctor' => new DoctorStrippedResource($this->whenLoaded('doctor')),
             'specialist_doctor_id' => $this->specialist_doctor_id,
             'specialist_doctor' => new DoctorStrippedResource($this->whenLoaded('specialistDoctor')),
             'result_is_locked' => (bool) $this->result_is_locked,
@@ -34,6 +34,7 @@ class PatientResource extends JsonResource
             'gov_id' => $this->gov_id, // Governorate ID or name
             'social_status' => $this->social_status,
             'income_source' => $this->income_source,
+            'from_admission' => (bool) $this->from_admission,
             // 'country_id' => $this->country_id, // If you have country management
 
             // Insurance & Company Information
@@ -74,7 +75,7 @@ class PatientResource extends JsonResource
             'doctor_finish' => (bool) $this->doctor_finish,
             'doctor_lab_request_confirm' => (bool) $this->doctor_lab_request_confirm,
             'doctor_lab_urgent_confirm' => (bool) $this->doctor_lab_urgent_confirm,
-            
+
             // Timestamps
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
@@ -86,7 +87,7 @@ class PatientResource extends JsonResource
 
             // Example for latest visit summary if needed here:
             // 'latest_visit' => new DoctorVisitStrippedResource($this->whenLoaded('latestDoctorVisit')),
-            
+
             // This is included because PatientController->store loads it for the response after registration.
             // This visit is the *initial* visit created during patient registration.
             'doctor_visit' => new DoctorVisitResource($this->whenLoaded('doctorVisit')),

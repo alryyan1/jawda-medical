@@ -32,6 +32,7 @@ use App\Models\RequestedService;
 use App\Models\Service;
 use App\Models\Setting;
 use App\Models\Shift;
+use App\Models\User;
 use App\Models\UserDocSelection;
 use App\Services\RequestedServiceHelper;
 use App\Services\WhatsAppCloudApiService;
@@ -104,6 +105,148 @@ class PatientController extends Controller
         return response()->json([
             'data' => $patients,
         ]);
+    }
+
+    /**
+     * Public, unauthenticated patient registration used by the inpatient
+     * system to create a matching Jawda Medical record for an admission
+     * patient and link the two systems. Mirrors the normal registration
+     * flow in store() (consumes a real shift visit_number and creates a
+     * DoctorVisit) but attributes the record to a dedicated system user
+     * instead of an authenticated clinic user, and flags it with
+     * from_admission so it can be told apart from a walk-in registration.
+     */
+    public function storeFromAdmission(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:10'],
+            'gender' => ['required', 'string', 'in:male,female,other'],
+            'age_year' => ['nullable', 'integer', 'min:0'],
+            'age_month' => ['nullable', 'integer', 'min:0', 'max:11'],
+            'age_day' => ['nullable', 'integer', 'min:0', 'max:30'],
+            'address' => ['nullable', 'string'],
+            'doctor_name' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $systemUser = User::where('username', 'admission_system')->first();
+        if (! $systemUser) {
+            Log::error('Admission integration system user is missing; run AdmissionIntegrationSeeder.');
+
+            return response()->json(['message' => 'النظام غير مهيأ لاستقبال مرضى من نظام التنويم.'], 500);
+        }
+
+        $currentGeneralShift = Shift::open()->orderByDesc('id')->first();
+        if (! $currentGeneralShift) {
+            return response()->json(['message' => 'لا توجد وردية مفتوحة حالياً.'], 400);
+        }
+
+        $patientSpecificData = [
+            'name' => $validated['name'],
+            'phone' => $validated['phone'] ?? '',
+            'gender' => $validated['gender'],
+            'age_year' => $validated['age_year'] ?? null,
+            'age_month' => $validated['age_month'] ?? null,
+            'age_day' => $validated['age_day'] ?? null,
+            'address' => $validated['address'] ?? '',
+        ];
+        $visitDoctorId = $this->resolveAdmissionDoctorId($validated['doctor_name'] ?? null);
+
+        DB::beginTransaction();
+        try {
+            $existingPatient = null;
+            $fileToUseId = null;
+
+            if ($patientSpecificData['phone'] !== '' && $patientSpecificData['name'] !== '') {
+                $existingPatient = Patient::where('phone', $patientSpecificData['phone'])
+                    ->latest()
+                    ->limit(50)
+                    ->get(['id', 'name'])
+                    ->first(fn (Patient $candidate) => $this->namesArePrefixCompatible($candidate->name, $patientSpecificData['name']));
+            }
+
+            if ($existingPatient) {
+                $latestVisit = $existingPatient->doctorVisit()->latest()->first();
+                if ($latestVisit && $latestVisit->file_id) {
+                    $fileToUseId = $latestVisit->file_id;
+                }
+            }
+
+            if (! $fileToUseId) {
+                $fileToUseId = File::create()->id;
+            }
+
+            $visitLabNumber = Patient::where('shift_id', $currentGeneralShift->id)
+                ->lockForUpdate()
+                ->count() + 1;
+
+            $patient = Patient::create(array_merge($patientSpecificData, [
+                'user_id' => $systemUser->id,
+                'shift_id' => $currentGeneralShift->id,
+                'visit_number' => $visitLabNumber,
+                'doctor_id' => $visitDoctorId,
+                'result_auth' => false,
+                'referred' => 'نظام التنويم',
+                'discount_comment' => '',
+                'auth_date' => null,
+                'from_admission' => true,
+            ]));
+
+            $patient->doctorVisit()->create([
+                'doctor_id' => $visitDoctorId,
+                'user_id' => $systemUser->id,
+                'shift_id' => $currentGeneralShift->id,
+                'doctor_shift_id' => null,
+                'file_id' => $fileToUseId,
+                'visit_date' => Carbon::today(),
+                'visit_time' => Carbon::now()->format('H:i:s'),
+                'status' => 'waiting',
+                'reason_for_visit' => 'تسجيل من نظام التنويم',
+                'is_new' => true,
+                'number' => $visitLabNumber,
+                'queue_number' => $visitLabNumber,
+            ]);
+
+            DB::commit();
+
+            return (new PatientResource($patient->loadMissing(['doctorVisit', 'primaryDoctor'])))
+                ->response()
+                ->setStatusCode(201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Admission-origin patient registration failed: '.$e->getMessage(), ['exception' => $e]);
+
+            return response()->json(['message' => 'فشل تسجيل المريض.', 'error' => 'خطأ داخلي.'.$e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * The inpatient system's doctors are separate records from Jawda
+     * Medical's own doctors table (no shared IDs), so a doctor name is
+     * matched/created here by name instead of trusting a foreign doctor_id.
+     * Falls back to doctor id 1, the placeholder doctor already used
+     * elsewhere (e.g. Lab2LabController) when no specific doctor applies.
+     */
+    private function resolveAdmissionDoctorId(?string $doctorName): int
+    {
+        $doctorName = trim((string) $doctorName);
+        if ($doctorName === '') {
+            return 1;
+        }
+
+        return Doctor::firstOrCreate(
+            ['name' => $doctorName],
+            [
+                'phone' => '0',
+                'cash_percentage' => 0,
+                'company_percentage' => 0,
+                'static_wage' => 0,
+                'lab_percentage' => 0,
+                'specialist_id' => Doctor::find(1)?->specialist_id ?? 1,
+                'start' => 0,
+                'calc_insurance' => false,
+            ]
+        )->id;
     }
 
     /**
@@ -1118,7 +1261,7 @@ class PatientController extends Controller
                     ->orWhere('id', $searchTerm);
             })
             ->select('id', 'patient_id', 'visit_date') // Select only what's needed
-            ->latest('visit_date') // Order by most recent visits first
+            ->orderByDesc('doctorvisits.id') // Order by most recent visits first
             ->limit(15) // Limit the number of results for performance
             ->get();
 
@@ -1127,6 +1270,7 @@ class PatientController extends Controller
             return [
                 'visit_id' => $visit->id,
                 'patient_id' => $visit->patient_id,
+                'patient_name' => $visit->patient->name,
                 // Create a user-friendly label for the dropdown
                 'autocomplete_label' => "{$visit->patient->name} (#{$visit->patient->id}) - Visit on {$visit->visit_date->format('d-M-Y')}",
             ];
@@ -1252,9 +1396,11 @@ class PatientController extends Controller
         // Simpler approach: Patients with most recent visits that included lab requests.
         $patients = DoctorVisit::whereHas('patientLabRequests', function ($query) {
             $query->where('valid', true);
-        })->with(['patient' => function ($query) {
-            $query->select('id', 'name', 'phone');
-        }])
+        })->with([
+            'patient' => function ($query) {
+                $query->select('id', 'name', 'phone');
+            },
+        ])
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();

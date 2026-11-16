@@ -119,6 +119,9 @@ Route::get('/all-doctors', [DoctorController::class, 'allDoctors']);
 // Public route — server-to-server patient search for the inpatient system's admission dialog
 Route::get('/public/patients-search', [PatientController::class, 'publicSearch']);
 
+// Public route — server-to-server patient registration from the inpatient admission system
+Route::post('/public/admission-patients', [PatientController::class, 'storeFromAdmission'])->middleware('throttle:30,1');
+
 Route::get('/lab/pending-queue', [LabRequestController::class, 'getLabPendingQueue']);
 // Registered before the apiResource so the literal path is not captured by main-tests/{main_test}
 Route::middleware('auth:sanctum')->group(function () {
