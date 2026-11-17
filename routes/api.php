@@ -62,6 +62,7 @@ use App\Http\Controllers\Api\UserDocSelectionController;
 use App\Http\Controllers\Api\UserPatientActivityReportController;
 use App\Http\Controllers\Api\VisitDiagnosisController;
 use App\Http\Controllers\Api\VisitDocumentsWhatsAppController;
+use App\Http\Controllers\Api\VisitDoseController;
 use App\Http\Controllers\Api\VisitMedicalReportController;
 use App\Http\Controllers\Api\VisitPrescriptionController;
 use App\Http\Controllers\Api\VisitServiceController;
@@ -290,6 +291,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/doctor-visits/{doctorVisit}/vitals/{vital}', [VisitVitalController::class, 'destroy']);
     Route::get('/patients/{patient}/vitals-trend', [VisitVitalController::class, 'trend']);
     Route::get('/doctor-visits/{doctorVisit}/vitals-pdf', [VisitVitalController::class, 'generatePdf']);
+
+    // Visit doses / MAR (Doctor Portal medical file)
+    Route::get('/doctor-visits/{doctorVisit}/doses', [VisitDoseController::class, 'index']);
+    Route::post('/doctor-visits/{doctorVisit}/doses', [VisitDoseController::class, 'store']);
+    Route::put('/doctor-visits/{doctorVisit}/doses/{dose}', [VisitDoseController::class, 'update']);
+    Route::delete('/doctor-visits/{doctorVisit}/doses/{dose}', [VisitDoseController::class, 'destroy']);
+    Route::post('/doctor-visits/{doctorVisit}/doses/{dose}/send-whatsapp', [VisitDoseController::class, 'sendWhatsapp']);
+    Route::get('/doctor-visits/{doctorVisit}/companion-contact', [VisitDoseController::class, 'companionContact']);
 
     // Visit summary PDF (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/summary-pdf', [DoctorVisitController::class, 'generateSummaryPdf']);

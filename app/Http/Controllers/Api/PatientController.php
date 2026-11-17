@@ -127,6 +127,7 @@ class PatientController extends Controller
             'age_day' => ['nullable', 'integer', 'min:0', 'max:30'],
             'address' => ['nullable', 'string'],
             'doctor_name' => ['nullable', 'string', 'max:255'],
+            'admission_id' => ['nullable', 'integer'],
         ]);
 
         $systemUser = User::where('username', 'admission_system')->first();
@@ -198,6 +199,7 @@ class PatientController extends Controller
                 'shift_id' => $currentGeneralShift->id,
                 'doctor_shift_id' => null,
                 'file_id' => $fileToUseId,
+                'admission_id' => $validated['admission_id'] ?? null,
                 'visit_date' => Carbon::today(),
                 'visit_time' => Carbon::now()->format('H:i:s'),
                 'status' => 'waiting',

@@ -50,6 +50,20 @@ class AdmissionPatientRegistrationTest extends TestCase
         $this->assertSame('admission_system', User::find($patient->user_id)->username);
     }
 
+    public function test_it_stores_the_admission_id_on_the_created_visit_when_given(): void
+    {
+        Shift::factory()->create(['is_closed' => false]);
+
+        $response = $this->postJson('/api/public/admission-patients', [
+            'name' => 'Ahmed Ali',
+            'gender' => 'male',
+            'admission_id' => 42,
+        ]);
+
+        $response->assertCreated();
+        $this->assertSame(42, Patient::where('name', 'Ahmed Ali')->first()->doctorVisit->admission_id);
+    }
+
     public function test_it_creates_a_new_doctor_by_name_when_none_matches_in_jawda_medical(): void
     {
         Shift::factory()->create(['is_closed' => false]);

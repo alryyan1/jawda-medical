@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
@@ -83,6 +84,7 @@ class DoctorVisit extends Model
         'doctor_shift_id',
         // 'appointment_id',
         'file_id',
+        'admission_id',
         'visit_date',
         'visit_time',
         'status',
@@ -203,6 +205,11 @@ class DoctorVisit extends Model
     public function vitals()
     {
         return $this->hasMany(VisitVital::class, 'doctor_visit_id');
+    }
+
+    public function doses(): HasMany
+    {
+        return $this->hasMany(VisitDose::class, 'doctor_visit_id');
     }
 
     // Scopes

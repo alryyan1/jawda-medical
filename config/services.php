@@ -36,6 +36,10 @@ return [
         'token' => env('REALTIME_SERVER_TOKEN'),
     ],
 
+    'jawda_inpatient' => [
+        'base_url' => env('JAWDA_INPATIENT_API_URL'),
+    ],
+
     'whatsapp_cloud' => [
         'token' => env('WHATSAPP_CLOUD_API_TOKEN'),
         'phone_number_id' => env('WHATSAPP_CLOUD_PHONE_NUMBER_ID'),
