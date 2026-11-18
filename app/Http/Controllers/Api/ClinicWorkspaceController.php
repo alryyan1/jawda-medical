@@ -23,6 +23,8 @@ class ClinicWorkspaceController extends Controller
             // axios's param serializer actually sends, so it's whitelisted explicitly
             // here instead; $request->boolean() below coerces it correctly either way.
             'from_admission' => ['nullable', 'in:0,1,true,false'],
+            'date_from' => 'nullable|date_format:Y-m-d',
+            'date_to' => 'nullable|date_format:Y-m-d',
         ]);
 
         $query = DoctorVisit::with([
@@ -81,6 +83,16 @@ class ClinicWorkspaceController extends Controller
                     ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
                     ->orWhere('id', $searchTerm); // Allow search by patient ID
             });
+        }
+
+        // Used by the "admitted patients" dialog (from_admission scope) to narrow
+        // the otherwise system-wide, all-time result set to a visit date range.
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
         }
 
         // Order by status (e.g., 'with_doctor' first), then by queue number or creation time

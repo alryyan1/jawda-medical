@@ -35,6 +35,7 @@ class DoctorVisitListItemResource extends JsonResource
             'doctor_shift_id' => $this->doctor_shift_id,
             'file_id' => $this->file_id,
             'file_visits_count' => (int) ($this->file_visits_count ?? 0),
+            'created_at' => $this->created_at?->toIso8601String(),
 
             // Truthy company check for card styling — full object not needed
             'company' => $this->patient?->company
