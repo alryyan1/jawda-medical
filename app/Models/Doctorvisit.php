@@ -212,6 +212,11 @@ class DoctorVisit extends Model
         return $this->hasMany(VisitDose::class, 'doctor_visit_id');
     }
 
+    public function intakeOutputs(): HasMany
+    {
+        return $this->hasMany(VisitIntakeOutput::class, 'doctor_visit_id');
+    }
+
     // Scopes
     public function scopeToday($query)
     {

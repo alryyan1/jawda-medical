@@ -602,4 +602,20 @@ class DoctorVisitController extends Controller
             'Content-Length' => strlen($pdfContent),
         ]);
     }
+
+    /**
+     * GET /doctor-visits/{doctorVisit}/short-stay-admission-pdf
+     */
+    public function generateShortStayAdmissionPdf(DoctorVisit $doctorVisit): \Illuminate\Http\Response
+    {
+        $doctorVisit->load(['patient', 'doctor', 'vitals', 'doses', 'intakeOutputs']);
+
+        $pdfContent = (new \App\Services\Pdf\VisitShortStayAdmissionPdf($doctorVisit))->generate();
+
+        return response($pdfContent, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="ShortStayAdmission.pdf"',
+            'Content-Length' => strlen($pdfContent),
+        ]);
+    }
 }

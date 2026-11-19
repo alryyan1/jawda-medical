@@ -63,6 +63,7 @@ use App\Http\Controllers\Api\UserPatientActivityReportController;
 use App\Http\Controllers\Api\VisitDiagnosisController;
 use App\Http\Controllers\Api\VisitDocumentsWhatsAppController;
 use App\Http\Controllers\Api\VisitDoseController;
+use App\Http\Controllers\Api\VisitIntakeOutputController;
 use App\Http\Controllers\Api\VisitMedicalReportController;
 use App\Http\Controllers\Api\VisitPrescriptionController;
 use App\Http\Controllers\Api\VisitServiceController;
@@ -300,8 +301,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/doctor-visits/{doctorVisit}/doses/{dose}/send-whatsapp', [VisitDoseController::class, 'sendWhatsapp']);
     Route::get('/doctor-visits/{doctorVisit}/companion-contact', [VisitDoseController::class, 'companionContact']);
 
+    // Visit intake/output (fluid balance) chart (Doctor Portal medical file)
+    Route::get('/doctor-visits/{doctorVisit}/intake-outputs', [VisitIntakeOutputController::class, 'index']);
+    Route::post('/doctor-visits/{doctorVisit}/intake-outputs', [VisitIntakeOutputController::class, 'store']);
+    Route::put('/doctor-visits/{doctorVisit}/intake-outputs/{intakeOutput}', [VisitIntakeOutputController::class, 'update']);
+    Route::delete('/doctor-visits/{doctorVisit}/intake-outputs/{intakeOutput}', [VisitIntakeOutputController::class, 'destroy']);
+
     // Visit summary PDF (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/summary-pdf', [DoctorVisitController::class, 'generateSummaryPdf']);
+
+    // Short stay admission chart PDF — admission summary, medications (MAR), vitals monitoring, intake/output
+    Route::get('/doctor-visits/{doctorVisit}/short-stay-admission-pdf', [DoctorVisitController::class, 'generateShortStayAdmissionPdf']);
 
     // Other visits sharing the same File (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/same-file', [DoctorVisitController::class, 'sameFile']);
