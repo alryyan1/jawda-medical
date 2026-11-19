@@ -224,6 +224,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Patients
     Route::apiResource('patients', PatientController::class);
     Route::get('/clinic-active-patients', [ClinicWorkspaceController::class, 'getActivePatients']);
+    Route::get('/clinic-active-patients/counts-by-day', [ClinicWorkspaceController::class, 'getPatientCountsByDay']);
     Route::get('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'show']);
     Route::put('/patients/{patient}/medical-history', [PatientMedicalHistoryController::class, 'update']);
     Route::get('/patients/{patient}/medical-history-pdf', [PatientMedicalHistoryController::class, 'generatePdf']);
@@ -265,6 +266,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Visit medical report (Doctor Portal medical file)
     Route::get('/doctor-visits/{doctorVisit}/medical-report', [VisitMedicalReportController::class, 'show']);
     Route::post('/doctor-visits/{doctorVisit}/medical-report', [VisitMedicalReportController::class, 'store']);
+    Route::get('/doctor-visits/{doctorVisit}/medical-reports', [VisitMedicalReportController::class, 'fileHistory']);
     Route::put('/visit-medical-reports/{visitMedicalReport}', [VisitMedicalReportController::class, 'update']);
     Route::get('/visit-medical-reports/{visitMedicalReport}/pdf', [VisitMedicalReportController::class, 'generatePdf']);
 

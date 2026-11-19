@@ -103,4 +103,27 @@ class ClinicWorkspaceController extends Controller
 
         return DoctorVisitListItemResource::collection($activeVisits);
     }
+
+    /**
+     * Patient counts per day for a doctor, within a date range — drives the
+     * Doctor Portal's calendar date picker (a badge on each day).
+     */
+    public function getPatientCountsByDay(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'doctor_id' => 'required|integer|exists:doctors,id',
+            'date_from' => 'required|date_format:Y-m-d',
+            'date_to' => 'required|date_format:Y-m-d|after_or_equal:date_from',
+        ]);
+
+        $counts = DoctorVisit::query()
+            ->whereHas('doctorShift', fn ($q) => $q->where('doctor_id', $request->doctor_id))
+            ->whereDate('created_at', '>=', $request->date_from)
+            ->whereDate('created_at', '<=', $request->date_to)
+            ->selectRaw('DATE(created_at) as visit_date, count(*) as total')
+            ->groupByRaw('DATE(created_at)')
+            ->pluck('total', 'visit_date');
+
+        return response()->json(['data' => $counts]);
+    }
 }

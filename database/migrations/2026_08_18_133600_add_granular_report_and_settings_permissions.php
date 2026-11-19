@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 return new class extends Migration
 {
@@ -55,6 +56,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
         $reportPermissionNames = array_keys($this->reportPermissions);
         $settingsPermissionNames = array_keys($this->settingsPermissions);
 

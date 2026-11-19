@@ -9,6 +9,7 @@ use App\Models\DoctorVisit;
 use App\Models\VisitMedicalReport;
 use App\Services\Pdf\VisitMedicalReportPdf;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 
@@ -69,6 +70,36 @@ class VisitMedicalReportController extends Controller
         $visitMedicalReport->update($validated);
 
         return new VisitMedicalReportResource($visitMedicalReport->fresh()->load(['user', 'printedByUser']));
+    }
+
+    /**
+     * GET /doctor-visits/{doctorVisit}/medical-reports
+     * All medical reports across every visit sharing this visit's File — the
+     * persistent identity (doctorvisits.file_id) linking a real person's
+     * separate registrations, mirroring DoctorVisitController::sameFile().
+     * Falls back to just this visit when it hasn't been linked to a File yet.
+     */
+    public function fileHistory(DoctorVisit $doctorVisit): AnonymousResourceCollection
+    {
+        $reports = VisitMedicalReport::query()
+            ->whereHas('doctorVisit', fn ($query) => $query
+                ->when(
+                    $doctorVisit->file_id,
+                    fn ($q) => $q->where('file_id', $doctorVisit->file_id),
+                    fn ($q) => $q->where('id', $doctorVisit->id)
+                )
+            )
+            ->with([
+                'user:id,name',
+                'printedByUser:id,name',
+                'doctorVisit:id,file_id,doctor_id,visit_date',
+                'doctorVisit.doctor:id,name',
+            ])
+            ->get()
+            ->sortByDesc(fn (VisitMedicalReport $report) => $report->doctorVisit->visit_date)
+            ->values();
+
+        return VisitMedicalReportResource::collection($reports);
     }
 
     /**

@@ -15,6 +15,14 @@ class VisitMedicalReportResource extends JsonResource
         return [
             'id' => $this->id,
             'doctor_visit_id' => $this->doctor_visit_id,
+            'doctor_visit' => $this->whenLoaded('doctorVisit', fn () => $this->doctorVisit ? [
+                'id' => $this->doctorVisit->id,
+                'visit_date' => $this->doctorVisit->visit_date?->format('Y-m-d'),
+                'doctor' => $this->doctorVisit->doctor ? [
+                    'id' => $this->doctorVisit->doctor->id,
+                    'name' => $this->doctorVisit->doctor->name,
+                ] : null,
+            ] : null),
             'user_id' => $this->user_id,
             'user' => $this->whenLoaded('user', fn () => $this->user ? [
                 'id' => $this->user->id,
